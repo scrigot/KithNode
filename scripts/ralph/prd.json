@@ -59,7 +59,7 @@
         "Loading skeleton while fetching"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "KN-005",
