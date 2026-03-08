@@ -67,4 +67,10 @@ npm run db:seed      # Seed test data
 - Outreach draft generation in `src/lib/outreach.ts` — pure function `generateOutreachDraft(ctx)` builds personalized email
 - Draft API at `POST /api/outreach/draft` — takes `connectionId`, returns `{ draft, subject, alumniName, alumniEmail }`
 - OutreachSlideOver component at `src/app/dashboard/contacts/outreach-slide-over.tsx` — slide-over panel for editing/sending drafts
-- ESLint globals: added `Request`, `HTMLTextAreaElement`, `HTMLAnchorElement` to flat config
+- ESLint globals: added `Request`, `HTMLTextAreaElement`, `HTMLAnchorElement`, `HTMLSelectElement`, `HTMLInputElement` to flat config
+- Use `globalThis.crypto` and `globalThis.setTimeout` in client components to satisfy ESLint (no browser env preset)
+- AutoGuard kill-switch in `src/lib/autoguard.ts` — `triggerAutoGuard()`, `resumeAutomation()`, `isAutomationAllowed()`
+- Connection model has `automationPaused` boolean field (default false)
+- PATCH /api/contacts/[id]/status — updates status, triggers AutoGuard on RESPONDED
+- POST /api/contacts/[id]/status — resumes automation with `{ action: "resume_automation" }`
+- AuditLog model tracks AUTOGUARD_TRIGGERED and AUTOMATION_RESUMED events

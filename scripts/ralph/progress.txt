@@ -16,6 +16,7 @@
 - NextAuth v5 (beta) can't be imported in Vitest jsdom — depends on `next/server`; test callback logic separately
 - NextAuth v5 uses `AUTH_SECRET` env var (not `NEXTAUTH_SECRET`)
 - Middleware export `auth as middleware` from NextAuth config to protect routes
+- ESLint flat config needs browser globals added manually (HTMLSelectElement, crypto, setTimeout, etc.) — use `globalThis.` prefix for browser APIs in components
 
 ## Completed Stories
 - KN-001: Initialize project with TypeScript, Next.js, and Tailwind (2026-03-08)
@@ -23,6 +24,8 @@
 - KN-003: Build authentication with NextAuth (2026-03-08)
 - KN-004: Create the alumni contact list view (2026-03-08)
 - KN-005: Implement basic lead scoring algorithm (2026-03-08)
+- KN-006: Build the outreach draft composer (2026-03-08)
+- KN-007: Implement the AutoGuard kill-switch (2026-03-08)
 
 ## Learnings
 ### KN-001 (2026-03-08)
@@ -61,3 +64,16 @@
 - 4 API tests for the score endpoint (auth, 404, scoring, empty)
 - Scores already display in contacts table from KN-004
 - All quality checks pass: typecheck, test (33 tests), lint
+
+### KN-007 (2026-03-08)
+- AutoGuard kill-switch library at `src/lib/autoguard.ts` with `triggerAutoGuard()`, `resumeAutomation()`, `isAutomationAllowed()`
+- Added `automationPaused` boolean field to Connection model in Prisma schema
+- PATCH /api/contacts/[id]/status endpoint: updates connection status, triggers AutoGuard on RESPONDED
+- POST /api/contacts/[id]/status endpoint: resumes automation with `action: "resume_automation"`
+- AuditLog entries created for both AUTOGUARD_TRIGGERED and AUTOMATION_RESUMED actions
+- Contacts table: status is now a `<select>` dropdown instead of static badge
+- In-app notification banner (amber for AutoGuard, blue for info) with auto-dismiss after 6s
+- "Draft Outreach" button replaced by "Resume Automation" when automation is paused
+- ESLint globals: added HTMLSelectElement, HTMLInputElement; used `globalThis.crypto` and `globalThis.setTimeout`
+- 9 unit tests for autoguard library, 9 API route tests, 2 new component tests
+- All quality checks pass: typecheck, test (79 tests), lint
