@@ -74,7 +74,7 @@
         "Scores display in contact list"
       ],
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "KN-006",
