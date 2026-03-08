@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  name           String
+  university     String
+  targetIndustry String
+  createdAt      DateTime     @default(now())
+  connections    Connection[]
+}
+
+model AlumniContact {
+  id             String       @id @default(cuid())
+  name           String
+  firmName       String
+  title          String
+  linkedInUrl    String       @default("")
+  university     String
+  graduationYear Int
+  connections    Connection[]
+}
+
+model Connection {
+  id            String        @id @default(cuid())
+  userId        String
+  alumniId      String
+  strengthScore Float         @default(0)
+  status        String        @default("NEW")
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id])
+  alumni        AlumniContact @relation(fields: [alumniId], references: [id])
+
+  @@unique([userId, alumniId])
+}

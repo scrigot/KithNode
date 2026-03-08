@@ -13,7 +13,11 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+*.db
+*.db-journal
 prisma/*.db
 prisma/*.db-journal
 scripts/ralph/archive/
 scripts/ralph/.last-branch
+
+/src/generated/prisma

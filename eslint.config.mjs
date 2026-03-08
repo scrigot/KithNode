@@ -15,6 +15,8 @@ export default [
         React: "readonly",
         console: "readonly",
         Response: "readonly",
+        process: "readonly",
+        globalThis: "readonly",
       },
     },
     rules: {
@@ -22,6 +24,6 @@ export default [
     },
   },
   {
-    ignores: [".next/", "node_modules/", "*.config.*"],
+    ignores: [".next/", "node_modules/", "*.config.*", "src/generated/"],
   },
 ];
