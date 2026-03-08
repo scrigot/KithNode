@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { trackEvent } from "@/lib/posthog";
 
 interface OutreachSlideOverProps {
   connectionId: string;
@@ -40,6 +41,7 @@ export function OutreachSlideOver({
       .then((data) => {
         setDraft(data.draft);
         setSubject(data.subject);
+        trackEvent("outreach_drafted", { connection_id: connectionId, contact_name: contactName });
       })
       .catch(() => {
         setError("Could not generate draft. Please try again.");
@@ -117,6 +119,7 @@ export function OutreachSlideOver({
           <div className="border-t px-4 py-3 flex gap-2">
             <a
               href={mailtoHref}
+              onClick={() => trackEvent("outreach_sent", { connection_id: connectionId, contact_name: contactName })}
               className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
               data-testid="open-in-email"
             >

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { OutreachSlideOver } from "./outreach-slide-over";
+import { trackEvent } from "@/lib/posthog";
 
 export interface Contact {
   id: string;
@@ -67,6 +68,7 @@ export function ContactsTable() {
       .then((data) => {
         setContacts(data);
         setLoading(false);
+        trackEvent("contact_viewed", { contact_count: data.length });
       })
       .catch(() => setLoading(false));
   }, []);
@@ -109,6 +111,7 @@ export function ContactsTable() {
 
       if (data.autoGuard?.triggered) {
         addNotification(data.autoGuard.message, "autoguard");
+        trackEvent("autoguard_triggered", { contact_id: contactId });
       }
     } catch {
       // silently fail
