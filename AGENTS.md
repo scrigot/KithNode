@@ -40,9 +40,17 @@ npm run db:seed      # Seed test data
 - Test files co-located with source (e.g. `route.test.ts` next to `route.ts`)
 - Test setup at `src/test/setup.ts` using `@testing-library/jest-dom/vitest`
 - ESLint uses flat config (`eslint.config.mjs`) with `@eslint/js` + `@typescript-eslint/parser`
+- Prisma v7 with `prisma-client` generator — outputs ESM TypeScript to `src/generated/prisma/`
+- Import Prisma client from `../generated/prisma/client.js` in app code
+- Database singleton in `src/lib/db.ts` using `@prisma/adapter-better-sqlite3`
+- Seed script at `prisma/seed.ts` — run with `npm run db:seed` (uses tsx with dynamic import)
 
 ## Gotchas
 - Next.js 16 removed `next lint` — use `eslint src` instead
 - Tailwind v4 uses `@import "tailwindcss"` not `@tailwind base/components/utilities`
 - `create-next-app` refuses to run in directories with existing files
 - FlatCompat + eslint-config-next causes circular JSON errors — use plain flat config
+- Prisma v7 requires driver adapter — `new PrismaClient()` alone throws; must pass `{ adapter }`
+- Adapter class is `PrismaBetterSqlite3` (lowercase "qlite"), not `PrismaBetterSQLite3`
+- SQLite dev.db lives at project root (`file:./dev.db`), not in prisma/
+- `src/generated/` is excluded from ESLint via `eslint.config.mjs` ignores

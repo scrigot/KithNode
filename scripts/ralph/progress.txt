@@ -7,12 +7,27 @@
 - ESLint 9 flat config — FlatCompat has circular reference issues with eslint-config-next; use `@eslint/js` + `@typescript-eslint/parser` directly
 - Vitest v4 works well with `@vitejs/plugin-react` and `jsdom` environment
 - `create-next-app` won't run in a directory with existing files — initialize manually
+- Prisma v7 uses `prisma-client` generator (not `prisma-client-js`) — generates ESM-only TypeScript
+- Prisma v7 generated client requires a driver adapter (e.g., `@prisma/adapter-better-sqlite3`) — `new PrismaClient()` without adapter throws
+- Prisma v7 generated client can't be run standalone with tsx CJS mode — use dynamic `import()` in seed scripts
+- The adapter class is `PrismaBetterSqlite3` (lowercase "qlite"), not `PrismaBetterSQLite3`
+- DATABASE_URL `file:./dev.db` creates db at project root (not prisma/); keep paths consistent
+- Must add `src/generated/` to ESLint ignores to avoid linting Prisma generated code
 
 ## Completed Stories
 - KN-001: Initialize project with TypeScript, Next.js, and Tailwind (2026-03-08)
+- KN-002: Set up database schema for users and alumni contacts (2026-03-08)
 
 ## Learnings
 ### KN-001 (2026-03-08)
 - Set up Next.js 16, TypeScript strict, Tailwind v4, ESLint 9 flat config, Prettier, Vitest
 - Health check API at /api/health, landing page at /
+- All quality checks pass: typecheck, test (1 test), lint
+
+### KN-002 (2026-03-08)
+- Prisma v7 with `prisma-client` generator, `@prisma/adapter-better-sqlite3` for SQLite
+- Schema: User, AlumniContact, Connection models with all required fields
+- Connection uses string status (NEW/CONTACTED/RESPONDED/CONVERTED) — SQLite doesn't support enums
+- Seed script: 5 users (UNC/Duke/WFU), 20 alumni across IB/PE/Consulting firms
+- db.ts singleton pattern for Next.js hot-reload safety
 - All quality checks pass: typecheck, test (1 test), lint
