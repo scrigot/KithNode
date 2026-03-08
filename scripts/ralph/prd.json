@@ -31,7 +31,7 @@
         "Seed script creates 5 test users and 20 test alumni"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "KN-003",
