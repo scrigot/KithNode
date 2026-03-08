@@ -44,6 +44,10 @@ npm run db:seed      # Seed test data
 - Import Prisma client from `../generated/prisma/client.js` in app code
 - Database singleton in `src/lib/db.ts` using `@prisma/adapter-better-sqlite3`
 - Seed script at `prisma/seed.ts` — run with `npm run db:seed` (uses tsx with dynamic import)
+- Auth config in `src/lib/auth.ts` — exports `auth`, `signIn`, `signOut`, `handlers`
+- Auth API route at `src/app/api/auth/[...nextauth]/route.ts`
+- Middleware at `src/middleware.ts` protects `/dashboard/:path*`
+- SessionProvider in `src/app/providers.tsx` wraps app layout
 
 ## Gotchas
 - Next.js 16 removed `next lint` — use `eslint src` instead
@@ -54,3 +58,5 @@ npm run db:seed      # Seed test data
 - Adapter class is `PrismaBetterSqlite3` (lowercase "qlite"), not `PrismaBetterSQLite3`
 - SQLite dev.db lives at project root (`file:./dev.db`), not in prisma/
 - `src/generated/` is excluded from ESLint via `eslint.config.mjs` ignores
+- NextAuth v5 beta can't be imported in Vitest jsdom (depends on `next/server`) — test callback logic via simulation
+- NextAuth v5 uses `AUTH_SECRET` env var; Google OAuth uses `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`

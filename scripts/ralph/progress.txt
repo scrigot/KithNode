@@ -13,10 +13,14 @@
 - The adapter class is `PrismaBetterSqlite3` (lowercase "qlite"), not `PrismaBetterSQLite3`
 - DATABASE_URL `file:./dev.db` creates db at project root (not prisma/); keep paths consistent
 - Must add `src/generated/` to ESLint ignores to avoid linting Prisma generated code
+- NextAuth v5 (beta) can't be imported in Vitest jsdom — depends on `next/server`; test callback logic separately
+- NextAuth v5 uses `AUTH_SECRET` env var (not `NEXTAUTH_SECRET`)
+- Middleware export `auth as middleware` from NextAuth config to protect routes
 
 ## Completed Stories
 - KN-001: Initialize project with TypeScript, Next.js, and Tailwind (2026-03-08)
 - KN-002: Set up database schema for users and alumni contacts (2026-03-08)
+- KN-003: Build authentication with NextAuth (2026-03-08)
 
 ## Learnings
 ### KN-001 (2026-03-08)
@@ -31,3 +35,15 @@
 - Seed script: 5 users (UNC/Duke/WFU), 20 alumni across IB/PE/Consulting firms
 - db.ts singleton pattern for Next.js hot-reload safety
 - All quality checks pass: typecheck, test (1 test), lint
+
+### KN-003 (2026-03-08)
+- NextAuth v5 (beta.30) with JWT strategy and Google OAuth provider
+- User model updated: `university` and `targetIndustry` now have `@default("")` for OAuth sign-ups
+- Added `image` field to User for Google profile photos
+- Auth callbacks: upsert user on signIn, attach userId to JWT token, pass to session
+- Middleware at `src/middleware.ts` protects `/dashboard/:path*` routes
+- SessionProvider wraps app in `src/app/providers.tsx` (client component)
+- Landing page redirects authenticated users to /dashboard
+- Dashboard shows welcome message with sign-out button
+- Cannot import next-auth directly in Vitest (jsdom) — needs Next.js server; test callback logic via simulation
+- All quality checks pass: typecheck, test (5 tests), lint
