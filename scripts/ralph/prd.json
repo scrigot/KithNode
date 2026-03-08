@@ -1,0 +1,125 @@
+{
+  "projectName": "KithNode MVP",
+  "branchName": "feature/kithnode-mvp",
+  "description": "Core MVP for KithNode: alumni signal discovery, lead scoring, outreach pipeline with AutoGuard kill-switch.",
+  "userStories": [
+    {
+      "id": "KN-001",
+      "title": "Initialize project with TypeScript, Next.js, and Tailwind",
+      "description": "Set up Next.js 14+ App Router, TypeScript strict mode, Tailwind CSS, ESLint. Include a health-check API route at /api/health and a minimal landing page.",
+      "acceptanceCriteria": [
+        "npm run dev starts without errors",
+        "TypeScript strict mode enabled",
+        "Tailwind CSS configured and working",
+        "ESLint + Prettier configured",
+        "Health check API at /api/health returns 200",
+        "Landing page renders at /"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "KN-002",
+      "title": "Set up database schema for users and alumni contacts",
+      "description": "Create Prisma schema with User, AlumniContact, and Connection models.",
+      "acceptanceCriteria": [
+        "Prisma schema with User, AlumniContact, Connection models",
+        "User: id, email, name, university, targetIndustry, createdAt",
+        "AlumniContact: id, name, firmName, title, linkedInUrl, university, graduationYear",
+        "Connection: id, userId, alumniId, strengthScore (float), status (enum: NEW/CONTACTED/RESPONDED/CONVERTED)",
+        "Migration runs successfully",
+        "Seed script creates 5 test users and 20 test alumni"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "KN-003",
+      "title": "Build authentication with NextAuth",
+      "description": "Implement NextAuth.js with Google OAuth. Protect dashboard routes.",
+      "acceptanceCriteria": [
+        "Google OAuth sign-in works",
+        "Session persists across refreshes",
+        "/dashboard routes protected",
+        "User record created in DB on first sign-in",
+        "Sign-out clears session"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "KN-004",
+      "title": "Create the alumni contact list view",
+      "description": "Build /dashboard/contacts page with sortable table of alumni contacts.",
+      "acceptanceCriteria": [
+        "Table with columns: Name, Firm, Title, University, Strength Score, Status",
+        "Sortable by strength score (default: highest first)",
+        "Search bar filters by name or firm",
+        "Empty state when no contacts",
+        "Loading skeleton while fetching"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "KN-005",
+      "title": "Implement basic lead scoring algorithm",
+      "description": "Server-side function computing Connection Strength (0-100). Factors: shared university (+20), shared graduation decade (+10), same industry (+15), firm prestige tier (+10-25), mutual connections (+5 each, max 20).",
+      "acceptanceCriteria": [
+        "scoreConnection(user, alumni) returns 0-100",
+        "Weighted scoring as described",
+        "Scores persisted to Connection model",
+        "POST /api/contacts/score triggers scoring",
+        "Unit tests cover each factor",
+        "Scores display in contact list"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "KN-006",
+      "title": "Build the outreach draft composer",
+      "description": "Slide-over panel that generates personalized outreach email draft with authenticity emphasis.",
+      "acceptanceCriteria": [
+        "Draft Outreach button opens slide-over",
+        "AI generates personalized draft from shared context",
+        "Active voice, no generic AI patterns",
+        "Editable textarea",
+        "Open in Email button creates mailto: link",
+        "Loading spinner during generation",
+        "Character count below textarea"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "KN-007",
+      "title": "Implement the AutoGuard kill-switch",
+      "description": "Detect when alumni responds, halt automations, notify user, log audit event.",
+      "acceptanceCriteria": [
+        "Status RESPONDED cancels pending automations",
+        "In-app notification: '[Name] responded — automation paused'",
+        "Audit log entry with timestamp, contactId, userId, action",
+        "No further auto-messages without explicit user action",
+        "Unit test: status change triggers kill-switch",
+        "Unit test: manual override re-enables automation"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "KN-008",
+      "title": "Add PostHog analytics integration",
+      "description": "Track key events: sign-up, contact-viewed, outreach-drafted, outreach-sent, autoguard-triggered.",
+      "acceptanceCriteria": [
+        "PostHog JS SDK initialized",
+        "Events: user_signed_up, contact_viewed, outreach_drafted, outreach_sent, autoguard_triggered",
+        "User identified on sign-in",
+        "NEXT_PUBLIC_POSTHOG_KEY env var configured",
+        "Events fire correctly"
+      ],
+      "priority": 8,
+      "passes": false
+    }
+  ]
+}

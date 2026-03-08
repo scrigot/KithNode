@@ -1,0 +1,10 @@
+# Progress Log — KithNode MVP
+
+## Codebase Patterns
+(Patterns discovered during development will be logged here by Ralph iterations)
+
+## Completed Stories
+(Story IDs marked complete will be logged here)
+
+## Learnings
+(Learnings from each iteration will be appended here)
