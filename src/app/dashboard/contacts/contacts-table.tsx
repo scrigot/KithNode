@@ -12,10 +12,17 @@ export interface Contact {
   university: string;
   strengthScore: number;
   status: string;
+  automationPaused: boolean;
 }
 
 type SortField = "name" | "firmName" | "title" | "university" | "strengthScore" | "status";
 type SortDirection = "asc" | "desc";
+
+interface Notification {
+  id: string;
+  message: string;
+  type: "autoguard" | "info";
+}
 
 const STATUS_LABELS: Record<string, string> = {
   NEW: "New",
@@ -30,6 +37,8 @@ const STATUS_COLORS: Record<string, string> = {
   RESPONDED: "bg-green-100 text-green-700",
   CONVERTED: "bg-purple-100 text-purple-700",
 };
+
+const STATUS_OPTIONS = ["NEW", "CONTACTED", "RESPONDED", "CONVERTED"];
 
 function SkeletonRow() {
   return (
@@ -50,6 +59,7 @@ export function ContactsTable() {
   const [sortField, setSortField] = useState<SortField>("strengthScore");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [slideOver, setSlideOver] = useState<{ connectionId: string; contactName: string } | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     fetch("/api/contacts")
@@ -60,6 +70,74 @@ export function ContactsTable() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const addNotification = (message: string, type: Notification["type"] = "info") => {
+    const id = globalThis.crypto.randomUUID();
+    setNotifications((prev) => [...prev, { id, message, type }]);
+    globalThis.setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }, 6000);
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleStatusChange = async (contactId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.id === contactId
+            ? {
+                ...c,
+                status: data.connection.status,
+                automationPaused: data.connection.automationPaused ?? c.automationPaused,
+              }
+            : c,
+        ),
+      );
+
+      if (data.autoGuard?.triggered) {
+        addNotification(data.autoGuard.message, "autoguard");
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleResumeAutomation = async (contactId: string) => {
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume_automation" }),
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      setContacts((prev) =>
+        prev.map((c) =>
+          c.id === contactId ? { ...c, automationPaused: false } : c,
+        ),
+      );
+
+      addNotification(data.message, "info");
+    } catch {
+      // silently fail
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -105,6 +183,28 @@ export function ContactsTable() {
         open={slideOver !== null}
         onClose={() => setSlideOver(null)}
       />
+
+      {/* AutoGuard Notifications */}
+      {notifications.map((n) => (
+        <div
+          key={n.id}
+          data-testid="autoguard-notification"
+          className={`mb-3 flex items-center justify-between rounded-md px-4 py-3 text-sm font-medium ${
+            n.type === "autoguard"
+              ? "bg-amber-50 text-amber-800 border border-amber-200"
+              : "bg-blue-50 text-blue-800 border border-blue-200"
+          }`}
+        >
+          <span>{n.message}</span>
+          <button
+            onClick={() => dismissNotification(n.id)}
+            className="ml-4 text-current opacity-60 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+
       <div className="mb-4">
         <input
           type="text"
@@ -194,19 +294,38 @@ export function ContactsTable() {
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLORS[contact.status] || "bg-gray-100 text-gray-700"}`}
+                    <select
+                      value={contact.status}
+                      onChange={(e) => handleStatusChange(contact.id, e.target.value)}
+                      data-testid={`status-select-${contact.id}`}
+                      className={`rounded-full border-0 px-2 py-1 text-xs font-medium ${STATUS_COLORS[contact.status] || "bg-gray-100 text-gray-700"}`}
                     >
-                      {STATUS_LABELS[contact.status] || contact.status}
-                    </span>
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm">
-                    <button
-                      onClick={() => setSlideOver({ connectionId: contact.id, contactName: contact.name })}
-                      className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                    >
-                      Draft Outreach
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {contact.automationPaused ? (
+                        <button
+                          onClick={() => handleResumeAutomation(contact.id)}
+                          data-testid={`resume-btn-${contact.id}`}
+                          className="rounded-md bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                        >
+                          Resume Automation
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSlideOver({ connectionId: contact.id, contactName: contact.name })}
+                          className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                          Draft Outreach
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

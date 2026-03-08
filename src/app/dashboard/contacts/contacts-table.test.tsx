@@ -12,6 +12,7 @@ const mockContacts: Contact[] = [
     university: "Harvard",
     strengthScore: 85,
     status: "NEW",
+    automationPaused: false,
   },
   {
     id: "conn-2",
@@ -22,6 +23,7 @@ const mockContacts: Contact[] = [
     university: "Stanford",
     strengthScore: 60,
     status: "CONTACTED",
+    automationPaused: false,
   },
 ];
 
@@ -130,7 +132,7 @@ describe("ContactsTable", () => {
     expect(sortedRows[1]).toHaveTextContent("John Smith");
   });
 
-  it("displays status badges with correct labels", async () => {
+  it("displays status selects with correct values", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       json: () => Promise.resolve(mockContacts),
     });
@@ -138,8 +140,45 @@ describe("ContactsTable", () => {
     render(<ContactsTable />);
 
     await waitFor(() => {
-      expect(screen.getByText("New")).toBeInTheDocument();
-      expect(screen.getByText("Contacted")).toBeInTheDocument();
+      const select1 = screen.getByTestId("status-select-conn-1") as HTMLSelectElement;
+      expect(select1.value).toBe("NEW");
+      const select2 = screen.getByTestId("status-select-conn-2") as HTMLSelectElement;
+      expect(select2.value).toBe("CONTACTED");
     });
+  });
+
+  it("shows Resume Automation button when automation is paused", async () => {
+    const pausedContacts = [
+      {
+        ...mockContacts[0],
+        status: "RESPONDED",
+        automationPaused: true,
+      },
+    ];
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(pausedContacts),
+    });
+
+    render(<ContactsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Resume Automation")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Draft Outreach")).not.toBeInTheDocument();
+  });
+
+  it("shows Draft Outreach button when automation is not paused", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(mockContacts),
+    });
+
+    render(<ContactsTable />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Draft Outreach")).toHaveLength(2);
+    });
+
+    expect(screen.queryByText("Resume Automation")).not.toBeInTheDocument();
   });
 });

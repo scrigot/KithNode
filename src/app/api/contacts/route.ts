@@ -24,6 +24,7 @@ export async function GET() {
     university: c.alumni.university,
     strengthScore: c.strengthScore,
     status: c.status,
+    automationPaused: c.automationPaused,
   }));
 
   return NextResponse.json(contacts);

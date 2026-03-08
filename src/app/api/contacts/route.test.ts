@@ -66,7 +66,7 @@ describe("GET /api/contacts", () => {
 
     expect(response.status).toBe(200);
     expect(body).toHaveLength(2);
-    expect(body[0]).toEqual({
+    expect(body[0]).toMatchObject({
       id: "conn-1",
       alumniId: "alumni-1",
       name: "Jane Doe",

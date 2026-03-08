@@ -23,6 +23,8 @@ export default [
         Request: "readonly",
         HTMLTextAreaElement: "readonly",
         HTMLAnchorElement: "readonly",
+        HTMLSelectElement: "readonly",
+        HTMLInputElement: "readonly",
       },
     },
     rules: {

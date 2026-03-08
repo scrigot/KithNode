@@ -34,10 +34,20 @@ model Connection {
   userId        String
   alumniId      String
   strengthScore Float         @default(0)
-  status        String        @default("NEW")
-  createdAt     DateTime      @default(now())
+  status           String        @default("NEW")
+  automationPaused Boolean       @default(false)
+  createdAt        DateTime      @default(now())
   user          User          @relation(fields: [userId], references: [id])
   alumni        AlumniContact @relation(fields: [alumniId], references: [id])
 
   @@unique([userId, alumniId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  contactId String
+  action    String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
 }
