@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "./sign-out-button";
 
@@ -25,6 +26,12 @@ export default async function DashboardPage() {
           <p className="text-gray-600">
             Your networking intelligence hub is coming soon.
           </p>
+          <Link
+            href="/dashboard/contacts"
+            className="mt-4 inline-block rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            View Alumni Contacts
+          </Link>
         </div>
       </div>
     </main>

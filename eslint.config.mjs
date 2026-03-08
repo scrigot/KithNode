@@ -17,6 +17,9 @@ export default [
         Response: "readonly",
         process: "readonly",
         globalThis: "readonly",
+        fetch: "readonly",
+        document: "readonly",
+        global: "readonly",
       },
     },
     rules: {
