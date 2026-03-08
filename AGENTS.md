@@ -64,3 +64,7 @@ npm run db:seed      # Seed test data
 - @testing-library/react: add `afterEach(cleanup)` in test files to prevent multiple render accumulation
 - Lead scoring logic in `src/lib/scoring.ts` — pure function `scoreConnection(user, alumni, mutualConnections)`
 - Score endpoint at `POST /api/contacts/score` — scores all user connections and persists to DB
+- Outreach draft generation in `src/lib/outreach.ts` — pure function `generateOutreachDraft(ctx)` builds personalized email
+- Draft API at `POST /api/outreach/draft` — takes `connectionId`, returns `{ draft, subject, alumniName, alumniEmail }`
+- OutreachSlideOver component at `src/app/dashboard/contacts/outreach-slide-over.tsx` — slide-over panel for editing/sending drafts
+- ESLint globals: added `Request`, `HTMLTextAreaElement`, `HTMLAnchorElement` to flat config

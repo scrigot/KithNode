@@ -25,6 +25,22 @@
 - Dashboard page updated with link to /dashboard/contacts
 - 15 tests passing (4 files)
 
+### KN-005: Lead scoring algorithm (Priority 5) ✓
+- scoreConnection() pure function computing 0-100 strength score
+- Weighted factors: university, graduation decade, industry, firm prestige, mutual connections
+- POST /api/contacts/score triggers rescoring
+- Unit tests for each factor
+
+### KN-006: Outreach draft composer (Priority 6) ✓
+- Template-based draft generation from shared context (src/lib/outreach.ts)
+- POST /api/outreach/draft API route with auth + ownership checks
+- OutreachSlideOver client component: slide-over panel, editable textarea, character count
+- "Open in Email" button creates mailto: link with subject and body
+- Loading spinner during generation, error state handling
+- "Draft Outreach" button on each contact row in ContactsTable
+- 26 new tests (12 outreach logic, 5 API route, 9 component)
+- 59 tests total passing (9 files)
+
 ## Codebase Patterns
 - Server components by default; client components only for interactivity ("use client")
 - Auth: import { auth } from "@/lib/auth" in server components, check session
