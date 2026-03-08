@@ -62,3 +62,5 @@ npm run db:seed      # Seed test data
 - NextAuth v5 uses `AUTH_SECRET` env var; Google OAuth uses `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
 - ESLint flat config needs explicit globals for browser APIs (fetch, document, global) — no env presets
 - @testing-library/react: add `afterEach(cleanup)` in test files to prevent multiple render accumulation
+- Lead scoring logic in `src/lib/scoring.ts` — pure function `scoreConnection(user, alumni, mutualConnections)`
+- Score endpoint at `POST /api/contacts/score` — scores all user connections and persists to DB

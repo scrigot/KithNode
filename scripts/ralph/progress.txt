@@ -21,6 +21,8 @@
 - KN-001: Initialize project with TypeScript, Next.js, and Tailwind (2026-03-08)
 - KN-002: Set up database schema for users and alumni contacts (2026-03-08)
 - KN-003: Build authentication with NextAuth (2026-03-08)
+- KN-004: Create the alumni contact list view (2026-03-08)
+- KN-005: Implement basic lead scoring algorithm (2026-03-08)
 
 ## Learnings
 ### KN-001 (2026-03-08)
@@ -47,3 +49,15 @@
 - Dashboard shows welcome message with sign-out button
 - Cannot import next-auth directly in Vitest (jsdom) — needs Next.js server; test callback logic via simulation
 - All quality checks pass: typecheck, test (5 tests), lint
+
+### KN-005 (2026-03-08)
+- Pure function `scoreConnection(user, alumni, mutualConnections)` in `src/lib/scoring.ts`
+- Weighted factors: shared university (+20), graduation decade (+10), same industry (+15), firm prestige tier (+10/18/25), mutual connections (+5 each, max 20)
+- Score capped at 100
+- Firm prestige tiers: Tier 1 (GS, MS, JPM, McKinsey, Bain, BCG, KKR, Blackstone, etc), Tier 2 (Citi, BofA, Deloitte, etc), Tier 3 (unknown)
+- Industry mapping from firm name to Investment Banking / Private Equity / Consulting
+- POST /api/contacts/score endpoint: fetches user + connections, counts mutual connections, scores all, persists to Connection model
+- 14 unit tests for scoring function covering each factor individually and in combination
+- 4 API tests for the score endpoint (auth, 404, scoring, empty)
+- Scores already display in contacts table from KN-004
+- All quality checks pass: typecheck, test (33 tests), lint
