@@ -1,0 +1,39 @@
+# KithNode Progress Log
+
+## Completed Stories
+
+### KN-001: Initialize project (Priority 1) ✓
+- Next.js 14+ App Router, TypeScript strict, Tailwind CSS, ESLint
+- Health check API at /api/health
+- Landing page at /
+
+### KN-002: Database schema (Priority 2) ✓
+- Prisma schema with User, AlumniContact, Connection models
+- SQLite dev / Postgres prod via BetterSqlite3 adapter
+- Seed script with test data
+
+### KN-003: Authentication (Priority 3) ✓
+- NextAuth.js v5 beta with Google OAuth
+- JWT session strategy
+- User upsert on sign-in, middleware protection for /dashboard
+
+### KN-004: Alumni contact list view (Priority 4) ✓
+- GET /api/contacts endpoint (auth-protected, returns connections with alumni data)
+- ContactsTable client component with sorting (default: strength score desc) and search (name/firm)
+- Empty state, loading skeleton, status badges (NEW/CONTACTED/RESPONDED/CONVERTED)
+- Next.js loading.tsx for route-level loading state
+- Dashboard page updated with link to /dashboard/contacts
+- 15 tests passing (4 files)
+
+## Codebase Patterns
+- Server components by default; client components only for interactivity ("use client")
+- Auth: import { auth } from "@/lib/auth" in server components, check session
+- DB: import { prisma } from "@/lib/db" — singleton PrismaClient with BetterSqlite3 adapter
+- Tests: Vitest + @testing-library/react, mock prisma and auth before importing modules
+- ESLint: flat config (eslint.config.mjs), globals for browser/node APIs added as needed
+- API routes: NextResponse.json() for responses, auth() for session check
+
+## Gotchas
+- ESLint config needs explicit globals for fetch, document, global (no env presets)
+- Tests need afterEach(cleanup) to avoid multiple render accumulation with @testing-library/react
+- Prisma uses BetterSqlite3 adapter — import from "../generated/prisma/client.js"
