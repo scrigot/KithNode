@@ -16,7 +16,7 @@
         "Landing page renders at /"
       ],
       "priority": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "KN-002",
