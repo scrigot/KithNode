@@ -1,10 +1,18 @@
 # Progress Log — KithNode MVP
 
 ## Codebase Patterns
-(Patterns discovered during development will be logged here by Ralph iterations)
+- Next.js 16 removed `next lint` CLI command — use `eslint src` directly
+- Tailwind CSS v4 uses `@import "tailwindcss"` instead of `@tailwind` directives
+- Tailwind v4 PostCSS plugin is `@tailwindcss/postcss` (not `tailwindcss`)
+- ESLint 9 flat config — FlatCompat has circular reference issues with eslint-config-next; use `@eslint/js` + `@typescript-eslint/parser` directly
+- Vitest v4 works well with `@vitejs/plugin-react` and `jsdom` environment
+- `create-next-app` won't run in a directory with existing files — initialize manually
 
 ## Completed Stories
-(Story IDs marked complete will be logged here)
+- KN-001: Initialize project with TypeScript, Next.js, and Tailwind (2026-03-08)
 
 ## Learnings
-(Learnings from each iteration will be appended here)
+### KN-001 (2026-03-08)
+- Set up Next.js 16, TypeScript strict, Tailwind v4, ESLint 9 flat config, Prettier, Vitest
+- Health check API at /api/health, landing page at /
+- All quality checks pass: typecheck, test (1 test), lint

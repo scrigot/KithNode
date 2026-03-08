@@ -36,7 +36,13 @@ npm run db:seed      # Seed test data
 - Commit messages: feat(STORY_ID): description or fix(STORY_ID): description
 
 ## Codebase Patterns
-(Patterns discovered during Ralph iterations will be added here)
+- Source code lives in `src/` directory (App Router at `src/app/`)
+- Test files co-located with source (e.g. `route.test.ts` next to `route.ts`)
+- Test setup at `src/test/setup.ts` using `@testing-library/jest-dom/vitest`
+- ESLint uses flat config (`eslint.config.mjs`) with `@eslint/js` + `@typescript-eslint/parser`
 
 ## Gotchas
-(Known issues and workarounds will be added here)
+- Next.js 16 removed `next lint` — use `eslint src` instead
+- Tailwind v4 uses `@import "tailwindcss"` not `@tailwind base/components/utilities`
+- `create-next-app` refuses to run in directories with existing files
+- FlatCompat + eslint-config-next causes circular JSON errors — use plain flat config
