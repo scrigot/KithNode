@@ -90,7 +90,7 @@
         "Character count below textarea"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "KN-007",
