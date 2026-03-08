@@ -20,6 +20,9 @@ export default [
         fetch: "readonly",
         document: "readonly",
         global: "readonly",
+        Request: "readonly",
+        HTMLTextAreaElement: "readonly",
+        HTMLAnchorElement: "readonly",
       },
     },
     rules: {

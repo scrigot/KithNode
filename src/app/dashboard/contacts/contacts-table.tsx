@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { OutreachSlideOver } from "./outreach-slide-over";
 
 export interface Contact {
   id: string;
@@ -33,7 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 7 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 rounded bg-gray-200" />
         </td>
@@ -48,6 +49,7 @@ export function ContactsTable() {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("strengthScore");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [slideOver, setSlideOver] = useState<{ connectionId: string; contactName: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/contacts")
@@ -97,6 +99,12 @@ export function ContactsTable() {
 
   return (
     <div>
+      <OutreachSlideOver
+        connectionId={slideOver?.connectionId ?? ""}
+        contactName={slideOver?.contactName ?? ""}
+        open={slideOver !== null}
+        onClose={() => setSlideOver(null)}
+      />
       <div className="mb-4">
         <input
           type="text"
@@ -120,6 +128,9 @@ export function ContactsTable() {
                     {col.label}
                   </th>
                 ))}
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
@@ -157,6 +168,9 @@ export function ContactsTable() {
                     {sortIndicator(col.field)}
                   </th>
                 ))}
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
@@ -185,6 +199,14 @@ export function ContactsTable() {
                     >
                       {STATUS_LABELS[contact.status] || contact.status}
                     </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm">
+                    <button
+                      onClick={() => setSlideOver({ connectionId: contact.id, contactName: contact.name })}
+                      className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      Draft Outreach
+                    </button>
                   </td>
                 </tr>
               ))}
