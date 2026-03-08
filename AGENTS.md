@@ -74,3 +74,8 @@ npm run db:seed      # Seed test data
 - PATCH /api/contacts/[id]/status — updates status, triggers AutoGuard on RESPONDED
 - POST /api/contacts/[id]/status — resumes automation with `{ action: "resume_automation" }`
 - AuditLog model tracks AUTOGUARD_TRIGGERED and AUTOMATION_RESUMED events
+- PostHog analytics in `src/lib/posthog.ts` — `initPostHog()`, `trackEvent()`, `identifyUser()`
+- PostHogProvider in `src/app/posthog-provider.tsx` — auto-initializes SDK and identifies user on session auth
+- Providers chain: SessionProvider → PostHogProvider (in `src/app/providers.tsx`)
+- PostHog env vars: `NEXT_PUBLIC_POSTHOG_KEY` (required), `NEXT_PUBLIC_POSTHOG_HOST` (optional, defaults to us.i.posthog.com)
+- Tracked events: user_signed_up, contact_viewed, outreach_drafted, outreach_sent, autoguard_triggered

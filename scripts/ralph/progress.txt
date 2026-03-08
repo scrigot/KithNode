@@ -26,6 +26,7 @@
 - KN-005: Implement basic lead scoring algorithm (2026-03-08)
 - KN-006: Build the outreach draft composer (2026-03-08)
 - KN-007: Implement the AutoGuard kill-switch (2026-03-08)
+- KN-008: Add PostHog analytics integration (2026-03-08)
 
 ## Learnings
 ### KN-001 (2026-03-08)
@@ -77,3 +78,16 @@
 - ESLint globals: added HTMLSelectElement, HTMLInputElement; used `globalThis.crypto` and `globalThis.setTimeout`
 - 9 unit tests for autoguard library, 9 API route tests, 2 new component tests
 - All quality checks pass: typecheck, test (79 tests), lint
+
+### KN-008 (2026-03-08)
+- PostHog JS SDK (`posthog-js`) installed and initialized via `src/lib/posthog.ts`
+- PostHogProvider client component in `src/app/posthog-provider.tsx` wraps app via providers.tsx
+- User identification on sign-in via `useSession()` hook — identifies with userId, email, name
+- `user_signed_up` event fires when session becomes authenticated
+- `contact_viewed` event fires when contacts list loads successfully
+- `outreach_drafted` event fires when AI draft is generated
+- `outreach_sent` event fires when "Open in Email" button clicked
+- `autoguard_triggered` event fires when AutoGuard kill-switch activates
+- `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST` env vars configured in .env
+- 7 unit tests for posthog.ts: init with/without key, custom host, trackEvent, identifyUser, all event names
+- All quality checks pass: typecheck, test (86 tests), lint
