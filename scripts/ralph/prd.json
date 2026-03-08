@@ -119,7 +119,7 @@
         "Events fire correctly"
       ],
       "priority": 8,
-      "passes": false
+      "passes": true
     }
   ]
 }
