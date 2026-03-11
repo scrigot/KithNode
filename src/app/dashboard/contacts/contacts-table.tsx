@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { OutreachSlideOver } from "./outreach-slide-over";
+import { AddContactSlideOver } from "./add-contact-slide-over";
 import { trackEvent } from "@/lib/posthog";
 
 export interface Contact {
@@ -60,9 +61,10 @@ export function ContactsTable() {
   const [sortField, setSortField] = useState<SortField>("strengthScore");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [slideOver, setSlideOver] = useState<{ connectionId: string; contactName: string } | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  useEffect(() => {
+  const fetchContacts = () => {
     fetch("/api/contacts")
       .then((res) => res.json())
       .then((data) => {
@@ -71,6 +73,10 @@ export function ContactsTable() {
         trackEvent("contact_viewed", { contact_count: data.length });
       })
       .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchContacts();
   }, []);
 
   const addNotification = (message: string, type: Notification["type"] = "info") => {
@@ -186,6 +192,15 @@ export function ContactsTable() {
         open={slideOver !== null}
         onClose={() => setSlideOver(null)}
       />
+      <AddContactSlideOver
+        open={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        onCreated={() => {
+          setShowAddForm(false);
+          fetchContacts();
+          addNotification("Contact added successfully", "info");
+        }}
+      />
 
       {/* AutoGuard Notifications */}
       {notifications.map((n) => (
@@ -208,14 +223,20 @@ export function ContactsTable() {
         </div>
       ))}
 
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <input
           type="text"
           placeholder="Search by name or firm..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          + Add Contact
+        </button>
       </div>
 
       {loading ? (
