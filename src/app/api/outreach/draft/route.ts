@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { generateOutreachDraft } from "@/lib/outreach";
+import { draftOutreach } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -11,42 +10,27 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { connectionId } = body;
+  const { contactId } = body;
 
-  if (!connectionId) {
+  if (!contactId) {
     return NextResponse.json(
-      { error: "connectionId is required" },
+      { error: "contactId is required" },
       { status: 400 },
     );
   }
 
-  const connection = await prisma.connection.findUnique({
-    where: { id: connectionId },
-    include: { alumni: true, user: true },
-  });
-
-  if (!connection || connection.userId !== session.user.id) {
+  try {
+    const result = await draftOutreach(Number(contactId));
+    return NextResponse.json({
+      draft: result.body,
+      subject: result.subject,
+      outreachId: result.outreach_id,
+    });
+  } catch (error) {
+    const status = (error as { status?: number }).status || 500;
     return NextResponse.json(
-      { error: "Connection not found" },
-      { status: 404 },
+      { error: "Failed to generate draft" },
+      { status },
     );
   }
-
-  const draft = generateOutreachDraft({
-    userName: connection.user.name,
-    userUniversity: connection.user.university,
-    userTargetIndustry: connection.user.targetIndustry,
-    alumniName: connection.alumni.name,
-    alumniTitle: connection.alumni.title,
-    alumniFirm: connection.alumni.firmName,
-    alumniUniversity: connection.alumni.university,
-    strengthScore: connection.strengthScore,
-  });
-
-  return NextResponse.json({
-    draft,
-    alumniName: connection.alumni.name,
-    alumniEmail: "", // placeholder — no email in schema yet
-    subject: `Reaching out from ${connection.user.university || "a fellow student"}`,
-  });
 }

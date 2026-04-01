@@ -10,15 +10,23 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-white px-4">
-      <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
-        KithNode
+    <main className="flex min-h-screen flex-col items-center justify-center bg-bg-primary px-4">
+      <h1 className="text-4xl font-bold tracking-tight text-accent-green sm:text-6xl">
+        KITHNODE
       </h1>
-      <p className="mt-4 max-w-lg text-center text-lg text-gray-600">
-        Build authentic connections with alumni who&apos;ve walked your path.
-        Intelligence-driven networking for IB, PE, and Consulting recruiting.
+      <p className="mt-2 text-xs uppercase tracking-widest text-text-muted">
+        warm signals intelligence
       </p>
-      <SignInButton />
+      <p className="mt-6 max-w-md text-center text-sm text-text-secondary">
+        Surface your strongest alumni connections. AI-powered scoring, signal
+        detection, and authentic outreach — built for UNC finance students.
+      </p>
+      <div className="mt-8">
+        <SignInButton />
+      </div>
+      <p className="mt-4 text-xs text-text-muted">
+        Alpha access restricted to @unc.edu emails
+      </p>
     </main>
   );
 }

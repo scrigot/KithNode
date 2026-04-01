@@ -1,25 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth", () => ({
   auth: () => mockAuth(),
 }));
 
-const mockConnectionFindUnique = vi.fn();
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    connection: {
-      findUnique: (...args: unknown[]) => mockConnectionFindUnique(...args),
-    },
-  },
+const mockDraftOutreach = vi.fn();
+vi.mock("@/lib/api", () => ({
+  draftOutreach: (...args: unknown[]) => mockDraftOutreach(...args),
 }));
 
 import { POST } from "./route";
 
-function makeRequest(body: Record<string, unknown>) {
-  return {
-    json: () => Promise.resolve(body),
-  } as unknown as Request;
+function makeRequest(body: unknown) {
+  return new NextRequest("http://localhost/api/outreach/draft", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 describe("POST /api/outreach/draft", () => {
@@ -29,70 +28,39 @@ describe("POST /api/outreach/draft", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const response = await POST(makeRequest({ connectionId: "conn-1" }) as never);
+    const response = await POST(makeRequest({ contactId: 1 }));
     expect(response.status).toBe(401);
   });
 
-  it("returns 400 when connectionId is missing", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    const response = await POST(makeRequest({}) as never);
+  it("returns 400 when contactId is missing", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
+    const response = await POST(makeRequest({}));
     expect(response.status).toBe(400);
   });
 
-  it("returns 404 when connection not found", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockConnectionFindUnique.mockResolvedValue(null);
-
-    const response = await POST(makeRequest({ connectionId: "conn-999" }) as never);
-    expect(response.status).toBe(404);
-  });
-
-  it("returns 404 when connection belongs to another user", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockConnectionFindUnique.mockResolvedValue({
-      id: "conn-1",
-      userId: "user-2",
-      strengthScore: 50,
-      user: { name: "Other User", university: "MIT", targetIndustry: "Consulting" },
-      alumni: {
-        name: "Jane Doe",
-        title: "VP",
-        firmName: "Goldman Sachs",
-        university: "MIT",
-      },
+  it("returns draft for valid contact", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
+    mockDraftOutreach.mockResolvedValue({
+      contact_id: 1,
+      subject: "Test Subject",
+      body: "Test body",
+      outreach_id: 42,
     });
 
-    const response = await POST(makeRequest({ connectionId: "conn-1" }) as never);
-    expect(response.status).toBe(404);
-  });
-
-  it("returns draft for valid connection", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockConnectionFindUnique.mockResolvedValue({
-      id: "conn-1",
-      userId: "user-1",
-      strengthScore: 65,
-      user: {
-        name: "John Smith",
-        university: "UNC Chapel Hill",
-        targetIndustry: "Investment Banking",
-      },
-      alumni: {
-        name: "Jane Doe",
-        title: "Vice President",
-        firmName: "Goldman Sachs",
-        university: "UNC Chapel Hill",
-      },
-    });
-
-    const response = await POST(makeRequest({ connectionId: "conn-1" }) as never);
-    expect(response.status).toBe(200);
-
+    const response = await POST(makeRequest({ contactId: 1 }));
     const body = await response.json();
-    expect(body.draft).toContain("Jane");
-    expect(body.draft).toContain("John Smith");
-    expect(body.draft).toContain("Goldman Sachs");
-    expect(body.subject).toBeTruthy();
-    expect(body.alumniName).toBe("Jane Doe");
+
+    expect(response.status).toBe(200);
+    expect(body.subject).toBe("Test Subject");
+    expect(body.draft).toBe("Test body");
+    expect(body.outreachId).toBe(42);
+  });
+
+  it("returns 500 on backend error", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
+    mockDraftOutreach.mockRejectedValue(new Error("Backend down"));
+
+    const response = await POST(makeRequest({ contactId: 1 }));
+    expect(response.status).toBe(500);
   });
 });

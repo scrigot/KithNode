@@ -1,39 +1,53 @@
-import { auth } from "@/lib/auth";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { SignOutButton } from "./sign-out-button";
 
-export default async function DashboardPage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/");
-  }
-
+export default function DashboardPage() {
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Welcome back, {session.user.name}
-            </p>
-          </div>
-          <SignOutButton />
-        </div>
-        <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6">
-          <p className="text-gray-600">
-            Your networking intelligence hub is coming soon.
+    <div className="p-6">
+      <h2 className="text-xl font-bold text-text-primary">Overview</h2>
+      <p className="mt-1 text-xs text-text-muted">
+        Your networking intelligence hub
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Link
+          href="/dashboard/contacts"
+          className="rounded-lg border border-border bg-bg-card p-5 transition-colors hover:border-accent-green"
+        >
+          <p className="text-xs uppercase tracking-wider text-text-muted">
+            Warm Signals
           </p>
-          <Link
-            href="/dashboard/contacts"
-            className="mt-4 inline-block rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            View Alumni Contacts
-          </Link>
-        </div>
+          <p className="mt-2 text-2xl font-bold text-accent-green">&gt;</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            Ranked connections by priority score
+          </p>
+        </Link>
+
+        <Link
+          href="/dashboard/discover"
+          className="rounded-lg border border-border bg-bg-card p-5 transition-colors hover:border-accent-amber"
+        >
+          <p className="text-xs uppercase tracking-wider text-text-muted">
+            Discover
+          </p>
+          <p className="mt-2 text-2xl font-bold text-accent-amber">*</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            Train your algorithm by rating contacts
+          </p>
+        </Link>
+
+        <Link
+          href="/dashboard/import"
+          className="rounded-lg border border-border bg-bg-card p-5 transition-colors hover:border-accent-blue"
+        >
+          <p className="text-xs uppercase tracking-wider text-text-muted">
+            Import
+          </p>
+          <p className="mt-2 text-2xl font-bold text-accent-blue">+</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            Add LinkedIn profiles to your pipeline
+          </p>
+        </Link>
       </div>
-    </main>
+    </div>
   );
 }
