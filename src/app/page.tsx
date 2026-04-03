@@ -33,8 +33,19 @@ export default async function Home() {
       <FeaturesSection />
 
       {/* Footer */}
-      <footer className="relative border-t border-white/[0.06] py-8 text-center">
-        <p className="text-xs text-text-muted">
+      <footer className="relative border-t border-white/[0.06] px-4 py-10 text-center">
+        <p className="text-sm text-text-secondary">
+          A UNC Chapel Hill startup by{" "}
+          <a
+            href="https://www.linkedin.com/in/samrigot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent-teal transition-colors hover:text-accent-teal/80"
+          >
+            Sam Rigot
+          </a>
+        </p>
+        <p className="mt-3 text-xs text-text-muted">
           &copy; {new Date().getFullYear()} KithNode &middot;{" "}
           <a
             href="https://kithnode.canny.io"

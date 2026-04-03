@@ -9,7 +9,7 @@ export default function ContactsLoading() {
         <div className="mb-4">
           <div className="h-10 w-full animate-pulse rounded-md bg-gray-200" />
         </div>
-        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div className="overflow-hidden border border-gray-200">
           <div className="bg-gray-50 px-4 py-3">
             <div className="flex gap-8">
               {Array.from({ length: 6 }).map((_, i) => (

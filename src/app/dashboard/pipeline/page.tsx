@@ -25,7 +25,7 @@ const STAGE_COLORS: Record<string, string> = {
 
 const TIER_STYLES: Record<string, string> = {
   hot: "text-red-400",
-  warm: "text-green-400",
+  warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
 };
@@ -117,7 +117,7 @@ export default function PipelinePage() {
           return (
             <div
               key={stage}
-              className={`min-w-[180px] flex-shrink-0 border-t-2 ${STAGE_COLORS[stage]} bg-card`}
+              className={`min-w-[220px] flex-shrink-0 border-t-2 ${STAGE_COLORS[stage]} bg-card`}
             >
               {/* Column header */}
               <div className="border-b border-border px-3 py-2">
@@ -174,7 +174,7 @@ export default function PipelinePage() {
                             href={contact.linkedin_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[8px] text-accent-blue hover:underline"
+                            className="text-[10px] text-accent-blue hover:underline"
                           >
                             LI
                           </a>
@@ -186,7 +186,7 @@ export default function PipelinePage() {
                             <Badge
                               key={a}
                               variant="outline"
-                              className="text-[7px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30"
+                              className="text-[10px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30"
                             >
                               {a}
                             </Badge>
@@ -197,14 +197,14 @@ export default function PipelinePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="mt-2 h-5 w-full text-[8px]"
+                          className="mt-2 h-5 w-full text-[10px]"
                           onClick={() => moveStage(contact.id, next)}
                         >
                           → {STAGE_LABELS[next]}
                         </Button>
                       )}
                       {stage === "responded" && (
-                        <p className="mt-1 text-[8px] text-amber-400">
+                        <p className="mt-1 text-[10px] text-amber-400">
                           AutoGuard active
                         </p>
                       )}

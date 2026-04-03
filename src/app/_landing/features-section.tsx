@@ -1,6 +1,3 @@
-"use client";
-
-import { ScrollReveal } from "@/components/scroll-reveal";
 import { GlassCard } from "@/components/glass-card";
 
 const FEATURES = [
@@ -30,7 +27,7 @@ const FEATURES = [
 export function FeaturesSection() {
   return (
     <section className="relative px-4 py-24">
-      <ScrollReveal className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl">
         <h2 className="mb-4 text-center font-heading text-3xl font-bold text-text-primary sm:text-4xl">
           Your warmest path in
         </h2>
@@ -42,7 +39,7 @@ export function FeaturesSection() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {FEATURES.map((feature) => (
             <GlassCard key={feature.title} glowColor={feature.glow}>
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06] font-mono text-lg text-accent-teal">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center bg-white/[0.06] font-mono text-lg text-accent-teal">
                 {feature.icon}
               </div>
               <h3 className="font-heading text-lg font-semibold text-text-primary">
@@ -54,7 +51,7 @@ export function FeaturesSection() {
             </GlassCard>
           ))}
         </div>
-      </ScrollReveal>
+      </div>
     </section>
   );
 }

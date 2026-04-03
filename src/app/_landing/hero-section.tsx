@@ -4,7 +4,7 @@ import { StaggerContainer, FadeUp } from "@/components/motion";
 
 export function HeroSection({ children }: { children: React.ReactNode }) {
   return (
-    <section className="relative flex min-h-screen flex-col items-center justify-center px-4">
+    <section className="relative flex flex-col items-center justify-center px-4 pt-32 pb-20">
       <StaggerContainer className="flex flex-col items-center text-center">
         <FadeUp>
           <h1 className="font-heading text-6xl font-bold tracking-tight sm:text-8xl">
@@ -34,14 +34,6 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
           </p>
         </FadeUp>
       </StaggerContainer>
-
-      {/* Scroll indicator */}
-      <FadeUp className="absolute bottom-8">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <span className="text-[10px] uppercase tracking-widest">Scroll</span>
-          <div className="h-6 w-px animate-pulse bg-text-muted/40" />
-        </div>
-      </FadeUp>
     </section>
   );
 }

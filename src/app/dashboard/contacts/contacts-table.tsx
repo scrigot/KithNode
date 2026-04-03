@@ -240,7 +240,7 @@ export function ContactsTable() {
       </div>
 
       {loading ? (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -265,20 +265,20 @@ export function ContactsTable() {
           </table>
         </div>
       ) : contacts.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+        <div className="border-2 border-dashed border-gray-300 p-12 text-center">
           <p className="text-lg font-medium text-gray-900">No contacts yet</p>
           <p className="mt-1 text-sm text-gray-500">
             Your alumni contacts will appear here once connections are added.
           </p>
         </div>
       ) : sorted.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+        <div className="border border-gray-200 bg-white p-8 text-center">
           <p className="text-sm text-gray-500">
             No contacts match &quot;{search}&quot;
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

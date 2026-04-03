@@ -1,6 +1,3 @@
-"use client";
-
-import { ScrollReveal } from "@/components/scroll-reveal";
 import { GlassCard } from "@/components/glass-card";
 
 const STATS = [
@@ -12,7 +9,7 @@ const STATS = [
 export function StatsSection() {
   return (
     <section className="relative px-4 py-24">
-      <ScrollReveal className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-4xl">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {STATS.map((stat) => (
             <GlassCard key={stat.label} className="text-center">
@@ -25,7 +22,7 @@ export function StatsSection() {
             </GlassCard>
           ))}
         </div>
-      </ScrollReveal>
+      </div>
     </section>
   );
 }

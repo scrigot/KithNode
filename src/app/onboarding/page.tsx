@@ -328,7 +328,6 @@ export default function OnboardingPage() {
             {step < totalSteps - 1 ? (
               <Button
                 size="sm"
-                variant="outline"
                 className="text-xs"
                 onClick={() => setStep(step + 1)}
               >

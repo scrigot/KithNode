@@ -9,7 +9,7 @@ import type { DiscoverContact, DiscoverResponse } from "@/lib/api";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
-  warm: "bg-green-500/20 text-green-400 border-green-500/30",
+  warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   cold: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
 };

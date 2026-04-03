@@ -6,7 +6,7 @@ const TIERS = ["all", "hot", "warm", "monitor", "cold"] as const;
 
 const TIER_BUTTON_STYLES: Record<string, string> = {
   hot: "data-[active=true]:bg-red-500/20 data-[active=true]:text-red-400 data-[active=true]:border-red-500/30",
-  warm: "data-[active=true]:bg-green-500/20 data-[active=true]:text-green-400 data-[active=true]:border-green-500/30",
+  warm: "data-[active=true]:bg-blue-500/20 data-[active=true]:text-blue-400 data-[active=true]:border-blue-500/30",
   monitor: "data-[active=true]:bg-amber-500/20 data-[active=true]:text-amber-400 data-[active=true]:border-amber-500/30",
   cold: "data-[active=true]:bg-zinc-500/20 data-[active=true]:text-zinc-400 data-[active=true]:border-zinc-500/30",
   all: "data-[active=true]:bg-primary/20 data-[active=true]:text-primary data-[active=true]:border-primary/30",
