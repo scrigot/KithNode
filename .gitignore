@@ -21,3 +21,4 @@ scripts/ralph/archive/
 scripts/ralph/.last-branch
 
 /src/generated/prisma
+.vercel

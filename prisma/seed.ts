@@ -1,9 +1,6 @@
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-
 async function main() {
   const { PrismaClient } = await import("../src/generated/prisma/client.js");
-  const adapter = new PrismaBetterSqlite3({ url: "file:./dev.db" });
-  const prisma = new PrismaClient({ adapter } as any);
+  const prisma = new PrismaClient();
 
   try {
     // Clean existing data
