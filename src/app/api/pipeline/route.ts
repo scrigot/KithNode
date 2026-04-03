@@ -6,6 +6,6 @@ export async function GET() {
     const data = await getPipeline();
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ error: "Failed to fetch pipeline" }, { status: 500 });
+    return NextResponse.json({ stages: [], contacts: {}, total: 0 });
   }
 }

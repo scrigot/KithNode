@@ -8,9 +8,6 @@ export async function GET(request: NextRequest) {
     const contacts = await getContactsRanked(0, 100, curated);
     return NextResponse.json(contacts);
   } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch contacts" },
-      { status: 500 },
-    );
+    return NextResponse.json([]);
   }
 }

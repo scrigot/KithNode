@@ -7,6 +7,6 @@ export async function GET() {
     const res = await fetch(`${FASTAPI_URL}/api/dashboard/coverage`);
     return NextResponse.json(await res.json());
   } catch {
-    return NextResponse.json({ covered: [], uncovered: [], total_target: 0, total_covered: 0 }, { status: 500 });
+    return NextResponse.json({ covered: [], uncovered: [], total_target: 0, total_covered: 0 });
   }
 }

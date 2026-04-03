@@ -58,7 +58,7 @@ export default function DashboardPage() {
         >
           <p className="text-[12px] text-text-muted">Warm Signals</p>
           <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.ratings.high_value || 0}
+            {overview?.ratings?.high_value || 0}
           </p>
           <p className="mt-1 text-[11px] text-accent-green">curated contacts</p>
         </Link>
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         >
           <p className="text-[12px] text-text-muted">Discovered</p>
           <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.stats.contacts || 0}
+            {overview?.stats?.contacts || 0}
           </p>
           <p className="mt-1 text-[11px] text-text-muted">total contacts</p>
         </Link>

@@ -7,6 +7,6 @@ export async function GET() {
     const res = await fetch(`${FASTAPI_URL}/api/pipeline/reminders`);
     return NextResponse.json(await res.json());
   } catch {
-    return NextResponse.json({ reminders: [] }, { status: 500 });
+    return NextResponse.json({ reminders: [] });
   }
 }

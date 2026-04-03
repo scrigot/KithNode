@@ -12,9 +12,6 @@ export async function GET(request: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch discover contacts" },
-      { status: 500 },
-    );
+    return NextResponse.json({ contacts: [], total: 0 });
   }
 }
