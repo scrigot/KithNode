@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,14 +86,29 @@ const QUICK_NAV = [
 export default function DashboardPage() {
   const trendMax = Math.max(...WARMTH_TREND);
 
+  const [displayScore, setDisplayScore] = useState(0);
+  useEffect(() => {
+    let current = 0;
+    const interval = setInterval(() => {
+      current += 2;
+      if (current >= WARMTH_SCORE) {
+        setDisplayScore(WARMTH_SCORE);
+        clearInterval(interval);
+      } else {
+        setDisplayScore(current);
+      }
+    }, 20);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="p-6">
+    <div className="p-5">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-white">Overview</h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Your networking intelligence hub
+            Week of Apr 3, 2026
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
@@ -101,15 +117,15 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Hero row: Warmth Score + Recruiting Countdown ─────────────── */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {/* Network Warmth Score */}
-        <div className="border border-white/[0.06] bg-bg-card p-6">
+        <div className="border border-white/[0.10] bg-bg-card p-5 shadow-[0_0_20px_rgba(14,165,233,0.05)]">
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
             Network Warmth
           </p>
           <div className="mt-3 flex items-end gap-4">
             <span className="font-mono text-5xl font-bold tabular-nums text-white">
-              {WARMTH_SCORE}
+              {displayScore}
             </span>
             <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-accent-green">
               <TrendingUp size={14} />
@@ -122,7 +138,7 @@ export default function DashboardPage() {
             {WARMTH_TREND.map((v, i) => (
               <div
                 key={i}
-                className="flex-1 bg-accent-teal/30 transition-all"
+                className="flex-1 bg-accent-teal/30 transition-all duration-150"
                 style={{
                   height: `${(v / trendMax) * 100}%`,
                   backgroundColor:
@@ -137,7 +153,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recruiting Countdown + Weekly Goals */}
-        <div className="border border-white/[0.06] bg-bg-card p-6">
+        <div className="border border-white/[0.10] bg-bg-card p-5">
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
             Recruiting Timeline
           </p>
@@ -165,7 +181,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-2 h-2 overflow-hidden bg-white/[0.06]">
               <div
-                className="h-full bg-accent-teal transition-all"
+                className="h-full bg-accent-teal transition-all duration-150"
                 style={{ width: `${(WEEKLY_GOAL.done / WEEKLY_GOAL.total) * 100}%` }}
               />
             </div>
@@ -174,7 +190,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Needs Attention Alerts ────────────────────────────────────── */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-text-muted">
           Needs Attention
         </h3>
@@ -184,7 +200,7 @@ export default function DashboardPage() {
             return (
               <button
                 key={alert.name}
-                className={`flex items-start gap-3 border border-white/[0.06] border-l-2 ${alert.border} bg-bg-card p-4 text-left transition-all hover:bg-bg-hover hover:border-white/[0.12]`}
+                className={`flex items-start gap-3 border border-white/[0.06] border-l-2 ${alert.border} bg-bg-card p-4 text-left transition-all duration-150 hover:bg-bg-hover hover:border-white/[0.12]`}
               >
                 <Icon size={16} className="mt-0.5 shrink-0 text-text-muted" />
                 <div className="min-w-0 flex-1">
@@ -205,12 +221,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI Stat Cards ────────────────────────────────────────────── */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {KPI.map((kpi) => {
           const inner = (
             <>
               <p className="text-[12px] text-text-muted">{kpi.label}</p>
-              <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
+              <p className="mt-2 font-mono text-2xl font-bold tabular-nums text-white">
                 {kpi.value}
               </p>
               <p className={`mt-1 text-[11px] ${kpi.subColor}`}>{kpi.sub}</p>
@@ -221,14 +237,14 @@ export default function DashboardPage() {
             <Link
               key={kpi.label}
               href={kpi.href}
-              className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
+              className="border border-white/[0.06] bg-bg-card p-4 transition-all duration-150 hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
             >
               {inner}
             </Link>
           ) : (
             <div
               key={kpi.label}
-              className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:glow-amber"
+              className="border border-white/[0.06] bg-bg-card p-4 transition-all duration-150 hover:glow-amber"
             >
               {inner}
             </div>
@@ -237,14 +253,14 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Quick Actions ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {QUICK_NAV.map((item) => {
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="group flex items-center gap-3 border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-white/[0.12] hover:bg-bg-hover"
+              className="group flex items-center gap-3 border border-white/[0.06] bg-bg-card p-4 transition-all duration-150 hover:border-white/[0.12] hover:bg-bg-hover"
             >
               <Icon size={18} className={`shrink-0 ${item.colorClass}`} />
               <div className="min-w-0 flex-1">
@@ -255,7 +271,7 @@ export default function DashboardPage() {
               </div>
               <ArrowUpRight
                 size={14}
-                className="shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100"
+                className="shrink-0 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
               />
             </Link>
           );

@@ -39,8 +39,8 @@ export function Sidebar({ userName }: { userName: string }) {
         <h1 className="font-heading text-xl font-bold tracking-tight text-white">
           Kith<span className="text-accent-teal">Node</span>
         </h1>
-        <p className="mt-0.5 text-[10px] font-mono uppercase tracking-widest text-text-muted">
-          Warm Signals Intelligence
+        <p className="mt-0.5 text-[9px] font-mono uppercase tracking-widest text-text-muted">
+          v0.1-alpha
         </p>
       </div>
 
@@ -49,19 +49,24 @@ export function Sidebar({ userName }: { userName: string }) {
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
+          const showSeparator = item.label === "Import";
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all ${
-                active
-                  ? "bg-accent-teal/10 text-accent-teal font-medium border-l-2 border-accent-teal -ml-[2px]"
-                  : "text-text-secondary hover:bg-white/[0.04] hover:text-white"
-              }`}
-            >
-              <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
-              {item.label}
-            </Link>
+            <div key={item.href}>
+              {showSeparator && (
+                <div className="mx-3 my-1.5 border-t border-white/[0.06]" />
+              )}
+              <Link
+                href={item.href}
+                className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-150 ${
+                  active
+                    ? "bg-accent-teal/10 text-accent-teal font-medium border-l-2 border-accent-teal -ml-[2px]"
+                    : "text-text-secondary hover:bg-white/[0.04] hover:text-white"
+                }`}
+              >
+                <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                {item.label}
+              </Link>
+            </div>
           );
         })}
       </nav>
@@ -72,7 +77,7 @@ export function Sidebar({ userName }: { userName: string }) {
           href="https://kithnode.canny.io"
           target="_blank"
           rel="noopener noreferrer"
-          className="mb-3 flex items-center gap-2 text-[11px] text-text-muted hover:text-accent-teal transition-colors"
+          className="mb-3 flex items-center gap-2 text-[11px] text-text-muted hover:text-accent-teal transition-colors duration-150"
         >
           <MessageSquare size={14} />
           Send Feedback
@@ -85,7 +90,7 @@ export function Sidebar({ userName }: { userName: string }) {
             <p className="truncate text-[12px] font-medium text-white">{userName}</p>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="flex items-center gap-1 text-[11px] text-text-muted hover:text-accent-red transition-colors"
+              className="flex items-center gap-1 text-[11px] text-text-muted hover:text-accent-red transition-colors duration-150"
             >
               <LogOut size={10} />
               Sign out
