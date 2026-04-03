@@ -1,208 +1,265 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Compass } from "lucide-react";
+import {
+  Upload,
+  Compass,
+  TrendingUp,
+  Clock,
+  AlertTriangle,
+  Sparkles,
+  Users,
+  Settings,
+  ArrowUpRight,
+  ChevronRight,
+} from "lucide-react";
 
-interface Reminder {
-  contact_id: number;
+// ── Demo data ──────────────────────────────────────────────────────────────────
+
+const WARMTH_SCORE = 78;
+const WARMTH_DELTA = 8;
+const WARMTH_TREND = [42, 48, 51, 55, 60, 63, 70, 78]; // 8 weeks
+
+const RECRUITING_DAYS = 47;
+const RECRUITING_LABEL = "Fall recruiting";
+const WEEKLY_GOAL = { done: 2, total: 3, label: "coffee chats this week" };
+
+const ALERTS: {
   name: string;
-  company_name: string;
-  stage: string;
-  days_since_activity: number;
-  message: string;
-  urgency: string;
-}
+  company: string;
+  action: string;
+  time: string;
+  border: string;
+  icon: typeof AlertTriangle;
+}[] = [
+  {
+    name: "Sarah Chen",
+    company: "Goldman Sachs",
+    action: "Going cold",
+    time: "14 days since contact",
+    border: "border-l-accent-red",
+    icon: AlertTriangle,
+  },
+  {
+    name: "Michael Park",
+    company: "Evercore",
+    action: "Follow-up due",
+    time: "Sent 5 days ago",
+    border: "border-l-accent-amber",
+    icon: Clock,
+  },
+  {
+    name: "James Liu",
+    company: "JPMorgan",
+    action: "Promoted to VP",
+    time: "New signal",
+    border: "border-l-accent-teal",
+    icon: Sparkles,
+  },
+  {
+    name: "Emily Zhao",
+    company: "Centerview Partners",
+    action: "Joined firm",
+    time: "New alumni",
+    border: "border-l-accent-blue",
+    icon: Users,
+  },
+];
 
-interface Coverage {
-  covered: { company: string; contacts: number }[];
-  uncovered: string[];
-  total_target: number;
-  total_covered: number;
-}
+const KPI = [
+  { label: "Warm Signals", value: 12, sub: "curated contacts", subColor: "text-accent-green", href: "/dashboard/contacts" },
+  { label: "In Pipeline", value: 8, sub: "active outreach", subColor: "text-accent-teal", href: "/dashboard/pipeline" },
+  { label: "Discovered", value: 47, sub: "total contacts", subColor: "text-text-muted", href: "/dashboard/discover" },
+  { label: "Action Needed", value: 3, sub: "follow-ups due", subColor: "text-accent-red", href: null },
+] as const;
 
-interface Overview {
-  stats: { companies: number; contacts: number; scored: number };
-  pipeline_total: number;
-  pipeline_by_stage: Record<string, number>;
-  reminders_count: number;
-  ratings: { total: number; high_value: number };
-}
+const QUICK_NAV = [
+  { href: "/dashboard/discover", label: "Discover", desc: "Find and rate new connections", icon: Compass, colorClass: "text-accent-blue" },
+  { href: "/dashboard/import", label: "Import", desc: "Add LinkedIn profiles in bulk", icon: Upload, colorClass: "text-accent-green" },
+  { href: "/dashboard/settings", label: "Settings", desc: "Target universities, industries", icon: Settings, colorClass: "text-text-muted" },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [coverage, setCoverage] = useState<Coverage | null>(null);
-
-  useEffect(() => {
-    fetch("/api/dashboard/overview").then((r) => r.json()).then(setOverview).catch(() => {});
-    fetch("/api/dashboard/reminders").then((r) => r.json()).then((d) => setReminders(d.reminders || [])).catch(() => {});
-    fetch("/api/dashboard/coverage").then((r) => r.json()).then(setCoverage).catch(() => {});
-  }, []);
+  const trendMax = Math.max(...WARMTH_TREND);
 
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="font-heading text-2xl font-bold text-white">Overview</h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Your networking intelligence hub
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-white">Overview</h2>
+          <p className="mt-1 text-sm text-text-secondary">
+            Your networking intelligence hub
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+          Demo data
+        </span>
       </div>
 
-      {/* Welcome state when no data */}
-      {(!overview || (overview.ratings?.high_value === 0 && overview.pipeline_total === 0 && overview.stats?.contacts === 0)) && (
-        <div className="mb-6 border border-white/[0.06] bg-bg-card p-8">
-          <h3 className="font-heading text-xl font-bold text-white">Welcome to KithNode</h3>
-          <p className="mt-2 text-sm text-text-secondary">
-            Import your network to see warm signals, pipeline stats, and more.
+      {/* ── Hero row: Warmth Score + Recruiting Countdown ─────────────── */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Network Warmth Score */}
+        <div className="border border-white/[0.06] bg-bg-card p-6">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            Network Warmth
           </p>
-          <div className="mt-5 flex gap-3">
-            <Link
-              href="/dashboard/import"
-              className="flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
-            >
-              <Upload size={16} />
-              Import Contacts
-            </Link>
-            <Link
-              href="/dashboard/discover"
-              className="flex items-center gap-2 border border-white/[0.12] px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-white/[0.06]"
-            >
-              <Compass size={16} />
-              Discover Alumni
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* KPI Stat Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Link
-          href="/dashboard/contacts"
-          className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
-        >
-          <p className="text-[12px] text-text-muted">Warm Signals</p>
-          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.ratings?.high_value || 0}
-          </p>
-          <p className="mt-1 text-[11px] text-accent-green">curated contacts</p>
-        </Link>
-
-        <Link
-          href="/dashboard/pipeline"
-          className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
-        >
-          <p className="text-[12px] text-text-muted">In Pipeline</p>
-          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.pipeline_total || 0}
-          </p>
-          <p className="mt-1 text-[11px] text-accent-teal">active outreach</p>
-        </Link>
-
-        <Link
-          href="/dashboard/discover"
-          className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
-        >
-          <p className="text-[12px] text-text-muted">Discovered</p>
-          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.stats?.contacts || 0}
-          </p>
-          <p className="mt-1 text-[11px] text-text-muted">total contacts</p>
-        </Link>
-
-        <div className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:glow-amber">
-          <p className="text-[12px] text-text-muted">Action Needed</p>
-          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
-            {overview?.reminders_count || 0}
-          </p>
-          <p className="mt-1 text-[11px] text-accent-red">follow-ups due</p>
-        </div>
-      </div>
-
-      {/* Reminders */}
-      {reminders.length > 0 && (
-        <div className="mb-6 border border-white/[0.06] bg-bg-card p-5">
-          <h3 className="mb-3 text-[13px] font-semibold text-white">
-            Action Needed
-          </h3>
-          <div className="space-y-2">
-            {reminders.slice(0, 5).map((r) => (
-              <Link
-                key={r.contact_id}
-                href="/dashboard/pipeline"
-                className="flex items-center justify-between bg-white/[0.03] px-4 py-2.5 text-sm transition-colors hover:bg-white/[0.06]"
-              >
-                <div>
-                  <span className="font-medium text-white">{r.name}</span>
-                  <span className="text-text-secondary"> @ {r.company_name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-accent-amber">{r.message}</span>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full text-[10px] bg-accent-amber/10 text-accent-amber border-accent-amber/20"
-                  >
-                    {r.days_since_activity}d ago
-                  </Badge>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Firm Coverage */}
-      {coverage && coverage.total_target > 0 && (
-        <div className="mb-6 border border-white/[0.06] bg-bg-card p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-[13px] font-semibold text-white">
-              Firm Coverage
-            </h3>
-            <span className="font-heading text-sm font-bold tabular-nums text-accent-teal">
-              {coverage.total_covered}/{coverage.total_target}
+          <div className="mt-3 flex items-end gap-4">
+            <span className="font-mono text-5xl font-bold tabular-nums text-white">
+              {WARMTH_SCORE}
+            </span>
+            <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-accent-green">
+              <TrendingUp size={14} />
+              +{WARMTH_DELTA} this week
             </span>
           </div>
-          <div className="mb-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full rounded-full bg-accent-teal transition-all"
-              style={{ width: `${(coverage.total_covered / coverage.total_target) * 100}%` }}
-            />
+
+          {/* Sparkline bar */}
+          <div className="mt-4 flex items-end gap-[3px]" style={{ height: 32 }}>
+            {WARMTH_TREND.map((v, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-accent-teal/30 transition-all"
+                style={{
+                  height: `${(v / trendMax) * 100}%`,
+                  backgroundColor:
+                    i === WARMTH_TREND.length - 1
+                      ? "var(--color-accent-teal)"
+                      : undefined,
+                }}
+              />
+            ))}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {coverage.covered.map((c) => (
-              <Badge key={c.company} className="rounded-full bg-accent-green/10 text-accent-green border-0 text-[11px]">
-                {c.company} ({c.contacts})
-              </Badge>
-            ))}
-            {coverage.uncovered.map((co) => (
-              <Badge key={co} variant="outline" className="rounded-full text-[11px] text-text-muted border-white/[0.08]">
-                {co}
-              </Badge>
-            ))}
+          <p className="mt-2 text-[10px] text-text-muted">8-week trend</p>
+        </div>
+
+        {/* Recruiting Countdown + Weekly Goals */}
+        <div className="border border-white/[0.06] bg-bg-card p-6">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            Recruiting Timeline
+          </p>
+          <div className="mt-3 flex items-end gap-3">
+            <span className="font-mono text-5xl font-bold tabular-nums text-white">
+              {RECRUITING_DAYS}
+            </span>
+            <span className="mb-1.5 text-sm text-text-secondary">
+              days until {RECRUITING_LABEL}
+            </span>
+          </div>
+
+          {/* Weekly goal tracker */}
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-text-secondary">
+                <span className="font-mono font-bold text-white">{WEEKLY_GOAL.done}</span>
+                {" "}of{" "}
+                <span className="font-mono font-bold text-white">{WEEKLY_GOAL.total}</span>
+                {" "}{WEEKLY_GOAL.label}
+              </span>
+              <span className="text-accent-amber">
+                {WEEKLY_GOAL.total - WEEKLY_GOAL.done} remaining
+              </span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden bg-white/[0.06]">
+              <div
+                className="h-full bg-accent-teal transition-all"
+                style={{ width: `${(WEEKLY_GOAL.done / WEEKLY_GOAL.total) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Quick nav */}
+      {/* ── Needs Attention Alerts ────────────────────────────────────── */}
+      <div className="mb-6">
+        <h3 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-text-muted">
+          Needs Attention
+        </h3>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {ALERTS.map((alert) => {
+            const Icon = alert.icon;
+            return (
+              <button
+                key={alert.name}
+                className={`flex items-start gap-3 border border-white/[0.06] border-l-2 ${alert.border} bg-bg-card p-4 text-left transition-all hover:bg-bg-hover hover:border-white/[0.12]`}
+              >
+                <Icon size={16} className="mt-0.5 shrink-0 text-text-muted" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-medium text-white">{alert.name}</span>
+                    <span className="text-[12px] text-text-secondary">@ {alert.company}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-[12px] text-text-secondary">{alert.action}</span>
+                    <span className="text-[11px] text-text-muted">{alert.time}</span>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="mt-0.5 shrink-0 text-text-muted" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── KPI Stat Cards ────────────────────────────────────────────── */}
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {KPI.map((kpi) => {
+          const inner = (
+            <>
+              <p className="text-[12px] text-text-muted">{kpi.label}</p>
+              <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-white">
+                {kpi.value}
+              </p>
+              <p className={`mt-1 text-[11px] ${kpi.subColor}`}>{kpi.sub}</p>
+            </>
+          );
+
+          return kpi.href ? (
+            <Link
+              key={kpi.label}
+              href={kpi.href}
+              className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-accent-teal/30 hover:bg-bg-hover hover:glow-teal"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div
+              key={kpi.label}
+              className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:glow-amber"
+            >
+              {inner}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Quick Actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {[
-          { href: "/dashboard/discover", label: "Discover", desc: "Find and rate new connections", colorClass: "text-accent-blue" },
-          { href: "/dashboard/import", label: "Import", desc: "Add LinkedIn profiles in bulk", colorClass: "text-accent-green" },
-          { href: "/dashboard/settings", label: "Settings", desc: "Target universities, industries", colorClass: "text-text-muted" },
-        ].map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-white/[0.12] hover:bg-bg-hover"
-          >
-            <p className={`text-[13px] font-semibold ${item.colorClass}`}>
-              {item.label}
-            </p>
-            <p className="mt-1 text-[12px] text-text-muted">{item.desc}</p>
-          </Link>
-        ))}
+        {QUICK_NAV.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group flex items-center gap-3 border border-white/[0.06] bg-bg-card p-5 transition-all hover:border-white/[0.12] hover:bg-bg-hover"
+            >
+              <Icon size={18} className={`shrink-0 ${item.colorClass}`} />
+              <div className="min-w-0 flex-1">
+                <p className={`text-[13px] font-semibold ${item.colorClass}`}>
+                  {item.label}
+                </p>
+                <p className="mt-0.5 text-[12px] text-text-muted">{item.desc}</p>
+              </div>
+              <ArrowUpRight
+                size={14}
+                className="shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100"
+              />
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
