@@ -1,18 +1,13 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { getContactsRanked } from "@/lib/api";
 
-export async function GET() {
-  // TODO: re-enable auth after Google OAuth is configured
-  // const session = await auth();
-  // if (!session?.user?.id) {
-  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // }
+export async function GET(request: NextRequest) {
+  const curated = request.nextUrl.searchParams.get("curated") === "true";
 
   try {
-    const contacts = await getContactsRanked();
+    const contacts = await getContactsRanked(0, 100, curated);
     return NextResponse.json(contacts);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch contacts" },
       { status: 500 },

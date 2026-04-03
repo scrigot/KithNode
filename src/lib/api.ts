@@ -46,6 +46,10 @@ export interface RankedContact {
   email: string;
   email_status: string;
   linkedin_url: string;
+  education: string;
+  linkedin_location: string;
+  why_now: string;
+  warm_path: string;
   company: {
     name: string;
     domain: string;
@@ -92,8 +96,59 @@ export interface ContactDetail extends RankedContact {
 export function getContactsRanked(
   minScore = 0,
   limit = 100,
+  curated = false,
 ): Promise<RankedContact[]> {
-  return request(`/api/contacts/ranked?min_score=${minScore}&limit=${limit}`);
+  return request(`/api/contacts/ranked?min_score=${minScore}&limit=${limit}&curated=${curated}`);
+}
+
+// ─── Pipeline ────────────────────────────────────────────────────────
+
+export interface PipelineContact {
+  id: number;
+  name: string;
+  title: string;
+  email: string;
+  linkedin_url: string;
+  education: string;
+  company_name: string;
+  company_location: string;
+  total_score: number;
+  tier: string;
+  stage: string;
+  notes: string;
+  added_at: string;
+  affiliations: string[];
+}
+
+export interface PipelineResponse {
+  stages: string[];
+  contacts: Record<string, PipelineContact[]>;
+  total: number;
+}
+
+export function getPipeline(): Promise<PipelineResponse> {
+  return request("/api/pipeline");
+}
+
+export function addToPipeline(
+  contactId: number,
+  stage = "researched",
+): Promise<{ contact_id: number; pipeline_id: number; stage: string }> {
+  return request(`/api/pipeline/${contactId}`, {
+    method: "POST",
+    body: JSON.stringify({ stage }),
+  });
+}
+
+export function updatePipelineStage(
+  contactId: number,
+  stage: string,
+  notes?: string,
+): Promise<{ contact_id: number; stage: string }> {
+  return request(`/api/pipeline/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stage, notes }),
+  });
 }
 
 export function getContactDetail(id: number): Promise<ContactDetail> {
