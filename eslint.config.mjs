@@ -25,6 +25,11 @@ export default [
         HTMLAnchorElement: "readonly",
         HTMLSelectElement: "readonly",
         HTMLInputElement: "readonly",
+        window: "readonly",
+        navigator: "readonly",
+        setTimeout: "readonly",
+        URLSearchParams: "readonly",
+        RequestInit: "readonly",
       },
     },
     rules: {
