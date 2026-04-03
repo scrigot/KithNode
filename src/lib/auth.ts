@@ -7,8 +7,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user }) {
       if (!user.email) return false;
 
-      // Alpha gate: only @unc.edu emails
-      if (!user.email.endsWith("@unc.edu")) {
+      // Alpha gate: @unc.edu emails + whitelisted testers
+      const ALLOWED_EMAILS = ["samrigot31@gmail.com"];
+      if (!user.email.endsWith("@unc.edu") && !ALLOWED_EMAILS.includes(user.email)) {
         return false;
       }
 
