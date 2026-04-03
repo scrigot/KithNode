@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Upload, Compass } from "lucide-react";
 
 interface Reminder {
   contact_id: number;
@@ -50,7 +51,33 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* KPI Stat Cards — Image 3 style */}
+      {/* Welcome state when no data */}
+      {(!overview || (overview.ratings?.high_value === 0 && overview.pipeline_total === 0 && overview.stats?.contacts === 0)) && (
+        <div className="mb-6 border border-white/[0.06] bg-bg-card p-8">
+          <h3 className="font-heading text-xl font-bold text-white">Welcome to KithNode</h3>
+          <p className="mt-2 text-sm text-text-secondary">
+            Import your network to see warm signals, pipeline stats, and more.
+          </p>
+          <div className="mt-5 flex gap-3">
+            <Link
+              href="/dashboard/import"
+              className="flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
+            >
+              <Upload size={16} />
+              Import Contacts
+            </Link>
+            <Link
+              href="/dashboard/discover"
+              className="flex items-center gap-2 border border-white/[0.12] px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-white/[0.06]"
+            >
+              <Compass size={16} />
+              Discover Alumni
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* KPI Stat Cards */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Link
           href="/dashboard/contacts"

@@ -5,7 +5,10 @@ import { WarmSignalCard } from "./warm-signal-card";
 import { FilterBar, type SortOption } from "./filter-bar";
 import { OutreachSheet } from "./outreach-sheet";
 import { trackEvent } from "@/lib/posthog";
+import { Users } from "lucide-react";
 import type { RankedContact } from "@/lib/api";
+import Link from "next/link";
+import { Upload } from "lucide-react";
 
 export function ContactsList() {
   const [contacts, setContacts] = useState<RankedContact[]>([]);
@@ -84,22 +87,38 @@ export function ContactsList() {
 
   if (error) {
     return (
-      <div className="border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
-        Failed to load contacts: {error}
+      <div className="border border-white/[0.06] bg-bg-card p-10 text-center">
+        <Users className="mx-auto mb-3 text-text-muted" size={32} strokeWidth={1.5} />
+        <p className="text-sm font-semibold text-white">No contacts yet</p>
+        <p className="mt-1 text-[12px] text-text-secondary">
+          Import your LinkedIn network or discover alumni to get started.
+        </p>
+        <Link
+          href="/dashboard/import"
+          className="mt-4 inline-flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
+        >
+          <Upload size={16} />
+          Import Contacts
+        </Link>
       </div>
     );
   }
 
   if (contacts.length === 0) {
     return (
-      <div className="border border-border bg-card p-8 text-center">
-        <p className="text-sm font-bold text-foreground">NO SIGNALS</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Run the seed pipeline to populate contacts.
+      <div className="border border-white/[0.06] bg-bg-card p-10 text-center">
+        <Users className="mx-auto mb-3 text-text-muted" size={32} strokeWidth={1.5} />
+        <p className="text-sm font-semibold text-white">No contacts yet</p>
+        <p className="mt-1 text-[12px] text-text-secondary">
+          Import your LinkedIn network or discover alumni to get started.
         </p>
-        <code className="mt-2 block text-[10px] text-muted-foreground">
-          cd backend && python scripts/seed_pipeline.py --seed-only
-        </code>
+        <Link
+          href="/dashboard/import"
+          className="mt-4 inline-flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
+        >
+          <Upload size={16} />
+          Import Contacts
+        </Link>
       </div>
     );
   }
