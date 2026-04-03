@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, HTTPException, Query
 
 import database as db
+from scoring import generate_why_now, generate_warm_path
 
 from app.models.contacts import (
     AffiliationOut,
@@ -46,9 +47,26 @@ def _parse_score(row: dict) -> ScoreOut:
 def get_ranked_contacts(
     min_score: float = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    curated: bool = Query(False),
 ):
-    """Return contacts ranked by priority score, with scores and tiers."""
+    """Return contacts ranked by priority score, with scores and tiers.
+
+    curated=true: only return contacts rated 'high_value' (for Warm Signals tab).
+    """
     rows = db.get_scored_contacts(min_score=min_score, limit=limit)
+
+    # Filter to curated-only (high_value rated contacts)
+    if curated:
+        high_value_ids = set()
+        with db.get_db() as conn:
+            rated = conn.execute(
+                "SELECT contact_id FROM contact_ratings WHERE rating = 'high_value'"
+            ).fetchall()
+            high_value_ids = {dict(r)["contact_id"] for r in rated}
+        rows = [r for r in rows if r["id"] in high_value_ids]
+
+    prefs = db.get_user_preferences()
+
     results = []
     for r in rows:
         results.append(
@@ -59,6 +77,10 @@ def get_ranked_contacts(
                 email=r.get("email", ""),
                 email_status=r.get("email_status", ""),
                 linkedin_url=r.get("linkedin_url", ""),
+                education=r.get("education", ""),
+                linkedin_location=r.get("linkedin_location", ""),
+                why_now=generate_why_now(r, prefs),
+                warm_path=generate_warm_path(r, prefs),
                 company=_parse_company(r),
                 score=_parse_score(r),
             )

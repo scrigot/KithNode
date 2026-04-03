@@ -260,6 +260,24 @@ CREATE TABLE IF NOT EXISTS learned_weights (
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(dimension, feature)
 );
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id SERIAL PRIMARY KEY,
+    key TEXT NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_contacts (
+    id SERIAL PRIMARY KEY,
+    contact_id INTEGER REFERENCES contacts(id) UNIQUE,
+    stage TEXT NOT NULL DEFAULT 'researched',
+    notes TEXT DEFAULT '',
+    last_activity_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    added_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON pipeline_contacts(stage);
 """
 
 _SQLITE_SCHEMA = """
@@ -366,6 +384,23 @@ CREATE TABLE IF NOT EXISTS learned_weights (
     updated_at TEXT DEFAULT (datetime('now')),
     UNIQUE(dimension, feature)
 );
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id INTEGER REFERENCES contacts(id) UNIQUE,
+    stage TEXT NOT NULL DEFAULT 'researched',
+    notes TEXT DEFAULT '',
+    added_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON pipeline_contacts(stage);
 """
 
 
@@ -805,7 +840,8 @@ def get_unrated_contacts(limit: int = 10) -> list[dict]:
             JOIN scores s ON c.id = s.contact_id
             JOIN companies co ON c.company_id = co.id
             LEFT JOIN contact_ratings cr ON c.id = cr.contact_id
-            WHERE cr.id IS NULL
+            LEFT JOIN pipeline_contacts pc ON c.id = pc.contact_id
+            WHERE cr.id IS NULL AND pc.id IS NULL
             ORDER BY s.total_score DESC
             LIMIT ?
             """,
@@ -919,6 +955,183 @@ def get_learned_weights_map() -> dict:
             result[dim] = {}
         result[dim][w["feature"]] = w["lift_factor"]
     return result
+
+
+# ─── Pipeline Operations ─────────────────────────────────────────────
+
+PIPELINE_STAGES = ["researched", "connected", "email_sent", "follow_up", "responded", "meeting_set"]
+
+
+def add_to_pipeline(contact_id: int, stage: str = "researched", notes: str = "") -> int:
+    """Add a contact to the pipeline. Returns the pipeline row ID."""
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT id FROM pipeline_contacts WHERE contact_id = ?", (contact_id,)
+        ).fetchone()
+        if existing:
+            return existing["id"]
+        cursor = conn.execute(
+            "INSERT INTO pipeline_contacts (contact_id, stage, notes) VALUES (?, ?, ?)",
+            (contact_id, stage, notes),
+        )
+        return cursor.lastrowid
+
+
+def update_pipeline_stage(contact_id: int, stage: str, notes: str | None = None):
+    """Update pipeline stage for a contact. Also updates last_activity_at."""
+    now = _now()
+    with get_db() as conn:
+        if notes is not None:
+            conn.execute(
+                "UPDATE pipeline_contacts SET stage = ?, notes = ?, last_activity_at = ?, updated_at = ? WHERE contact_id = ?",
+                (stage, notes, now, now, contact_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE pipeline_contacts SET stage = ?, last_activity_at = ?, updated_at = ? WHERE contact_id = ?",
+                (stage, now, now, contact_id),
+            )
+
+
+def remove_from_pipeline(contact_id: int):
+    """Remove a contact from the pipeline."""
+    with get_db() as conn:
+        conn.execute(
+            "DELETE FROM pipeline_contacts WHERE contact_id = ?", (contact_id,)
+        )
+
+
+def get_pipeline_contacts() -> list[dict]:
+    """Get all pipeline contacts with their company and score data."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT p.stage, p.notes, p.added_at, p.updated_at as pipeline_updated,
+                   c.*, s.fit_score, s.signal_score, s.engagement_score,
+                   s.total_score, s.tier,
+                   co.name as company_name, co.domain as company_domain,
+                   co.location as company_location,
+                   co.industry_tags as company_industry_tags
+            FROM pipeline_contacts p
+            JOIN contacts c ON p.contact_id = c.id
+            LEFT JOIN scores s ON c.id = s.contact_id
+            JOIN companies co ON c.company_id = co.id
+            ORDER BY
+                CASE p.stage
+                    WHEN 'researched' THEN 1
+                    WHEN 'connected' THEN 2
+                    WHEN 'email_sent' THEN 3
+                    WHEN 'follow_up' THEN 4
+                    WHEN 'responded' THEN 5
+                    WHEN 'meeting_set' THEN 6
+                END,
+                s.total_score DESC
+            """,
+        ).fetchall()
+        results = []
+        for row in rows:
+            r = dict(row)
+            r["company_industry_tags"] = json.loads(r.get("company_industry_tags") or "[]")
+            results.append(r)
+        return results
+
+
+def is_in_pipeline(contact_id: int) -> bool:
+    """Check if a contact is already in the pipeline."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM pipeline_contacts WHERE contact_id = ?", (contact_id,)
+        ).fetchone()
+        return row is not None
+
+
+# Follow-up reminder rules: {stage: days_before_reminder}
+_REMINDER_RULES = {
+    "connected": 14,     # 14 days to send initial outreach
+    "email_sent": 7,     # 7 days to follow up
+    "follow_up": 14,     # 14 days to check in again
+    "responded": 1,      # 24h to send thank-you
+}
+
+
+def get_pipeline_reminders() -> list[dict]:
+    """Get pipeline contacts that need follow-up action."""
+    reminders = []
+    contacts = get_pipeline_contacts()
+
+    for c in contacts:
+        stage = c.get("stage", "")
+        if stage not in _REMINDER_RULES:
+            continue
+
+        threshold_days = _REMINDER_RULES[stage]
+        last_activity = c.get("last_activity_at") or c.get("added_at") or ""
+
+        if not last_activity:
+            continue
+
+        try:
+            from datetime import datetime, timedelta, timezone
+            activity_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+            if activity_dt.tzinfo is None:
+                activity_dt = activity_dt.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            days_since = (now - activity_dt).days
+        except (ValueError, TypeError):
+            days_since = 0
+
+        if days_since >= threshold_days:
+            messages = {
+                "connected": "Time to send initial outreach",
+                "email_sent": "Send a follow-up email",
+                "follow_up": "Check in again or move on",
+                "responded": "Send thank-you within 24h",
+            }
+            reminders.append({
+                "contact_id": c["id"],
+                "name": c.get("name", ""),
+                "company_name": c.get("company_name", ""),
+                "stage": stage,
+                "days_since_activity": days_since,
+                "message": messages.get(stage, "Follow up"),
+                "urgency": "high" if days_since >= threshold_days * 2 else "normal",
+            })
+
+    return reminders
+
+
+# ─── User Preferences Operations ─────────────────────────────────────
+
+def save_user_preference(key: str, value: str):
+    """Upsert a user preference (value is a JSON string)."""
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT id FROM user_preferences WHERE key = ?", (key,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE user_preferences SET value = ?, updated_at = ? WHERE key = ?",
+                (value, _now(), key),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO user_preferences (key, value) VALUES (?, ?)",
+                (key, value),
+            )
+
+
+def get_user_preferences() -> dict:
+    """Get all user preferences as {key: parsed_value}."""
+    with get_db() as conn:
+        rows = conn.execute("SELECT key, value FROM user_preferences").fetchall()
+        result = {}
+        for row in rows:
+            r = dict(row)
+            try:
+                result[r["key"]] = json.loads(r["value"])
+            except (json.JSONDecodeError, TypeError):
+                result[r["key"]] = r["value"]
+        return result
 
 
 # ─── Helpers for Pipeline Integration ─────────────────────────────────

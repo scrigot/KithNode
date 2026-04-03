@@ -34,9 +34,78 @@ def _build_ratings_progress() -> RatingsProgress:
 
 
 @router.get("/discover", response_model=DiscoverResponse)
-def get_discover_contacts(limit: int = Query(10, ge=1, le=50)):
-    """Return unrated contacts for the swipe/discover UI."""
-    rows = db.get_unrated_contacts(limit=limit)
+def get_discover_contacts(
+    limit: int = Query(10, ge=1, le=50),
+    university: str = Query("", description="Hard filter: only contacts with this in education/affiliations"),
+    role: str = Query("", description="Hard filter: only contacts matching this role (founder, recruiter, etc.)"),
+    industry: str = Query("", description="Hard filter: only contacts in this industry"),
+    location: str = Query("", description="Hard filter: only contacts in this location"),
+    company: str = Query("", description="Hard filter: only contacts at this company"),
+):
+    """Return unrated contacts for the swipe/discover UI. Supports hard filters."""
+    # Fetch a large batch for filtering
+    rows = db.get_unrated_contacts(limit=500)
+
+    # Apply hard filters
+    if university:
+        uni_lower = university.lower()
+        rows = [r for r in rows if (
+            uni_lower in str(r.get("education", "")).lower()
+            or uni_lower in str(r.get("company_description", "")).lower()
+        )]
+        # Also check affiliations
+        filtered = []
+        for r in rows:
+            affs = db.get_affiliations_for_contact(r["id"])
+            aff_text = " ".join(a["name"].lower() for a in affs)
+            if uni_lower in aff_text or uni_lower in str(r.get("education", "")).lower():
+                filtered.append(r)
+        if filtered:
+            rows = filtered
+
+    if role:
+        role_lower = role.lower()
+        role_keywords = {
+            "founder": ["founder", "co-founder", "ceo"],
+            "recruiter": ["recruiter", "talent", "hiring", "hr", "people operations"],
+            "vp": ["vp", "vice president", "director", "head of"],
+            "alumni": ["professor", "faculty", "lecturer"],
+        }
+        keywords = role_keywords.get(role_lower, [role_lower])
+        rows = [r for r in rows if any(
+            kw in str(r.get("title", "")).lower() for kw in keywords
+        )]
+
+    if industry:
+        ind_lower = industry.lower()
+        rows = [r for r in rows if (
+            ind_lower in str(r.get("company_industry_tags", [])).lower()
+            or ind_lower in str(r.get("company_description", "")).lower()
+        )]
+
+    if location:
+        loc_lower = location.lower()
+        rows = [r for r in rows if (
+            loc_lower in str(r.get("company_location", "")).lower()
+            or loc_lower in str(r.get("linkedin_location", "")).lower()
+        )]
+
+    if company:
+        co_lower = company.lower()
+        rows = [r for r in rows if co_lower in str(r.get("company_name", "")).lower()]
+
+    # Diversity cap: max 2 contacts per company in any batch
+    MAX_PER_COMPANY = 2
+    company_counts: dict[str, int] = {}
+    diverse_rows = []
+    for r in rows:
+        co = r.get("company_name", "")
+        if company_counts.get(co, 0) < MAX_PER_COMPANY:
+            diverse_rows.append(r)
+            company_counts[co] = company_counts.get(co, 0) + 1
+        if len(diverse_rows) >= limit:
+            break
+    rows = diverse_rows
 
     contacts = []
     for r in rows:

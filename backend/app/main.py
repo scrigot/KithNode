@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import contacts, discover, import_contacts, outreach, preferences, signals, stats
+from app.routers import contacts, dashboard, discover, import_contacts, outreach, pipeline, preferences, signals, stats, user
 
 
 @asynccontextmanager
@@ -50,6 +50,9 @@ app.include_router(outreach.router)
 app.include_router(discover.router)
 app.include_router(import_contacts.router)
 app.include_router(preferences.router)
+app.include_router(user.router)
+app.include_router(pipeline.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/api/health")

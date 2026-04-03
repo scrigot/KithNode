@@ -48,6 +48,10 @@ class ContactRankedOut(BaseModel):
     email: str = ""
     email_status: str = ""
     linkedin_url: str = ""
+    education: str = ""
+    linkedin_location: str = ""
+    why_now: str = ""
+    warm_path: str = ""
     company: CompanyOut
     score: ScoreOut
 
