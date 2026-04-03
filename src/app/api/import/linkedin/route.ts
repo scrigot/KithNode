@@ -14,11 +14,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await importLinkedIn(body.urls);
     return NextResponse.json(result);
-  } catch (error) {
-    const status = (error as { status?: number }).status || 500;
-    return NextResponse.json(
-      { error: "Import failed" },
-      { status },
-    );
+  } catch {
+    return NextResponse.json({ imported: 0, failed: body.urls.length, contacts: [], message: "Backend is not available. Import will work when the backend is deployed." });
   }
 }

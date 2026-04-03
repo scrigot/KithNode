@@ -120,14 +120,22 @@ export default function DiscoverPage() {
   if (!contact) {
     return (
       <div className="flex min-h-full items-center justify-center p-6">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-primary">ALL RATED</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            No more contacts to rate. Import more profiles or run the pipeline.
+        <div className="max-w-sm border border-white/[0.06] bg-bg-card p-10 text-center">
+          <p className="text-lg font-semibold text-white">Discovery</p>
+          <p className="mt-2 text-[12px] text-text-secondary">
+            Discovery is powered by your preferences. Set your target firms and industries in Settings to see scored alumni.
           </p>
-          <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
-            {totalRatings} total ratings
-          </p>
+          <a
+            href="/dashboard/settings"
+            className="mt-5 inline-flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
+          >
+            Configure Preferences
+          </a>
+          {totalRatings > 0 && (
+            <p className="mt-3 text-[10px] tabular-nums text-text-muted">
+              {totalRatings} total ratings
+            </p>
+          )}
         </div>
       </div>
     );

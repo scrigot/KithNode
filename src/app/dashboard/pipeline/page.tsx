@@ -88,11 +88,17 @@ export default function PipelinePage() {
           ACTIVE OUTREACH WORKFLOW
         </p>
         <div className="mt-4 h-px bg-border" />
-        <div className="mt-8 border border-border bg-card p-8 text-center">
-          <p className="text-sm font-bold text-foreground">EMPTY PIPELINE</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add contacts from Warm Signals to start tracking your outreach.
+        <div className="mt-8 border border-white/[0.06] bg-bg-card p-10 text-center">
+          <p className="text-lg font-semibold text-white">Your pipeline is empty</p>
+          <p className="mt-2 text-[12px] text-text-secondary">
+            Start by discovering and rating contacts, then add your top matches to the outreach pipeline.
           </p>
+          <a
+            href="/dashboard/discover"
+            className="mt-5 inline-flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
+          >
+            Discover Alumni
+          </a>
         </div>
       </div>
     );
