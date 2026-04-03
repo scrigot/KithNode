@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SignInButton } from "./sign-in-button";
+import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { StatsSection } from "./_landing/stats-section";
+import { HowItWorksSection } from "./_landing/how-it-works-section";
 import { FeaturesSection } from "./_landing/features-section";
 
 export default async function Home() {
@@ -14,12 +16,8 @@ export default async function Home() {
 
   return (
     <main className="grain-overlay relative min-h-screen overflow-hidden bg-bg-primary">
-      {/* Gradient mesh background */}
-      <div className="pointer-events-none fixed inset-0" aria-hidden>
-        <div className="absolute -right-40 -top-40 h-[600px] w-[600px] rounded-full bg-accent-teal/15 blur-[128px]" />
-        <div className="absolute -bottom-40 -left-40 h-[500px] w-[500px] rounded-full bg-accent-amber/10 blur-[128px]" />
-        <div className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-blue/8 blur-[128px]" />
-      </div>
+      {/* Navbar */}
+      <Navbar />
 
       {/* Hero */}
       <HeroSection>
@@ -28,6 +26,9 @@ export default async function Home() {
 
       {/* Stats */}
       <StatsSection />
+
+      {/* How it works */}
+      <HowItWorksSection />
 
       {/* Features */}
       <FeaturesSection />
