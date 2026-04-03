@@ -93,14 +93,6 @@ export default function ImportPage() {
         </div>
       </div>
 
-      {/* Info */}
-      <div className="mt-4 max-w-xl border border-accent-teal/20 bg-accent-teal/5 p-4">
-        <p className="text-[12px] font-medium text-accent-teal">LinkedIn import coming soon</p>
-        <p className="mt-1 text-[11px] text-text-secondary">
-          Import will be available when the backend is deployed. In the meantime, explore your dashboard with demo data.
-        </p>
-      </div>
-
       {/* Error */}
       {error && (
         <div className="mt-4 max-w-xl border border-accent-amber/30 bg-accent-amber/5 p-3 text-xs text-accent-amber">

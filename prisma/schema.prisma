@@ -23,9 +23,15 @@ model AlumniContact {
   name           String
   firmName       String
   title          String
-  linkedInUrl    String       @default("")
+  linkedInUrl    String       @unique @default("")
   university     String
   graduationYear Int
+  education      String       @default("")
+  location       String       @default("")
+  affiliations   String       @default("")
+  warmthScore    Float        @default(0)
+  tier           String       @default("cold")
+  source         String       @default("manual")
   connections    Connection[]
 }
 
