@@ -1,12 +1,33 @@
 import { NextResponse } from "next/server";
-
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://localhost:8000";
+import { supabase } from "@/lib/supabase";
 
 export async function GET() {
   try {
-    const res = await fetch(`${FASTAPI_URL}/api/dashboard/overview`);
-    return NextResponse.json(await res.json());
+    const { count: totalContacts } = await supabase
+      .from("AlumniContact")
+      .select("*", { count: "exact", head: true });
+
+    const { count: highValue } = await supabase
+      .from("AlumniContact")
+      .select("*", { count: "exact", head: true })
+      .in("tier", ["hot", "warm"]);
+
+    return NextResponse.json({
+      ratings: { high_value: highValue || 0, total: totalContacts || 0 },
+      stats: { companies: 0, contacts: totalContacts || 0, scored: totalContacts || 0 },
+      pipeline_total: 0,
+      pipeline_by_stage: {},
+      reminders_count: 0,
+      recent_activity: [],
+    });
   } catch {
-    return NextResponse.json({ ratings: { high_value: 0, medium: 0, low: 0 }, total_contacts: 0, pipeline: { researched: 0, connected: 0, email_sent: 0, follow_up: 0, responded: 0, meeting_set: 0 }, recent_activity: [] });
+    return NextResponse.json({
+      ratings: { high_value: 0, total: 0 },
+      stats: { companies: 0, contacts: 0, scored: 0 },
+      pipeline_total: 0,
+      pipeline_by_stage: {},
+      reminders_count: 0,
+      recent_activity: [],
+    });
   }
 }
