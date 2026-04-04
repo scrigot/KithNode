@@ -68,16 +68,27 @@ function parseLinkedInCSV(text: string): CsvContact[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
 
-  const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase().trim());
+  // Find the actual header row (LinkedIn CSVs have disclaimer lines at the top)
+  let headerIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const lower = lines[i].toLowerCase();
+    if (lower.includes("first name") && lower.includes("last name")) {
+      headerIdx = i;
+      break;
+    }
+  }
+
+  const headers = parseCSVLine(lines[headerIdx]).map((h) => h.toLowerCase().trim());
   const firstNameIdx = headers.findIndex((h) => h === "first name");
   const lastNameIdx = headers.findIndex((h) => h === "last name");
   const emailIdx = headers.findIndex((h) => h === "email address");
   const companyIdx = headers.findIndex((h) => h === "company");
   const positionIdx = headers.findIndex((h) => h === "position");
+  const urlIdx = headers.findIndex((h) => h === "url");
 
   const contacts: CsvContact[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerIdx + 1; i < lines.length; i++) {
     const fields = parseCSVLine(lines[i]);
     const firstName = firstNameIdx >= 0 ? parseCSVField(fields[firstNameIdx] || "") : "";
     const lastName = lastNameIdx >= 0 ? parseCSVField(fields[lastNameIdx] || "") : "";
@@ -88,12 +99,16 @@ function parseLinkedInCSV(text: string): CsvContact[] {
     const firmName = companyIdx >= 0 ? parseCSVField(fields[companyIdx] || "") : "";
     const title = positionIdx >= 0 ? parseCSVField(fields[positionIdx] || "") : "";
 
-    // Construct a best-guess LinkedIn URL from name
-    const slug = `${firstName}-${lastName}`
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-");
-    const linkedInUrl = slug ? `https://linkedin.com/in/${slug}` : "";
+    // Use real LinkedIn URL from CSV if available, otherwise construct from name
+    const csvUrl = urlIdx >= 0 ? parseCSVField(fields[urlIdx] || "") : "";
+    let linkedInUrl = csvUrl;
+    if (!linkedInUrl) {
+      const slug = `${firstName}-${lastName}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-");
+      linkedInUrl = slug ? `https://linkedin.com/in/${slug}` : "";
+    }
 
     contacts.push({
       name,
