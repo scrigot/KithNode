@@ -111,31 +111,47 @@ const TOP_FIRMS = [
 const CONSULTING = [/mckinsey/i, /bcg|boston\s*consulting/i, /bain/i, /deloitte/i, /accenture/i];
 
 export function detectAffiliations(meta: LinkedInMeta): Affiliation[] {
-  const text = [meta.education, meta.location, meta.experience, meta.title].join(" ");
+  const allText = [meta.education, meta.location, meta.experience, meta.title].join(" ");
   const affiliations: Affiliation[] = [];
 
-  const hasKenanFlagler = KENAN_FLAGLER.some((p) => p.test(text));
-  const hasUNC = UNC_PATTERNS.some((p) => p.test(text));
+  // Check if current company IS a university (= active student, not alumni)
+  const companyText = (meta.experience || meta.title || "").toLowerCase();
+  const isCurrentStudent =
+    UNC_PATTERNS.some((p) => p.test(companyText)) ||
+    /\buniversity\b/i.test(companyText) ||
+    /\bstudent\b/i.test(companyText) ||
+    /\bintern\b/i.test(meta.title || "");
 
-  if (hasKenanFlagler) {
-    affiliations.push({ name: "Kenan-Flagler", boost: 25 });
-  } else if (hasUNC) {
+  // UNC affiliation: only "Alumni" if UNC is in education but NOT their current company
+  const uncInEducation = UNC_PATTERNS.some((p) => p.test(meta.education || ""));
+  const kfInEducation = KENAN_FLAGLER.some((p) => p.test(meta.education || ""));
+  const uncInCompany = UNC_PATTERNS.some((p) => p.test(companyText));
+
+  if (kfInEducation && !uncInCompany) {
+    affiliations.push({ name: "Kenan-Flagler Alumni", boost: 25 });
+  } else if (uncInEducation && !uncInCompany) {
     affiliations.push({ name: "UNC Alumni", boost: 20 });
+  } else if (uncInCompany || isCurrentStudent) {
+    affiliations.push({ name: "UNC Student", boost: 5 });
+  } else if (UNC_PATTERNS.some((p) => p.test(allText))) {
+    // UNC mentioned somewhere else (e.g., location)
+    affiliations.push({ name: "UNC Connected", boost: 10 });
   }
 
-  if (CHI_PHI.some((p) => p.test(text))) {
+  if (CHI_PHI.some((p) => p.test(allText))) {
     affiliations.push({ name: "Chi Phi", boost: 15 });
   }
 
-  if (NC_LOCATIONS.some((p) => p.test(meta.location || text))) {
+  if (NC_LOCATIONS.some((p) => p.test(meta.location || allText))) {
     affiliations.push({ name: "NC Local", boost: 10 });
   }
 
-  if (TOP_FIRMS.some((p) => p.test(text))) {
+  // Top firms — only count if they actually WORK there (not a student)
+  if (!isCurrentStudent && TOP_FIRMS.some((p) => p.test(companyText))) {
     affiliations.push({ name: "Top Firm", boost: 15 });
   }
 
-  if (CONSULTING.some((p) => p.test(text))) {
+  if (!isCurrentStudent && CONSULTING.some((p) => p.test(companyText))) {
     affiliations.push({ name: "Consulting", boost: 12 });
   }
 
