@@ -14,11 +14,11 @@ import { Separator } from "@/components/ui/separator";
 import { trackEvent } from "@/lib/posthog";
 
 interface OutreachSheetProps {
-  contactId: number | null;
+  contactId: string | null;
   contactName: string;
   open: boolean;
   onClose: () => void;
-  onStatusChange?: (contactId: number, status: string) => void;
+  onStatusChange?: (contactId: string, status: string) => void;
 }
 
 export function OutreachSheet({

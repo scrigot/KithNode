@@ -58,10 +58,12 @@ export function WarmSignalCard({
   contact,
   onDraftOutreach,
   onAddToPipeline,
+  pipelineAdded,
 }: {
   contact: RankedContact;
-  onDraftOutreach?: (id: number) => void;
-  onAddToPipeline?: (id: number) => void;
+  onDraftOutreach?: (id: string) => void;
+  onAddToPipeline?: (id: string) => void;
+  pipelineAdded?: boolean;
 }) {
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
@@ -157,34 +159,36 @@ export function WarmSignalCard({
       {/* Bottom row: Affiliations + Actions */}
       <div className="mt-3 flex items-center justify-between">
         <div className="flex flex-wrap gap-1">
-          {(contact as unknown as { affiliations?: { name: string }[] })
-            .affiliations?.map((aff: { name: string }) => (
-              <Badge
-                key={aff.name}
-                variant="outline"
-                className={`text-[10px] ${AFFILIATION_COLORS[aff.name] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"}`}
-              >
-                {aff.name}
-              </Badge>
-            ))}
+          {contact.affiliations?.map((aff) => (
+            <Badge
+              key={aff.name}
+              variant="outline"
+              className={`text-[10px] ${AFFILIATION_COLORS[aff.name] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"}`}
+            >
+              {aff.name}
+            </Badge>
+          ))}
         </div>
 
         <div className="flex items-center gap-2">
-          <a
-            href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] text-muted-foreground hover:text-accent-blue"
-            title="Check mutual connections"
-          >
-            MUTUAL
-          </a>
+          {contact.company.name && (
+            <a
+              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-muted-foreground hover:text-accent-blue"
+              title="Check mutual connections"
+            >
+              MUTUAL
+            </a>
+          )}
           {contact.linkedin_url && (
             <a
               href={contact.linkedin_url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[10px] text-muted-foreground hover:text-accent-blue"
+              title={contact.linkedin_url}
             >
               LI
             </a>
@@ -193,13 +197,14 @@ export function WarmSignalCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-6 px-2 text-[10px] text-accent-amber hover:bg-accent-amber/20"
+              className={`h-6 px-2 text-[10px] ${pipelineAdded ? "text-green-400 border-green-500/30 cursor-default" : "text-accent-amber hover:bg-accent-amber/20"}`}
+              disabled={pipelineAdded}
               onClick={(e) => {
                 e.preventDefault();
-                onAddToPipeline(contact.id);
+                if (!pipelineAdded) onAddToPipeline(contact.id);
               }}
             >
-              + PIPELINE
+              {pipelineAdded ? "IN PIPELINE" : "+ PIPELINE"}
             </Button>
           )}
           {onDraftOutreach && (

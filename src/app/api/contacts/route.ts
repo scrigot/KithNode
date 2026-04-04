@@ -12,8 +12,8 @@ export async function GET() {
     if (!contacts || contacts.length === 0) return NextResponse.json([]);
 
     // Transform Supabase data to match RankedContact interface
-    const ranked = contacts.map((c, i) => ({
-      id: i + 1,
+    const ranked = contacts.map((c) => ({
+      id: c.id,
       name: c.name || "",
       title: c.title || "",
       email: "",
@@ -25,6 +25,9 @@ export async function GET() {
         ? c.affiliations.split(",").filter(Boolean).join(", ")
         : "",
       warm_path: c.university || "",
+      affiliations: c.affiliations
+        ? c.affiliations.split(",").filter(Boolean).map((name: string) => ({ name: name.trim(), boost: 10 }))
+        : [],
       company: {
         name: c.firmName || "",
         domain: "",

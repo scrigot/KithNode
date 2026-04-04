@@ -40,7 +40,7 @@ async function request<T>(
 // ─── Contacts ────────────────────────────────────────────────────────
 
 export interface RankedContact {
-  id: number;
+  id: string;
   name: string;
   title: string;
   email: string;
@@ -50,13 +50,13 @@ export interface RankedContact {
   linkedin_location: string;
   why_now: string;
   warm_path: string;
+  affiliations: { name: string; boost: number }[];
   company: {
     name: string;
     domain: string;
     website: string;
     location: string;
     industry_tags: string[];
-    description: string;
   };
   score: {
     fit_score: number;
@@ -64,7 +64,6 @@ export interface RankedContact {
     engagement_score: number;
     total_score: number;
     tier: string;
-    scored_at: string;
   };
 }
 
@@ -104,7 +103,7 @@ export function getContactsRanked(
 // ─── Pipeline ────────────────────────────────────────────────────────
 
 export interface PipelineContact {
-  id: number;
+  id: string;
   name: string;
   title: string;
   email: string;
@@ -131,9 +130,9 @@ export function getPipeline(): Promise<PipelineResponse> {
 }
 
 export function addToPipeline(
-  contactId: number,
+  contactId: string,
   stage = "researched",
-): Promise<{ contact_id: number; pipeline_id: number; stage: string }> {
+): Promise<{ contact_id: string; pipeline_id: string; stage: string }> {
   return request(`/api/pipeline/${contactId}`, {
     method: "POST",
     body: JSON.stringify({ stage }),
@@ -141,10 +140,10 @@ export function addToPipeline(
 }
 
 export function updatePipelineStage(
-  contactId: number,
+  contactId: string,
   stage: string,
   notes?: string,
-): Promise<{ contact_id: number; stage: string }> {
+): Promise<{ contact_id: string; stage: string }> {
   return request(`/api/pipeline/${contactId}`, {
     method: "PATCH",
     body: JSON.stringify({ stage, notes }),

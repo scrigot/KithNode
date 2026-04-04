@@ -18,9 +18,10 @@ export function ContactsList() {
   const [activeTier, setActiveTier] = useState("all");
   const [sort, setSort] = useState<SortOption>("score");
   const [outreachTarget, setOutreachTarget] = useState<{
-    id: number;
+    id: string;
     name: string;
   } | null>(null);
+  const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/contacts?curated=true")
@@ -157,8 +158,12 @@ export function ContactsList() {
             onDraftOutreach={(id) => {
               setOutreachTarget({ id, name: contact.name });
             }}
+            pipelineAdded={pipelineAdded.has(contact.id)}
             onAddToPipeline={async (id) => {
-              await fetch(`/api/pipeline/${id}`, { method: "POST" });
+              const res = await fetch(`/api/pipeline/${id}`, { method: "POST" });
+              if (res.ok) {
+                setPipelineAdded((prev) => new Set(prev).add(String(id)));
+              }
               trackEvent("pipeline_added", {
                 contact_id: id,
                 name: contact.name,

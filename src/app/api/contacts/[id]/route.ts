@@ -1,27 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getContactDetail } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  // TODO: re-enable auth after Google OAuth is configured
-  // const session = await auth();
-  // if (!session?.user?.id) {
-  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // }
-
   const { id } = await params;
 
-  try {
-    const contact = await getContactDetail(Number(id));
-    return NextResponse.json(contact);
-  } catch (error) {
-    const status = (error as { status?: number }).status || 500;
-    return NextResponse.json(
-      { error: "Contact not found" },
-      { status },
-    );
+  const { data: contact, error } = await supabase
+    .from("AlumniContact")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !contact) {
+    return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
+
+  return NextResponse.json({
+    id: contact.id,
+    name: contact.name,
+    title: contact.title,
+    email: "",
+    linkedin_url: contact.linkedInUrl,
+    education: contact.education,
+    linkedin_location: contact.location,
+    company: {
+      name: contact.firmName,
+      domain: "",
+      website: "",
+      location: contact.location,
+      industry_tags: [],
+    },
+    score: {
+      fit_score: contact.warmthScore,
+      signal_score: 0,
+      engagement_score: 0,
+      total_score: contact.warmthScore,
+      tier: contact.tier,
+    },
+    affiliations: contact.affiliations
+      ? contact.affiliations
+          .split(",")
+          .filter(Boolean)
+          .map((n: string) => ({ id: 0, name: n.trim(), boost: 10 }))
+      : [],
+    why_now: contact.affiliations || "",
+    warm_path: contact.university || "",
+    outreach_history: [],
+    signals: [],
+  });
 }

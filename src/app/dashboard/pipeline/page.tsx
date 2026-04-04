@@ -50,7 +50,7 @@ export default function PipelinePage() {
     fetchPipeline();
   }, [fetchPipeline]);
 
-  const moveStage = async (contactId: number, newStage: string) => {
+  const moveStage = async (contactId: string, newStage: string) => {
     await fetch(`/api/pipeline/${contactId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
