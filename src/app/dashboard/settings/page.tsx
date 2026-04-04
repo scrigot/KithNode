@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   GraduationCap,
+  MapPin,
   Target,
   Building2,
   CheckCircle2,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import { trackEvent } from "@/lib/posthog";
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const INDUSTRY_OPTIONS = [
   "Investment Banking",
@@ -47,12 +48,26 @@ const FIRM_OPTIONS = [
   "Deloitte",
 ];
 
-const STEP_ICONS = [GraduationCap, Target, Building2, CheckCircle2];
+const LOCATION_OPTIONS = [
+  "New York",
+  "San Francisco",
+  "Chicago",
+  "Charlotte",
+  "Boston",
+  "Houston",
+  "Dallas",
+  "London",
+];
+
+const STEP_ICONS = [GraduationCap, MapPin, Target, Building2, CheckCircle2];
 
 interface Preferences {
   university: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
+  hometown: string;
+  targetLocations: string[];
+  customLocations: string[];
   targetIndustries: string[];
   targetFirms: string[];
   customFirms: string[];
@@ -76,6 +91,9 @@ function getDefaults(): Preferences {
     university: "",
     greekLifeEnabled: false,
     greekOrganization: "",
+    hometown: "",
+    targetLocations: [],
+    customLocations: [],
     targetIndustries: [],
     targetFirms: [],
     customFirms: [],
@@ -98,6 +116,11 @@ async function syncToAPI(prefs: Preferences) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         current_university: prefs.university || null,
+        hometown: prefs.hometown || null,
+        target_locations:
+          [...prefs.targetLocations, ...prefs.customLocations].length > 0
+            ? [...prefs.targetLocations, ...prefs.customLocations]
+            : null,
         target_industries: prefs.targetIndustries.length > 0 ? prefs.targetIndustries : null,
         target_companies:
           [...prefs.targetFirms, ...prefs.customFirms].length > 0
@@ -116,6 +139,7 @@ export default function SettingsPage() {
   const [step, setStep] = useState(0);
   const [prefs, setPrefs] = useState<Preferences>(getDefaults);
   const [customFirmInput, setCustomFirmInput] = useState("");
+  const [customLocationInput, setCustomLocationInput] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   // Load from localStorage on mount
@@ -167,11 +191,42 @@ export default function SettingsPage() {
     }));
   };
 
+  const toggleLocation = (loc: string) => {
+    setPrefs((p) => ({
+      ...p,
+      targetLocations: p.targetLocations.includes(loc)
+        ? p.targetLocations.filter((l) => l !== loc)
+        : [...p.targetLocations, loc],
+    }));
+  };
+
+  const addCustomLocation = () => {
+    const loc = customLocationInput.trim();
+    if (!loc) return;
+    if (
+      prefs.customLocations.includes(loc) ||
+      prefs.targetLocations.includes(loc) ||
+      LOCATION_OPTIONS.includes(loc)
+    )
+      return;
+    setPrefs((p) => ({ ...p, customLocations: [...p.customLocations, loc] }));
+    setCustomLocationInput("");
+  };
+
+  const removeCustomLocation = (loc: string) => {
+    setPrefs((p) => ({
+      ...p,
+      customLocations: p.customLocations.filter((l) => l !== loc),
+    }));
+  };
+
   const handleFinish = async () => {
     savePreferences(prefs);
     await syncToAPI(prefs);
     trackEvent("settings_onboarding_completed", {
       university: prefs.university,
+      hometown: prefs.hometown,
+      targetLocations: [...prefs.targetLocations, ...prefs.customLocations],
       industries: prefs.targetIndustries,
       firms: [...prefs.targetFirms, ...prefs.customFirms],
       greekLife: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
@@ -336,8 +391,104 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* STEP 2: Target Industries */}
+          {/* STEP 2: Location */}
           {step === 1 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Your Location
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">
+                Where you&apos;re from and where you want to work helps us find
+                local connections
+              </h2>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Where are you from?
+                  </label>
+                  <Input
+                    placeholder="Charlotte, NC"
+                    value={prefs.hometown}
+                    onChange={(e) =>
+                      setPrefs({ ...prefs, hometown: e.target.value })
+                    }
+                    className="bg-muted text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Where do you want to work?
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {LOCATION_OPTIONS.map((loc) => {
+                      const active = prefs.targetLocations.includes(loc);
+                      return (
+                        <button
+                          key={loc}
+                          onClick={() => toggleLocation(loc)}
+                          className={`border px-4 py-2.5 text-xs font-bold transition-colors ${
+                            active
+                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                              : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {loc}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom locations */}
+                {prefs.customLocations.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {prefs.customLocations.map((loc) => (
+                      <span
+                        key={loc}
+                        className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                      >
+                        {loc}
+                        <button
+                          onClick={() => removeCustomLocation(loc)}
+                          className="text-accent-teal/60 hover:text-accent-teal"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a location..."
+                    value={customLocationInput}
+                    onChange={(e) => setCustomLocationInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomLocation();
+                      }
+                    }}
+                    className="bg-muted text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={addCustomLocation}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Target Industries */}
+          {step === 2 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Target Industries
@@ -367,8 +518,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* STEP 3: Target Firms */}
-          {step === 2 && (
+          {/* STEP 4: Target Firms */}
+          {step === 3 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                 Target Firms
@@ -442,8 +593,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* STEP 4: All Set */}
-          {step === 3 && (
+          {/* STEP 5: All Set */}
+          {step === 4 && (
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border border-accent-teal/30 bg-accent-teal/10">
                 <CheckCircle2 className="h-8 w-8 text-accent-teal" />
@@ -465,6 +616,22 @@ export default function SettingsPage() {
                       {prefs.university}
                       {prefs.greekLifeEnabled && prefs.greekOrganization
                         ? ` / ${prefs.greekOrganization}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+                {(prefs.hometown || prefs.targetLocations.length > 0 || prefs.customLocations.length > 0) && (
+                  <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
+                    <MapPin className="h-4 w-4 text-accent-teal" />
+                    <span className="text-xs text-foreground">
+                      {prefs.hometown ? `From ${prefs.hometown}` : ""}
+                      {prefs.hometown && (prefs.targetLocations.length + prefs.customLocations.length) > 0
+                        ? " · "
+                        : ""}
+                      {(prefs.targetLocations.length + prefs.customLocations.length) > 0
+                        ? `${prefs.targetLocations.length + prefs.customLocations.length} target location${
+                            prefs.targetLocations.length + prefs.customLocations.length === 1 ? "" : "s"
+                          }`
                         : ""}
                     </span>
                   </div>

@@ -60,9 +60,9 @@ export async function POST(req: NextRequest) {
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: {
-        trial_period_days: TRIAL_DAYS,
-      },
+      ...(plan === "annual"
+        ? { subscription_data: { trial_period_days: TRIAL_DAYS } }
+        : {}),
       success_url: `${origin}/dashboard?checkout=success`,
       cancel_url: `${origin}/dashboard/billing`,
       metadata: {

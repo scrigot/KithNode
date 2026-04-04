@@ -11,6 +11,9 @@ const PLANS: {
   price: string;
   perMonth: string;
   badge?: string;
+  trialBadge?: string;
+  buttonText: string;
+  buttonSubtext?: string;
   features: string[];
 }[] = [
   {
@@ -18,6 +21,7 @@ const PLANS: {
     name: "Monthly",
     price: "$15",
     perMonth: "$15/mo",
+    buttonText: "Subscribe — $15/mo",
     features: [
       "Unlimited warm signals",
       "AI outreach drafts",
@@ -32,6 +36,9 @@ const PLANS: {
     price: "$120",
     perMonth: "$10/mo",
     badge: "Save $60",
+    trialBadge: "7-DAY FREE TRIAL",
+    buttonText: "Start 7-day free trial",
+    buttonSubtext: "then $120/yr ($10/mo)",
     features: [
       "Everything in Monthly",
       "2 months free",
@@ -154,12 +161,19 @@ export default function BillingPage() {
                   : "border-white/[0.10]"
               }`}
             >
-              {/* Save badge */}
-              {plan.badge && (
-                <span className="absolute right-4 top-4 bg-accent-teal/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
-                  {plan.badge}
-                </span>
-              )}
+              {/* Badges */}
+              <div className="absolute right-4 top-4 flex flex-col items-end gap-1.5">
+                {plan.trialBadge && (
+                  <span className="bg-accent-teal px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                    {plan.trialBadge}
+                  </span>
+                )}
+                {plan.badge && (
+                  <span className="bg-accent-teal/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
+                    {plan.badge}
+                  </span>
+                )}
+              </div>
 
               <h4 className="text-[13px] font-medium uppercase tracking-wider text-text-muted">
                 {plan.name}
@@ -195,27 +209,34 @@ export default function BillingPage() {
                 ))}
               </ul>
 
-              <button
-                onClick={() =>
-                  isCurrentPlan ? handlePortal() : handleCheckout(plan.id)
-                }
-                disabled={isLoading}
-                className={`mt-6 flex w-full items-center justify-center gap-2 py-3 text-[13px] font-semibold transition-all duration-150 ${
-                  isCurrentPlan
-                    ? "border border-white/[0.10] bg-white/[0.04] text-text-secondary"
-                    : plan.id === "annual"
-                      ? "bg-accent-teal text-white hover:bg-accent-teal/90"
-                      : "border border-accent-teal/40 text-accent-teal hover:bg-accent-teal/10"
-                }`}
-              >
-                {isLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : isCurrentPlan ? (
-                  "Current Plan"
-                ) : (
-                  "Start 7-day free trial"
+              <div className="mt-6">
+                <button
+                  onClick={() =>
+                    isCurrentPlan ? handlePortal() : handleCheckout(plan.id)
+                  }
+                  disabled={isLoading}
+                  className={`flex w-full items-center justify-center gap-2 py-3 text-[13px] font-semibold transition-all duration-150 ${
+                    isCurrentPlan
+                      ? "border border-white/[0.10] bg-white/[0.04] text-text-secondary"
+                      : plan.id === "annual"
+                        ? "bg-accent-teal text-white hover:bg-accent-teal/90"
+                        : "border border-accent-teal/40 text-accent-teal hover:bg-accent-teal/10"
+                  }`}
+                >
+                  {isLoading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : isCurrentPlan ? (
+                    "Current Plan"
+                  ) : (
+                    plan.buttonText
+                  )}
+                </button>
+                {plan.buttonSubtext && !isCurrentPlan && (
+                  <p className="mt-1.5 text-center text-[11px] text-text-muted">
+                    {plan.buttonSubtext}
+                  </p>
                 )}
-              </button>
+              </div>
             </div>
           );
         })}
@@ -224,8 +245,9 @@ export default function BillingPage() {
       {/* FAQ / Note */}
       <div className="mt-6 border border-white/[0.06] bg-bg-card p-5">
         <p className="text-[12px] text-text-muted leading-relaxed">
-          All plans include a 7-day free trial. You won&apos;t be charged until
-          your trial ends. Cancel anytime from the billing portal. Payments are
+          The annual plan includes a 7-day free trial — you won&apos;t be
+          charged until your trial ends. The monthly plan is charged
+          immediately. Cancel anytime from the billing portal. Payments are
           securely processed by Stripe.
         </p>
       </div>
