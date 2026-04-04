@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import {
   scrapeLinkedInMeta,
   detectAffiliations,
@@ -31,13 +31,8 @@ export async function POST(request: NextRequest) {
   for (const url of body.urls) {
     if (!isValidLinkedInUrl(url)) {
       results.push({
-        name: "",
-        title: "",
-        linkedin_url: url,
-        company_name: "",
-        affiliations: [],
-        total_score: 0,
-        tier: "cold",
+        name: "", title: "", linkedin_url: url, company_name: "",
+        affiliations: [], total_score: 0, tier: "cold",
         error: "Invalid LinkedIn URL format",
       });
       failed++;
@@ -45,49 +40,59 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Scrape LinkedIn profile meta tags
       const meta = await scrapeLinkedInMeta(url);
-
-      // Detect affiliations
       const affiliations = detectAffiliations(meta);
-
-      // Compute warmth score
       const { score, tier } = computeWarmthScore(affiliations);
 
-      // Upsert into database
-      const contact = await prisma.alumniContact.upsert({
-        where: { linkedInUrl: url },
-        update: {
-          name: meta.name,
-          title: meta.title,
-          firmName: meta.experience,
-          university: meta.education,
-          education: meta.education,
-          location: meta.location,
-          affiliations: affiliations.map((a) => a.name).join(","),
-          warmthScore: score,
-          tier,
-          source: "linkedin_import",
-        },
-        create: {
-          name: meta.name,
-          title: meta.title,
-          firmName: meta.experience,
-          linkedInUrl: url,
-          university: meta.education,
-          graduationYear: 0,
-          education: meta.education,
-          location: meta.location,
-          affiliations: affiliations.map((a) => a.name).join(","),
-          warmthScore: score,
-          tier,
-          source: "linkedin_import",
-        },
-      });
+      // Check if contact already exists
+      const { data: existing } = await supabase
+        .from("AlumniContact")
+        .select("id")
+        .eq("linkedInUrl", url)
+        .single();
+
+      if (existing) {
+        // Update existing
+        await supabase
+          .from("AlumniContact")
+          .update({
+            name: meta.name,
+            title: meta.title,
+            firmName: meta.experience,
+            university: meta.education,
+            education: meta.education,
+            location: meta.location,
+            affiliations: affiliations.map((a) => a.name).join(","),
+            warmthScore: score,
+            tier,
+            source: "linkedin_import",
+          })
+          .eq("id", existing.id);
+      } else {
+        // Insert new
+        const { error: insertError } = await supabase
+          .from("AlumniContact")
+          .insert({
+            name: meta.name,
+            title: meta.title,
+            firmName: meta.experience,
+            linkedInUrl: url,
+            university: meta.education,
+            graduationYear: 0,
+            education: meta.education,
+            location: meta.location,
+            affiliations: affiliations.map((a) => a.name).join(","),
+            warmthScore: score,
+            tier,
+            source: "linkedin_import",
+          });
+
+        if (insertError) throw new Error(insertError.message);
+      }
 
       results.push({
-        name: contact.name,
-        title: contact.title,
+        name: meta.name,
+        title: meta.title,
         linkedin_url: url,
         company_name: meta.experience,
         affiliations: affiliations.map((a) => a.name),
@@ -97,13 +102,8 @@ export async function POST(request: NextRequest) {
       imported++;
     } catch (err) {
       results.push({
-        name: "",
-        title: "",
-        linkedin_url: url,
-        company_name: "",
-        affiliations: [],
-        total_score: 0,
-        tier: "cold",
+        name: "", title: "", linkedin_url: url, company_name: "",
+        affiliations: [], total_score: 0, tier: "cold",
         error: err instanceof Error ? err.message : "Import failed",
       });
       failed++;
