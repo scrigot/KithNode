@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://localhost:8000";
+import { supabase } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
-  // Pass all query params through to FastAPI
-  const params = request.nextUrl.searchParams.toString();
-  const url = `${FASTAPI_URL}/api/discover${params ? `?${params}` : ""}`;
+  const query = request.nextUrl.searchParams.get("q") || "";
+  const tier = request.nextUrl.searchParams.get("tier") || "";
 
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch {
-    return NextResponse.json({ contacts: [], total: 0 });
+  let builder = supabase.from("AlumniContact").select("*");
+
+  if (query) {
+    builder = builder.or(
+      `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
+    );
   }
+  if (tier) {
+    builder = builder.eq("tier", tier);
+  }
+
+  const { data, error } = await builder
+    .order("warmthScore", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    return NextResponse.json({ contacts: [], total: 0 }, { status: 500 });
+  }
+
+  return NextResponse.json({ contacts: data || [], total: data?.length || 0 });
 }

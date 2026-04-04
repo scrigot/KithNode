@@ -14,13 +14,22 @@ const STAGE_LABELS: Record<string, string> = {
   meeting_set: "MEETING SET",
 };
 
-const STAGE_COLORS: Record<string, string> = {
-  researched: "border-zinc-500/30",
-  connected: "border-blue-500/30",
-  email_sent: "border-accent-blue",
-  follow_up: "border-amber-500/30",
-  responded: "border-green-500/30",
-  meeting_set: "border-primary",
+const STAGE_HEADER_COLORS: Record<string, string> = {
+  researched: "bg-zinc-500/10 border-zinc-500/30",
+  connected: "bg-blue-500/10 border-blue-500/30",
+  email_sent: "bg-sky-500/10 border-sky-500/30",
+  follow_up: "bg-amber-500/10 border-amber-500/30",
+  responded: "bg-green-500/10 border-green-500/30",
+  meeting_set: "bg-primary/10 border-primary/30",
+};
+
+const STAGE_BADGE_COLORS: Record<string, string> = {
+  researched: "bg-zinc-500/20 text-zinc-400",
+  connected: "bg-blue-500/20 text-blue-400",
+  email_sent: "bg-sky-500/20 text-sky-400",
+  follow_up: "bg-amber-500/20 text-amber-400",
+  responded: "bg-green-500/20 text-green-400",
+  meeting_set: "bg-primary/20 text-primary",
 };
 
 const TIER_STYLES: Record<string, string> = {
@@ -28,6 +37,13 @@ const TIER_STYLES: Record<string, string> = {
   warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
+};
+
+const TIER_BADGE_STYLES: Record<string, string> = {
+  hot: "bg-red-500/20 text-red-400 border-red-500/30",
+  warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  cold: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
 };
 
 export default function PipelinePage() {
@@ -67,11 +83,11 @@ export default function PipelinePage() {
 
   if (loading) {
     return (
-      <div className="p-6">
+      <div className="min-h-full p-6">
         <div className="h-4 w-32 animate-pulse bg-muted" />
-        <div className="mt-4 flex gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-64 w-40 animate-pulse bg-muted" />
+        <div className="mt-4 space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 w-full animate-pulse bg-muted" />
           ))}
         </div>
       </div>
@@ -80,7 +96,7 @@ export default function PipelinePage() {
 
   if (!data || data.total === 0) {
     return (
-      <div className="p-6">
+      <div className="min-h-full p-6">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
           PIPELINE
         </h2>
@@ -105,7 +121,7 @@ export default function PipelinePage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="min-h-full p-6">
       <div className="mb-1 flex items-baseline justify-between">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
           PIPELINE
@@ -114,110 +130,127 @@ export default function PipelinePage() {
           {data.total} CONTACTS IN PIPELINE
         </span>
       </div>
-      <div className="mb-4 h-px bg-border" />
+      <div className="mb-5 h-px bg-border" />
 
-      {/* Kanban columns */}
-      <div className="flex gap-2 overflow-x-auto pb-4">
+      {/* Vertical Kanban — stages stack top-to-bottom */}
+      <div className="space-y-4">
         {data.stages.map((stage) => {
           const contacts = data.contacts[stage] || [];
           return (
-            <div
-              key={stage}
-              className={`min-w-[220px] flex-shrink-0 border-t-2 ${STAGE_COLORS[stage]} bg-card`}
-            >
-              {/* Column header */}
-              <div className="border-b border-border px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <div key={stage}>
+              {/* Stage header bar */}
+              <div
+                className={`flex items-center justify-between border px-4 py-2.5 ${STAGE_HEADER_COLORS[stage]}`}
+              >
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   {STAGE_LABELS[stage]}
-                </p>
-                <p className="text-[10px] tabular-nums text-muted-foreground">
+                </span>
+                <span
+                  className={`inline-flex h-5 min-w-[20px] items-center justify-center px-1.5 text-[10px] font-bold tabular-nums ${STAGE_BADGE_COLORS[stage]}`}
+                >
                   {contacts.length}
-                </p>
+                </span>
               </div>
 
-              {/* Cards */}
-              <div className="space-y-1 p-2">
-                {contacts.map((contact: PipelineContact) => {
-                  const next = getNextStage(stage);
-                  // Freshness dot
-                  const addedDate = new Date(contact.added_at || Date.now());
-                  const daysSince = Math.floor(
-                    (Date.now() - addedDate.getTime()) / (1000 * 60 * 60 * 24),
-                  );
-                  const freshness =
-                    daysSince < 7
-                      ? "bg-green-400"
-                      : daysSince < 21
-                        ? "bg-amber-400"
-                        : "bg-red-400";
+              {/* Cards row or empty state */}
+              {contacts.length === 0 ? (
+                <div className="border border-dashed border-white/[0.08] bg-transparent px-6 py-6 text-center">
+                  <span className="text-[12px] text-text-muted">
+                    No contacts in this stage
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3 border border-t-0 border-white/[0.06] bg-bg-card/30 p-3">
+                  {contacts.map((contact: PipelineContact) => {
+                    const next = getNextStage(stage);
+                    const addedDate = new Date(contact.added_at || Date.now());
+                    const daysSince = Math.floor(
+                      (Date.now() - addedDate.getTime()) / (1000 * 60 * 60 * 24),
+                    );
+                    const freshness =
+                      daysSince < 7
+                        ? "bg-green-400"
+                        : daysSince < 21
+                          ? "bg-amber-400"
+                          : "bg-red-400";
 
-                  return (
-                    <div
-                      key={contact.id}
-                      className="border border-border bg-background p-2 text-xs"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshness}`}
-                          title={`${daysSince}d since activity`}
-                        />
-                        <p className="truncate font-bold text-foreground">
-                          {contact.name}
+                    return (
+                      <div
+                        key={contact.id}
+                        className="w-[220px] border border-white/[0.06] bg-bg-card p-3"
+                      >
+                        {/* Name + freshness */}
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshness}`}
+                            title={`${daysSince}d since activity`}
+                          />
+                          <p className="truncate text-[13px] font-bold text-foreground">
+                            {contact.name}
+                          </p>
+                        </div>
+
+                        {/* Company */}
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          {contact.company_name || contact.title}
                         </p>
-                      </div>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {contact.title}
-                        {contact.company_name ? ` @ ${contact.company_name}` : ""}
-                      </p>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span
-                          className={`text-[10px] font-bold tabular-nums ${TIER_STYLES[contact.tier] || "text-zinc-400"}`}
-                        >
-                          {Math.round(contact.total_score)}
-                        </span>
-                        {contact.linkedin_url && (
-                          <a
-                            href={contact.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-accent-blue hover:underline"
+
+                        {/* Score + Tier */}
+                        <div className="mt-2 flex items-center gap-2">
+                          <span
+                            className={`text-[13px] font-bold tabular-nums ${TIER_STYLES[contact.tier] || "text-zinc-400"}`}
                           >
-                            LI
-                          </a>
+                            {Math.round(contact.total_score)}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] px-1.5 py-0 uppercase ${TIER_BADGE_STYLES[contact.tier] || TIER_BADGE_STYLES.cold}`}
+                          >
+                            {contact.tier}
+                          </Badge>
+                          {contact.linkedin_url && (
+                            <a
+                              href={contact.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-auto text-[10px] text-accent-blue hover:underline"
+                            >
+                              LI
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Affiliations */}
+                        {contact.affiliations.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-0.5">
+                            {contact.affiliations.map((a) => (
+                              <Badge
+                                key={a}
+                                variant="outline"
+                                className="text-[9px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30"
+                              >
+                                {a}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Advance button */}
+                        {next && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3 h-6 w-full text-[11px]"
+                            onClick={() => moveStage(contact.id, next)}
+                          >
+                            Advance &rarr;
+                          </Button>
                         )}
                       </div>
-                      {contact.affiliations.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-0.5">
-                          {contact.affiliations.map((a) => (
-                            <Badge
-                              key={a}
-                              variant="outline"
-                              className="text-[10px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30"
-                            >
-                              {a}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                      {next && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 h-5 w-full text-[10px]"
-                          onClick={() => moveStage(contact.id, next)}
-                        >
-                          → {STAGE_LABELS[next]}
-                        </Button>
-                      )}
-                      {stage === "responded" && (
-                        <p className="mt-1 text-[10px] text-amber-400">
-                          AutoGuard active
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
