@@ -1,256 +1,546 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import {
+  GraduationCap,
+  Target,
+  Building2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  X,
+} from "lucide-react";
+import { trackEvent } from "@/lib/posthog";
+
+const TOTAL_STEPS = 4;
 
 const INDUSTRY_OPTIONS = [
-  "Fintech", "AI", "Consulting", "VC", "SaaS", "Financial Services", "Real Estate", "Startup",
+  "Investment Banking",
+  "Private Equity",
+  "Consulting",
+  "Venture Capital",
+  "Corporate Finance",
+  "Asset Management",
 ];
-const ROLE_OPTIONS = [
-  { value: "founder", label: "Founders" },
-  { value: "recruiter", label: "Recruiters" },
-  { value: "alumni", label: "Alumni" },
-  { value: "vp_director", label: "VPs/Directors" },
+
+const FIRM_OPTIONS = [
+  "Goldman Sachs",
+  "JPMorgan",
+  "Morgan Stanley",
+  "Bank of America",
+  "Evercore",
+  "Lazard",
+  "Centerview",
+  "Moelis",
+  "PJT Partners",
+  "Blackstone",
+  "KKR",
+  "Carlyle",
+  "Apollo",
+  "McKinsey",
+  "BCG",
+  "Bain",
+  "Deloitte",
 ];
-const LOCATION_OPTIONS = [
-  "Chapel Hill", "Durham", "Raleigh", "Charlotte", "Charleston", "NYC", "SF", "Remote",
-];
+
+const STEP_ICONS = [GraduationCap, Target, Building2, CheckCircle2];
+
+interface Preferences {
+  university: string;
+  greekLifeEnabled: boolean;
+  greekOrganization: string;
+  targetIndustries: string[];
+  targetFirms: string[];
+  customFirms: string[];
+}
+
+const STORAGE_KEY = "kithnode_preferences";
+
+function loadPreferences(): Preferences {
+  if (typeof window === "undefined") return getDefaults();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...getDefaults(), ...JSON.parse(raw) };
+  } catch {
+    // ignore
+  }
+  return getDefaults();
+}
+
+function getDefaults(): Preferences {
+  return {
+    university: "",
+    greekLifeEnabled: false,
+    greekOrganization: "",
+    targetIndustries: [],
+    targetFirms: [],
+    customFirms: [],
+  };
+}
+
+function savePreferences(prefs: Preferences) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
+
+// Also persist to the existing API if it exists
+async function syncToAPI(prefs: Preferences) {
+  try {
+    await fetch("/api/user/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_university: prefs.university || null,
+        target_industries: prefs.targetIndustries.length > 0 ? prefs.targetIndustries : null,
+        target_companies:
+          [...prefs.targetFirms, ...prefs.customFirms].length > 0
+            ? [...prefs.targetFirms, ...prefs.customFirms]
+            : null,
+        greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+      }),
+    });
+  } catch {
+    // API may not exist yet — localStorage is the source of truth
+  }
+}
 
 export default function SettingsPage() {
-  const [prefs, setPrefs] = useState({
-    current_university: "",
-    target_universities: "",
-    target_industries: [] as string[],
-    target_companies: "",
-    greek_life: "",
-    target_locations: [] as string[],
-    target_roles: [] as string[],
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [rescored, setRescored] = useState(0);
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  const [prefs, setPrefs] = useState<Preferences>(getDefaults);
+  const [customFirmInput, setCustomFirmInput] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
+  // Load from localStorage on mount
   useEffect(() => {
-    fetch("/api/user/preferences")
-      .then((r) => r.json())
-      .then((data) => {
-        setPrefs({
-          current_university: data.current_university || "",
-          target_universities: Array.isArray(data.target_universities)
-            ? data.target_universities.join(", ")
-            : "",
-          target_industries: data.target_industries || [],
-          target_companies: Array.isArray(data.target_companies)
-            ? data.target_companies.join(", ")
-            : "",
-          greek_life: data.greek_life || "",
-          target_locations: data.target_locations || [],
-          target_roles: data.target_roles || [],
-        });
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    setPrefs(loadPreferences());
+    setLoaded(true);
   }, []);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
+  // Save to localStorage on every change (after initial load)
+  useEffect(() => {
+    if (loaded) savePreferences(prefs);
+  }, [prefs, loaded]);
 
-    const payload = {
-      current_university: prefs.current_university || null,
-      target_universities: prefs.target_universities
-        ? prefs.target_universities.split(",").map((s) => s.trim()).filter(Boolean)
-        : null,
-      target_industries: prefs.target_industries.length > 0 ? prefs.target_industries : null,
-      target_companies: prefs.target_companies
-        ? prefs.target_companies.split(",").map((s) => s.trim()).filter(Boolean)
-        : null,
-      greek_life: prefs.greek_life || null,
-      target_locations: prefs.target_locations.length > 0 ? prefs.target_locations : null,
-      target_roles: prefs.target_roles.length > 0 ? prefs.target_roles : null,
-    };
-
-    try {
-      const res = await fetch("/api/user/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      setRescored(data.rescored || 0);
-      setSaved(true);
-    } catch {
-      // fail silently
-    }
-    setSaving(false);
-  };
-
-  const toggle = (
-    field: "target_industries" | "target_locations" | "target_roles",
-    value: string,
-  ) => {
+  const toggleIndustry = (ind: string) => {
     setPrefs((p) => ({
       ...p,
-      [field]: p[field].includes(value)
-        ? p[field].filter((v) => v !== value)
-        : [...p[field], value],
+      targetIndustries: p.targetIndustries.includes(ind)
+        ? p.targetIndustries.filter((i) => i !== ind)
+        : [...p.targetIndustries, ind],
     }));
   };
 
-  if (loading) {
+  const toggleFirm = (firm: string) => {
+    setPrefs((p) => ({
+      ...p,
+      targetFirms: p.targetFirms.includes(firm)
+        ? p.targetFirms.filter((f) => f !== firm)
+        : [...p.targetFirms, firm],
+    }));
+  };
+
+  const addCustomFirm = () => {
+    const firm = customFirmInput.trim();
+    if (!firm) return;
+    if (
+      prefs.customFirms.includes(firm) ||
+      prefs.targetFirms.includes(firm) ||
+      FIRM_OPTIONS.includes(firm)
+    )
+      return;
+    setPrefs((p) => ({ ...p, customFirms: [...p.customFirms, firm] }));
+    setCustomFirmInput("");
+  };
+
+  const removeCustomFirm = (firm: string) => {
+    setPrefs((p) => ({
+      ...p,
+      customFirms: p.customFirms.filter((f) => f !== firm),
+    }));
+  };
+
+  const handleFinish = async () => {
+    savePreferences(prefs);
+    await syncToAPI(prefs);
+    trackEvent("settings_onboarding_completed", {
+      university: prefs.university,
+      industries: prefs.targetIndustries,
+      firms: [...prefs.targetFirms, ...prefs.customFirms],
+      greekLife: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+    });
+    router.push("/dashboard");
+  };
+
+  const handleSkip = () => {
+    trackEvent("settings_onboarding_skipped", { step });
+    router.push("/dashboard");
+  };
+
+  const goNext = () => {
+    if (step < TOTAL_STEPS - 1) setStep(step + 1);
+  };
+
+  const goBack = () => {
+    if (step > 0) setStep(step - 1);
+  };
+
+  const allFirmsCount = prefs.targetFirms.length + prefs.customFirms.length;
+
+  if (!loaded) {
     return (
-      <div className="p-6">
+      <div className="flex min-h-[80vh] items-center justify-center">
         <div className="h-4 w-32 animate-pulse bg-muted" />
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-        SETTINGS
-      </h2>
-      <p className="mt-1 text-[10px] text-muted-foreground">
-        YOUR TARGETING PREFERENCES — CHANGES RE-SCORE ALL CONTACTS
-      </p>
-      <div className="mt-4 h-px bg-border" />
-
-      <div className="mt-6 max-w-lg space-y-6">
-        {/* University */}
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            YOUR UNIVERSITY
-          </label>
-          <Input
-            value={prefs.current_university}
-            onChange={(e) => setPrefs({ ...prefs, current_university: e.target.value })}
-            className="bg-muted text-xs"
-            placeholder="e.g. UNC Chapel Hill"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            TARGET UNIVERSITIES (COMMA SEPARATED)
-          </label>
-          <Input
-            value={prefs.target_universities}
-            onChange={(e) => setPrefs({ ...prefs, target_universities: e.target.value })}
-            className="bg-muted text-xs"
-            placeholder="e.g. Duke, NC State, MIT, Harvard"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            GREEK LIFE
-          </label>
-          <Input
-            value={prefs.greek_life}
-            onChange={(e) => setPrefs({ ...prefs, greek_life: e.target.value })}
-            className="bg-muted text-xs"
-            placeholder="e.g. Chi Phi"
-          />
-        </div>
-
-        {/* Industries */}
-        <div>
-          <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            TARGET INDUSTRIES
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {INDUSTRY_OPTIONS.map((ind) => (
-              <button
-                key={ind}
-                onClick={() => toggle("target_industries", ind)}
-                className={`border px-3 py-1.5 text-[10px] font-bold transition-colors ${
-                  prefs.target_industries.includes(ind)
-                    ? "border-primary bg-primary/20 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {ind.toUpperCase()}
-              </button>
-            ))}
+    <div className="flex min-h-[80vh] flex-col items-center justify-center px-4 py-8">
+      {/* Skip link */}
+      {step < TOTAL_STEPS - 1 && (
+        <div className="w-full max-w-lg">
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={handleSkip}
+              className="text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Skip
+            </button>
           </div>
         </div>
+      )}
 
-        {/* Companies */}
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            TOP COMPANIES (COMMA SEPARATED)
-          </label>
-          <Input
-            value={prefs.target_companies}
-            onChange={(e) => setPrefs({ ...prefs, target_companies: e.target.value })}
-            className="bg-muted text-xs"
-            placeholder="e.g. Deloitte, KKR, McKinsey, Ramp"
-          />
+      {/* Progress bar */}
+      <div className="mb-8 w-full max-w-lg">
+        <div className="flex gap-2">
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <div key={i} className="flex-1">
+              <div
+                className={`h-1 w-full transition-colors duration-300 ${
+                  i <= step ? "bg-accent-teal" : "bg-white/[0.06]"
+                }`}
+              />
+            </div>
+          ))}
         </div>
-
-        {/* Roles */}
-        <div>
-          <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            PRIORITIZE ROLES
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {ROLE_OPTIONS.map((role) => (
-              <button
-                key={role.value}
-                onClick={() => toggle("target_roles", role.value)}
-                className={`border px-3 py-1.5 text-[10px] font-bold transition-colors ${
-                  prefs.target_roles.includes(role.value)
-                    ? "border-primary bg-primary/20 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
+        <div className="mt-2 flex justify-between">
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
+            const Icon = STEP_ICONS[i];
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors duration-300 ${
+                  i <= step ? "text-accent-teal" : "text-muted-foreground/40"
                 }`}
               >
-                {role.label.toUpperCase()}
-              </button>
-            ))}
-          </div>
+                <Icon className="h-3 w-3" />
+                <span>{i + 1}</span>
+              </div>
+            );
+          })}
         </div>
+      </div>
 
-        {/* Locations */}
-        <div>
-          <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            TARGET LOCATIONS
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {LOCATION_OPTIONS.map((loc) => (
-              <button
-                key={loc}
-                onClick={() => toggle("target_locations", loc)}
-                className={`border px-3 py-1.5 text-[10px] font-bold transition-colors ${
-                  prefs.target_locations.includes(loc)
-                    ? "border-primary bg-primary/20 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
+      {/* Step content */}
+      <div className="w-full max-w-lg">
+        <div className="border border-white/[0.06] bg-bg-card p-8">
+          {/* STEP 1: Your School */}
+          {step === 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Your School
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">
+                Tell us where you&apos;re at so we can find your warmest alumni
+                connections
+              </h2>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    University
+                  </label>
+                  <Input
+                    placeholder="University of North Carolina at Chapel Hill"
+                    value={prefs.university}
+                    onChange={(e) =>
+                      setPrefs({ ...prefs, university: e.target.value })
+                    }
+                    className="bg-muted text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Greek Life
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setPrefs({ ...prefs, greekLifeEnabled: true })
+                      }
+                      className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                        prefs.greekLifeEnabled
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      YES
+                    </button>
+                    <button
+                      onClick={() =>
+                        setPrefs({
+                          ...prefs,
+                          greekLifeEnabled: false,
+                          greekOrganization: "",
+                        })
+                      }
+                      className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                        !prefs.greekLifeEnabled
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      NO
+                    </button>
+                  </div>
+                </div>
+
+                {prefs.greekLifeEnabled && (
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Organization Name
+                    </label>
+                    <Input
+                      placeholder="e.g. Chi Phi"
+                      value={prefs.greekOrganization}
+                      onChange={(e) =>
+                        setPrefs({
+                          ...prefs,
+                          greekOrganization: e.target.value,
+                        })
+                      }
+                      className="bg-muted text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Target Industries */}
+          {step === 1 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Target Industries
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">
+                What areas of finance are you recruiting for?
+              </h2>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                {INDUSTRY_OPTIONS.map((ind) => {
+                  const active = prefs.targetIndustries.includes(ind);
+                  return (
+                    <button
+                      key={ind}
+                      onClick={() => toggleIndustry(ind)}
+                      className={`border px-4 py-2.5 text-xs font-bold transition-colors ${
+                        active
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {ind}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Target Firms */}
+          {step === 2 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                Target Firms
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">
+                Which firms are you most interested in? We&apos;ll prioritize
+                alumni at these.
+              </h2>
+
+              <div className="mt-6 flex flex-wrap gap-2">
+                {FIRM_OPTIONS.map((firm) => {
+                  const active = prefs.targetFirms.includes(firm);
+                  return (
+                    <button
+                      key={firm}
+                      onClick={() => toggleFirm(firm)}
+                      className={`border px-3 py-2 text-xs font-bold transition-colors ${
+                        active
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {firm}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom firms */}
+              {prefs.customFirms.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {prefs.customFirms.map((firm) => (
+                    <span
+                      key={firm}
+                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    >
+                      {firm}
+                      <button
+                        onClick={() => removeCustomFirm(firm)}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <Input
+                  placeholder="Add a firm..."
+                  value={customFirmInput}
+                  onChange={(e) => setCustomFirmInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomFirm();
+                    }
+                  }}
+                  className="bg-muted text-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={addCustomFirm}
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: All Set */}
+          {step === 3 && (
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border border-accent-teal/30 bg-accent-teal/10">
+                <CheckCircle2 className="h-8 w-8 text-accent-teal" />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground">
+                You&apos;re all set!
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                KithNode is now configured to find your warmest paths into
+                finance.
+              </p>
+
+              {/* Summary */}
+              <div className="mt-6 space-y-2 text-left">
+                {prefs.university && (
+                  <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
+                    <GraduationCap className="h-4 w-4 text-accent-teal" />
+                    <span className="text-xs text-foreground">
+                      {prefs.university}
+                      {prefs.greekLifeEnabled && prefs.greekOrganization
+                        ? ` / ${prefs.greekOrganization}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+                {prefs.targetIndustries.length > 0 && (
+                  <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
+                    <Target className="h-4 w-4 text-accent-teal" />
+                    <span className="text-xs text-foreground">
+                      {prefs.targetIndustries.length} industr
+                      {prefs.targetIndustries.length === 1 ? "y" : "ies"}{" "}
+                      selected
+                    </span>
+                  </div>
+                )}
+                {allFirmsCount > 0 && (
+                  <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
+                    <Building2 className="h-4 w-4 text-accent-teal" />
+                    <span className="text-xs text-foreground">
+                      {allFirmsCount} firm{allFirmsCount === 1 ? "" : "s"}{" "}
+                      targeted
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                className="mt-8 w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+                onClick={handleFinish}
               >
-                {loc.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Save */}
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            className="text-xs"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            {saving ? "SAVING & RE-SCORING..." : "SAVE PREFERENCES"}
-          </Button>
-          {saved && (
-            <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">
-              SAVED — {rescored} contacts re-scored
-            </Badge>
+                Go to Dashboard
+              </Button>
+            </div>
           )}
         </div>
+
+        {/* Navigation buttons */}
+        {step < TOTAL_STEPS - 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div>
+              {step > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={goBack}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Back
+                </Button>
+              )}
+            </div>
+            <Button
+              size="sm"
+              className="gap-1 bg-accent-teal text-xs font-bold text-white hover:bg-accent-teal/90"
+              onClick={goNext}
+            >
+              Continue
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Back button on final step */}
+        {step === TOTAL_STEPS - 1 && (
+          <div className="mt-4">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={goBack}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
