@@ -14,6 +14,7 @@ import {
   Settings,
   ArrowUpRight,
   ChevronRight,
+  Zap,
 } from "lucide-react";
 
 // ── Demo data ──────────────────────────────────────────────────────────────────
@@ -114,6 +115,22 @@ export default function DashboardPage() {
         <span className="inline-flex items-center gap-1.5 border border-white/[0.06] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-text-muted">
           Demo data
         </span>
+      </div>
+
+      {/* ── Trial Banner ────────────────────────────────────────────── */}
+      <div className="mb-4 flex items-center justify-between border border-accent-teal/20 bg-accent-teal/[0.06] px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Zap size={15} className="text-accent-teal" />
+          <span className="text-[13px] text-text-secondary">
+            <span className="font-medium text-white">7 days</span> left in your free trial
+          </span>
+        </div>
+        <Link
+          href="/dashboard/billing"
+          className="text-[12px] font-semibold text-accent-teal hover:text-white transition-colors duration-150"
+        >
+          Upgrade
+        </Link>
       </div>
 
       {/* ── Hero row: Warmth Score + Recruiting Countdown ─────────────── */}

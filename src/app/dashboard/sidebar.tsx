@@ -10,6 +10,7 @@ import {
   Compass,
   Upload,
   Settings,
+  CreditCard,
   MessageSquare,
   LogOut,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/discover", label: "Discover", icon: Compass },
   { href: "/dashboard/import", label: "Import", icon: Upload },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {
