@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUserId } from "@/lib/get-user";
 import {
   scrapeLinkedInMeta,
   detectAffiliations,
@@ -18,6 +19,7 @@ interface CsvContact {
 }
 
 export async function POST(request: NextRequest) {
+  const userId = await getUserId();
   const body = await request.json();
 
   const hasUrls = body.urls && Array.isArray(body.urls) && body.urls.length > 0;
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest) {
           warmthScore: score,
           tier,
           source: "linkedin_csv",
+          importedByUserId: userId,
         };
 
         if (existing) {
@@ -177,6 +180,7 @@ export async function POST(request: NextRequest) {
               warmthScore: score,
               tier,
               source: "linkedin_import",
+              importedByUserId: userId,
             })
             .eq("id", existing.id);
         } else {
@@ -195,6 +199,7 @@ export async function POST(request: NextRequest) {
               warmthScore: score,
               tier,
               source: "linkedin_import",
+              importedByUserId: userId,
             });
 
           if (insertError) throw new Error(insertError.message);

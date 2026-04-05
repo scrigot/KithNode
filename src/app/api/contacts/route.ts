@@ -1,18 +1,47 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUserId } from "@/lib/get-user";
 
 export async function GET() {
   try {
-    const { data: contacts, error } = await supabase
+    const userId = await getUserId();
+
+    // Get user's own imports
+    const { data: ownContacts } = await supabase
       .from("AlumniContact")
       .select("*")
+      .eq("importedByUserId", userId)
       .order("warmthScore", { ascending: false });
 
-    if (error) throw new Error(error.message);
-    if (!contacts || contacts.length === 0) return NextResponse.json([]);
+    // Get contacts user discovered and rated high_value
+    const { data: discoveries } = await supabase
+      .from("UserDiscover")
+      .select("contactId")
+      .eq("userId", userId)
+      .eq("rating", "high_value");
+
+    let discoveredContacts: typeof ownContacts = [];
+    if (discoveries && discoveries.length > 0) {
+      const discoveredIds = discoveries.map((d) => d.contactId);
+      const { data } = await supabase
+        .from("AlumniContact")
+        .select("*")
+        .in("id", discoveredIds);
+      discoveredContacts = data || [];
+    }
+
+    // Merge and deduplicate
+    const seen = new Set<string>();
+    const all = [...(ownContacts || []), ...(discoveredContacts || [])]
+      .filter((c) => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      })
+      .sort((a, b) => (b.warmthScore || 0) - (a.warmthScore || 0));
 
     // Transform Supabase data to match RankedContact interface
-    const ranked = contacts.map((c) => ({
+    const ranked = all.map((c) => ({
       id: c.id,
       name: c.name || "",
       title: c.title || "",
@@ -26,7 +55,10 @@ export async function GET() {
         : "",
       warm_path: c.university || "",
       affiliations: c.affiliations
-        ? c.affiliations.split(",").filter(Boolean).map((name: string) => ({ name: name.trim(), boost: 10 }))
+        ? c.affiliations
+            .split(",")
+            .filter(Boolean)
+            .map((name: string) => ({ name: name.trim(), boost: 10 }))
         : [],
       company: {
         name: c.firmName || "",

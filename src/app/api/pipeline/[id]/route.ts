@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUserId } from "@/lib/get-user";
 
 const STAGES = [
   "researched",
@@ -16,13 +17,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: contactId } = await params;
+  const userId = await getUserId();
 
   try {
-    // Check if already in pipeline
+    // Check if already in pipeline for this user
     const { data: existing } = await supabase
       .from("PipelineEntry")
       .select("*")
       .eq("contactId", contactId)
+      .eq("userId", userId)
       .maybeSingle();
 
     if (existing) {
@@ -34,11 +37,12 @@ export async function POST(
       });
     }
 
-    // Create new pipeline entry
+    // Create new pipeline entry with userId
     const { data: entry, error } = await supabase
       .from("PipelineEntry")
       .insert({
         contactId,
+        userId,
         stage: "researched",
         notes: "",
         addedAt: new Date().toISOString(),
@@ -68,15 +72,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: contactId } = await params;
+  const userId = await getUserId();
 
   try {
     const body = await request.json();
 
-    // Get current pipeline entry
+    // Get current pipeline entry for this user
     const { data: existing, error: fetchError } = await supabase
       .from("PipelineEntry")
       .select("*")
       .eq("contactId", contactId)
+      .eq("userId", userId)
       .single();
 
     if (fetchError || !existing) {

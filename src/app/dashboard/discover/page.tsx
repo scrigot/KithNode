@@ -23,7 +23,7 @@ const SCORE_STYLES: Record<string, string> = {
 const TIERS = ["HOT", "WARM", "MONITOR", "COLD"] as const;
 
 interface Contact {
-  id: number;
+  id: string;
   name: string;
   title: string;
   firmName: string;
@@ -39,22 +39,20 @@ interface Contact {
 
 type ViewMode = "browse" | "search";
 
-// localStorage helpers for rated contacts
-const RATED_KEY = "kithnode_discover_rated";
-
-function getRatedContacts(): Record<string, "high_value" | "skip"> {
-  if (typeof window === "undefined") return {};
+async function rateContact(
+  contactId: string,
+  rating: "high_value" | "skip",
+): Promise<boolean> {
   try {
-    return JSON.parse(localStorage.getItem(RATED_KEY) || "{}");
+    const res = await fetch("/api/discover/rate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactId, rating }),
+    });
+    return res.ok;
   } catch {
-    return {};
+    return false;
   }
-}
-
-function saveRating(contactId: number, rating: "high_value" | "skip") {
-  const rated = getRatedContacts();
-  rated[String(contactId)] = rating;
-  localStorage.setItem(RATED_KEY, JSON.stringify(rated));
 }
 
 // ─── Browse Card Component ─────────────────────────────────────────
@@ -198,8 +196,8 @@ export default function DiscoverPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
-  const [addingToPipeline, setAddingToPipeline] = useState<number | null>(null);
-  const [pipelineAdded, setPipelineAdded] = useState<Set<number>>(new Set());
+  const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
+  const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
 
   // Browse mode state
   const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
@@ -237,20 +235,14 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  // Fetch all contacts for browse mode
+  // Fetch unrated contacts for browse mode (API already filters out rated + own imports)
   const fetchBrowseContacts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/discover");
       if (!res.ok) throw new Error();
       const data = await res.json();
-      const allContacts: Contact[] = data.contacts || [];
-
-      // Filter out already-rated contacts
-      const rated = getRatedContacts();
-      const unrated = allContacts.filter(
-        (c) => !rated[String(c.id)]
-      );
+      const unrated: Contact[] = data.contacts || [];
 
       if (unrated.length === 0) {
         setAllRated(true);
@@ -260,11 +252,7 @@ export default function DiscoverPage() {
         setBrowseContacts(unrated);
       }
 
-      if (allContacts.length === 0) {
-        setHasAnyContacts(false);
-      } else {
-        setHasAnyContacts(true);
-      }
+      setHasAnyContacts(unrated.length > 0 || data.total > 0);
     } catch {
       setBrowseContacts([]);
     } finally {
@@ -304,7 +292,9 @@ export default function DiscoverPage() {
       if (!current) return;
 
       animatingRef.current = true;
-      saveRating(current.id, rating);
+
+      // Persist rating to Supabase via API
+      rateContact(current.id, rating);
       trackEvent("discover_rate", {
         contact_id: current.id,
         rating,
@@ -325,7 +315,7 @@ export default function DiscoverPage() {
         animatingRef.current = false;
       }, 300);
     },
-    [browseContacts, currentIndex]
+    [browseContacts, currentIndex],
   );
 
   // Keyboard shortcuts for browse mode
@@ -342,7 +332,7 @@ export default function DiscoverPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [mode, allRated, browseContacts.length, handleRate]);
 
-  const handleAddToPipeline = async (contactId: number) => {
+  const handleAddToPipeline = async (contactId: string) => {
     setAddingToPipeline(contactId);
     try {
       const res = await fetch(`/api/pipeline/${contactId}`, {
@@ -402,8 +392,8 @@ export default function DiscoverPage() {
           </h2>
           <p className="text-[10px] text-muted-foreground">
             {mode === "browse"
-              ? "RATE YOUR CONTACTS ONE BY ONE"
-              : "SEARCH YOUR IMPORTED NETWORK"}
+              ? "RATE CONTACTS FROM THE SHARED POOL"
+              : "SEARCH THE SHARED NETWORK"}
           </p>
         </div>
 

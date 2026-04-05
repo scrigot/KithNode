@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUserId } from "@/lib/get-user";
 
 const STAGES = [
   "researched",
@@ -12,10 +13,13 @@ const STAGES = [
 
 export async function GET() {
   try {
-    // Fetch all pipeline entries
+    const userId = await getUserId();
+
+    // Fetch pipeline entries for current user
     const { data: entries, error: entryError } = await supabase
       .from("PipelineEntry")
       .select("*")
+      .eq("userId", userId)
       .order("addedAt", { ascending: false });
 
     if (entryError) throw new Error(entryError.message);
