@@ -102,13 +102,32 @@ const UNC_PATTERNS = [/unc/i, /chapel\s*hill/i, /university of north carolina/i]
 const KENAN_FLAGLER = [/kenan[\s-]?flagler/i];
 const CHI_PHI = [/chi\s*phi/i];
 const NC_LOCATIONS = [/raleigh/i, /durham/i, /chapel hill/i, /charlotte/i, /greensboro/i, /winston[\s-]?salem/i];
-const TOP_FIRMS = [
-  /goldman\s*sachs/i, /jpmorgan/i, /morgan\s*stanley/i, /bank of america/i,
-  /evercore/i, /lazard/i, /centerview/i, /moelis/i, /perella/i, /pjt/i,
-  /blackstone/i, /kkr/i, /carlyle/i, /apollo/i, /warburg/i, /tpg/i,
-  /citadel/i, /point72/i, /two sigma/i, /bridgewater/i,
+// Tiered firm categories
+const BULGE_BRACKET = [/goldman\s*sachs/i, /jpmorgan/i, /morgan\s*stanley/i, /bank of america/i, /citi(?:group|bank)?/i, /barclays/i, /deutsche\s*bank/i, /ubs\b/i, /credit\s*suisse/i, /hsbc/i, /wells\s*fargo/i];
+const ELITE_BOUTIQUE = [/evercore/i, /lazard/i, /centerview/i, /moelis/i, /perella/i, /pjt/i, /guggenheim/i, /greenhill/i, /rothschild/i, /qatalyst/i, /houlihan/i, /jefferies/i, /raymond\s*james/i, /william\s*blair/i, /piper\s*sandler/i, /robert\s*w\.?\s*baird/i];
+const MEGA_PE = [/blackstone/i, /kkr\b/i, /carlyle/i, /apollo\s*(?:global)?/i, /warburg/i, /tpg\b/i, /thoma\s*bravo/i, /vista\s*equity/i, /silver\s*lake/i, /bain\s*capital/i, /general\s*atlantic/i, /advent\s*international/i, /hellman/i, /leonard\s*green/i, /ares\s*management/i, /providence\s*equity/i, /welsh\s*carson/i];
+const HEDGE_FUNDS = [/citadel/i, /point72/i, /two\s*sigma/i, /bridgewater/i, /millennium/i, /de\s*shaw/i, /jane\s*street/i, /hudson\s*river/i, /jump\s*trading/i, /tower\s*research/i, /renaissance/i, /man\s*group/i, /aqr/i, /elliott/i, /baupost/i];
+const MBB = [/mckinsey/i, /boston\s*consulting|bcg\b/i, /\bbain\b(?!\s*capital)/i];
+const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|ey\b/i, /kpmg/i];
+
+const FIRM_TIERS: { patterns: RegExp[]; label: string; boost: number }[] = [
+  { patterns: MEGA_PE, label: "Mega PE", boost: 20 },
+  { patterns: BULGE_BRACKET, label: "Bulge Bracket", boost: 18 },
+  { patterns: HEDGE_FUNDS, label: "Hedge Fund", boost: 18 },
+  { patterns: ELITE_BOUTIQUE, label: "Elite Boutique", boost: 16 },
+  { patterns: MBB, label: "MBB", boost: 15 },
+  { patterns: BIG4, label: "Big 4", boost: 8 },
 ];
-const CONSULTING = [/mckinsey/i, /bcg|boston\s*consulting/i, /bain/i, /deloitte/i, /accenture/i];
+
+function detectSeniority(title: string): { level: string; boost: number } {
+  const t = title.toLowerCase();
+  if (/managing\s*director|partner|principal|founder|ceo|cfo|coo/i.test(t)) return { level: "Senior", boost: 10 };
+  if (/vice\s*president|\bvp\b|director(?!\s*of\s*operations)/i.test(t)) return { level: "VP", boost: 7 };
+  if (/\bassociate\b(?!\s*analyst)/i.test(t)) return { level: "Associate", boost: 5 };
+  if (/\banalyst\b(?!.*incoming)/i.test(t)) return { level: "Analyst", boost: 3 };
+  if (/incoming|intern/i.test(t)) return { level: "Incoming", boost: 1 };
+  return { level: "", boost: 0 };
+}
 
 export function detectAffiliations(meta: LinkedInMeta): Affiliation[] {
   const allText = [meta.education, meta.location, meta.experience, meta.title].join(" ");
@@ -148,21 +167,20 @@ export function detectAffiliations(meta: LinkedInMeta): Affiliation[] {
     affiliations.push({ name: "NC Local", boost: 10 });
   }
 
-  // Top firms — full boost if working there, reduced if incoming/intern
-  if (TOP_FIRMS.some((p) => p.test(companyText))) {
-    if (isCurrentStudent) {
-      affiliations.push({ name: "Top Firm (Incoming)", boost: 8 });
-    } else {
-      affiliations.push({ name: "Top Firm", boost: 15 });
+  // Tiered firm detection — check company against all tiers
+  for (const tier of FIRM_TIERS) {
+    if (tier.patterns.some((p) => p.test(companyText))) {
+      const boost = isCurrentStudent ? Math.round(tier.boost / 2) : tier.boost;
+      const label = isCurrentStudent ? `${tier.label} (Incoming)` : tier.label;
+      affiliations.push({ name: label, boost });
+      break; // Only match the highest tier
     }
   }
 
-  if (CONSULTING.some((p) => p.test(companyText))) {
-    if (isCurrentStudent) {
-      affiliations.push({ name: "Consulting (Incoming)", boost: 6 });
-    } else {
-      affiliations.push({ name: "Consulting", boost: 12 });
-    }
+  // Seniority boost from title
+  const seniority = detectSeniority(meta.title || "");
+  if (seniority.boost > 0 && !isCurrentStudent) {
+    affiliations.push({ name: seniority.level, boost: seniority.boost });
   }
 
   return affiliations;

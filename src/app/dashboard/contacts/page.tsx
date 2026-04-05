@@ -2,32 +2,30 @@
 
 import { useState } from "react";
 import { ContactsList } from "./contacts-list";
-import { Sparkles } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 export default function ContactsPage() {
-  const [enriching, setEnriching] = useState(false);
-  const [enrichResult, setEnrichResult] = useState<{
-    enriched: number;
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreResult, setRescoreResult] = useState<{
+    rescored: number;
     total: number;
-    skipped: number;
   } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleEnrich = async () => {
-    setEnriching(true);
-    setEnrichResult(null);
+  const handleRescore = async () => {
+    setRescoring(true);
+    setRescoreResult(null);
 
     try {
-      const res = await fetch("/api/contacts/enrich", { method: "POST" });
-      if (!res.ok) throw new Error("Enrichment failed");
+      const res = await fetch("/api/contacts/rescore", { method: "POST" });
+      if (!res.ok) throw new Error("Rescore failed");
       const data = await res.json();
-      setEnrichResult(data);
-      // Refresh contacts list
+      setRescoreResult(data);
       setRefreshKey((k) => k + 1);
     } catch {
-      setEnrichResult({ enriched: 0, total: 0, skipped: -1 });
+      setRescoreResult({ rescored: 0, total: -1 });
     } finally {
-      setEnriching(false);
+      setRescoring(false);
     }
   };
 
@@ -39,12 +37,12 @@ export default function ContactsPage() {
             WARM SIGNALS
           </h2>
           <button
-            onClick={handleEnrich}
-            disabled={enriching}
-            className="inline-flex items-center gap-1.5 border border-border bg-transparent px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-accent-teal hover:text-accent-teal disabled:opacity-50"
+            onClick={handleRescore}
+            disabled={rescoring}
+            className="inline-flex items-center gap-1.5 border border-border bg-transparent px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:border-accent-teal hover:text-accent-teal disabled:opacity-50"
           >
-            <Sparkles size={10} />
-            {enriching ? "Enriching..." : "Enrich from LinkedIn"}
+            <RefreshCw size={10} className={rescoring ? "animate-spin" : ""} />
+            {rescoring ? "Rescoring..." : "Rescore Contacts"}
           </button>
         </div>
         <span className="text-[10px] text-muted-foreground">
@@ -52,20 +50,15 @@ export default function ContactsPage() {
         </span>
       </div>
 
-      {enrichResult && (
+      {rescoreResult && (
         <div className="mb-2">
-          {enrichResult.skipped === -1 ? (
+          {rescoreResult.total === -1 ? (
             <p className="text-[10px] text-red-400">
-              Enrichment failed. Try again later.
-            </p>
-          ) : enrichResult.total === 0 ? (
-            <p className="text-[10px] text-muted-foreground">
-              No contacts need enrichment — all CSV imports already have education data.
+              Rescore failed. Try again later.
             </p>
           ) : (
             <p className="text-[10px] text-green-400">
-              Enriched {enrichResult.enriched} of {enrichResult.total} contacts
-              {enrichResult.skipped > 0 && ` (${enrichResult.skipped} skipped)`}
+              Rescored {rescoreResult.rescored} of {rescoreResult.total} contacts
             </p>
           )}
         </div>
