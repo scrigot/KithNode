@@ -375,6 +375,13 @@ export default function ImportPage() {
         </div>
       )}
 
+      {/* Enrich Tip */}
+      {result && result.imported > 0 && (
+        <div className="mt-4 max-w-xl border border-accent-teal/30 bg-accent-teal/5 p-3 text-xs text-accent-teal">
+          Tip: Click &ldquo;Enrich from LinkedIn&rdquo; in Warm Signals to fill in education data and improve scores.
+        </div>
+      )}
+
       {/* Results */}
       {result && (
         <div className="mt-6 max-w-xl">
