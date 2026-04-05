@@ -114,27 +114,29 @@ export function detectAffiliations(meta: LinkedInMeta): Affiliation[] {
   const allText = [meta.education, meta.location, meta.experience, meta.title].join(" ");
   const affiliations: Affiliation[] = [];
 
-  // Check if current company IS a university (= active student, not alumni)
-  const companyText = (meta.experience || meta.title || "").toLowerCase();
+  // Check if this person is a current student / incoming analyst (not yet working full-time)
+  const companyText = (meta.experience || "").toLowerCase();
+  const titleText = (meta.title || "").toLowerCase();
   const isCurrentStudent =
     UNC_PATTERNS.some((p) => p.test(companyText)) ||
     /\buniversity\b/i.test(companyText) ||
-    /\bstudent\b/i.test(companyText) ||
-    /\bintern\b/i.test(meta.title || "");
+    /\bstudent\b/i.test(titleText) ||
+    /\bincoming\b/i.test(titleText) ||
+    /\bintern\b/i.test(titleText) ||
+    /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText);
 
-  // UNC affiliation: only "Alumni" if UNC is in education but NOT their current company
+  // UNC affiliation: check education field AND company/title (CSV may not have education)
   const uncInEducation = UNC_PATTERNS.some((p) => p.test(meta.education || ""));
   const kfInEducation = KENAN_FLAGLER.some((p) => p.test(meta.education || ""));
-  const uncInCompany = UNC_PATTERNS.some((p) => p.test(companyText));
-
-  if (kfInEducation && !uncInCompany) {
+  // For CSV imports without education data, check if UNC appears in company (= student there)
+  const uncInCompanyOrTitle = UNC_PATTERNS.some((p) => p.test(companyText)) || UNC_PATTERNS.some((p) => p.test(titleText));
+  if (kfInEducation && !isCurrentStudent) {
     affiliations.push({ name: "Kenan-Flagler Alumni", boost: 25 });
-  } else if (uncInEducation && !uncInCompany) {
+  } else if (uncInEducation && !isCurrentStudent) {
     affiliations.push({ name: "UNC Alumni", boost: 20 });
-  } else if (uncInCompany || isCurrentStudent) {
-    affiliations.push({ name: "UNC Student", boost: 5 });
+  } else if (uncInCompanyOrTitle || (isCurrentStudent && UNC_PATTERNS.some((p) => p.test(allText)))) {
+    affiliations.push({ name: "UNC Peer", boost: 5 });
   } else if (UNC_PATTERNS.some((p) => p.test(allText))) {
-    // UNC mentioned somewhere else (e.g., location)
     affiliations.push({ name: "UNC Connected", boost: 10 });
   }
 
@@ -146,13 +148,21 @@ export function detectAffiliations(meta: LinkedInMeta): Affiliation[] {
     affiliations.push({ name: "NC Local", boost: 10 });
   }
 
-  // Top firms — only count if they actually WORK there (not a student)
-  if (!isCurrentStudent && TOP_FIRMS.some((p) => p.test(companyText))) {
-    affiliations.push({ name: "Top Firm", boost: 15 });
+  // Top firms — full boost if working there, reduced if incoming/intern
+  if (TOP_FIRMS.some((p) => p.test(companyText))) {
+    if (isCurrentStudent) {
+      affiliations.push({ name: "Top Firm (Incoming)", boost: 8 });
+    } else {
+      affiliations.push({ name: "Top Firm", boost: 15 });
+    }
   }
 
-  if (!isCurrentStudent && CONSULTING.some((p) => p.test(companyText))) {
-    affiliations.push({ name: "Consulting", boost: 12 });
+  if (CONSULTING.some((p) => p.test(companyText))) {
+    if (isCurrentStudent) {
+      affiliations.push({ name: "Consulting (Incoming)", boost: 6 });
+    } else {
+      affiliations.push({ name: "Consulting", boost: 12 });
+    }
   }
 
   return affiliations;
