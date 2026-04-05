@@ -20,6 +20,7 @@ export function ContactsList() {
   const [outreachTarget, setOutreachTarget] = useState<{
     id: string;
     name: string;
+    email?: string;
   } | null>(null);
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
 
@@ -129,6 +130,7 @@ export function ContactsList() {
       <OutreachSheet
         contactId={outreachTarget?.id ?? null}
         contactName={outreachTarget?.name ?? ""}
+        contactEmail={outreachTarget?.email}
         open={outreachTarget !== null}
         onClose={() => setOutreachTarget(null)}
         onStatusChange={(contactId, status) => {
@@ -156,7 +158,7 @@ export function ContactsList() {
             key={contact.id}
             contact={contact}
             onDraftOutreach={(id) => {
-              setOutreachTarget({ id, name: contact.name });
+              setOutreachTarget({ id, name: contact.name, email: contact.email });
             }}
             pipelineAdded={pipelineAdded.has(contact.id)}
             onAddToPipeline={async (id) => {

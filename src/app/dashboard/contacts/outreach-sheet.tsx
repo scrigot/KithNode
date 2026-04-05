@@ -16,6 +16,7 @@ import { trackEvent } from "@/lib/posthog";
 interface OutreachSheetProps {
   contactId: string | null;
   contactName: string;
+  contactEmail?: string;
   open: boolean;
   onClose: () => void;
   onStatusChange?: (contactId: string, status: string) => void;
@@ -24,6 +25,7 @@ interface OutreachSheetProps {
 export function OutreachSheet({
   contactId,
   contactName,
+  contactEmail,
   open,
   onClose,
   onStatusChange,
@@ -118,7 +120,9 @@ export function OutreachSheet({
     }
   };
 
-  const mailtoHref = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`;
+  const mailtoHref = contactEmail
+    ? `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`
+    : `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(draft)}`;
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -141,7 +145,14 @@ export function OutreachSheet({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{contactName}</p>
+          <p className="text-xs text-muted-foreground">
+            {contactName}
+            {contactEmail && (
+              <span className="ml-2 text-[10px] text-accent-teal">
+                {contactEmail}
+              </span>
+            )}
+          </p>
         </SheetHeader>
 
         <Separator />
@@ -151,7 +162,7 @@ export function OutreachSheet({
             <div className="flex flex-col items-center justify-center py-16">
               <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
               <p className="mt-3 text-[10px] text-muted-foreground">
-                GENERATING DRAFT...
+                GENERATING WITH CLAUDE...
               </p>
             </div>
           ) : error ? (
@@ -176,7 +187,7 @@ export function OutreachSheet({
                 <Input
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="bg-muted text-xs"
+                  className="border-border bg-muted font-mono text-xs"
                 />
               </div>
 
@@ -189,7 +200,7 @@ export function OutreachSheet({
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   rows={14}
-                  className="w-full resize-y border border-input bg-muted px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                  className="w-full resize-y border border-border bg-muted px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                 />
                 <p className="mt-1 text-[10px] tabular-nums text-muted-foreground">
                   {draft.split(/\s+/).filter(Boolean).length} words
@@ -207,7 +218,7 @@ export function OutreachSheet({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 text-[10px]"
+                className="h-7 border-border text-[10px] hover:border-primary hover:text-primary"
                 onClick={generateDraft}
               >
                 REGENERATE
@@ -215,21 +226,21 @@ export function OutreachSheet({
               <Button
                 variant="outline"
                 size="sm"
-                className={`h-7 text-[10px] ${copied ? "border-green-500/30 text-green-400" : ""}`}
+                className={`h-7 text-[10px] ${copied ? "border-green-500/30 text-green-400" : "border-border hover:border-accent-teal hover:text-accent-teal"}`}
                 onClick={handleCopy}
               >
-                {copied ? "COPIED" : "COPY"}
+                {copied ? "COPIED" : "COPY TO CLIPBOARD"}
               </Button>
               <a
                 href={mailtoHref}
-                className="inline-flex h-7 items-center border border-border bg-background px-3 text-[10px] font-medium text-foreground hover:bg-accent"
+                className="inline-flex h-7 items-center border border-accent-teal bg-accent-teal/10 px-3 text-[10px] font-medium text-accent-teal hover:bg-accent-teal/20"
               >
-                OPEN IN EMAIL
+                OPEN IN GMAIL
               </a>
-              {status !== "sent" && (
+              {status !== "sent" && outreachId && (
                 <Button
                   size="sm"
-                  className="ml-auto h-7 text-[10px]"
+                  className="ml-auto h-7 bg-accent-teal text-[10px] text-white hover:bg-accent-teal/80"
                   onClick={handleMarkSent}
                 >
                   MARK AS SENT

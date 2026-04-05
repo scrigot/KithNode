@@ -198,6 +198,7 @@ export default function ContactDetailPage() {
       <OutreachSheet
         contactId={contact.id}
         contactName={contact.name}
+        contactEmail={contact.email}
         open={showOutreach}
         onClose={() => setShowOutreach(false)}
       />
