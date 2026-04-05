@@ -32,7 +32,7 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-5">
       <div className="mb-1 flex items-baseline justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-primary">

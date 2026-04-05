@@ -83,7 +83,7 @@ export default function PipelinePage() {
 
   if (loading) {
     return (
-      <div className="min-h-full p-6">
+      <div className="min-h-full p-5">
         <div className="h-4 w-32 animate-pulse bg-muted" />
         <div className="mt-4 space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -96,7 +96,7 @@ export default function PipelinePage() {
 
   if (!data || data.total === 0) {
     return (
-      <div className="min-h-full p-6">
+      <div className="min-h-full p-5">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
           PIPELINE
         </h2>
@@ -121,7 +121,7 @@ export default function PipelinePage() {
   }
 
   return (
-    <div className="min-h-full p-6">
+    <div className="min-h-full p-5">
       <div className="mb-1 flex items-baseline justify-between">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
           PIPELINE
@@ -154,7 +154,7 @@ export default function PipelinePage() {
 
               {/* Cards row or empty state */}
               {contacts.length === 0 ? (
-                <div className="border border-dashed border-white/[0.08] bg-transparent px-6 py-6 text-center">
+                <div className="border border-dashed border-white/[0.15] bg-transparent px-6 py-6 text-center">
                   <span className="text-[12px] text-text-muted">
                     No contacts in this stage
                   </span>
@@ -177,7 +177,7 @@ export default function PipelinePage() {
                     return (
                       <div
                         key={contact.id}
-                        className="w-[220px] border border-white/[0.06] bg-bg-card p-3"
+                        className="w-full sm:w-[220px] lg:w-[260px] border border-white/[0.06] bg-bg-card p-3"
                       >
                         {/* Name + freshness */}
                         <div className="flex items-center gap-1.5">

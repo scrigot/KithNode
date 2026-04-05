@@ -1,15 +1,14 @@
 import { Sidebar } from "./sidebar";
+import { auth } from "@/lib/auth";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // TODO: re-enable auth after Google OAuth is configured
-  // const session = await auth();
-  // if (!session?.user) redirect("/");
+  const session = await auth();
 
-  const userName = process.env.NODE_ENV === "development" ? "Sam Rigot" : "User";
+  const userName = session?.user?.name || "User";
 
   return (
     <div className="flex min-h-screen bg-bg-primary">

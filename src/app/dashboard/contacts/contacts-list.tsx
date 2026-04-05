@@ -89,19 +89,10 @@ export function ContactsList() {
 
   if (error) {
     return (
-      <div className="border border-white/[0.06] bg-bg-card p-10 text-center">
-        <Users className="mx-auto mb-3 text-text-muted" size={32} strokeWidth={1.5} />
-        <p className="text-sm font-semibold text-white">No contacts yet</p>
-        <p className="mt-1 text-[12px] text-text-secondary">
-          Import your LinkedIn network or discover alumni to get started.
-        </p>
-        <Link
-          href="/dashboard/import"
-          className="mt-4 inline-flex items-center gap-2 bg-accent-teal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-teal/80"
-        >
-          <Upload size={16} />
-          Import Contacts
-        </Link>
+      <div className="border border-accent-amber/20 bg-accent-amber/5 p-6 text-center">
+        <p className="text-sm font-medium text-accent-amber">Unable to load contacts</p>
+        <p className="mt-1 text-[12px] text-text-secondary">Check your connection and try again.</p>
+        <button onClick={() => window.location.reload()} className="mt-3 border border-white/[0.12] px-3 py-1.5 text-[12px] text-white hover:bg-white/[0.06]">Retry</button>
       </div>
     );
   }

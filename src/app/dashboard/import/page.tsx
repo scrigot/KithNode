@@ -8,7 +8,7 @@ import type { ImportResult } from "@/lib/api";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "text-red-400",
-  warm: "text-green-400",
+  warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
 };
@@ -238,7 +238,7 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-5">
       <div className="mb-1">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
           IMPORT

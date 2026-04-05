@@ -14,7 +14,7 @@ const TIER_STYLES: Record<string, string> = {
 
 const SCORE_STYLES: Record<string, string> = {
   hot: "text-red-400",
-  warm: "text-green-400",
+  warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
 };
@@ -74,11 +74,7 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  useEffect(() => {
-    search(query, activeTier);
-  }, [search, activeTier]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Debounced search on query change
+  // Debounced search on query/tier change
   useEffect(() => {
     const timer = setTimeout(() => {
       search(query, activeTier);
@@ -106,7 +102,7 @@ export default function DiscoverPage() {
   // Empty state: no contacts imported at all
   if (!loading && !hasAnyContacts) {
     return (
-      <div className="flex min-h-full items-center justify-center p-6">
+      <div className="flex min-h-full items-center justify-center p-5">
         <div className="max-w-sm border border-white/[0.06] bg-card p-10 text-center">
           <svg
             className="mx-auto mb-4 h-10 w-10 text-muted-foreground"
@@ -137,7 +133,7 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col p-6">
+    <div className="flex min-h-full flex-col p-5">
       {/* Header */}
       <div className="mb-1">
         <h2 className="text-sm font-bold uppercase tracking-wider text-primary">

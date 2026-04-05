@@ -59,8 +59,11 @@ export default function BillingPage() {
   const isSubscribed =
     subscriptionStatus === "active" && !!subscriptionPlan;
 
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
   async function handleCheckout(plan: PlanType) {
     setLoading(plan);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -71,11 +74,11 @@ export default function BillingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error("Checkout error:", data.error);
+        setCheckoutError(data.error || "Unable to start checkout. Please try again.");
         setLoading(null);
       }
-    } catch (err) {
-      console.error("Checkout error:", err);
+    } catch {
+      setCheckoutError("Unable to reach payment server. Check your connection and try again.");
       setLoading(null);
     }
   }
@@ -135,6 +138,13 @@ export default function BillingPage() {
           </button>
         )}
       </div>
+
+      {/* Checkout Error */}
+      {checkoutError && (
+        <div className="mb-4 border border-accent-amber/20 bg-accent-amber/5 p-4">
+          <p className="text-sm font-medium text-accent-amber">{checkoutError}</p>
+        </div>
+      )}
 
       {/* Pricing Cards */}
       <div className="mb-4">
