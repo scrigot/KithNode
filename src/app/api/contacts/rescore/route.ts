@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/get-user";
+import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 
 export async function POST() {
   try {
     const userId = await getUserId();
+    const prefs = await getUserPrefs(userId);
 
     const { data: contacts, error } = await supabase
       .from("AlumniContact")
@@ -26,9 +28,11 @@ export async function POST() {
         location: c.location || "",
         experience: c.firmName || "",
         title: c.title || "",
+        industry: c.industry || "",
+        seniorityLevel: c.seniorityLevel || "",
       };
 
-      const affiliations = detectAffiliations(meta);
+      const affiliations = detectAffiliations(meta, prefs);
       const { score, tier } = computeWarmthScore(affiliations);
 
       const { error: updateError } = await supabase

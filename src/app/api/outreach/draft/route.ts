@@ -1,24 +1,65 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { getUserPrefs, type UserPrefs } from "@/lib/user-prefs";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 
-function getPlaceholderDraft(name: string, affiliations: string[]) {
-  const warmHook = affiliations.includes("UNC Alumni") || affiliations.includes("Kenan-Flagler Alumni")
-    ? "fellow Tar Heel"
-    : affiliations.includes("Chi Phi")
-      ? "Chi Phi brother"
-      : affiliations.includes("NC Local")
-        ? "fellow North Carolinian"
-        : "shared connection";
+function shortSchoolName(university: string): string {
+  const u = university.toLowerCase();
+  if (u.includes("north carolina") || u.includes("chapel hill")) return "UNC";
+  if (u.includes("pennsylvania") || u.includes("upenn")) return "Penn";
+  if (u.includes("virginia")) return "UVA";
+  if (u.includes("michigan")) return "Michigan";
+  if (u.includes("california, berkeley")) return "Berkeley";
+  if (u.includes("new york university")) return "NYU";
+  return university.split(/[\s,]+/)[0] || "school";
+}
+
+function schoolMascot(university: string): string {
+  const u = university.toLowerCase();
+  if (u.includes("north carolina") || u.includes("chapel hill")) return "Tar Heel";
+  if (u.includes("duke")) return "Blue Devil";
+  if (u.includes("michigan")) return "Wolverine";
+  if (u.includes("pennsylvania")) return "Quaker";
+  if (u.includes("virginia")) return "Cavalier";
+  if (u.includes("notre dame")) return "Domer";
+  return "alum";
+}
+
+function getPlaceholderDraft(
+  contactName: string,
+  affiliations: string[],
+  prefs: UserPrefs,
+  senderFirstName: string,
+) {
+  const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
+  const userSchool = prefs.university ? shortSchoolName(prefs.university) : "my school";
+
+  const warmHook = affiliations.includes("Same School")
+    ? `fellow ${userMascot}`
+    : affiliations.includes("Same Greek Org") && prefs.greekOrg
+      ? `${prefs.greekOrg} brother`
+      : affiliations.includes("Hometown Match")
+        ? "fellow local"
+        : affiliations.includes("Target Firm")
+          ? "shared interest in your firm"
+          : "shared connection";
 
   return {
-    subject: `Fellow Tar Heel reaching out — coffee chat?`,
-    body: `Hi ${name.split(" ")[0]},\n\nI'm a freshman at UNC studying business and came across your profile through our ${warmHook} network. Your work really stood out to me, and I'd love to hear about your experience.\n\nWould you have 15 minutes for a quick coffee chat sometime in the next couple weeks? I'd be grateful for any insight you could share.\n\nThanks so much,\nSam`,
+    subject: `Quick coffee chat — ${userMascot} reaching out`,
+    body: `Hi ${contactName.split(" ")[0]},\n\nI'm a student at ${userSchool} and came across your profile through our ${warmHook}. Your work really stood out to me, and I'd love to hear about your experience.\n\nWould you have 15 minutes for a quick coffee chat sometime in the next couple weeks? I'd be grateful for any insight you could share.\n\nThanks so much,\n${senderFirstName}`,
   };
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  const userEmail = session?.user?.email || "";
+  const senderFullName = session?.user?.name || "";
+  const senderFirstName = senderFullName.split(" ")[0] || "Me";
+
+  const prefs = await getUserPrefs(userEmail);
+
   const body = await request.json();
   const { contactId } = body;
 
@@ -41,11 +82,18 @@ export async function POST(request: NextRequest) {
       ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())
       : [];
 
+    const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
+    const userSchool = prefs.university || "my school";
+    const userIndustryFocus =
+      prefs.targetIndustries.length > 0 ? prefs.targetIndustries.join(", ") : "finance";
+    const userGreek = prefs.greekOrg || "";
+
     const warmConnections = affiliationNames
       .map((a) => {
-        if (a.includes("UNC Alumni") || a.includes("Kenan-Flagler")) return "fellow Tar Heel";
-        if (a === "Chi Phi") return "Chi Phi brother";
-        if (a === "NC Local") return "fellow North Carolinian";
+        if (a === "Same School") return `fellow ${userMascot}`;
+        if (a === "Same Greek Org" && userGreek) return `${userGreek} brother`;
+        if (a === "Hometown Match") return "fellow local";
+        if (a === "Target Firm") return "shared interest in your firm";
         return a;
       })
       .join(", ");
@@ -62,18 +110,18 @@ CONTACT INFO:
 - Warm Connection Phrases: ${warmConnections || "professional connection"}
 
 SENDER CONTEXT:
-- Sam, a freshman at UNC Chapel Hill
-- Studying business, interested in finance (IB, PE, consulting)
-- Member of Chi Phi fraternity
+- ${senderFullName || "Me"}, a student at ${userSchool}
+- Interested in ${userIndustryFocus}
+${userGreek ? `- Member of ${userGreek}` : ""}
 - Genuine interest in learning from professionals
 
 TONE REQUIREMENTS:
 - Authentic and warm, NOT spammy or templated
 - Concise — max 150 words for the body
-- Reference the specific warm connection (e.g., "fellow Tar Heel", "Kenan-Flagler connection")
+- Reference the specific warm connection if one exists (e.g., "fellow ${userMascot}"${userGreek ? `, "${userGreek} brother"` : ""})
 - Humble and curious, not presumptuous
 - Clear ask: 15-minute coffee chat / virtual call
-- Sign off as "Sam"
+- Sign off with the sender's first name: "${senderFirstName}"
 
 Return ONLY valid JSON with exactly two keys:
 {"subject": "...", "body": "..."}
@@ -101,7 +149,7 @@ The subject should be casual and warm, under 60 characters. The body should feel
     }
 
     if (!subject || !draft) {
-      const placeholder = getPlaceholderDraft(contact.name, affiliationNames);
+      const placeholder = getPlaceholderDraft(contact.name, affiliationNames, prefs, senderFirstName);
       subject = placeholder.subject;
       draft = placeholder.body;
     }
@@ -119,7 +167,12 @@ The subject should be casual and warm, under 60 characters. The body should feel
       const affiliationNames: string[] = contact?.affiliations
         ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())
         : [];
-      const placeholder = getPlaceholderDraft(contact?.name || "there", affiliationNames);
+      const placeholder = getPlaceholderDraft(
+        contact?.name || "there",
+        affiliationNames,
+        prefs,
+        senderFirstName,
+      );
       return NextResponse.json({ draft: placeholder.body, subject: placeholder.subject });
     } catch {
       return NextResponse.json({ error: "Failed to generate draft" }, { status: 500 });

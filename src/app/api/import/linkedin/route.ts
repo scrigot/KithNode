@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/get-user";
+import { getUserPrefs } from "@/lib/user-prefs";
 import {
   scrapeLinkedInMeta,
   detectAffiliations,
@@ -20,6 +21,7 @@ interface CsvContact {
 
 export async function POST(request: NextRequest) {
   const userId = await getUserId();
+  const prefs = await getUserPrefs(userId);
   const body = await request.json();
 
   const hasUrls = body.urls && Array.isArray(body.urls) && body.urls.length > 0;
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
           title: contact.title || "",
         };
 
-        const affiliations = detectAffiliations(meta);
+        const affiliations = detectAffiliations(meta, prefs);
         const { score, tier } = computeWarmthScore(affiliations);
         const linkedInUrl = contact.linkedInUrl || "";
 
@@ -156,7 +158,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const meta = await scrapeLinkedInMeta(url);
-        const affiliations = detectAffiliations(meta);
+        const affiliations = detectAffiliations(meta, prefs);
         const { score, tier } = computeWarmthScore(affiliations);
 
         // Check if contact already exists

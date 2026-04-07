@@ -2,30 +2,51 @@
 
 import { useState } from "react";
 import { ContactsList } from "./contacts-list";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 
 export default function ContactsPage() {
   const [rescoring, setRescoring] = useState(false);
-  const [rescoreResult, setRescoreResult] = useState<{
-    rescored: number;
-    total: number;
-  } | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRescore = async () => {
     setRescoring(true);
-    setRescoreResult(null);
-
+    setStatusMsg(null);
     try {
       const res = await fetch("/api/contacts/rescore", { method: "POST" });
       if (!res.ok) throw new Error("Rescore failed");
       const data = await res.json();
-      setRescoreResult(data);
+      setStatusMsg({ kind: "success", text: `Rescored ${data.rescored} of ${data.total} contacts` });
       setRefreshKey((k) => k + 1);
     } catch {
-      setRescoreResult({ rescored: 0, total: -1 });
+      setStatusMsg({ kind: "error", text: "Rescore failed. Try again later." });
     } finally {
       setRescoring(false);
+    }
+  };
+
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch("/api/contacts/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error("Enrich failed");
+      const data = await res.json();
+      const failedSuffix = data.failed > 0 ? ` (${data.failed} failed)` : "";
+      setStatusMsg({
+        kind: "success",
+        text: `Enriched ${data.enriched} of ${data.total} contacts${failedSuffix}`,
+      });
+      setRefreshKey((k) => k + 1);
+    } catch {
+      setStatusMsg({ kind: "error", text: "Enrich failed. Try again later." });
+    } finally {
+      setEnriching(false);
     }
   };
 
@@ -37,12 +58,22 @@ export default function ContactsPage() {
             WARM SIGNALS
           </h2>
           <button
-            onClick={handleRescore}
-            disabled={rescoring}
+            onClick={handleEnrich}
+            disabled={enriching || rescoring}
             className="inline-flex items-center gap-1.5 border border-border bg-transparent px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:border-accent-teal hover:text-accent-teal disabled:opacity-50"
+            title="Use Claude to fill in missing industry, seniority, education, and location, then re-score"
+          >
+            <Sparkles size={10} className={enriching ? "animate-spin" : ""} />
+            {enriching ? "Enriching..." : "Enrich All"}
+          </button>
+          <button
+            onClick={handleRescore}
+            disabled={rescoring || enriching}
+            className="inline-flex items-center gap-1.5 border border-border bg-transparent px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:border-accent-teal hover:text-accent-teal disabled:opacity-50"
+            title="Re-run scoring against your current preferences"
           >
             <RefreshCw size={10} className={rescoring ? "animate-spin" : ""} />
-            {rescoring ? "Rescoring..." : "Rescore Contacts"}
+            {rescoring ? "Rescoring..." : "Rescore"}
           </button>
         </div>
         <span className="text-[10px] text-muted-foreground">
@@ -50,17 +81,11 @@ export default function ContactsPage() {
         </span>
       </div>
 
-      {rescoreResult && (
+      {statusMsg && (
         <div className="mb-2">
-          {rescoreResult.total === -1 ? (
-            <p className="text-[10px] text-red-400">
-              Rescore failed. Try again later.
-            </p>
-          ) : (
-            <p className="text-[10px] text-green-400">
-              Rescored {rescoreResult.rescored} of {rescoreResult.total} contacts
-            </p>
-          )}
+          <p className={`text-[10px] ${statusMsg.kind === "error" ? "text-red-400" : "text-green-400"}`}>
+            {statusMsg.text}
+          </p>
         </div>
       )}
 
