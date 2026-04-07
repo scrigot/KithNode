@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreditCard, Check, Sparkles, Loader2 } from "lucide-react";
 
 type PlanType = "monthly" | "annual";
@@ -51,10 +51,17 @@ const PLANS: {
 
 export default function BillingPage() {
   const [loading, setLoading] = useState<PlanType | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("trial");
+  const [subscriptionPlan, setSubscriptionPlan] = useState<string>("");
 
-  // TODO: fetch real subscription status from API
-  const subscriptionStatus: string = "trial";
-  const subscriptionPlan: string = "";
+  useEffect(() => {
+    fetch("/api/dashboard/overview")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.subscription_status) setSubscriptionStatus(data.subscription_status);
+      })
+      .catch(() => {});
+  }, []);
 
   const isSubscribed =
     subscriptionStatus === "active" && !!subscriptionPlan;
