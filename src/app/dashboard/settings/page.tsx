@@ -142,10 +142,38 @@ export default function SettingsPage() {
   const [customLocationInput, setCustomLocationInput] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  // Load from localStorage on mount
+  // Load from API on mount, fall back to localStorage
   useEffect(() => {
-    setPrefs(loadPreferences());
-    setLoaded(true);
+    async function loadFromAPI() {
+      try {
+        const res = await fetch("/api/user/preferences");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length)) {
+            const merged: Preferences = {
+              university: data.university || "",
+              greekLifeEnabled: !!data.greekOrg,
+              greekOrganization: data.greekOrg || "",
+              hometown: data.hometown || "",
+              targetLocations: Array.isArray(data.targetLocations) ? data.targetLocations : [],
+              customLocations: [],
+              targetIndustries: Array.isArray(data.targetIndustries) ? data.targetIndustries : [],
+              targetFirms: Array.isArray(data.targetFirms) ? data.targetFirms : [],
+              customFirms: [],
+            };
+            setPrefs(merged);
+            savePreferences(merged);
+            setLoaded(true);
+            return;
+          }
+        }
+      } catch {
+        // fall through to localStorage
+      }
+      setPrefs(loadPreferences());
+      setLoaded(true);
+    }
+    loadFromAPI();
   }, []);
 
   // Save to localStorage on every change (after initial load)
