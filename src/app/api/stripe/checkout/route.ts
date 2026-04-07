@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const priceId = STRIPE_PRICES[plan];
+  console.log("Stripe checkout priceId:", priceId, "plan:", plan);
   if (!priceId) {
     return NextResponse.json(
       { error: "Stripe price not configured for this plan." },
@@ -73,9 +74,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: checkoutSession.url });
   } catch (error) {
-    console.error("Stripe checkout error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Stripe checkout error:", msg);
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: "Failed to create checkout session", detail: msg },
       { status: 500 }
     );
   }
