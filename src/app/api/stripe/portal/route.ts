@@ -10,11 +10,16 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userEmail = session.user.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Missing user email" }, { status: 400 });
+  }
+
   try {
     const { data: user } = await supabase
       .from("User")
       .select("stripeCustomerId")
-      .eq("email", session.user.id)
+      .eq("email", userEmail)
       .single();
 
     if (!user?.stripeCustomerId) {

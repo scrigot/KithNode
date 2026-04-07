@@ -33,25 +33,30 @@ export async function POST(req: NextRequest) {
     // Look up or create Stripe customer
     let stripeCustomerId: string | null = null;
 
+    const userEmail = session.user.email;
+    if (!userEmail) {
+      return NextResponse.json({ error: "Missing user email" }, { status: 400 });
+    }
+
     const { data: user } = await supabase
       .from("User")
       .select("stripeCustomerId")
-      .eq("email", session.user.id)
+      .eq("email", userEmail)
       .single();
 
     if (user?.stripeCustomerId) {
       stripeCustomerId = user.stripeCustomerId;
     } else {
       const customer = await getStripe().customers.create({
-        email: session.user.email || undefined,
-        metadata: { userId: session.user.id },
+        email: userEmail,
+        metadata: { userId: userEmail },
       });
       stripeCustomerId = customer.id;
 
       await supabase
         .from("User")
         .update({ stripeCustomerId: customer.id })
-        .eq("email", session.user.id);
+        .eq("email", userEmail);
     }
 
     const origin = req.nextUrl.origin;
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest) {
       success_url: `${origin}/dashboard?checkout=success`,
       cancel_url: `${origin}/dashboard/billing`,
       metadata: {
-        userId: session.user.id,
+        userId: userEmail,
         plan,
       },
     });
