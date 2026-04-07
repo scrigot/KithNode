@@ -105,8 +105,11 @@ function parseLinkedInCSV(text: string): CsvContact[] {
     if (!linkedInUrl) {
       const slug = `${firstName}-${lastName}`
         .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "")
-        .replace(/-+/g, "-");
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
       linkedInUrl = slug ? `https://linkedin.com/in/${slug}` : "";
     }
 
@@ -165,7 +168,7 @@ export default function ImportPage() {
         total: urlList.length,
       });
     } catch {
-      setError("Failed to import. Check that the backend is running.");
+      setError("Import failed. Please try again or check that your URLs are valid LinkedIn profile links.");
     } finally {
       setLoading(false);
     }
