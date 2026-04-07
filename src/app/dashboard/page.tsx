@@ -21,13 +21,11 @@ interface OverviewData {
   pipeline_total: number;
   pipeline_by_stage: Record<string, number>;
   reminders_count: number;
+  recruiting_date: string | null;
+  days_until_recruiting: number | null;
+  weekly_goal_done: number;
+  weekly_goal_target: number;
 }
-
-// ── Constants (user-configurable, not demo data) ─────────────────────────────
-
-const RECRUITING_DAYS = 47;
-const RECRUITING_LABEL = "Fall recruiting";
-const WEEKLY_GOAL = { done: 2, total: 3, label: "coffee chats this week" };
 
 const QUICK_NAV = [
   { href: "/dashboard/discover", label: "Discover", desc: "Find and rate new connections", icon: Compass, colorClass: "text-accent-blue" },
@@ -227,35 +225,50 @@ export default function DashboardPage() {
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
             Recruiting Timeline
           </p>
-          <div className="mt-3 flex items-end gap-3">
-            <span className="font-mono text-5xl font-bold tabular-nums text-white">
-              {RECRUITING_DAYS}
-            </span>
-            <span className="mb-1.5 text-sm text-text-secondary">
-              days until {RECRUITING_LABEL}
-            </span>
-          </div>
+          {data?.days_until_recruiting != null ? (
+            <div className="mt-3 flex items-end gap-3">
+              <span className="font-mono text-5xl font-bold tabular-nums text-white">
+                {data.days_until_recruiting}
+              </span>
+              <span className="mb-1.5 text-sm text-text-secondary">
+                days until recruiting
+              </span>
+            </div>
+          ) : (
+            <p className="mt-3 text-[13px] text-text-muted">
+              Set your recruiting date in{" "}
+              <Link href="/dashboard/settings" className="text-accent-teal hover:underline">
+                Settings
+              </Link>
+            </p>
+          )}
 
           {/* Weekly goal tracker */}
-          <div className="mt-5">
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-text-secondary">
-                <span className="font-mono font-bold text-white">{WEEKLY_GOAL.done}</span>
-                {" "}of{" "}
-                <span className="font-mono font-bold text-white">{WEEKLY_GOAL.total}</span>
-                {" "}{WEEKLY_GOAL.label}
-              </span>
-              <span className="text-accent-amber">
-                {WEEKLY_GOAL.total - WEEKLY_GOAL.done} remaining
-              </span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden bg-white/[0.06]">
-              <div
-                className="h-full bg-accent-teal transition-all duration-150"
-                style={{ width: `${(WEEKLY_GOAL.done / WEEKLY_GOAL.total) * 100}%` }}
-              />
-            </div>
-          </div>
+          {(() => {
+            const done = data?.weekly_goal_done ?? 0;
+            const total = data?.weekly_goal_target ?? 3;
+            return (
+              <div className="mt-5">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-text-secondary">
+                    <span className="font-mono font-bold text-white">{done}</span>
+                    {" "}of{" "}
+                    <span className="font-mono font-bold text-white">{total}</span>
+                    {" "}coffee chats this week
+                  </span>
+                  <span className="text-accent-amber">
+                    {Math.max(0, total - done)} remaining
+                  </span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden bg-white/[0.06]">
+                  <div
+                    className="h-full bg-accent-teal transition-all duration-150"
+                    style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

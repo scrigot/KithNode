@@ -6,6 +6,14 @@ export async function GET() {
   try {
     const userId = await getUserId();
 
+    // Start of current week (Monday 00:00 UTC)
+    const now = new Date();
+    const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(now);
+    weekStart.setUTCDate(now.getUTCDate() - daysFromMonday);
+    weekStart.setUTCHours(0, 0, 0, 0);
+
     // Total contacts (this user's only)
     const { count: totalContacts } = await supabase
       .from("AlumniContact")
@@ -55,6 +63,30 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .lt("updatedAt", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
+    // Recruiting date + weekly goal target from User row
+    const { data: userRow } = await supabase
+      .from("User")
+      .select("recruitingDate, weeklyGoalTarget")
+      .eq("id", userId)
+      .single();
+
+    const recruitingDate: string | null = userRow?.recruitingDate ?? null;
+    const weeklyGoalTarget: number = userRow?.weeklyGoalTarget ?? 3;
+
+    let daysUntilRecruiting: number | null = null;
+    if (recruitingDate) {
+      const diff = new Date(recruitingDate).getTime() - Date.now();
+      daysUntilRecruiting = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
+
+    // Weekly goal done: pipeline entries with outreach stages added this week
+    const { count: weeklyGoalDone } = await supabase
+      .from("PipelineEntry")
+      .select("*", { count: "exact", head: true })
+      .eq("userId", userId)
+      .in("stage", ["EMAIL_SENT", "FOLLOW_UP", "RESPONDED", "MEETING_SET"])
+      .gte("addedAt", weekStart.toISOString());
+
     return NextResponse.json({
       ratings: { high_value: highValue || 0, total: totalContacts || 0 },
       stats: {
@@ -66,6 +98,10 @@ export async function GET() {
       pipeline_total: pipelineTotal,
       pipeline_by_stage: pipelineByStage,
       reminders_count: remindersCount || 0,
+      recruiting_date: recruitingDate,
+      days_until_recruiting: daysUntilRecruiting,
+      weekly_goal_done: weeklyGoalDone || 0,
+      weekly_goal_target: weeklyGoalTarget,
     });
   } catch {
     return NextResponse.json({
