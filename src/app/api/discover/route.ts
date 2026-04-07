@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     .eq("userId", userId);
   const ratedIds = (rated || []).map((r) => r.contactId);
 
-  // Build query — exclude own imports and legacy unowned contacts
+  // Build query — prefer other users' contacts (shared pool)
   let builder = supabase
     .from("AlumniContact")
     .select("*")
@@ -30,16 +30,42 @@ export async function GET(request: NextRequest) {
     builder = builder.eq("tier", tier);
   }
 
-  const { data, error } = await builder
+  const { data: otherData, error: otherError } = await builder
     .order("warmthScore", { ascending: false })
     .limit(100);
 
-  if (error) {
+  if (otherError) {
     return NextResponse.json({ contacts: [], total: 0 }, { status: 500 });
   }
 
-  // Filter out already rated (can't do NOT IN with Supabase easily)
-  const filtered = (data || []).filter((c) => !ratedIds.includes(c.id));
+  let contacts = otherData || [];
+
+  // Fallback: if no other-user contacts exist (single-user demo / no shared pool yet),
+  // show the user's own contacts so Discover is not empty
+  if (contacts.length === 0) {
+    let ownBuilder = supabase
+      .from("AlumniContact")
+      .select("*")
+      .eq("importedByUserId", userId);
+
+    if (query) {
+      ownBuilder = ownBuilder.or(
+        `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
+      );
+    }
+    if (tier) {
+      ownBuilder = ownBuilder.eq("tier", tier);
+    }
+
+    const { data: ownData } = await ownBuilder
+      .order("warmthScore", { ascending: false })
+      .limit(100);
+
+    contacts = ownData || [];
+  }
+
+  // Filter out already rated
+  const filtered = contacts.filter((c) => !ratedIds.includes(c.id));
 
   return NextResponse.json({
     contacts: filtered,
