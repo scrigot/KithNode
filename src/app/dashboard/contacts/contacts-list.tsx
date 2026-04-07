@@ -100,7 +100,7 @@ export function ContactsList() {
   if (contacts.length === 0) {
     return (
       <div className="border border-white/[0.06] bg-bg-card p-10 text-center">
-        <Users className="mx-auto mb-3 text-text-muted" size={32} strokeWidth={1.5} />
+        <Users className="mx-auto mb-3 text-accent-teal" size={32} strokeWidth={1.5} />
         <p className="text-sm font-semibold text-white">No contacts yet</p>
         <p className="mt-1 text-[12px] text-text-secondary">
           Import your LinkedIn network or discover alumni to get started.

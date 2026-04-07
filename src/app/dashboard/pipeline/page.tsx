@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { GitBranch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PipelineContact, PipelineResponse } from "@/lib/api";
@@ -105,6 +106,7 @@ export default function PipelinePage() {
         </p>
         <div className="mt-4 h-px bg-border" />
         <div className="mt-8 border border-white/[0.06] bg-bg-card p-10 text-center">
+          <GitBranch size={32} strokeWidth={1.5} className="mx-auto mb-3 text-accent-teal" />
           <p className="text-lg font-semibold text-white">Your pipeline is empty</p>
           <p className="mt-2 text-[12px] text-text-secondary">
             Start by discovering and rating contacts, then add your top matches to the outreach pipeline.

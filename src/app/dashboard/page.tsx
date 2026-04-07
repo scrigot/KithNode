@@ -174,8 +174,8 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-2xl font-bold text-white">Overview</h2>
-          <p className="mt-1 text-sm text-text-secondary">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-primary">OVERVIEW</h2>
+          <p className="mt-1 text-xs text-text-secondary">
             Your networking intelligence at a glance
           </p>
         </div>

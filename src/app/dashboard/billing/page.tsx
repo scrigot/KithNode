@@ -21,6 +21,7 @@ const PLANS: {
     name: "Monthly",
     price: "$15",
     perMonth: "$15/mo",
+    badge: "Flexible",
     buttonText: "Subscribe — $15/mo",
     features: [
       "Unlimited warm signals",
@@ -113,8 +114,8 @@ export default function BillingPage() {
     <div className="p-5">
       {/* Header */}
       <div className="mb-6">
-        <h2 className="font-heading text-2xl font-bold text-white">Billing</h2>
-        <p className="mt-1 text-sm text-text-secondary">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-primary">BILLING</h2>
+        <p className="mt-1 text-xs text-text-secondary">
           Manage your subscription and billing details
         </p>
       </div>
@@ -186,7 +187,7 @@ export default function BillingPage() {
                   </span>
                 )}
                 {plan.badge && (
-                  <span className="bg-accent-teal/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
+                  <span className={`px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider ${plan.id === "annual" ? "bg-accent-teal/15 font-bold text-accent-teal" : "border border-white/[0.10] text-text-muted"}`}>
                     {plan.badge}
                   </span>
                 )}
