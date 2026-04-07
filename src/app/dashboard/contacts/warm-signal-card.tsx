@@ -48,7 +48,7 @@ function ScoreBar({
         <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="w-6 text-right text-muted-foreground">
-        {Math.round(value)}
+        {Math.min(Math.round(value), max)}
       </span>
     </div>
   );
