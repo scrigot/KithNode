@@ -1,23 +1,29 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getUserId } from "@/lib/get-user";
 
 export async function GET() {
   try {
-    // Total contacts
+    const userId = await getUserId();
+
+    // Total contacts (this user's only)
     const { count: totalContacts } = await supabase
       .from("AlumniContact")
-      .select("*", { count: "exact", head: true });
+      .select("*", { count: "exact", head: true })
+      .eq("importedByUserId", userId);
 
     // High-value (hot + warm tier) contacts
     const { count: highValue } = await supabase
       .from("AlumniContact")
       .select("*", { count: "exact", head: true })
+      .eq("importedByUserId", userId)
       .in("tier", ["hot", "warm"]);
 
     // Average warmth score
     const { data: scoreData } = await supabase
       .from("AlumniContact")
-      .select("warmthScore");
+      .select("warmthScore")
+      .eq("importedByUserId", userId);
 
     let avgWarmth = 0;
     if (scoreData && scoreData.length > 0) {
