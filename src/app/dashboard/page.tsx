@@ -25,6 +25,8 @@ interface OverviewData {
   days_until_recruiting: number | null;
   weekly_goal_done: number;
   weekly_goal_target: number;
+  subscription_status: string;
+  trial_days_left: number | null;
 }
 
 const QUICK_NAV = [
@@ -179,21 +181,46 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Trial Banner */}
-      <div className="mb-4 flex items-center justify-between border border-accent-teal/20 bg-accent-teal/[0.06] px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <Zap size={15} className="text-accent-teal" />
-          <span className="text-[13px] text-text-secondary">
-            <span className="font-medium text-white">7 days</span> left in your free trial
-          </span>
+      {/* Subscription Banner */}
+      {data?.subscription_status === "active" ? (
+        <div className="mb-4 flex items-center gap-2.5 border border-accent-green/20 bg-accent-green/[0.06] px-4 py-3">
+          <Zap size={15} className="text-accent-green" />
+          <span className="text-[13px] font-medium text-accent-green">Active subscription</span>
         </div>
-        <Link
-          href="/dashboard/billing"
-          className="text-[12px] font-semibold text-accent-teal hover:text-white transition-colors duration-150"
-        >
-          Upgrade
-        </Link>
-      </div>
+      ) : data?.subscription_status === "trial" ? (
+        <div className="mb-4 flex items-center justify-between border border-accent-teal/20 bg-accent-teal/[0.06] px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Zap size={15} className="text-accent-teal" />
+            <span className="text-[13px] text-text-secondary">
+              <span className="font-medium text-white">
+                {data.trial_days_left != null ? data.trial_days_left : "—"} days
+              </span>{" "}
+              left in your free trial
+            </span>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="text-[12px] font-semibold text-accent-teal hover:text-white transition-colors duration-150"
+          >
+            Upgrade
+          </Link>
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center justify-between border border-accent-amber/20 bg-accent-amber/[0.06] px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Zap size={15} className="text-accent-amber" />
+            <span className="text-[13px] text-text-secondary">
+              Upgrade to unlock all features
+            </span>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="text-[12px] font-semibold text-accent-amber hover:text-white transition-colors duration-150"
+          >
+            Upgrade
+          </Link>
+        </div>
+      )}
 
       {/* Hero row: Warmth Score + Recruiting Countdown */}
       <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-2">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { generateText } from "ai";
+import { gateway } from "@ai-sdk/gateway";
 
 function getPlaceholderDraft(name: string, affiliations: string[]) {
   const warmHook = affiliations.includes("UNC Alumni") || affiliations.includes("Kenan-Flagler Alumni")
@@ -80,7 +81,7 @@ Return ONLY valid JSON with exactly two keys:
 The subject should be casual and warm, under 60 characters. The body should feel like a real person wrote it, not AI.`;
 
     const { text } = await generateText({
-      model: "anthropic/claude-sonnet-4.6",
+      model: gateway("anthropic/claude-sonnet-4.6"),
       prompt,
     });
 

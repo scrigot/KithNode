@@ -63,15 +63,23 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .lt("updatedAt", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-    // Recruiting date + weekly goal target from User row
+    // Recruiting date + weekly goal target + subscription info from User row
     const { data: userRow } = await supabase
       .from("User")
-      .select("recruitingDate, weeklyGoalTarget")
+      .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, trialEndsAt")
       .eq("id", userId)
       .single();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
     const weeklyGoalTarget: number = userRow?.weeklyGoalTarget ?? 3;
+    const subscriptionStatus: string = userRow?.subscriptionStatus ?? "trial";
+    const trialEndsAt: string | null = userRow?.trialEndsAt ?? null;
+
+    let trialDaysLeft: number | null = null;
+    if (subscriptionStatus === "trial" && trialEndsAt) {
+      const diff = new Date(trialEndsAt).getTime() - Date.now();
+      trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+    }
 
     let daysUntilRecruiting: number | null = null;
     if (recruitingDate) {
@@ -102,6 +110,8 @@ export async function GET() {
       days_until_recruiting: daysUntilRecruiting,
       weekly_goal_done: weeklyGoalDone || 0,
       weekly_goal_target: weeklyGoalTarget,
+      subscription_status: subscriptionStatus,
+      trial_days_left: trialDaysLeft,
     });
   } catch {
     return NextResponse.json({
