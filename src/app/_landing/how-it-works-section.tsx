@@ -1,4 +1,7 @@
+"use client";
+
 import { GlassCard } from "@/components/glass-card";
+import { ScrollReveal } from "@/components/scroll-reveal";
 import { Link2, Radar, Send } from "lucide-react";
 
 const STEPS = [
@@ -26,29 +29,33 @@ export function HowItWorksSection() {
   return (
     <section className="relative px-4 py-24">
       <div className="mx-auto max-w-5xl">
-        <h2 className="mb-4 text-center font-heading text-3xl font-bold text-text-primary sm:text-4xl">
-          How it works
-        </h2>
-        <p className="mx-auto mb-12 max-w-lg text-center text-sm text-text-secondary">
-          Three steps from cold outreach to warm introduction.
-        </p>
+        <ScrollReveal>
+          <h2 className="mb-4 text-center font-heading text-3xl font-bold tracking-tight text-text-primary sm:text-4xl">
+            How it works
+          </h2>
+          <p className="mx-auto mb-12 max-w-lg text-center text-sm text-text-secondary">
+            Three steps from cold outreach to warm introduction.
+          </p>
+        </ScrollReveal>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {STEPS.map((step) => (
-            <GlassCard key={step.step}>
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center bg-accent-teal/10 font-mono text-sm font-bold text-accent-teal">
-                  {step.step}
-                </span>
-                <step.Icon className="h-5 w-5 text-text-muted" />
-              </div>
-              <h3 className="font-heading text-lg font-semibold text-text-primary">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                {step.description}
-              </p>
-            </GlassCard>
+          {STEPS.map((step, i) => (
+            <ScrollReveal key={step.step} delay={i * 0.05}>
+              <GlassCard>
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center bg-accent-teal/10 font-mono text-sm font-bold text-accent-teal">
+                    {step.step}
+                  </span>
+                  <step.Icon className="h-5 w-5 text-text-muted" />
+                </div>
+                <h3 className="font-heading text-lg font-semibold text-text-primary">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                  {step.description}
+                </p>
+              </GlassCard>
+            </ScrollReveal>
           ))}
         </div>
       </div>

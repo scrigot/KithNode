@@ -3,19 +3,19 @@
 import { StaggerContainer, FadeUp } from "@/components/motion";
 
 const MOCK_CONTACTS = [
-  { name: "J. Chen", company: "Goldman Sachs", score: 94, tier: "HOT", tierColor: "bg-tier-hot" },
-  { name: "M. Patel", company: "Morgan Stanley", score: 87, tier: "HOT", tierColor: "bg-tier-hot" },
-  { name: "R. Thompson", company: "Evercore", score: 72, tier: "WARM", tierColor: "bg-tier-warm" },
-  { name: "S. Williams", company: "Lazard", score: 64, tier: "WARM", tierColor: "bg-tier-warm" },
-  { name: "A. Rodriguez", company: "Centerview", score: 41, tier: "MONITOR", tierColor: "bg-tier-monitor" },
+  { name: "Jacob Goldstein", company: "KKR", score: 78, tier: "HOT", tierColor: "bg-tier-hot" },
+  { name: "Sarah Chen", company: "Goldman Sachs", score: 71, tier: "HOT", tierColor: "bg-tier-hot" },
+  { name: "Mike Park", company: "Evercore", score: 65, tier: "WARM", tierColor: "bg-tier-warm" },
+  { name: "James Liu", company: "McKinsey", score: 58, tier: "WARM", tierColor: "bg-tier-warm" },
+  { name: "Priya Nair", company: "Centerview", score: 34, tier: "MONITOR", tierColor: "bg-tier-monitor" },
 ];
 
 export function HeroSection({ children }: { children: React.ReactNode }) {
   return (
-    <section className="relative flex flex-col items-center justify-center px-4 pt-32 pb-20">
+    <section className="relative flex flex-col items-center justify-center px-4 pt-32 pb-16">
       <StaggerContainer className="flex flex-col items-center text-center">
         <FadeUp>
-          <h1 className="font-heading text-6xl font-bold tracking-tight sm:text-8xl">
+          <h1 className="font-heading text-6xl font-bold tracking-tighter sm:text-8xl">
             <span className="text-text-primary">Kith</span>
             <span className="text-accent-teal">Node</span>
           </h1>
@@ -75,7 +75,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
                 >
                   <span className="truncate text-text-primary">{contact.name}</span>
                   <span className="truncate text-text-secondary">{contact.company}</span>
-                  <span className="text-right font-mono text-text-primary">{contact.score}</span>
+                  <span className="text-right font-mono tabular-nums text-text-primary">{contact.score}</span>
                   <span className="flex justify-end">
                     <span
                       className={`${contact.tierColor} inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white`}

@@ -34,29 +34,47 @@ export default async function Home() {
       <FeaturesSection />
 
       {/* Footer */}
-      <footer className="relative border-t border-white/[0.06] px-4 py-10 text-center">
-        <p className="text-sm text-text-secondary">
-          A UNC Chapel Hill startup by{" "}
-          <a
-            href="https://www.linkedin.com/in/samrigot"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent-teal transition-colors hover:text-accent-teal/80"
-          >
-            Sam Rigot
-          </a>
-        </p>
-        <p className="mt-3 text-xs text-text-muted">
-          &copy; {new Date().getFullYear()} KithNode &middot;{" "}
-          <a
-            href="https://kithnode.canny.io"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-colors hover:text-accent-teal"
-          >
-            Send Feedback
-          </a>
-        </p>
+      <footer className="relative border-t border-white/[0.06] px-6 py-12">
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left */}
+          <div className="flex flex-col gap-2">
+            <span className="font-heading text-base font-bold tracking-tight">
+              <span className="text-text-primary">Kith</span>
+              <span className="text-accent-teal">Node</span>
+            </span>
+            <p className="text-sm text-text-secondary">
+              A UNC Chapel Hill startup by{" "}
+              <a
+                href="https://www.linkedin.com/in/samrigot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-teal transition-colors hover:text-accent-teal/80"
+              >
+                Sam Rigot
+              </a>
+            </p>
+            <p className="text-xs text-text-muted">
+              &copy; {new Date().getFullYear()} KithNode &middot; v1.0.0
+            </p>
+          </div>
+          {/* Right */}
+          <div className="flex items-center gap-6 text-xs text-text-muted">
+            <a href="#" className="transition-colors hover:text-text-secondary">
+              Privacy
+            </a>
+            <a href="#" className="transition-colors hover:text-text-secondary">
+              Terms
+            </a>
+            <a
+              href="https://kithnode.canny.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-accent-teal"
+            >
+              Contact
+            </a>
+          </div>
+        </div>
       </footer>
     </main>
   );

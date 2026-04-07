@@ -1,4 +1,7 @@
+"use client";
+
 import { GlassCard } from "@/components/glass-card";
+import { ScrollReveal } from "@/components/scroll-reveal";
 
 const STATS = [
   { value: "500+", label: "Alumni Mapped", color: "text-accent-teal" },
@@ -8,18 +11,20 @@ const STATS = [
 
 export function StatsSection() {
   return (
-    <section className="relative px-4 py-24">
+    <section className="relative px-4 py-16">
       <div className="mx-auto max-w-4xl">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {STATS.map((stat) => (
-            <GlassCard key={stat.label} className="text-center">
-              <p
-                className={`font-heading text-4xl font-bold tabular-nums ${stat.color}`}
-              >
-                {stat.value}
-              </p>
-              <p className="mt-2 text-sm text-text-secondary">{stat.label}</p>
-            </GlassCard>
+            <ScrollReveal key={stat.label}>
+              <GlassCard className="text-center">
+                <p
+                  className={`font-heading text-4xl font-bold font-mono tabular-nums ${stat.color}`}
+                >
+                  {stat.value}
+                </p>
+                <p className="mt-2 text-sm text-text-secondary">{stat.label}</p>
+              </GlassCard>
+            </ScrollReveal>
           ))}
         </div>
       </div>
