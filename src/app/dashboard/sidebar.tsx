@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -13,6 +14,8 @@ import {
   CreditCard,
   MessageSquare,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -25,17 +28,25 @@ const NAV_ITEMS = [
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
-export function Sidebar({ userName }: { userName: string }) {
-  const pathname = usePathname();
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "U";
+function NavContent({
+  pathname,
+  userName,
+  onNavClick,
+}: {
+  pathname: string;
+  userName: string;
+  onNavClick?: () => void;
+}) {
+  const initials =
+    userName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
 
   return (
-    <aside className="flex w-[220px] flex-col border-r border-white/[0.06] bg-bg-secondary">
+    <>
       {/* Logo */}
       <div className="px-5 py-5">
         <h1 className="font-heading text-xl font-bold tracking-tight text-white">
@@ -59,6 +70,7 @@ export function Sidebar({ userName }: { userName: string }) {
               )}
               <Link
                 href={item.href}
+                onClick={onNavClick}
                 className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-150 ${
                   active
                     ? "bg-accent-teal/10 text-accent-teal font-medium border-l-2 border-accent-teal -ml-[2px]"
@@ -100,6 +112,65 @@ export function Sidebar({ userName }: { userName: string }) {
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function Sidebar({ userName }: { userName: string }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {/* Desktop sidebar — hidden below lg */}
+      <aside className="hidden lg:flex w-[220px] flex-col border-r border-white/[0.06] bg-bg-secondary">
+        <NavContent pathname={pathname} userName={userName} />
+      </aside>
+
+      {/* Mobile top bar — visible below lg */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-white/[0.06] bg-bg-secondary px-4 py-3">
+        <h1 className="font-heading text-lg font-bold tracking-tight text-white">
+          Kith<span className="text-accent-teal">Node</span>
+        </h1>
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Open navigation"
+          className="text-text-secondary hover:text-white transition-colors duration-150"
+        >
+          <Menu size={22} />
+        </button>
+      </div>
+
+      {/* Mobile drawer backdrop */}
+      {open && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/60"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={`lg:hidden fixed top-0 left-0 z-50 flex h-full w-[260px] flex-col border-r border-white/[0.06] bg-bg-secondary transition-transform duration-300 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Close button */}
+        <div className="flex justify-end px-4 pt-4">
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation"
+            className="text-text-secondary hover:text-white transition-colors duration-150"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <NavContent
+          pathname={pathname}
+          userName={userName}
+          onNavClick={() => setOpen(false)}
+        />
+      </aside>
+    </>
   );
 }

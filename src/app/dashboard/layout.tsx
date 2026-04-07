@@ -13,7 +13,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-bg-primary">
       <Sidebar userName={userName} />
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto pt-[49px] lg:pt-0">{children}</main>
     </div>
   );
 }
