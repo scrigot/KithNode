@@ -15,12 +15,12 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_HEADER_COLORS: Record<string, string> = {
-  researched: "bg-zinc-500/10 border-zinc-500/30",
-  connected: "bg-blue-500/10 border-blue-500/30",
-  email_sent: "bg-sky-500/10 border-sky-500/30",
-  follow_up: "bg-amber-500/10 border-amber-500/30",
-  responded: "bg-green-500/10 border-green-500/30",
-  meeting_set: "bg-primary/10 border-primary/30",
+  researched: "bg-zinc-500/10 border-zinc-500/30 border-l-zinc-500",
+  connected: "bg-blue-500/10 border-blue-500/30 border-l-blue-500",
+  email_sent: "bg-sky-500/10 border-sky-500/30 border-l-sky-400",
+  follow_up: "bg-amber-500/10 border-amber-500/30 border-l-amber-500",
+  responded: "bg-green-500/10 border-green-500/30 border-l-green-500",
+  meeting_set: "bg-purple-500/10 border-purple-500/30 border-l-purple-500",
 };
 
 const STAGE_BADGE_COLORS: Record<string, string> = {
@@ -140,7 +140,7 @@ export default function PipelinePage() {
             <div key={stage}>
               {/* Stage header bar */}
               <div
-                className={`flex items-center justify-between border px-4 py-2.5 ${STAGE_HEADER_COLORS[stage]}`}
+                className={`flex items-center justify-between border border-l-4 px-4 py-2.5 ${STAGE_HEADER_COLORS[stage]}`}
               >
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   {STAGE_LABELS[stage]}

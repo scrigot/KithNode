@@ -69,7 +69,7 @@ export function WarmSignalCard({
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
 
   return (
-    <div className="group border border-white/[0.06] bg-bg-card p-4 transition-all hover:border-white/[0.12] hover:bg-bg-hover">
+    <div className="group border border-white/[0.06] bg-bg-card p-4 transition-all duration-200 hover:-translate-y-[1px] hover:border-white/[0.12] hover:bg-bg-hover hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
       <div className="flex items-start justify-between gap-4">
         {/* Left: Name + Company */}
         <div className="min-w-0 flex-1">

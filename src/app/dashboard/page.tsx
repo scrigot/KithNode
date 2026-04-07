@@ -225,7 +225,7 @@ export default function DashboardPage() {
       {/* Hero row: Warmth Score + Recruiting Countdown */}
       <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {/* Network Warmth Score */}
-        <div className="border border-white/[0.10] bg-bg-card p-5 shadow-[0_0_20px_rgba(14,165,233,0.05)]">
+        <div className="relative overflow-hidden border border-white/[0.10] bg-bg-card p-5 shadow-[0_0_20px_rgba(14,165,233,0.05)] before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-accent-teal/[0.04] before:to-transparent">
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
             Network Warmth
           </p>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recruiting Countdown + Weekly Goals */}
-        <div className="border border-white/[0.10] bg-bg-card p-5">
+        <div className="relative overflow-hidden border border-white/[0.10] bg-bg-card p-5 before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-accent-teal/[0.04] before:to-transparent">
           <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
             Recruiting Timeline
           </p>

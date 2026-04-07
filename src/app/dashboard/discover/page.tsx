@@ -170,7 +170,7 @@ function BrowseCard({
       <div className="flex gap-3 border-t border-white/[0.06] px-6 py-4">
         <button
           onClick={() => onRate("skip")}
-          className="flex flex-1 items-center justify-center gap-2 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+          className="flex flex-1 items-center justify-center gap-2 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:bg-red-500/10 hover:text-red-400"
         >
           <X className="h-4 w-4" />
           SKIP

@@ -71,13 +71,17 @@ function NavContent({
               <Link
                 href={item.href}
                 onClick={onNavClick}
-                className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-150 ${
+                className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-200 ${
                   active
-                    ? "bg-accent-teal/10 text-accent-teal font-medium border-l-2 border-accent-teal -ml-[2px]"
+                    ? "bg-accent-teal/10 text-accent-teal font-medium border-l-2 border-accent-teal -ml-[2px] shadow-[inset_4px_0_12px_-6px_rgba(14,165,233,0.3)]"
                     : "text-text-secondary hover:bg-white/[0.04] hover:text-white"
                 }`}
               >
-                <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                <Icon
+                  size={18}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  className={active ? "text-accent-teal drop-shadow-[0_0_8px_rgba(14,165,233,0.4)]" : ""}
+                />
                 {item.label}
               </Link>
             </div>
