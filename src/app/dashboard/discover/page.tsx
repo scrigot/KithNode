@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
-import { X, Star, Search, Layers } from "lucide-react";
+import { X, Star, Search, Layers, Sparkles, Loader2 } from "lucide-react";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -198,6 +198,8 @@ export default function DiscoverPage() {
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
   const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverResult, setDiscoverResult] = useState<string | null>(null);
 
   // Browse mode state
   const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
@@ -332,6 +334,44 @@ export default function DiscoverPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [mode, allRated, browseContacts.length, handleRate]);
 
+  const runDiscover = useCallback(async () => {
+    if (discoverLoading) return;
+    setDiscoverLoading(true);
+    setDiscoverResult(null);
+    try {
+      const res = await fetch("/api/discover/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "quick" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDiscoverResult(data.message || data.error || "Discover failed");
+      } else {
+        setDiscoverResult(
+          `Found ${data.candidatesFound} · Imported ${data.imported} · Updated ${data.updated}`,
+        );
+        trackEvent("discover_run", {
+          mode: data.mode,
+          imported: data.imported,
+          updated: data.updated,
+        });
+        // Refresh whichever pane is active
+        if (mode === "browse") {
+          await fetchBrowseContacts();
+        } else {
+          await search(query, activeTier);
+        }
+      }
+    } catch {
+      setDiscoverResult("Network error");
+    } finally {
+      setDiscoverLoading(false);
+      // Auto-clear toast after 6s
+      setTimeout(() => setDiscoverResult(null), 6000);
+    }
+  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier]);
+
   const handleAddToPipeline = async (contactId: string) => {
     setAddingToPipeline(contactId);
     try {
@@ -397,6 +437,21 @@ export default function DiscoverPage() {
           </p>
         </div>
 
+        <div className="flex items-center gap-2">
+          {/* Discover New button — runs the cold-outreach pipeline */}
+          <button
+            onClick={runDiscover}
+            disabled={discoverLoading}
+            className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+          >
+            {discoverLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            {discoverLoading ? "Discovering" : "Discover New"}
+          </button>
+
         {/* Mode toggle */}
         <div className="flex overflow-hidden border border-white/[0.06]">
           <button
@@ -422,7 +477,13 @@ export default function DiscoverPage() {
             Search
           </button>
         </div>
+        </div>
       </div>
+      {discoverResult && (
+        <div className="mb-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+          {discoverResult}
+        </div>
+      )}
       <div className="mb-4 h-px bg-border" />
 
       {/* ═══════ BROWSE MODE ═══════ */}
