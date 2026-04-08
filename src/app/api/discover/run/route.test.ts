@@ -108,7 +108,7 @@ vi.mock("@/lib/discover/seeds", () => ({
   seedsForIndustries: (...args: unknown[]) => mockSeedsForIndustries(...args),
 }));
 
-import { POST } from "./route";
+import { POST, type DiscoverEvent } from "./route";
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/discover/run", {
@@ -116,6 +116,39 @@ function makeRequest(body: unknown): NextRequest {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * Consume an NDJSON-streaming Response and return every parsed event.
+ * The route's success path returns a stream; validation errors still
+ * return plain JSON, in which case `events` is empty and `json` holds
+ * the parsed body.
+ */
+async function readNdjson(res: Response): Promise<DiscoverEvent[]> {
+  const events: DiscoverEvent[] = [];
+  if (!res.body) return events;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line) events.push(JSON.parse(line) as DiscoverEvent);
+    }
+  }
+  if (buffer.trim()) events.push(JSON.parse(buffer.trim()) as DiscoverEvent);
+  return events;
+}
+
+function findDone(events: DiscoverEvent[]): Extract<DiscoverEvent, { type: "done" }> {
+  const done = events.find((e) => e.type === "done");
+  if (!done) throw new Error("no done event in stream: " + JSON.stringify(events));
+  return done as Extract<DiscoverEvent, { type: "done" }>;
 }
 
 const PREFS = {
@@ -199,13 +232,15 @@ describe("POST /api/discover/run", () => {
 
     const res = await POST(makeRequest({ mode: "quick" }));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.mode).toBe("quick");
-    expect(body.candidatesFound).toBe(1);
-    expect(body.imported).toBe(1);
-    expect(body.updated).toBe(0);
-    expect(body.failed).toBe(0);
-    expect(body.contacts[0]).toMatchObject({
+    expect(res.headers.get("content-type")).toContain("application/x-ndjson");
+    const events = await readNdjson(res);
+    const done = findDone(events);
+    expect(done.mode).toBe("quick");
+    expect(done.candidatesFound).toBe(1);
+    expect(done.imported).toBe(1);
+    expect(done.updated).toBe(0);
+    expect(done.failed).toBe(0);
+    expect(done.contacts[0]).toMatchObject({
       name: "Alice Johnson",
       company: "Goldman Sachs",
       score: 88,
@@ -214,6 +249,9 @@ describe("POST /api/discover/run", () => {
     });
     expect(supabaseState.insertCalls).toBe(1);
     expect(supabaseState.updateCalls).toBe(0);
+    // We should also see at least one stage event before the done.
+    const stageEvents = events.filter((e) => e.type === "stage");
+    expect(stageEvents.length).toBeGreaterThanOrEqual(2);
   });
 
   it("updates instead of inserting when LinkedIn URL is already in DB", async () => {
@@ -239,7 +277,8 @@ describe("POST /api/discover/run", () => {
 
     supabaseState.existingByLinkedIn = { id: "existing-row" };
 
-    await POST(makeRequest({ mode: "quick" }));
+    const res = await POST(makeRequest({ mode: "quick" }));
+    await readNdjson(res); // drain the stream so the route's `for` loop runs
     expect(supabaseState.updateCalls).toBe(1);
     expect(supabaseState.insertCalls).toBe(0);
   });
@@ -280,9 +319,10 @@ describe("POST /api/discover/run", () => {
     mockRank.mockReturnValue({ score: 50, tier: "monitor", fit: 0, affinity: 0, reachability: 0, intent: 0, confidence: 1 });
 
     const res = await POST(makeRequest({ mode: "quick" }));
-    const body = await res.json();
-    expect(body.hunterCallsMade).toBe(10);
-    expect(body.hunterBudget).toBe(10);
+    const events = await readNdjson(res);
+    const done = findDone(events);
+    expect(done.hunterCallsMade).toBe(10);
+    expect(done.hunterBudget).toBe(10);
 
     // Inspect the skipHunter argument passed to findEmail across calls.
     const calls = mockFindEmail.mock.calls;
@@ -314,9 +354,67 @@ describe("POST /api/discover/run", () => {
     supabaseState.insertError = new Error("RLS denied");
 
     const res = await POST(makeRequest({ mode: "quick" }));
-    const body = await res.json();
     expect(res.status).toBe(200);
-    expect(body.failed).toBe(1);
-    expect(body.imported).toBe(0);
+    const events = await readNdjson(res);
+    const done = findDone(events);
+    expect(done.failed).toBe(1);
+    expect(done.imported).toBe(0);
+  });
+
+  it("emits stage events for prefs, seeds, scanning, enriching, saving, then done", async () => {
+    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockGetUserPrefs.mockResolvedValue(PREFS);
+    mockSeedsForIndustries.mockReturnValue([
+      { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
+      { name: "JPMorgan", domain: "jpmorganchase.com", website: "https://jpmorganchase.com" },
+    ]);
+    mockFindContacts.mockImplementation(
+      async (
+        _companies: unknown,
+        opts: {
+          onProgress?: (info: { index: number; total: number; company: { name: string }; foundForCompany: number; foundTotal: number }) => Promise<void>;
+        },
+      ) => {
+        if (opts?.onProgress) {
+          await opts.onProgress({ index: 0, total: 2, company: { name: "Goldman Sachs" }, foundForCompany: 1, foundTotal: 1 });
+          await opts.onProgress({ index: 1, total: 2, company: { name: "JPMorgan" }, foundForCompany: 1, foundTotal: 2 });
+        }
+        return [
+          {
+            name: "Alice Johnson",
+            title: "Analyst",
+            company: "Goldman Sachs",
+            companyDomain: "goldmansachs.com",
+            linkedinUrl: "",
+            source: "team_page",
+            sourceUrl: "https://goldmansachs.com/team",
+          },
+        ];
+      },
+    );
+    mockDetectSignals.mockResolvedValue([]);
+    mockFindEmail.mockResolvedValue({ email: "", confidence: 0, source: "none" });
+    mockRank.mockReturnValue({ score: 50, tier: "monitor", fit: 0, affinity: 0, reachability: 0, intent: 0, confidence: 1 });
+
+    const res = await POST(makeRequest({ mode: "quick" }));
+    const events = await readNdjson(res);
+    const stages = events
+      .filter((e) => e.type === "stage")
+      .map((e) => (e as Extract<DiscoverEvent, { type: "stage" }>).stage);
+    expect(stages).toContain("prefs");
+    expect(stages).toContain("seeds");
+    expect(stages).toContain("scanning");
+    expect(stages).toContain("enriching");
+    expect(stages).toContain("saving");
+    expect(events.at(-1)?.type).toBe("done");
+
+    // Progress is monotonically non-decreasing.
+    let prev = 0;
+    for (const e of events) {
+      if (e.type === "stage" || e.type === "done") {
+        expect(e.progress).toBeGreaterThanOrEqual(prev);
+        prev = e.progress;
+      }
+    }
   });
 });

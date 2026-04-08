@@ -198,8 +198,15 @@ export default function DiscoverPage() {
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
   const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
+  // Discover pipeline modal state — streamed NDJSON progress.
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverResult, setDiscoverResult] = useState<string | null>(null);
+  const [discoverProgress, setDiscoverProgress] = useState(0);
+  const [discoverStage, setDiscoverStage] = useState<string>("");
+  const [discoverMessage, setDiscoverMessage] = useState<string>("");
+  const [discoverLog, setDiscoverLog] = useState<string[]>([]);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const discoverAbortRef = useRef<AbortController | null>(null);
 
   // Browse mode state
   const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
@@ -336,25 +343,89 @@ export default function DiscoverPage() {
 
   const runDiscover = useCallback(async () => {
     if (discoverLoading) return;
+    const abort = new AbortController();
+    discoverAbortRef.current = abort;
     setDiscoverLoading(true);
     setDiscoverResult(null);
+    setDiscoverError(null);
+    setDiscoverProgress(0);
+    setDiscoverStage("starting");
+    setDiscoverMessage("Starting discover pipeline…");
+    setDiscoverLog([]);
+
     try {
       const res = await fetch("/api/discover/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "quick" }),
+        signal: abort.signal,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setDiscoverResult(data.message || data.error || "Discover failed");
-      } else {
+
+      // Validation errors come back as JSON, not stream.
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok || !ct.includes("application/x-ndjson")) {
+        const data = await res.json().catch(() => ({}));
+        setDiscoverError(data.message || data.error || `HTTP ${res.status}`);
+        setDiscoverLoading(false);
+        discoverAbortRef.current = null;
+        return;
+      }
+
+      // Stream NDJSON line-by-line.
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalEvent: { imported: number; updated: number; failed: number; candidatesFound: number; mode: string } | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let event: { type: string; stage?: string; message?: string; progress?: number; imported?: number; updated?: number; failed?: number; candidatesFound?: number; mode?: string };
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (event.type === "stage") {
+            setDiscoverStage(event.stage || "");
+            setDiscoverMessage(event.message || "");
+            if (typeof event.progress === "number") setDiscoverProgress(event.progress);
+            setDiscoverLog((log) => [...log, event.message || ""]);
+          } else if (event.type === "done") {
+            finalEvent = {
+              imported: event.imported || 0,
+              updated: event.updated || 0,
+              failed: event.failed || 0,
+              candidatesFound: event.candidatesFound || 0,
+              mode: event.mode || "quick",
+            };
+            setDiscoverProgress(100);
+            setDiscoverStage("done");
+            setDiscoverMessage(
+              `Found ${finalEvent.candidatesFound} · Imported ${finalEvent.imported} · Updated ${finalEvent.updated}`,
+            );
+          } else if (event.type === "error") {
+            setDiscoverError(event.message || "Pipeline error");
+          } else if (event.type === "aborted") {
+            setDiscoverError("Cancelled");
+          }
+        }
+      }
+
+      if (finalEvent) {
         setDiscoverResult(
-          `Found ${data.candidatesFound} · Imported ${data.imported} · Updated ${data.updated}`,
+          `Found ${finalEvent.candidatesFound} · Imported ${finalEvent.imported} · Updated ${finalEvent.updated}`,
         );
         trackEvent("discover_run", {
-          mode: data.mode,
-          imported: data.imported,
-          updated: data.updated,
+          mode: finalEvent.mode,
+          imported: finalEvent.imported,
+          updated: finalEvent.updated,
         });
         // Refresh whichever pane is active
         if (mode === "browse") {
@@ -363,14 +434,53 @@ export default function DiscoverPage() {
           await search(query, activeTier);
         }
       }
-    } catch {
-      setDiscoverResult("Network error");
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") {
+        setDiscoverError("Cancelled");
+      } else {
+        setDiscoverError((err as Error)?.message || "Network error");
+      }
     } finally {
-      setDiscoverLoading(false);
-      // Auto-clear toast after 6s
-      setTimeout(() => setDiscoverResult(null), 6000);
+      discoverAbortRef.current = null;
+      // Keep modal open briefly so the user sees the final state, then
+      // auto-close on success. On error, leave it open until they dismiss.
+      setTimeout(() => {
+        setDiscoverLoading(false);
+      }, 1200);
+      setTimeout(() => setDiscoverResult(null), 8000);
     }
   }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier]);
+
+  const cancelDiscover = useCallback(() => {
+    if (discoverAbortRef.current) {
+      discoverAbortRef.current.abort();
+    }
+  }, []);
+
+  const dismissDiscoverModal = useCallback(() => {
+    if (!discoverAbortRef.current) {
+      setDiscoverLoading(false);
+      setDiscoverError(null);
+    }
+  }, []);
+
+  // Lock body scroll + block escape key while the discover modal is open.
+  useEffect(() => {
+    if (!discoverLoading) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const blockEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", blockEscape, true);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", blockEscape, true);
+    };
+  }, [discoverLoading]);
 
   const handleAddToPipeline = async (contactId: string) => {
     setAddingToPipeline(contactId);
@@ -733,6 +843,105 @@ export default function DiscoverPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ═══════ DISCOVER PIPELINE MODAL ═══════ */}
+      {discoverLoading && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="discover-modal-title"
+        >
+          <div className="w-full max-w-md border border-primary/30 bg-card shadow-2xl shadow-primary/20">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h3
+                  id="discover-modal-title"
+                  className="text-[11px] font-bold uppercase tracking-wider text-primary"
+                >
+                  {discoverError ? "DISCOVER STOPPED" : discoverStage === "done" ? "DISCOVER COMPLETE" : "DISCOVERING"}
+                </h3>
+              </div>
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                {discoverProgress}%
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-1 w-full bg-muted">
+              <div
+                className={`h-full transition-all duration-300 ease-out ${
+                  discoverError ? "bg-red-500" : discoverStage === "done" ? "bg-green-500" : "bg-primary"
+                }`}
+                style={{ width: `${discoverProgress}%` }}
+              />
+            </div>
+
+            {/* Stage label + current message */}
+            <div className="space-y-3 px-5 py-5">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Stage
+                </p>
+                <p className="font-mono text-sm font-bold text-foreground">
+                  {discoverStage.toUpperCase() || "—"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Status
+                </p>
+                <p className="text-[12px] text-foreground">
+                  {discoverError ? (
+                    <span className="text-red-400">{discoverError}</span>
+                  ) : (
+                    discoverMessage || "—"
+                  )}
+                </p>
+              </div>
+
+              {/* Activity log — last 6 lines */}
+              {discoverLog.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    Activity
+                  </p>
+                  <div className="mt-1 max-h-32 overflow-y-auto border border-white/[0.06] bg-black/40 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+                    {discoverLog.slice(-6).map((line, i) => (
+                      <div key={`${i}-${line}`} className="truncate">
+                        ▸ {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer — cancel or dismiss */}
+            <div className="flex gap-2 border-t border-white/[0.06] px-5 py-3">
+              {discoverError || discoverStage === "done" ? (
+                <button
+                  onClick={dismissDiscoverModal}
+                  className="flex-1 border border-white/[0.12] bg-muted py-2 text-[11px] font-bold uppercase tracking-wider text-foreground hover:bg-white/[0.08]"
+                >
+                  CLOSE
+                </button>
+              ) : (
+                <button
+                  onClick={cancelDiscover}
+                  className="flex-1 border border-red-500/30 bg-red-500/10 py-2 text-[11px] font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/20"
+                >
+                  <X className="mr-1 inline h-3 w-3" />
+                  CANCEL
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

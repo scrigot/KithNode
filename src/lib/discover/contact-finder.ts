@@ -83,6 +83,16 @@ export interface FindContactsOptions {
   throttleMs?: number;
   /** Skip the LinkedIn dork fallback (useful for tests / quick mode). */
   skipLinkedInFallback?: boolean;
+  /** Called once per company so the caller can emit progress events. */
+  onProgress?: (info: {
+    index: number;
+    total: number;
+    company: CompanyInput;
+    foundForCompany: number;
+    foundTotal: number;
+  }) => void | Promise<void>;
+  /** Abort signal — checked between companies to exit early on cancel. */
+  signal?: AbortSignal;
 }
 
 // ── Page fetching ─────────────────────────────────────────────────────
@@ -278,11 +288,18 @@ export async function findContacts(
   companies: readonly CompanyInput[],
   options: FindContactsOptions = {},
 ): Promise<ContactCandidate[]> {
-  const { maxPerCompany = 3, throttleMs = 1000, skipLinkedInFallback = false } = options;
+  const {
+    maxPerCompany = 3,
+    throttleMs = 1000,
+    skipLinkedInFallback = false,
+    onProgress,
+    signal,
+  } = options;
   const all: ContactCandidate[] = [];
   const seenGlobal = new Set<string>();
 
   for (let i = 0; i < companies.length; i++) {
+    if (signal?.aborted) break;
     const company = companies[i];
     const found: ContactCandidate[] = [];
 
@@ -309,11 +326,23 @@ export async function findContacts(
 
     // Filter to roles we care about, then take top N.
     const ranked = rankByRole(found);
+    let acceptedForCompany = 0;
     for (const c of ranked.slice(0, maxPerCompany)) {
       const key = `${c.name.toLowerCase()}|${company.domain}`;
       if (seenGlobal.has(key)) continue;
       seenGlobal.add(key);
       all.push(c);
+      acceptedForCompany++;
+    }
+
+    if (onProgress) {
+      await onProgress({
+        index: i,
+        total: companies.length,
+        company,
+        foundForCompany: acceptedForCompany,
+        foundTotal: all.length,
+      });
     }
 
     if (i < companies.length - 1 && throttleMs > 0) {
