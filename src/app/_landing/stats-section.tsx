@@ -4,9 +4,9 @@ import { GlassCard } from "@/components/glass-card";
 import { ScrollReveal } from "@/components/scroll-reveal";
 
 const STATS = [
-  { value: "500+", label: "Alumni Mapped", color: "text-accent-teal" },
-  { value: "12", label: "Target Firms", color: "text-accent-amber" },
-  { value: "3x", label: "Response Rate", color: "text-accent-green" },
+  { value: "500+", label: "Alumni Mapped", color: "text-accent-teal", accent: "teal" as const },
+  { value: "12", label: "Target Firms", color: "text-accent-amber", accent: "amber" as const },
+  { value: "3x", label: "Response Rate", color: "text-accent-green", accent: "green" as const },
 ];
 
 export function StatsSection() {
@@ -16,7 +16,7 @@ export function StatsSection() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {STATS.map((stat) => (
             <ScrollReveal key={stat.label}>
-              <GlassCard className="text-center">
+              <GlassCard className="text-center" accentColor={stat.accent}>
                 <p
                   className={`font-heading text-4xl font-bold font-mono tabular-nums ${stat.color}`}
                 >

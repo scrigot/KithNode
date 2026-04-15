@@ -3,9 +3,16 @@ import { redirect } from "next/navigation";
 import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
-import { StatsSection } from "./_landing/stats-section";
-import { HowItWorksSection } from "./_landing/how-it-works-section";
-import { FeaturesSection } from "./_landing/features-section";
+import { TrustBar } from "./_landing/trust-bar";
+import { LogoCarousel } from "./_landing/logo-carousel";
+import { ProductCards } from "./_landing/product-cards";
+import { SolutionsSection } from "./_landing/solutions-section";
+import { ValueProps } from "./_landing/value-props";
+import { SocialProof } from "./_landing/social-proof";
+import { Integrations } from "./_landing/integrations";
+import { Showcase } from "./_landing/showcase";
+import { Testimonials } from "./_landing/testimonials";
+import { CTASection } from "./_landing/cta-section";
 
 export default async function Home() {
   const session = await auth();
@@ -15,65 +22,58 @@ export default async function Home() {
   }
 
   return (
-    <main className="grain-overlay relative min-h-screen overflow-hidden bg-bg-primary">
-      {/* Navbar */}
+    <main className="relative min-h-screen overflow-hidden bg-white">
       <Navbar />
-
-      {/* Hero */}
       <HeroSection>
         <SignInButton />
       </HeroSection>
-
-      {/* Stats */}
-      <StatsSection />
-
-      {/* How it works */}
-      <HowItWorksSection />
-
-      {/* Features */}
-      <FeaturesSection />
+      <TrustBar />
+      <LogoCarousel />
+      <ProductCards />
+      <SolutionsSection />
+      <ValueProps />
+      <SocialProof />
+      <Integrations />
+      <Showcase />
+      <Testimonials />
+      <CTASection />
 
       {/* Footer */}
-      <footer className="relative border-t border-white/[0.06] px-6 py-12">
-        <div className="mx-auto flex max-w-5xl flex-col gap-8 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left */}
-          <div className="flex flex-col gap-2">
-            <span className="font-heading text-base font-bold tracking-tight">
-              <span className="text-text-primary">Kith</span>
+      <footer className="border-t border-slate-200 px-6 py-16 bg-slate-50">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Brand */}
+          <div className="flex flex-col gap-3">
+            <span className="font-heading text-lg font-bold tracking-tight">
+              <span className="text-slate-900">Kith</span>
               <span className="text-accent-teal">Node</span>
             </span>
-            <p className="text-sm text-text-secondary">
-              A UNC Chapel Hill startup by{" "}
-              <a
-                href="https://www.linkedin.com/in/samrigot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent-teal transition-colors hover:text-accent-teal/80"
-              >
-                Sam Rigot
-              </a>
-            </p>
-            <p className="text-xs text-text-muted">
-              &copy; {new Date().getFullYear()} KithNode &middot; v1.0.0
+            <p className="text-sm text-slate-600">
+              AI-powered networking intelligence for ambitious students breaking into finance.
             </p>
           </div>
-          {/* Right */}
-          <div className="flex items-center gap-6 text-xs text-text-muted">
-            <a href="#" className="transition-colors hover:text-text-secondary">
-              Privacy
-            </a>
-            <a href="#" className="transition-colors hover:text-text-secondary">
-              Terms
-            </a>
-            <a
-              href="https://kithnode.canny.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-accent-teal"
-            >
-              Contact
-            </a>
+          {/* Product */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-slate-900">Product</h4>
+            <a href="#products" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Signal Detection</a>
+            <a href="#products" className="text-sm text-slate-600 transition-colors hover:text-slate-900">AI Scoring</a>
+            <a href="#products" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Smart Outreach</a>
+            <a href="#products" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Discover</a>
           </div>
+          {/* Company */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-slate-900">Company</h4>
+            <a href="https://www.linkedin.com/in/samrigot" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-600 transition-colors hover:text-slate-900">About</a>
+            <a href="https://kithnode.canny.io" target="_blank" rel="noopener noreferrer" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Feedback</a>
+          </div>
+          {/* Legal */}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold text-slate-900">Legal</h4>
+            <a href="#" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Privacy</a>
+            <a href="#" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Terms</a>
+          </div>
+        </div>
+        <div className="mx-auto mt-12 max-w-6xl border-t border-slate-200 pt-8">
+          <p className="text-xs text-slate-400">&copy; {new Date().getFullYear()} KithNode. A UNC Chapel Hill startup by Sam Rigot.</p>
         </div>
       </footer>
     </main>

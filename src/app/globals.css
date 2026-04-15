@@ -171,6 +171,32 @@
     box-shadow: 0 0 30px -5px rgba(245, 158, 11, 0.15);
   }
 
+  /* Gradient blob for landing page */
+  .gradient-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  .gradient-blob-teal {
+    background: linear-gradient(135deg, #0EA5E9, #06B6D4);
+  }
+
+  .gradient-blob-cyan {
+    background: linear-gradient(135deg, #06B6D4, #22D3EE);
+  }
+
+  /* Landing page rounded corners override */
+  .landing [class*="rounded-none"] {
+    border-radius: 0px;
+  }
+
+  .landing .card-rounded {
+    border-radius: 12px;
+  }
+
   /* Discover card swipe animations */
   .animate-slide-out-left {
     animation: slideOutLeft 0.3s ease-in forwards;

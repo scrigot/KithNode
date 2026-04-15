@@ -6,9 +6,9 @@ export function SignInButton() {
   return (
     <button
       onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-      className="bg-accent-teal px-8 py-3.5 text-sm font-medium text-white transition-all duration-200 hover:bg-accent-teal/80 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(14,165,233,0.3)]"
+      className="rounded-lg bg-accent-teal px-8 py-3.5 text-sm font-medium text-white transition-all duration-200 hover:bg-accent-teal/90 hover:scale-[1.02] hover:shadow-lg hover:shadow-accent-teal/25"
     >
-      Sign in with Google
+      Get Started with Google
     </button>
   );
 }

@@ -22,3 +22,4 @@ scripts/ralph/.last-branch
 
 /src/generated/prisma
 .vercel
+.env*.local
