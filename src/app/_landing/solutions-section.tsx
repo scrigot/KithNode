@@ -1,8 +1,6 @@
-"use client";
-
+import Link from "next/link";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { TrendingUp, Building2, Briefcase } from "lucide-react";
-import { signIn } from "next-auth/react";
 
 const FIRMS = [
   "Goldman Sachs", "Morgan Stanley", "J.P. Morgan", "Evercore", "Centerview",
@@ -88,12 +86,12 @@ export function SolutionsSection() {
                     </li>
                   ))}
                 </ul>
-                <button
-                  onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-                  className="mt-6 w-full rounded-lg border border-[#0EA5E9] bg-white py-2.5 text-sm font-medium text-[#0EA5E9] transition-colors duration-300 hover:bg-[#0EA5E9] hover:text-white"
+                <Link
+                  href="/waitlist"
+                  className="mt-6 block w-full rounded-lg border border-[#0EA5E9] bg-white py-2.5 text-center text-sm font-semibold text-[#0EA5E9] transition-colors duration-300 hover:bg-[#0EA5E9] hover:text-white"
                 >
-                  Get Started
-                </button>
+                  Request Access
+                </Link>
               </div>
             </ScrollReveal>
           ))}

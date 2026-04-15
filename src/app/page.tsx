@@ -3,16 +3,11 @@ import { redirect } from "next/navigation";
 import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
-import { TrustBar } from "./_landing/trust-bar";
-import { LogoCarousel } from "./_landing/logo-carousel";
 import { ProductCards } from "./_landing/product-cards";
-import { SolutionsSection } from "./_landing/solutions-section";
-import { ValueProps } from "./_landing/value-props";
-import { SocialProof } from "./_landing/social-proof";
-import { Integrations } from "./_landing/integrations";
 import { Showcase } from "./_landing/showcase";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
+import { ReelEmbed } from "./_landing/reel-embed";
 
 export default async function Home() {
   const session = await auth();
@@ -27,13 +22,12 @@ export default async function Home() {
       <HeroSection>
         <SignInButton />
       </HeroSection>
-      <TrustBar />
-      <LogoCarousel />
+      <section className="bg-white px-4 py-16">
+        <div className="mx-auto max-w-[1200px]">
+          <ReelEmbed />
+        </div>
+      </section>
       <ProductCards />
-      <SolutionsSection />
-      <ValueProps />
-      <SocialProof />
-      <Integrations />
       <Showcase />
       <Testimonials />
       <CTASection />

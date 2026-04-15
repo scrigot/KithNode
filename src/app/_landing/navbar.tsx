@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 
 export function Navbar() {
@@ -50,23 +50,12 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <motion.button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-          className="text-sm font-medium transition-colors"
-          style={{
-            color: useTransform(scrolled, (v) =>
-              v > 0.5 ? "#475569" : "rgba(255,255,255,0.9)"
-            ),
-          }}
+        <Link
+          href="/waitlist"
+          className="rounded-lg bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"
         >
-          Sign in
-        </motion.button>
-        <button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-          className="rounded-lg bg-white/20 px-5 py-2 text-sm font-medium text-white backdrop-blur-sm transition-all hover:bg-white/30"
-        >
-          Get Started
-        </button>
+          Request Access
+        </Link>
       </div>
     </motion.nav>
   );

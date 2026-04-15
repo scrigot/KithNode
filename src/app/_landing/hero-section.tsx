@@ -1,8 +1,7 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { StaggerContainer, FadeUp } from "@/components/motion";
-import { ReelEmbed } from "./reel-embed";
 
 export function HeroSection({ children }: { children: React.ReactNode }) {
   return (
@@ -20,35 +19,31 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
         <StaggerContainer className="flex flex-col items-center text-center">
           <FadeUp>
-            <span className="mb-6 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
-              Now in private alpha at UNC
+            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#D7F548]" />
+              Private alpha &middot; free for founding users
             </span>
           </FadeUp>
 
           <FadeUp>
-            <h1 className="font-heading text-6xl font-bold tracking-tight text-white sm:text-8xl">
-              Your Warmest Path
+            <h1 className="font-heading text-5xl font-bold tracking-tight text-white sm:text-7xl">
+              Break into finance
               <br />
-              <span className="text-white/90">Into Finance</span>
+              <span className="text-white/90">through the people</span>
+              <br />
+              <span className="text-white/90">you already know.</span>
             </h1>
           </FadeUp>
 
           <FadeUp>
-            <p className="mt-8 max-w-2xl text-xl leading-relaxed text-white/80">
-              KithNode uses AI to surface your strongest alumni connections, score
-              every relationship, and draft authentic outreach &mdash; so you land
-              the coffee chat, not the cold shoulder.
+            <p className="mt-8 max-w-2xl text-xl leading-relaxed text-white/85">
+              KithNode maps every UNC alum, Chi Phi brother, and Charlotte native across 50+ target firms &mdash; scores the warmest paths &mdash; and drafts outreach that actually gets replies.
             </p>
           </FadeUp>
 
           <FadeUp>
             <div className="mt-12 flex flex-col items-center gap-4 sm:flex-row">
-              <button
-                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-                className="rounded-lg bg-white px-10 py-4 text-base font-semibold text-[#0EA5E9] shadow-lg transition-all hover:bg-white/90 hover:shadow-xl"
-              >
-                Get Started Free
-              </button>
+              {children}
               <button
                 onClick={() => {
                   document
@@ -57,21 +52,17 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
                 }}
                 className="rounded-lg border border-white/40 px-10 py-4 text-base font-medium text-white transition-all hover:bg-white/10"
               >
-                See How It Works
+                See it in action
               </button>
             </div>
           </FadeUp>
-        </StaggerContainer>
-      </div>
 
-      {/* Animated hero reel — below the fold, still on gradient bg */}
-      <div className="relative z-10 flex justify-center px-4 pb-24">
-        <FadeUp>
-          <div className="relative w-full max-w-[1200px]">
-            <ReelEmbed />
-            <div className="absolute -bottom-6 left-1/2 h-12 w-3/4 -translate-x-1/2 rounded-full bg-black/10 blur-2xl" />
-          </div>
-        </FadeUp>
+          <FadeUp>
+            <p className="mt-10 max-w-xl text-sm text-white/70">
+              Built by <Link href="https://www.linkedin.com/in/samrigot" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-4 hover:text-[#D7F548]">Sam Rigot</Link>, a UNC freshman who scored 500+ real alumni connections on LinkedIn before writing a line of outreach.
+            </p>
+          </FadeUp>
+        </StaggerContainer>
       </div>
     </section>
   );
