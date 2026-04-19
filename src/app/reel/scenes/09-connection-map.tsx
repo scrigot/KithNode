@@ -14,13 +14,13 @@ const CLUSTERS = [
 
 const NODES: Node[] = [];
 const NAMED = [
-  { cluster: 0, label: "Jack M.", firm: "Goldman" },
-  { cluster: 0, label: "Priya P.", firm: "Evercore" },
-  { cluster: 1, label: "Marcus C.", firm: "MS" },
-  { cluster: 1, label: "Ellie R.", firm: "Lazard" },
-  { cluster: 2, label: "Tom O.", firm: "Houlihan" },
+  { cluster: 0, label: "Morgan R.", firm: "Goldman" },
+  { cluster: 0, label: "Ava S.", firm: "Evercore" },
+  { cluster: 1, label: "Marcus E.", firm: "MS" },
+  { cluster: 1, label: "Elise N.", firm: "Lazard" },
+  { cluster: 2, label: "Theo B.", firm: "Houlihan" },
   { cluster: 2, label: "Aarya S.", firm: "Citi" },
-  { cluster: 3, label: "Diego L.", firm: "PJT" },
+  { cluster: 3, label: "Diego M.", firm: "PJT" },
   { cluster: 3, label: "Mei W.", firm: "Centerview" },
 ];
 
@@ -51,7 +51,7 @@ NAMED.forEach((n, i) => {
     cluster: n.cluster,
     label: n.label,
     firm: n.firm,
-    delay: 1.4 + i * 0.14,
+    delay: 0.7 + i * 0.08,
   });
 });
 
@@ -149,7 +149,7 @@ export function ConnectionMap() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 2.6, duration: 0.4 }}
+        transition={{ delay: 1.5, duration: 0.4 }}
         className="absolute bottom-[6%] right-[6%] text-right font-mono text-xl font-bold tracking-widest text-[#D7F548]"
       >
         UPDATED IN REAL TIME

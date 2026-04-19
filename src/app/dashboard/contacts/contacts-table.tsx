@@ -341,14 +341,14 @@ export function ContactsTable() {
                         >
                           Resume Automation
                         </button>
-                      ) : (
+                      ) : process.env.NEXT_PUBLIC_ENABLE_OUTREACH_DRAFTS !== 'false' ? (
                         <button
                           onClick={() => setSlideOver({ connectionId: contact.id, contactName: contact.name })}
                           className="rounded-md bg-accent-blue/10 px-3 py-1 text-xs font-medium text-accent-blue hover:bg-accent-blue/20"
                         >
                           Draft Outreach
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                 </tr>

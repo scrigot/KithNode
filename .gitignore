@@ -23,3 +23,8 @@ scripts/ralph/.last-branch
 /src/generated/prisma
 .vercel
 .env*.local
+
+# Local-only agent/session state
+.claude/
+.omc/
+

@@ -477,6 +477,10 @@ function Wizard({
   const [customLocationInput, setCustomLocationInput] = useState("");
 
   useEffect(() => {
+    trackEvent("onboarding_started");
+  }, []);
+
+  useEffect(() => {
     savePreferences(prefs);
   }, [prefs]);
 

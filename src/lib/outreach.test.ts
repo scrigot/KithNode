@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateOutreachDraft, OutreachContext } from "./outreach";
+import { generateOutreachDraft, getLastName, OutreachContext } from "./outreach";
 
 const baseContext: OutreachContext = {
   userName: "John Smith",
@@ -77,5 +77,92 @@ describe("generateOutreachDraft", () => {
     const ctx = { ...baseContext, userUniversity: "" };
     const draft = generateOutreachDraft(ctx);
     expect(draft.length).toBeGreaterThan(0);
+  });
+});
+
+const baseProfCtx: OutreachContext = {
+  userName: "John Smith",
+  userUniversity: "UNC Chapel Hill",
+  userTargetIndustry: "Finance",
+  alumniName: "Eric Ghysels",
+  alumniTitle: "Professor",
+  alumniFirm: "",
+  alumniUniversity: "UNC Chapel Hill",
+  strengthScore: 70,
+  alumniSource: "professor",
+  researchAreas: ["financial econometrics", "machine learning", "high-frequency data"],
+  department: "UNC Finance",
+};
+
+describe("getLastName", () => {
+  it("extracts last name from full name", () => {
+    expect(getLastName("Eric Ghysels")).toBe("Ghysels");
+  });
+
+  it("ignores Jr. suffix and returns preceding name", () => {
+    expect(getLastName("Elena Ramirez Jr.")).toBe("Ramirez");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(getLastName("")).toBe("");
+  });
+
+  it("returns the only word for a single-word name", () => {
+    expect(getLastName("Madonna")).toBe("Madonna");
+  });
+});
+
+describe("generateOutreachDraft — professor templates", () => {
+  it("research-heavy: opener, ask, and closing appear", () => {
+    const ctx: OutreachContext = { ...baseProfCtx, profType: "research-heavy" };
+    const draft = generateOutreachDraft(ctx);
+    expect(draft).toContain("Hi Professor Ghysels");
+    expect(draft).toContain("deeply interested in financial econometrics");
+    expect(draft).toContain("20-minute conversation");
+    expect(draft).toContain("Best,\nJohn Smith");
+  });
+
+  it("research-heavy: cites recentPaper when provided", () => {
+    const ctx: OutreachContext = {
+      ...baseProfCtx,
+      profType: "research-heavy",
+      recentPaper: "MIDAS Regressions",
+    };
+    const draft = generateOutreachDraft(ctx);
+    expect(draft).toContain("MIDAS Regressions");
+  });
+
+  it("teaching-heavy: opener, ask, and closing appear", () => {
+    const ctx: OutreachContext = { ...baseProfCtx, profType: "teaching-heavy" };
+    const draft = generateOutreachDraft(ctx);
+    expect(draft).toContain("Hi Professor Ghysels");
+    expect(draft).toContain("considering enrolling in your course");
+    expect(draft).toContain("15 minutes");
+    expect(draft).toContain("Best,\nJohn Smith");
+  });
+
+  it("mixed (explicit): opener, ask, and closing appear", () => {
+    const ctx: OutreachContext = { ...baseProfCtx, profType: "mixed" };
+    const draft = generateOutreachDraft(ctx);
+    expect(draft).toContain("Hi Professor Ghysels");
+    expect(draft).toContain("strong interest in financial econometrics");
+    expect(draft).toContain("15 minutes");
+    expect(draft).toContain("Best,\nJohn Smith");
+  });
+
+  it("profType undefined defaults to mixed template", () => {
+    const ctx: OutreachContext = { ...baseProfCtx, profType: undefined };
+    const draft = generateOutreachDraft(ctx);
+    expect(draft).toContain("strong interest in");
+    expect(draft).toContain("15 minutes");
+  });
+
+  it("alumniSource omitted defaults to alumni path (backward compat)", () => {
+    const ctx: OutreachContext = { ...baseContext };
+    const draft = generateOutreachDraft(ctx);
+    // Alumni path uses first name, not "Professor"
+    expect(draft).toContain("Jane");
+    expect(draft).not.toContain("Professor");
+    expect(draft).toContain("15-minute call");
   });
 });

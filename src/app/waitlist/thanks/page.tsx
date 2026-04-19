@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { CopyRefButton } from "./copy-ref-button";
 
 export const metadata = {
@@ -28,7 +29,13 @@ export default function ThanksPage() {
               <p className="mt-2 text-sm text-white/90">
                 Referrals move you up the list. Send this link to anyone you&apos;d vouch for.
               </p>
-              <CopyRefButton />
+              <Suspense
+                fallback={
+                  <div className="mt-4 h-10 w-full rounded-lg border border-white/20 bg-white/5" />
+                }
+              >
+                <CopyRefButton />
+              </Suspense>
             </div>
 
             <div className="rounded-xl bg-white/10 p-5">

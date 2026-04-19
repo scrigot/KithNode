@@ -16,11 +16,11 @@ const SCREENS = [
           <span className="text-right">Tier</span>
         </div>
         {[
-          { name: "Jacob Goldstein", company: "KKR", score: 78, tier: "HOT", color: "bg-red-500" },
-          { name: "Sarah Chen", company: "Goldman Sachs", score: 71, tier: "HOT", color: "bg-red-500" },
-          { name: "Mike Park", company: "Evercore", score: 65, tier: "WARM", color: "bg-blue-500" },
-          { name: "James Liu", company: "McKinsey", score: 58, tier: "WARM", color: "bg-blue-500" },
-          { name: "Priya Nair", company: "Centerview", score: 34, tier: "MONITOR", color: "bg-amber-500" },
+          { name: "Ben Kaminski", company: "KKR", score: 78, tier: "HOT", color: "bg-red-500" },
+          { name: "Riley Chen", company: "Goldman Sachs", score: 71, tier: "HOT", color: "bg-red-500" },
+          { name: "Miles Park", company: "Evercore", score: 65, tier: "WARM", color: "bg-blue-500" },
+          { name: "Jamie Liu", company: "McKinsey", score: 58, tier: "WARM", color: "bg-blue-500" },
+          { name: "Nisha Rao", company: "Centerview", score: 34, tier: "MONITOR", color: "bg-amber-500" },
         ].map((c) => (
           <div key={c.name} className="grid grid-cols-[1.2fr_1fr_60px_64px] gap-2 border-b border-slate-100 px-4 py-2.5 text-[11px] last:border-b-0">
             <span className="truncate font-medium text-slate-900">{c.name}</span>
@@ -58,7 +58,7 @@ const SCREENS = [
       <div className="space-y-3 p-4">
         <div className="flex items-center gap-2 text-[11px]">
           <span className="font-medium text-slate-400">To:</span>
-          <span className="text-slate-700">jacob.goldstein@kkr.com</span>
+          <span className="text-slate-700">ben.kaminski@kkr.com</span>
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           <span className="font-medium text-slate-400">Subject:</span>
@@ -66,7 +66,7 @@ const SCREENS = [
         </div>
         <div className="h-px bg-slate-200" />
         <div className="space-y-2 text-[11px] leading-relaxed text-slate-600">
-          <p>Hi Jacob,</p>
+          <p>Hi Ben,</p>
           <p>I noticed you graduated from Kenan-Flagler in 2019 and made the move to KKR &mdash; congrats on the trajectory. I&apos;m a sophomore at UNC exploring PE paths and would love to hear about your experience.</p>
           <p>Would you have 15 minutes for a quick call next week?</p>
         </div>

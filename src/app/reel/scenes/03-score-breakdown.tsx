@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { BlueBg, ScoreTicker, TierChip } from "../primitives";
 
-const BADGES = ["UNC", "Chi Phi", "Charlotte"];
+const BADGES = ["UNC", "Chi Phi", "NC"];
 const FACTORS = [
   { label: "Fit", value: 40, color: "#3661FF" },
   { label: "Affinity", value: 25, color: "#D7F548" },
@@ -29,7 +29,7 @@ export function ScoreBreakdown() {
       >
         <div className="flex items-start justify-between">
           <div>
-            <div className="font-heading text-4xl font-bold text-slate-900">Jack Morrison</div>
+            <div className="font-heading text-4xl font-bold text-slate-900">Morgan Reyes</div>
             <div className="mt-2 text-lg text-slate-500">VP, M&amp;A &middot; Goldman Sachs</div>
           </div>
           <div className="flex flex-col items-end">
@@ -46,7 +46,7 @@ export function ScoreBreakdown() {
               key={b}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6 + i * 0.18 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
               className="rounded-full bg-[#1D3FE0]/10 px-4 py-1.5 text-sm font-semibold text-[#1D3FE0]"
             >
               {b}
@@ -60,7 +60,7 @@ export function ScoreBreakdown() {
               key={f.label}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1.2 + i * 0.15 }}
+              transition={{ delay: 0.7 + i * 0.08 }}
               className="flex items-center gap-4"
             >
               <span className="w-24 text-sm font-semibold uppercase tracking-wide text-slate-500">{f.label}</span>
@@ -68,7 +68,7 @@ export function ScoreBreakdown() {
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${f.value * 2}%` }}
-                  transition={{ delay: 1.2 + i * 0.15, duration: 0.7, ease: "easeOut" }}
+                  transition={{ delay: 0.7 + i * 0.08, duration: 0.5, ease: "easeOut" }}
                   className="h-full rounded-full"
                   style={{ backgroundColor: f.color }}
                 />
@@ -82,7 +82,7 @@ export function ScoreBreakdown() {
       <motion.div
         initial={{ opacity: 0, x: 40 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 2.4, duration: 0.6 }}
+        transition={{ delay: 1.3, duration: 0.5 }}
         className="absolute bottom-[12%] right-[8%] text-right font-heading text-[100px] font-bold leading-[0.95] text-white"
       >
         every<br />connection,<br />scored.

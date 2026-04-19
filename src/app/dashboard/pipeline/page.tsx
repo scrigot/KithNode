@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { GitBranch } from "lucide-react";
+import { trackEvent } from "@/lib/posthog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { PipelineContact, PipelineResponse } from "@/lib/api";
@@ -68,11 +69,22 @@ export default function PipelinePage() {
   }, [fetchPipeline]);
 
   const moveStage = async (contactId: string, newStage: string) => {
-    await fetch(`/api/pipeline/${contactId}`, {
+    const res = await fetch(`/api/pipeline/${contactId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stage: newStage }),
     });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.conversion) {
+        trackEvent("conversion_tracked", {
+          contactId: json.conversion.contactId,
+          source: json.conversion.source,
+          stage: json.conversion.stage,
+          warmPathCount: json.conversion.warmPathCount,
+        });
+      }
+    }
     fetchPipeline();
   };
 

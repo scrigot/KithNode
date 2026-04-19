@@ -28,7 +28,16 @@ import { findContacts, type CompanyInput } from "@/lib/discover/contact-finder";
 import { detectSignals } from "@/lib/discover/signal-detector";
 import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
-import { seedsForIndustries } from "@/lib/discover/seeds";
+import { seedsForIndustries, seedsForSchool } from "@/lib/discover/seeds";
+
+function dedupeSeeds(seeds: import("@/lib/discover/seeds").FirmSeed[]) {
+  const seen = new Set<string>();
+  return seeds.filter((s) => {
+    if (seen.has(s.domain)) return false;
+    seen.add(s.domain);
+    return true;
+  });
+}
 
 const QUICK_SEED_CAP = 5;
 const DEEP_SEED_CAP = 15;
@@ -99,7 +108,12 @@ export async function POST(request: NextRequest) {
   const mode: "quick" | "deep" = body.mode === "deep" ? "deep" : "quick";
 
   const prefs = await getUserPrefs(userId);
-  const allSeeds = seedsForIndustries(prefs.targetIndustries);
+  const schoolSeeds = prefs.university ? seedsForSchool(prefs.university) : [];
+  const industrySeeds = seedsForIndustries(prefs.targetIndustries);
+  // Prefer school-specific seeds, dedup against industry seeds, then append.
+  const allSeeds = schoolSeeds.length > 0
+    ? dedupeSeeds([...schoolSeeds, ...industrySeeds])
+    : industrySeeds;
   if (allSeeds.length === 0) {
     return NextResponse.json(
       {

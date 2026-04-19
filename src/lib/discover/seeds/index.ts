@@ -146,3 +146,74 @@ export function seedsForIndustries(industries: readonly string[]): FirmSeed[] {
   }
   return out;
 }
+
+// ── School-specific seed lists ──────────────────────────────────────
+//
+// Maps normalized school slugs to firms known to actively recruit there.
+// Used by the discover pipeline to prioritize school-relevant firms
+// when the user has a university set in preferences.
+
+type SchoolKey = string;
+
+const SCHOOL_ALIASES: Record<string, SchoolKey> = {
+  "unc": "unc",
+  "unc-chapel-hill": "unc",
+  "university of north carolina": "unc",
+  "nc state": "ncsu",
+  "ncsu": "ncsu",
+  "north carolina state": "ncsu",
+};
+
+const SCHOOL_SEEDS: Record<SchoolKey, readonly FirmSeed[]> = {
+  unc: [
+    s("Goldman Sachs", "goldmansachs.com"),
+    s("JPMorgan", "jpmorganchase.com"),
+    s("Bank of America", "bankofamerica.com"),
+    s("Morgan Stanley", "morganstanley.com"),
+    s("Wells Fargo", "wellsfargo.com"),
+    s("Deloitte", "deloitte.com"),
+    s("EY", "ey.com"),
+    s("PwC", "pwc.com"),
+    s("KPMG", "kpmg.com"),
+    s("McKinsey & Company", "mckinsey.com"),
+    s("Boston Consulting Group", "bcg.com"),
+    s("Bain & Company", "bain.com"),
+    s("Evercore", "evercore.com"),
+    s("Lazard", "lazard.com"),
+    s("Centerview Partners", "centerviewpartners.com"),
+  ],
+  ncsu: [
+    s("Bank of America", "bankofamerica.com"),
+    s("Wells Fargo", "wellsfargo.com"),
+    s("Truist", "truist.com"),
+    s("First Citizens", "firstcitizens.com"),
+    s("Deloitte", "deloitte.com"),
+    s("EY", "ey.com"),
+    s("PwC", "pwc.com"),
+    s("KPMG", "kpmg.com"),
+    s("RSM", "rsmus.com"),
+    s("Grant Thornton", "grantthornton.com"),
+    s("Protiviti", "protiviti.com"),
+    s("Raymond James", "raymondjames.com"),
+  ],
+};
+
+/**
+ * Resolve a school name/slug to a deduped list of FirmSeed objects.
+ * Returns an empty array for unrecognized schools (caller falls back
+ * to seedsForIndustries).
+ */
+export function seedsForSchool(school: string): FirmSeed[] {
+  const normalized = school.trim().toLowerCase();
+  const key = SCHOOL_ALIASES[normalized] ?? normalized;
+  const seeds = SCHOOL_SEEDS[key];
+  if (!seeds) return [];
+  const seen = new Set<string>();
+  const out: FirmSeed[] = [];
+  for (const seed of seeds) {
+    if (seen.has(seed.domain)) continue;
+    seen.add(seed.domain);
+    out.push(seed);
+  }
+  return out;
+}

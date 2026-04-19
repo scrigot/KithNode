@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
-import { X, Star, Search, Layers, Sparkles, Loader2 } from "lucide-react";
+import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap } from "lucide-react";
+import { IntroModal } from "./intro-modal";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -22,6 +24,13 @@ const SCORE_STYLES: Record<string, string> = {
 
 const TIERS = ["HOT", "WARM", "MONITOR", "COLD"] as const;
 
+interface WarmPath {
+  intermediaryName: string;
+  intermediaryRelation: string;
+  firmName: string;
+  title: string;
+}
+
 interface Contact {
   id: string;
   name: string;
@@ -35,9 +44,11 @@ interface Contact {
   tier: string;
   affiliations: string;
   source: string;
+  warmPaths?: WarmPath[];
 }
 
 type ViewMode = "browse" | "search";
+type SourceFilter = "alumni" | "professor";
 
 async function rateContact(
   contactId: string,
@@ -55,16 +66,34 @@ async function rateContact(
   }
 }
 
-// ─── Browse Card Component ─────────────────────────────────────────
+const warmPathFiredRef = { current: false };
+
 function BrowseCard({
   contact,
   direction,
   onRate,
+  onAskIntro,
+  sourceFilter,
 }: {
   contact: Contact;
   direction: "left" | "right" | "enter" | null;
   onRate: (rating: "high_value" | "skip") => void;
+  onAskIntro: (contact: Contact, warmPath: WarmPath) => void;
+  sourceFilter: SourceFilter;
 }) {
+  const isProfessor = sourceFilter === "professor" || contact.source === "professor";
+  if (
+    contact.warmPaths &&
+    contact.warmPaths.length > 0 &&
+    !warmPathFiredRef.current
+  ) {
+    warmPathFiredRef.current = true;
+    trackEvent("first_warm_path_viewed", {
+      contact_id: contact.id,
+      warm_path_count: contact.warmPaths.length,
+    });
+  }
+
   const tierKey = (contact.tier || "cold").toLowerCase();
   const affiliationList = contact.affiliations
     ? contact.affiliations.split(",").filter(Boolean)
@@ -104,21 +133,65 @@ function BrowseCard({
         <h3 className="text-xl font-bold text-foreground">{contact.name}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           {contact.title}
-          {contact.title && contact.firmName ? " @ " : ""}
+          {contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : ""}
           <span className="text-foreground">{contact.firmName}</span>
         </p>
+        {isProfessor && contact.firmName && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              DEPT
+            </span>
+            <span className="text-[11px] text-muted-foreground">{contact.firmName}</span>
+          </div>
+        )}
 
-        {/* Affiliation chips */}
+        {/* Warm path chain */}
+        {contact.warmPaths && contact.warmPaths.length > 0 && (
+          <div className="mt-3 border border-primary/20 bg-primary/5 px-4 py-3">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              WARM PATH
+            </span>
+            <div className="mt-1.5 space-y-1">
+              {contact.warmPaths.slice(0, 3).map((wp) => (
+                <p key={`${wp.intermediaryName}-${wp.title}`} className="font-mono text-[11px]">
+                  <span className="text-muted-foreground">Via </span>
+                  <span className="text-primary">{wp.intermediaryName}</span>
+                  <span className="text-muted-foreground"> ({wp.intermediaryRelation})</span>
+                  <span className="text-muted-foreground"> -&gt; </span>
+                  <span className="text-primary">{wp.title}</span>
+                  <span className="text-muted-foreground"> at </span>
+                  <span className="text-primary">{wp.firmName}</span>
+                </p>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onAskIntro(contact, contact.warmPaths![0])}
+              className="mt-2 w-full border border-primary/30 bg-primary/10 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+            >
+              ASK FOR INTRO
+            </button>
+          </div>
+        )}
+
+        {/* Affiliation chips / Research areas */}
         {affiliationList.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {affiliationList.map((a) => (
-              <span
-                key={a}
-                className="border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary"
-              >
-                {a.trim()}
+          <div className="mt-4">
+            {isProfessor && (
+              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                RESEARCH AREAS
               </span>
-            ))}
+            )}
+            <div className="flex flex-wrap gap-2">
+              {affiliationList.map((a) => (
+                <span
+                  key={a}
+                  className="border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary"
+                >
+                  {a.trim()}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -189,7 +262,12 @@ function BrowseCard({
 
 // ─── Main Page ─────────────────────────────────────────────────────
 export default function DiscoverPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<ViewMode>("browse");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
+    searchParams.get("source") === "professor" ? "professor" : "alumni",
+  );
   const [query, setQuery] = useState("");
   const [activeTier, setActiveTier] = useState<string>("");
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -208,6 +286,13 @@ export default function DiscoverPage() {
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const discoverAbortRef = useRef<AbortController | null>(null);
 
+  // Intro modal state
+  const [introTarget, setIntroTarget] = useState<{
+    contact: Contact;
+    warmPath: WarmPath;
+  } | null>(null);
+  const [userName, setUserName] = useState("");
+
   // Browse mode state
   const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -217,11 +302,12 @@ export default function DiscoverPage() {
   const [allRated, setAllRated] = useState(false);
   const animatingRef = useRef(false);
 
-  const search = useCallback(async (q: string, tier: string) => {
+  const search = useCallback(async (q: string, tier: string, src: SourceFilter) => {
     setLoading(true);
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (tier) params.set("tier", tier.toLowerCase());
+    params.set("source", src);
     const qs = params.toString();
 
     try {
@@ -245,10 +331,10 @@ export default function DiscoverPage() {
   }, []);
 
   // Fetch unrated contacts for browse mode (API already filters out rated + own imports)
-  const fetchBrowseContacts = useCallback(async () => {
+  const fetchBrowseContacts = useCallback(async (src: SourceFilter) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/discover");
+      const res = await fetch(`/api/discover?source=${src}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       const unrated: Contact[] = data.contacts || [];
@@ -273,18 +359,18 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (mode !== "search") return;
     const timer = setTimeout(() => {
-      search(query, activeTier);
+      search(query, activeTier, sourceFilter);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, activeTier, search, mode]);
+  }, [query, activeTier, search, mode, sourceFilter]);
 
   // Browse mode: load contacts
   useEffect(() => {
     if (mode !== "browse") return;
     setCurrentIndex(0);
     setSlideDirection("enter");
-    fetchBrowseContacts();
-  }, [mode, fetchBrowseContacts]);
+    fetchBrowseContacts(sourceFilter);
+  }, [mode, fetchBrowseContacts, sourceFilter]);
 
   // Clear enter animation after mount
   useEffect(() => {
@@ -340,6 +426,24 @@ export default function DiscoverPage() {
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [mode, allRated, browseContacts.length, handleRate]);
+
+  // Fetch user name for intro modal
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.name) setUserName(data.user.name);
+        else if (data?.user?.email) setUserName(data.user.email.split("@")[0]);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleAskIntro = useCallback(
+    (contact: Contact, warmPath: WarmPath) => {
+      setIntroTarget({ contact, warmPath });
+    },
+    [],
+  );
 
   const runDiscover = useCallback(async () => {
     if (discoverLoading) return;
@@ -429,9 +533,9 @@ export default function DiscoverPage() {
         });
         // Refresh whichever pane is active
         if (mode === "browse") {
-          await fetchBrowseContacts();
+          await fetchBrowseContacts(sourceFilter);
         } else {
-          await search(query, activeTier);
+          await search(query, activeTier, sourceFilter);
         }
       }
     } catch (err) {
@@ -449,7 +553,19 @@ export default function DiscoverPage() {
       }, 1200);
       setTimeout(() => setDiscoverResult(null), 8000);
     }
-  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier]);
+  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+
+  const handleSourceFilter = useCallback((src: SourceFilter) => {
+    setSourceFilter(src);
+    const params = new URLSearchParams(searchParams.toString());
+    if (src === "alumni") {
+      params.delete("source");
+    } else {
+      params.set("source", src);
+    }
+    const qs = params.toString();
+    router.replace(`/dashboard/discover${qs ? `?${qs}` : ""}`, { scroll: false });
+  }, [router, searchParams]);
 
   const cancelDiscover = useCallback(() => {
     if (discoverAbortRef.current) {
@@ -538,16 +654,45 @@ export default function DiscoverPage() {
       <div className="mb-1 flex items-end justify-between">
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-            DISCOVER
+            {sourceFilter === "professor" ? "PROFESSORS" : "DISCOVER"}
           </h2>
           <p className="text-[10px] text-muted-foreground">
             {mode === "browse"
-              ? "RATE CONTACTS FROM THE SHARED POOL"
-              : "SEARCH THE SHARED NETWORK"}
+              ? sourceFilter === "professor"
+                ? "RATE PROFESSORS FROM THE SHARED POOL"
+                : "RATE CONTACTS FROM THE SHARED POOL"
+              : sourceFilter === "professor"
+                ? "SEARCH THE PROFESSOR NETWORK"
+                : "SEARCH THE SHARED NETWORK"}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Source filter: Alumni / Professors */}
+          <div className="flex overflow-hidden border border-white/[0.06]">
+            <button
+              onClick={() => handleSourceFilter("alumni")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                sourceFilter === "alumni"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Alumni
+            </button>
+            <button
+              onClick={() => handleSourceFilter("professor")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                sourceFilter === "professor"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <GraduationCap className="h-3 w-3" />
+              Professors
+            </button>
+          </div>
+
           {/* Discover New button — runs the cold-outreach pipeline */}
           <button
             onClick={runDiscover}
@@ -635,6 +780,8 @@ export default function DiscoverPage() {
                   contact={browseContacts[currentIndex]}
                   direction={slideDirection}
                   onRate={handleRate}
+                  onAskIntro={handleAskIntro}
+                  sourceFilter={sourceFilter}
                 />
               </div>
               <div className="mt-4 flex items-center gap-3">
@@ -751,9 +898,18 @@ export default function DiscoverPage() {
                         </p>
                         <p className="truncate text-[10px] text-muted-foreground">
                           {c.title}
-                          {c.title && c.firmName ? " @ " : ""}
+                          {c.title && c.firmName
+                            ? c.source === "professor"
+                              ? " · "
+                              : " @ "
+                            : ""}
                           {c.firmName}
                         </p>
+                        {c.source === "professor" && c.firmName && (
+                          <p className="truncate text-[9px] text-muted-foreground/60">
+                            DEPT: {c.firmName}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <span
@@ -781,18 +937,25 @@ export default function DiscoverPage() {
                       {c.email && <p>{c.email}</p>}
                     </div>
 
-                    {/* Affiliations */}
+                    {/* Affiliations / Research areas */}
                     {affiliationList.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {affiliationList.map((a) => (
-                          <Badge
-                            key={a}
-                            variant="outline"
-                            className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
-                          >
-                            {a.trim()}
-                          </Badge>
-                        ))}
+                      <div className="mt-2">
+                        {c.source === "professor" && (
+                          <p className="mb-1 text-[8px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                            Research
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {affiliationList.map((a) => (
+                            <Badge
+                              key={a}
+                              variant="outline"
+                              className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
+                            >
+                              {a.trim()}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -843,6 +1006,21 @@ export default function DiscoverPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ═══════ INTRO REQUEST MODAL ═══════ */}
+      {introTarget && (
+        <IntroModal
+          contact={{
+            id: introTarget.contact.id,
+            name: introTarget.contact.name,
+            title: introTarget.contact.title,
+            firmName: introTarget.contact.firmName,
+          }}
+          warmPath={introTarget.warmPath}
+          userName={userName || "a KithNode user"}
+          onClose={() => setIntroTarget(null)}
+        />
       )}
 
       {/* ═══════ DISCOVER PIPELINE MODAL ═══════ */}

@@ -22,10 +22,10 @@ for (let cx = 1; cx <= COLS; cx++) {
 
 const YOU = { x: 1920 / 2, y: 1080 / 2 };
 const ALUMNI = [
-  { x: YOU.x - 380, y: YOU.y - 220, label: "UNC", delay: 0.6 },
-  { x: YOU.x + 360, y: YOU.y - 200, label: "Chi Phi", delay: 0.95 },
-  { x: YOU.x - 340, y: YOU.y + 240, label: "Charlotte", delay: 1.3 },
-  { x: YOU.x + 400, y: YOU.y + 220, label: "Goldman", delay: 1.65 },
+  { x: YOU.x - 380, y: YOU.y - 220, label: "UNC", delay: 0.35 },
+  { x: YOU.x + 360, y: YOU.y - 200, label: "Chi Phi", delay: 0.55 },
+  { x: YOU.x - 340, y: YOU.y + 240, label: "NC", delay: 0.75 },
+  { x: YOU.x + 400, y: YOU.y + 220, label: "Goldman", delay: 0.95 },
 ];
 
 export function NetworkIgnite() {
@@ -127,7 +127,7 @@ export function NetworkIgnite() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 2.0, duration: 0.4 }}
+        transition={{ delay: 1.1, duration: 0.35 }}
         className="absolute top-[8%] left-[8%] font-heading text-[96px] font-bold leading-[0.95] tracking-tight"
         style={{ color: BLUE }}
       >

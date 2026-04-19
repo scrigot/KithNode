@@ -18,8 +18,27 @@ export async function PATCH(
 
   try {
     const result = await updateOutreachStatus(Number(id), status);
+
+    // Include conversion data when status reaches a conversion milestone
+    const isConversion =
+      status === "RESPONDED" || status === "MEETING_SET";
+    let conversion: {
+      contactId: string;
+      source: string;
+      stage: string;
+    } | undefined;
+
+    if (isConversion) {
+      conversion = {
+        contactId: id,
+        source: "outreach_status",
+        stage: status,
+      };
+    }
+
     return NextResponse.json({
       connection: { id, status: result.status },
+      ...(conversion ? { conversion } : {}),
     });
   } catch (error) {
     const errStatus = (error as { status?: number }).status || 500;

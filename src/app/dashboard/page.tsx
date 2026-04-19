@@ -10,6 +10,7 @@ import {
   Settings,
   ArrowUpRight,
   Zap,
+  Users,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -27,6 +28,7 @@ interface OverviewData {
   weekly_goal_target: number;
   subscription_status: string;
   trial_days_left: number | null;
+  referral_count: number;
 }
 
 const QUICK_NAV = [
@@ -219,6 +221,17 @@ export default function DashboardPage() {
           >
             Upgrade
           </Link>
+        </div>
+      )}
+
+      {/* Referral count */}
+      {(data?.referral_count ?? 0) > 0 && (
+        <div className="mb-4 flex items-center gap-2.5 border border-accent-blue/20 bg-accent-blue/[0.06] px-4 py-3">
+          <Users size={15} className="text-accent-blue" />
+          <span className="text-[13px] text-text-secondary">
+            <span className="font-medium text-white">{data?.referral_count}</span>{" "}
+            referral{data?.referral_count !== 1 ? "s" : ""} signed up from your link
+          </span>
         </div>
       )}
 

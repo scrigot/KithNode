@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/get-user";
+import { findWarmPaths } from "@/lib/warm-paths";
 
 export async function GET(request: NextRequest) {
   const userId = await getUserId();
   const query = request.nextUrl.searchParams.get("q") || "";
   const tier = request.nextUrl.searchParams.get("tier") || "";
+  const source = request.nextUrl.searchParams.get("source") || "alumni";
 
   // Get IDs user already rated
   const { data: rated } = await supabase
@@ -28,6 +30,11 @@ export async function GET(request: NextRequest) {
   }
   if (tier) {
     builder = builder.eq("tier", tier);
+  }
+  if (source === "professor") {
+    builder = builder.eq("source", "professor");
+  } else {
+    builder = builder.neq("source", "professor");
   }
 
   const { data: otherData, error: otherError } = await builder
@@ -56,6 +63,11 @@ export async function GET(request: NextRequest) {
     if (tier) {
       ownBuilder = ownBuilder.eq("tier", tier);
     }
+    if (source === "professor") {
+      ownBuilder = ownBuilder.eq("source", "professor");
+    } else {
+      ownBuilder = ownBuilder.neq("source", "professor");
+    }
 
     const { data: ownData } = await ownBuilder
       .order("warmthScore", { ascending: false })
@@ -67,8 +79,16 @@ export async function GET(request: NextRequest) {
   // Filter out already rated
   const filtered = contacts.filter((c) => !ratedIds.includes(c.id));
 
+  // Enrich each contact with warm paths (user's own contacts at the same firm)
+  const enriched = await Promise.all(
+    filtered.map(async (c) => {
+      const warmPaths = await findWarmPaths(userId, c.firmName);
+      return { ...c, warmPaths };
+    }),
+  );
+
   return NextResponse.json({
-    contacts: filtered,
-    total: filtered.length,
+    contacts: enriched,
+    total: enriched.length,
   });
 }

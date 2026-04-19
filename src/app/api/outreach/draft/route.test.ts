@@ -6,12 +6,51 @@ vi.mock("@/lib/auth", () => ({
   auth: () => mockAuth(),
 }));
 
-const mockDraftOutreach = vi.fn();
-vi.mock("@/lib/api", () => ({
-  draftOutreach: (...args: unknown[]) => mockDraftOutreach(...args),
+const mockGetUserPrefs = vi.fn();
+vi.mock("@/lib/user-prefs", () => ({
+  getUserPrefs: (...args: unknown[]) => mockGetUserPrefs(...args),
+}));
+
+const mockGenerateText = vi.fn();
+vi.mock("ai", () => ({
+  generateText: (...args: unknown[]) => mockGenerateText(...args),
+}));
+
+vi.mock("@ai-sdk/gateway", () => ({
+  gateway: vi.fn(() => "mock-model"),
+}));
+
+const supabaseResults: Array<{ data: unknown; error: unknown }> = [];
+let supabaseCallIndex = 0;
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => {
+            const result = supabaseResults[supabaseCallIndex] ?? { data: null, error: { message: "no mock" } };
+            supabaseCallIndex++;
+            if (result && (result as Record<string, unknown>).__throw) {
+              return Promise.reject(new Error("db down"));
+            }
+            return Promise.resolve(result);
+          }),
+        })),
+      })),
+    })),
+  },
 }));
 
 import { POST } from "./route";
+
+const DEFAULT_PREFS = {
+  university: "UNC Chapel Hill",
+  hometown: "Charlotte, NC",
+  greekOrg: "Chi Phi",
+  targetIndustries: ["Investment Banking"],
+  targetFirms: ["Goldman Sachs"],
+  targetLocations: ["New York, NY"],
+};
 
 function makeRequest(body: unknown) {
   return new NextRequest("http://localhost/api/outreach/draft", {
@@ -24,43 +63,56 @@ function makeRequest(body: unknown) {
 describe("POST /api/outreach/draft", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("returns 401 when not authenticated", async () => {
-    mockAuth.mockResolvedValue(null);
-    const response = await POST(makeRequest({ contactId: 1 }));
-    expect(response.status).toBe(401);
+    supabaseResults.length = 0;
+    supabaseCallIndex = 0;
+    mockGetUserPrefs.mockResolvedValue(DEFAULT_PREFS);
   });
 
   it("returns 400 when contactId is missing", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
     const response = await POST(makeRequest({}));
     expect(response.status).toBe(400);
   });
 
   it("returns draft for valid contact", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
-    mockDraftOutreach.mockResolvedValue({
-      contact_id: 1,
-      subject: "Test Subject",
-      body: "Test body",
-      outreach_id: 42,
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    supabaseResults.push({
+      data: {
+        id: "1",
+        name: "Jane Doe",
+        title: "Analyst",
+        firmName: "Goldman Sachs",
+        location: "New York",
+        education: "UNC",
+        affiliations: "Same School,Target Firm",
+      },
+      error: null,
+    });
+    mockGenerateText.mockResolvedValue({
+      text: JSON.stringify({ subject: "Test Subject", body: "Test body" }),
     });
 
-    const response = await POST(makeRequest({ contactId: 1 }));
+    const response = await POST(makeRequest({ contactId: "1" }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.subject).toBe("Test Subject");
     expect(body.draft).toBe("Test body");
-    expect(body.outreachId).toBe(42);
   });
 
   it("returns 500 on backend error", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
-    mockDraftOutreach.mockRejectedValue(new Error("Backend down"));
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    // First contact fetch succeeds so route proceeds to generateText
+    supabaseResults.push({
+      data: { id: "1", name: "Jane Doe", title: "Analyst", firmName: "GS", affiliations: "" },
+      error: null,
+    });
+    // generateText throws, route enters catch block
+    mockGenerateText.mockRejectedValue(new Error("Backend down"));
+    // Fallback contact fetch in catch block also throws -> inner catch -> 500
+    supabaseResults.push({ __throw: true } as never);
 
-    const response = await POST(makeRequest({ contactId: 1 }));
+    const response = await POST(makeRequest({ contactId: "1" }));
     expect(response.status).toBe(500);
   });
 });

@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export function CopyRefButton() {
+  const params = useSearchParams();
   const [link, setLink] = useState("https://kithnode.vercel.app/?ref=alpha");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const base = window.location.origin;
-      const slug = Math.random().toString(36).slice(2, 8);
+      const slug = params.get("ref") || Math.random().toString(36).slice(2, 8);
       setLink(`${base}/?ref=${slug}`);
     }
-  }, []);
+  }, [params]);
 
   async function copy() {
     try {

@@ -63,6 +63,10 @@ export function OutreachSheet({
         contact_id: contactId,
         contact_name: contactName,
       });
+      trackEvent("outreach_draft_generated", {
+        contact_id: contactId,
+        contact_name: contactName,
+      });
     } catch {
       setError("Could not generate draft. Check that the backend is running.");
     } finally {
@@ -72,7 +76,6 @@ export function OutreachSheet({
 
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen && contactId) {
-      // Reset state and generate on open
       setDraft("");
       setSubject("");
       setOutreachId(null);
@@ -82,6 +85,12 @@ export function OutreachSheet({
       generateDraft();
     }
     if (!isOpen) {
+      if (draft && status !== "sent" && !copied) {
+        trackEvent("outreach_draft_abandoned", {
+          contact_id: contactId,
+          contact_name: contactName,
+        });
+      }
       onClose();
     }
   };
@@ -93,6 +102,11 @@ export function OutreachSheet({
     trackEvent("outreach_copied", {
       contact_id: contactId,
       contact_name: contactName,
+    });
+    trackEvent("outreach_draft_sent", {
+      contact_id: contactId,
+      contact_name: contactName,
+      method: "copy",
     });
     setTimeout(() => setCopied(false), 2000);
   };
@@ -112,6 +126,11 @@ export function OutreachSheet({
         trackEvent("outreach_sent", {
           contact_id: contactId,
           contact_name: contactName,
+        });
+        trackEvent("outreach_draft_sent", {
+          contact_id: contactId,
+          contact_name: contactName,
+          method: "mark_sent",
         });
         onStatusChange?.(contactId!, "sent");
       }

@@ -125,10 +125,38 @@ export async function PATCH(
 
     if (updateError) throw new Error(updateError.message);
 
+    // Build conversion data for RESPONDED / MEETING_SET transitions
+    const isConversion =
+      newStage === "responded" || newStage === "meeting_set";
+    let conversion: {
+      contactId: string;
+      source: string;
+      stage: string;
+      warmPathCount: number;
+    } | undefined;
+
+    if (isConversion) {
+      const { data: contact } = await supabase
+        .from("AlumniContact")
+        .select("source, affiliations")
+        .eq("id", contactId)
+        .maybeSingle();
+
+      conversion = {
+        contactId,
+        source: contact?.source ?? "unknown",
+        stage: newStage,
+        warmPathCount: contact?.affiliations
+          ? contact.affiliations.split(",").filter(Boolean).length
+          : 0,
+      };
+    }
+
     return NextResponse.json({
       contact_id: contactId,
       pipeline_id: updated.id,
       stage: updated.stage,
+      ...(conversion ? { conversion } : {}),
     });
   } catch {
     return NextResponse.json(

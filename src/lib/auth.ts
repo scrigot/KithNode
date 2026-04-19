@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
+import { supabase } from "./supabase";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -12,6 +13,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!user.email.endsWith("@unc.edu") && !ALLOWED_EMAILS.includes(user.email)) {
         return false;
       }
+
+      // Upsert user row so billing/settings routes can find the user
+      await supabase.from("User").upsert(
+        { email: user.email, name: user.name ?? "", image: user.image ?? "" },
+        { onConflict: "email", ignoreDuplicates: true }
+      );
 
       return true;
     },

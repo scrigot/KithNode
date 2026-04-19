@@ -32,7 +32,7 @@ export default function ReelPage() {
             initial={crossfade ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
             exit={crossfade ? { opacity: 0 } : { opacity: 1 }}
-            transition={{ duration: crossfade ? 0.4 : 0, ease: "easeOut" }}
+            transition={{ duration: crossfade ? 0.55 : 0, ease: "easeInOut" }}
             className="absolute inset-0 flex items-center justify-center"
           >
             <Scene />

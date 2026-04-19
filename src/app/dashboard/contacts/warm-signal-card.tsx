@@ -207,7 +207,7 @@ export function WarmSignalCard({
               {pipelineAdded ? "IN PIPELINE" : "+ PIPELINE"}
             </Button>
           )}
-          {onDraftOutreach && (
+          {onDraftOutreach && process.env.NEXT_PUBLIC_ENABLE_OUTREACH_DRAFTS !== 'false' && (
             <Button
               size="sm"
               variant="outline"

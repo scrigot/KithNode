@@ -104,8 +104,10 @@ vi.mock("@/lib/discover/ranker", () => ({
 }));
 
 const mockSeedsForIndustries = vi.fn();
+const mockSeedsForSchool = vi.fn();
 vi.mock("@/lib/discover/seeds", () => ({
   seedsForIndustries: (...args: unknown[]) => mockSeedsForIndustries(...args),
+  seedsForSchool: (...args: unknown[]) => mockSeedsForSchool(...args),
 }));
 
 import { POST, type DiscoverEvent } from "./route";
@@ -164,6 +166,8 @@ beforeEach(() => {
   supabaseState.reset();
   vi.clearAllMocks();
   delete process.env.HUNTER_API_KEY;
+  // Default: no school-specific seeds so route falls through to industry seeds
+  mockSeedsForSchool.mockReturnValue([]);
 });
 
 afterEach(() => {

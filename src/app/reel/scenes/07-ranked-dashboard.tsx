@@ -6,11 +6,11 @@ import { BlueBg, BloomFlash, EASE_OUT, ScoreTicker, TierChip } from "../primitiv
 
 type Tier = "hot" | "warm" | "monitor" | "cold";
 const CARDS: { name: string; firm: string; score: number; tier: Tier; rot: number; x: string; y: string; delay: number }[] = [
-  { name: "Jack Morrison", firm: "Goldman Sachs", score: 91, tier: "hot", rot: -4, x: "6%", y: "12%", delay: 0.2 },
-  { name: "Priya Patel", firm: "Evercore", score: 84, tier: "hot", rot: 3, x: "32%", y: "28%", delay: 0.45 },
-  { name: "Marcus Chen", firm: "Morgan Stanley", score: 72, tier: "warm", rot: -2, x: "58%", y: "10%", delay: 0.7 },
-  { name: "Ellie Rodriguez", firm: "Lazard", score: 58, tier: "monitor", rot: 5, x: "12%", y: "52%", delay: 0.95 },
-  { name: "Tom O'Neill", firm: "Houlihan", score: 41, tier: "monitor", rot: -3, x: "55%", y: "48%", delay: 1.2 },
+  { name: "Morgan Reyes", firm: "Goldman Sachs", score: 91, tier: "hot", rot: -4, x: "6%", y: "12%", delay: 0.1 },
+  { name: "Ava Shah", firm: "Evercore", score: 84, tier: "hot", rot: 3, x: "32%", y: "28%", delay: 0.25 },
+  { name: "Marcus Ellery", firm: "Morgan Stanley", score: 72, tier: "warm", rot: -2, x: "58%", y: "10%", delay: 0.4 },
+  { name: "Elise Navarro", firm: "Lazard", score: 58, tier: "monitor", rot: 5, x: "12%", y: "52%", delay: 0.55 },
+  { name: "Theo Brennan", firm: "Houlihan", score: 41, tier: "monitor", rot: -3, x: "55%", y: "48%", delay: 0.7 },
 ];
 
 export function RankedDashboard() {
@@ -77,8 +77,8 @@ export function RankedDashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1, scale: [1, 1.04, 1] }}
         transition={{
-          opacity: { delay: 1.8, duration: 0.5 },
-          scale: { delay: 2.3, duration: 2.2, repeat: Infinity, ease: "easeInOut" },
+          opacity: { delay: 1.1, duration: 0.4 },
+          scale: { delay: 1.5, duration: 2.0, repeat: Infinity, ease: "easeInOut" },
         }}
         className="absolute bottom-[8%] right-[5%] flex flex-col items-end text-right text-white"
       >
@@ -90,7 +90,7 @@ export function RankedDashboard() {
         </div>
       </motion.div>
 
-      <BloomFlash delay={2.2} />
+      <BloomFlash delay={1.4} />
     </div>
   );
 }

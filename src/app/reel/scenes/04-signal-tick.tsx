@@ -31,7 +31,7 @@ export function SignalTick() {
         }
         return i + 1;
       });
-    }, 400);
+    }, 170);
     return () => clearInterval(t);
   }, []);
 

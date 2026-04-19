@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/posthog";
 
 interface OutreachSlideOverProps {
@@ -20,6 +20,15 @@ export function OutreachSlideOver({
   const [subject, setSubject] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const sentRef = useRef(false);
+
+  const handleClose = () => {
+    if (draft && !sentRef.current) {
+      trackEvent("outreach_draft_abandoned", { connection_id: connectionId, contact_name: contactName });
+    }
+    sentRef.current = false;
+    onClose();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -42,6 +51,7 @@ export function OutreachSlideOver({
         setDraft(data.draft);
         setSubject(data.subject);
         trackEvent("outreach_drafted", { connection_id: connectionId, contact_name: contactName });
+        trackEvent("outreach_draft_generated", { connection_id: connectionId, contact_name: contactName });
       })
       .catch(() => {
         setError("Could not generate draft. Please try again.");
@@ -57,7 +67,7 @@ export function OutreachSlideOver({
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
         className="fixed inset-0 bg-black/30"
-        onClick={onClose}
+        onClick={handleClose}
         data-testid="slide-over-backdrop"
       />
       <div className="relative w-full max-w-md bg-white shadow-xl flex flex-col">
@@ -66,7 +76,7 @@ export function OutreachSlideOver({
             Draft Outreach — {contactName}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
             aria-label="Close"
           >
@@ -119,14 +129,14 @@ export function OutreachSlideOver({
           <div className="border-t px-4 py-3 flex gap-2">
             <a
               href={mailtoHref}
-              onClick={() => trackEvent("outreach_sent", { connection_id: connectionId, contact_name: contactName })}
+              onClick={() => { sentRef.current = true; trackEvent("outreach_sent", { connection_id: connectionId, contact_name: contactName }); trackEvent("outreach_draft_sent", { connection_id: connectionId, contact_name: contactName, method: "email" }); }}
               className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
               data-testid="open-in-email"
             >
               Open in Email
             </a>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Close

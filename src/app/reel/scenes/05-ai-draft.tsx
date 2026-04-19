@@ -22,7 +22,7 @@ export function AiDraft() {
         <div className="flex items-center justify-between border-b border-slate-100 pb-5">
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Draft to</div>
-            <div className="mt-1 font-heading text-2xl font-bold text-slate-900">Jack Morrison</div>
+            <div className="mt-1 font-heading text-2xl font-bold text-slate-900">Morgan Reyes</div>
           </div>
           <div className="flex items-center gap-2 rounded-full bg-[#1D3FE0]/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[#1D3FE0]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#1D3FE0]" />
@@ -32,15 +32,15 @@ export function AiDraft() {
 
         <div className="mt-6 text-xs font-semibold uppercase tracking-widest text-slate-400">Subject</div>
         <div className="mt-2 text-xl font-semibold text-slate-900">
-          <TypewriterLine text="Fellow Charlotte kid at UNC, 15 min?" delay={0.2} cps={95} />
+          <TypewriterLine text="Fellow NC kid at UNC, 15 min?" delay={0.15} cps={130} />
         </div>
 
         <div className="mt-6 text-xs font-semibold uppercase tracking-widest text-slate-400">Body</div>
         <div className="mt-2 text-lg leading-relaxed text-slate-700">
           <TypewriterLine
-            text="Hi Jack, saw your Providence Day reunion post and had to reach out. I'm a UNC freshman in Chi Phi trying to learn what the path from Chapel Hill to Goldman M&A actually looks like. Open to 15 min in the next two weeks?"
-            delay={1.4}
-            cps={130}
+            text="Hi Morgan, Chi Phi '24 here at UNC. Saw your recent Goldman M&A post and had to reach out. Open to 15 min in the next two weeks?"
+            delay={0.6}
+            cps={200}
           />
         </div>
       </motion.div>
@@ -48,7 +48,7 @@ export function AiDraft() {
       <motion.div
         initial={{ opacity: 0, x: -40 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
+        transition={{ delay: 0.35, duration: 0.4 }}
         className="absolute bottom-[10%] left-[6%] font-heading text-[90px] font-bold leading-[0.95] text-white"
       >
         real messages.<br />your voice.

@@ -95,6 +95,22 @@ export async function GET() {
       .in("stage", ["EMAIL_SENT", "FOLLOW_UP", "RESPONDED", "MEETING_SET"])
       .gte("addedAt", weekStart.toISOString());
 
+    // Referral count: look up this user's waitlist ref_code, then count signups that used it
+    let referralCount = 0;
+    const { data: waitlistRow } = await supabase
+      .from("waitlist_signups")
+      .select("ref_code")
+      .eq("email", userId)
+      .single();
+
+    if (waitlistRow?.ref_code) {
+      const { count: refCount } = await supabase
+        .from("waitlist_signups")
+        .select("*", { count: "exact", head: true })
+        .eq("referred_by", waitlistRow.ref_code);
+      referralCount = refCount || 0;
+    }
+
     return NextResponse.json({
       ratings: { high_value: highValue || 0, total: totalContacts || 0 },
       stats: {
@@ -112,6 +128,7 @@ export async function GET() {
       weekly_goal_target: weeklyGoalTarget,
       subscription_status: subscriptionStatus,
       trial_days_left: trialDaysLeft,
+      referral_count: referralCount,
     });
   } catch {
     return NextResponse.json({

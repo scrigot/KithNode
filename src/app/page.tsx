@@ -5,7 +5,7 @@ import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { ProductCards } from "./_landing/product-cards";
 import { Showcase } from "./_landing/showcase";
-import { Testimonials } from "./_landing/testimonials";
+// import { Testimonials } from "./_landing/testimonials"; // re-enable once Fortune 500 offer is formal
 import { CTASection } from "./_landing/cta-section";
 import { ReelEmbed } from "./_landing/reel-embed";
 
@@ -29,7 +29,7 @@ export default async function Home() {
       </section>
       <ProductCards />
       <Showcase />
-      <Testimonials />
+      {/* <Testimonials /> -- re-enable once Fortune 500 offer is formal */}
       <CTASection />
 
       {/* Footer */}

@@ -68,14 +68,19 @@ function parseLinkedInCSV(text: string): CsvContact[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
 
-  // Find the actual header row (LinkedIn CSVs have disclaimer lines at the top)
-  let headerIdx = 0;
+  let headerIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const lower = lines[i].toLowerCase();
     if (lower.includes("first name") && lower.includes("last name")) {
       headerIdx = i;
       break;
     }
+  }
+
+  if (headerIdx === -1) {
+    throw new Error(
+      "LinkedIn may have changed their export format. Expected columns: First Name, Last Name, Company, Position. Try re-exporting from LinkedIn Settings > Get a copy of your data > Connections."
+    );
   }
 
   const headers = parseCSVLine(lines[headerIdx]).map((h) => h.toLowerCase().trim());
@@ -183,11 +188,17 @@ export default function ImportPage() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const contacts = parseLinkedInCSV(text);
-      setCsvContacts(contacts);
-      setCsvFileName(file.name);
-      setError(null);
-      setResult(null);
+      try {
+        const contacts = parseLinkedInCSV(text);
+        setCsvContacts(contacts);
+        setCsvFileName(file.name);
+        setError(null);
+        setResult(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to parse CSV.");
+        setCsvContacts([]);
+        setCsvFileName(null);
+      }
     };
     reader.readAsText(file);
   };

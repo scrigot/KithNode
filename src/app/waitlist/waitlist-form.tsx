@@ -41,7 +41,7 @@ export function WaitlistForm() {
     startTransition(async () => {
       const res = await submitWaitlist(input);
       if (res.ok) {
-        router.push("/waitlist/thanks");
+        router.push(`/waitlist/thanks?ref=${res.ref_code}`);
       } else {
         setError(res.error);
       }

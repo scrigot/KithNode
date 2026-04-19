@@ -16,7 +16,7 @@ export type WaitlistInput = {
   referred_by?: string;
 };
 
-export type WaitlistResult = { ok: true } | { ok: false; error: string };
+export type WaitlistResult = { ok: true; ref_code: string } | { ok: false; error: string };
 
 export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResult> {
   if (!input.email || !input.full_name || !input.university || !input.target_track) {
@@ -29,6 +29,8 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
     return { ok: false, error: "Pick a graduation year between 2025 and 2030." };
   }
 
+  const refCode = Math.random().toString(36).slice(2, 8);
+
   const payload = {
     email: input.email.trim().toLowerCase(),
     full_name: input.full_name.trim(),
@@ -39,6 +41,7 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
     greek_affiliation: input.greek_affiliation?.trim() || null,
     current_prep: input.current_prep?.trim() || null,
     referred_by: input.referred_by?.trim() || null,
+    ref_code: refCode,
   };
 
   const { error } = await supabase.from("waitlist_signups").insert(payload);
@@ -53,8 +56,7 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
   const h = await headers();
   const host = h.get("host") || "kithnode.vercel.app";
   const proto = h.get("x-forwarded-proto") || "https";
-  const slug = Math.random().toString(36).slice(2, 8);
-  const referralLink = `${proto}://${host}/?ref=${slug}`;
+  const referralLink = `${proto}://${host}/?ref=${refCode}`;
 
   void sendWaitlistConfirmation({
     email: payload.email,
@@ -62,5 +64,5 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
     referralLink,
   });
 
-  return { ok: true };
+  return { ok: true, ref_code: refCode };
 }
