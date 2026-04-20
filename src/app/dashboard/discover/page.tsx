@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
-import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap } from "lucide-react";
+import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw } from "lucide-react";
 import { IntroModal } from "./intro-modal";
 
 const TIER_STYLES: Record<string, string> = {
@@ -285,6 +285,16 @@ export default function DiscoverPage() {
   const [discoverLog, setDiscoverLog] = useState<string[]>([]);
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const discoverAbortRef = useRef<AbortController | null>(null);
+
+  // Seed Professors modal state — streamed NDJSON progress.
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedResult, setSeedResult] = useState<string | null>(null);
+  const [seedProgress, setSeedProgress] = useState(0);
+  const [seedStage, setSeedStage] = useState<string>("");
+  const [seedMessage, setSeedMessage] = useState<string>("");
+  const [seedLog, setSeedLog] = useState<string[]>([]);
+  const [seedError, setSeedError] = useState<string | null>(null);
+  const seedAbortRef = useRef<AbortController | null>(null);
 
   // Intro modal state
   const [introTarget, setIntroTarget] = useState<{
@@ -598,6 +608,135 @@ export default function DiscoverPage() {
     };
   }, [discoverLoading]);
 
+  const runSeedProfessors = useCallback(async () => {
+    if (seedLoading) return;
+    const abort = new AbortController();
+    seedAbortRef.current = abort;
+    setSeedLoading(true);
+    setSeedResult(null);
+    setSeedError(null);
+    setSeedProgress(0);
+    setSeedStage("starting");
+    setSeedMessage("Starting professor seed pipeline...");
+    setSeedLog([]);
+
+    try {
+      const res = await fetch("/api/professors/seed", {
+        method: "POST",
+        signal: abort.signal,
+      });
+
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok || !ct.includes("application/x-ndjson")) {
+        const data = await res.json().catch(() => ({}));
+        setSeedError(data.message || data.error || `HTTP ${res.status}`);
+        setSeedLoading(false);
+        seedAbortRef.current = null;
+        return;
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalEvent: { scraped: number; classified: number; inserted: number; updated: number; failed: number } | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          let event: { type: string; stage?: string; message?: string; progress?: number; scraped?: number; classified?: number; inserted?: number; updated?: number; failed?: number };
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (event.type === "stage") {
+            setSeedStage(event.stage || "");
+            setSeedMessage(event.message || "");
+            if (typeof event.progress === "number") setSeedProgress(event.progress);
+            setSeedLog((log) => [...log, event.message || ""]);
+          } else if (event.type === "done") {
+            finalEvent = {
+              scraped: event.scraped || 0,
+              classified: event.classified || 0,
+              inserted: event.inserted || 0,
+              updated: event.updated || 0,
+              failed: event.failed || 0,
+            };
+            setSeedProgress(100);
+            setSeedStage("done");
+            setSeedMessage(
+              `Scraped ${finalEvent.scraped} · Inserted ${finalEvent.inserted} · Updated ${finalEvent.updated}`,
+            );
+          } else if (event.type === "error") {
+            setSeedError(event.message || "Seed pipeline error");
+          } else if (event.type === "aborted") {
+            setSeedError("Cancelled");
+          }
+        }
+      }
+
+      if (finalEvent) {
+        setSeedResult(
+          `Scraped ${finalEvent.scraped} · Inserted ${finalEvent.inserted} · Updated ${finalEvent.updated}`,
+        );
+        if (mode === "browse") {
+          await fetchBrowseContacts(sourceFilter);
+        } else {
+          await search(query, activeTier, sourceFilter);
+        }
+      }
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") {
+        setSeedError("Cancelled");
+      } else {
+        setSeedError((err as Error)?.message || "Network error");
+      }
+    } finally {
+      seedAbortRef.current = null;
+      setTimeout(() => {
+        setSeedLoading(false);
+      }, 1200);
+      setTimeout(() => setSeedResult(null), 8000);
+    }
+  }, [seedLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+
+  const cancelSeed = useCallback(() => {
+    if (seedAbortRef.current) {
+      seedAbortRef.current.abort();
+    }
+  }, []);
+
+  const dismissSeedModal = useCallback(() => {
+    if (!seedAbortRef.current) {
+      setSeedLoading(false);
+      setSeedError(null);
+    }
+  }, []);
+
+  // Lock body scroll + block escape key while the seed modal is open.
+  useEffect(() => {
+    if (!seedLoading) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const blockEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", blockEscape, true);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", blockEscape, true);
+    };
+  }, [seedLoading]);
+
   const handleAddToPipeline = async (contactId: string) => {
     setAddingToPipeline(contactId);
     try {
@@ -693,19 +832,34 @@ export default function DiscoverPage() {
             </button>
           </div>
 
-          {/* Discover New button — runs the cold-outreach pipeline */}
-          <button
-            onClick={runDiscover}
-            disabled={discoverLoading}
-            className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-          >
-            {discoverLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Sparkles className="h-3 w-3" />
-            )}
-            {discoverLoading ? "Discovering" : "Discover New"}
-          </button>
+          {/* Action button — Discover New (alumni) or Seed Professors (professor) */}
+          {sourceFilter === "professor" ? (
+            <button
+              onClick={runSeedProfessors}
+              disabled={seedLoading}
+              className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+            >
+              {seedLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              {seedLoading ? "Seeding" : "Seed Professors"}
+            </button>
+          ) : (
+            <button
+              onClick={runDiscover}
+              disabled={discoverLoading}
+              className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+            >
+              {discoverLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              {discoverLoading ? "Discovering" : "Discover New"}
+            </button>
+          )}
 
         {/* Mode toggle */}
         <div className="flex overflow-hidden border border-white/[0.06]">
@@ -737,6 +891,11 @@ export default function DiscoverPage() {
       {discoverResult && (
         <div className="mb-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
           {discoverResult}
+        </div>
+      )}
+      {seedResult && (
+        <div className="mb-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+          {seedResult}
         </div>
       )}
       <div className="mb-4 h-px bg-border" />
@@ -1021,6 +1180,105 @@ export default function DiscoverPage() {
           userName={userName || "a KithNode user"}
           onClose={() => setIntroTarget(null)}
         />
+      )}
+
+      {/* ═══════ SEED PROFESSORS MODAL ═══════ */}
+      {seedLoading && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="seed-modal-title"
+        >
+          <div className="w-full max-w-md border border-primary/30 bg-card shadow-2xl shadow-primary/20">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-primary" />
+                <h3
+                  id="seed-modal-title"
+                  className="text-[11px] font-bold uppercase tracking-wider text-primary"
+                >
+                  {seedError ? "SEED STOPPED" : seedStage === "done" ? "SEED COMPLETE" : "SEEDING PROFESSORS"}
+                </h3>
+              </div>
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                {seedProgress}%
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-1 w-full bg-muted">
+              <div
+                className={`h-full transition-all duration-300 ease-out ${
+                  seedError ? "bg-red-500" : seedStage === "done" ? "bg-green-500" : "bg-primary"
+                }`}
+                style={{ width: `${seedProgress}%` }}
+              />
+            </div>
+
+            {/* Stage label + current message */}
+            <div className="space-y-3 px-5 py-5">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Stage
+                </p>
+                <p className="font-mono text-sm font-bold text-foreground">
+                  {seedStage.toUpperCase() || "—"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Status
+                </p>
+                <p className="text-[12px] text-foreground">
+                  {seedError ? (
+                    <span className="text-red-400">{seedError}</span>
+                  ) : (
+                    seedMessage || "—"
+                  )}
+                </p>
+              </div>
+
+              {/* Activity log — last 6 lines */}
+              {seedLog.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    Activity
+                  </p>
+                  <div className="mt-1 max-h-32 overflow-y-auto border border-white/[0.06] bg-black/40 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+                    {seedLog.slice(-6).map((line, i) => (
+                      <div key={`${i}-${line}`} className="truncate">
+                        ▸ {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer — cancel or dismiss */}
+            <div className="flex gap-2 border-t border-white/[0.06] px-5 py-3">
+              {seedError || seedStage === "done" ? (
+                <button
+                  onClick={dismissSeedModal}
+                  className="flex-1 border border-white/[0.12] bg-muted py-2 text-[11px] font-bold uppercase tracking-wider text-foreground hover:bg-white/[0.08]"
+                >
+                  CLOSE
+                </button>
+              ) : (
+                <button
+                  onClick={cancelSeed}
+                  className="flex-1 border border-red-500/30 bg-red-500/10 py-2 text-[11px] font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/20"
+                >
+                  <X className="mr-1 inline h-3 w-3" />
+                  CANCEL
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══════ DISCOVER PIPELINE MODAL ═══════ */}
