@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRef } from "react";
 import {
   motion,
@@ -245,17 +244,8 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            Built by{" "}
-            <Link
-              href="https://www.linkedin.com/in/samrigot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-white underline underline-offset-4 hover:text-[#D7F548]"
-            >
-              Sam Rigot
-            </Link>
-            , a UNC freshman who scored 500+ real alumni connections on
-            LinkedIn before writing a line of outreach.
+            Built on a proven playbook &mdash; 500+ real alumni mapped, scored,
+            and activated before writing a single line of outreach.
           </motion.p>
         </motion.div>
       </motion.div>
