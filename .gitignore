@@ -28,3 +28,4 @@ scripts/ralph/.last-branch
 .claude/
 .omc/
 
+db.sqlite

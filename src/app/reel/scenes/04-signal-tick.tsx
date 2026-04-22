@@ -72,6 +72,7 @@ export function SignalTick() {
                     opacity: isActive ? 1 : 0.2,
                   }}
                   transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ whiteSpace: "nowrap" }}
                 >
                   {w}
                 </motion.span>

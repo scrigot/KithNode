@@ -244,8 +244,9 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            Built on a proven playbook &mdash; 500+ real alumni mapped, scored,
-            and activated before writing a single line of outreach.
+            Built on a proven playbook by a Fortune 500 intern &mdash; 500+ real
+            alumni mapped, scored, and activated before writing a single line of
+            outreach.
           </motion.p>
         </motion.div>
       </motion.div>
