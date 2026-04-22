@@ -380,7 +380,7 @@ function OutreachPreview() {
         <div className="space-y-2 text-[12px] leading-relaxed text-white/80">
           <p>Hi Riley,</p>
           <p>
-            I&apos;m a UNC freshman starting fall IB recruiting. Jake Bennett (Chi Phi &apos;24) mentioned you took a similar path, UNC → GS, and suggested I reach out.
+            I&apos;m a UNC freshman starting fall IB recruiting. Jake Bennett (UNC Greek Life) mentioned you took a similar path, UNC → GS, and suggested I reach out.
           </p>
           <p>
             Would you be open to a 15-min coffee chat? Happy to work around your schedule.
@@ -438,7 +438,7 @@ function DiscoverPreview() {
               Warm Path
             </p>
             <p className="font-mono text-[11px] leading-relaxed text-[#0EA5E9]">
-              Via Jake Bennett (Chi Phi) → Associate at Moelis
+              Via Jake Bennett (Greek Life) → Associate at Moelis
             </p>
           </div>
 

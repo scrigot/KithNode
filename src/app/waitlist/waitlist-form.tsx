@@ -67,7 +67,7 @@ export function WaitlistForm() {
           name="full_name"
           required
           autoComplete="name"
-          placeholder="Sam Rigot"
+          placeholder="Your name"
           className="input"
         />
       </Field>

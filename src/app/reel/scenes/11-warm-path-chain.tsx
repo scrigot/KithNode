@@ -9,7 +9,7 @@ import { BlueBg, EASE_OUT } from "../primitives";
 
 const Y = 540;
 const YOU = { x: 300, y: Y, label: "YOU" };
-const MID = { x: 960, y: Y, label: "JAKE BENNETT", sub: "Chi Phi '24 · UNC" };
+const MID = { x: 960, y: Y, label: "JAKE BENNETT", sub: "Greek Life · UNC '24" };
 const TGT = { x: 1620, y: Y, label: "ELENA RUIZ", sub: "Associate · Moelis" };
 
 export function WarmPathChain() {
@@ -76,7 +76,7 @@ export function WarmPathChain() {
         style={{ left: MID.x, top: Y }}
       >
         <div className="flex h-[110px] w-[110px] items-center justify-center rounded-full bg-[#D7F548] text-sm font-black text-[#0E2BB8] shadow-[0_0_40px_rgba(215,245,72,0.6)]">
-          CHI PHI
+          GREEK LIFE
         </div>
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -126,7 +126,7 @@ export function WarmPathChain() {
         transition={{ delay: 1.85, duration: 0.4 }}
         className="absolute bottom-[12%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/30 px-6 py-3 text-center font-mono text-xl tracking-wider text-[#D7F548] backdrop-blur-sm"
       >
-        you → jake bennett (chi phi) → associate @ moelis
+        you → jake bennett (greek life) → associate @ moelis
       </motion.div>
     </div>
   );

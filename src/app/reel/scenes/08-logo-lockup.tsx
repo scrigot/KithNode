@@ -25,9 +25,17 @@ export function LogoLockup() {
           initial={{ opacity: 0, scale: 0.92, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="font-heading text-[260px] font-black leading-none tracking-tight text-white"
+          className="flex items-center gap-6 font-heading text-[260px] font-black leading-none tracking-tight text-white"
         >
-          KithNode
+          <svg viewBox="0 0 40 40" className="h-[200px] w-[200px]" aria-hidden>
+            <path d="M 10 28 Q 20 6 30 28" fill="none" stroke="#0EA5E9" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="20" cy="13" r="2.5" fill="#0EA5E9" />
+            <circle cx="10" cy="28" r="5" fill="currentColor" />
+            <circle cx="30" cy="28" r="5" fill="#0EA5E9" />
+          </svg>
+          <span>
+            Kith<span className="text-[#0EA5E9]">Node</span>
+          </span>
         </motion.div>
 
         <motion.div

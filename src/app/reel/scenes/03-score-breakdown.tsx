@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { BlueBg, ScoreTicker, TierChip } from "../primitives";
 
-const BADGES = ["UNC", "Chi Phi", "NC"];
+const BADGES = ["UNC", "Greek Life", "NC"];
 const FACTORS = [
   { label: "Fit", value: 40, color: "#3661FF" },
   { label: "Affinity", value: 25, color: "#D7F548" },

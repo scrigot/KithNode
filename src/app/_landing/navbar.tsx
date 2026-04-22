@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { LogoIcon } from "@/components/logo";
 
 export function Navbar() {
   const { scrollY } = useScroll();
@@ -24,13 +25,15 @@ export function Navbar() {
     >
       <div className="flex items-center gap-8">
         <motion.span
-          className="font-heading text-lg font-bold tracking-tight"
+          className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight"
           style={{
             color: useTransform(scrolled, (v) => (v > 0.5 ? "#0f172a" : "#ffffff")),
           }}
         >
-          Kith
-          <span className="text-[#0EA5E9]">Node</span>
+          <LogoIcon className="h-7 w-7" />
+          <span>
+            Kith<span className="text-[#0EA5E9]">Node</span>
+          </span>
         </motion.span>
         <div className="hidden items-center gap-6 md:flex">
           {["Products", "Solutions", "How It Works"].map((label) => (

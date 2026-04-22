@@ -38,7 +38,7 @@ export function AiDraft() {
         <div className="mt-6 text-xs font-semibold uppercase tracking-widest text-slate-400">Body</div>
         <div className="mt-2 text-lg leading-relaxed text-slate-700">
           <TypewriterLine
-            text="Hi Morgan, Chi Phi '24 here at UNC. Saw your recent Goldman M&A post and had to reach out. Open to 15 min in the next two weeks?"
+            text="Hi Morgan, UNC '24 here. Saw your recent Goldman M&A post and had to reach out. Open to 15 min in the next two weeks?"
             delay={0.6}
             cps={200}
           />

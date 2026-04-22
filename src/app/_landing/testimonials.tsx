@@ -8,10 +8,10 @@ export function Testimonials() {
       <div className="mx-auto max-w-3xl">
         <ScrollReveal>
           <p className="mb-3 text-center text-xs font-semibold uppercase tracking-widest text-[#0EA5E9]">
-            A Note from the Founder
+            From the Founder
           </p>
           <h2 className="mb-10 text-center font-heading text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-            Why I built KithNode
+            Why KithNode exists
           </h2>
         </ScrollReveal>
 
@@ -19,29 +19,24 @@ export function Testimonials() {
           <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
             <div className="space-y-5 text-base leading-relaxed text-slate-700">
               <p>
-                I&apos;m Sam, a freshman at UNC Chapel Hill and a Raleigh native.
-                Last year, I landed a Fortune 500 internship as a freshman —
-                not through luck, and not by cold emailing a hundred people.
-                I did it by finding the right <span className="font-semibold text-slate-900">warm paths</span>:
-                people two degrees away who could actually vouch for me.
+                Every finance hire traces back to the same pattern &mdash; a{" "}
+                <span className="font-semibold text-slate-900">warm connection</span> two or
+                three degrees away that surfaced at the right moment. The pattern is
+                well documented. The execution &mdash; finding those connections,
+                scoring them, and drafting outreach that doesn&apos;t feel robotic
+                &mdash; is what kills candidates.
               </p>
               <p>
-                That process was brutal. Hours on LinkedIn, spreadsheets of
-                alumni, awkward guesses about who knew who. I realized the
-                entire recruiting game comes down to discovering the connections
-                you already have... but nobody builds the tool to surface them.
+                KithNode was built by an operator who ran this exact playbook
+                manually. That playbook landed a{" "}
+                <span className="font-semibold text-slate-900">Fortune 500 internship</span>{" "}
+                freshman year. Every feature in the product exists because a
+                student tried it at 2am and found the friction. We&apos;re not
+                shipping theories. We&apos;re shipping the method that already works.
               </p>
               <p>
-                <span className="font-semibold text-slate-900">KithNode is that tool.</span>{" "}
-                It imports your network, scores every contact, and shows you the
-                warm paths you didn&apos;t know existed. The same method that got
-                me my internship, automated for every student who doesn&apos;t
-                have a Goldman VP in their family group chat.
-              </p>
-              <p>
-                I&apos;m onboarding alpha users this summer before fall recruiting
-                kicks off. If you&apos;re serious about IB, PE, or consulting
-                recruiting, join the waitlist below.
+                Private alpha opens this spring. If you&apos;re serious about 2026
+                recruiting, request access below.
               </p>
             </div>
 
@@ -52,7 +47,7 @@ export function Testimonials() {
               <div>
                 <p className="text-sm font-semibold text-slate-900">Sam Rigot</p>
                 <p className="text-xs text-slate-500">
-                  Founder, KithNode · UNC Chapel Hill &apos;29
+                  Founder &middot; UNC Chapel Hill &apos;29 &middot; Fortune 500 Intern, Summer 2026
                 </p>
               </div>
             </div>

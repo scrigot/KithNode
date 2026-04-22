@@ -159,7 +159,7 @@ const SCORE_ROWS: ScoreRow[] = [
     meta: (
       <div className="flex flex-wrap gap-1">
         <Chip>UNC</Chip>
-        <Chip>Chi Phi</Chip>
+        <Chip>Greek Life</Chip>
         <Chip>Kenan-Flagler</Chip>
       </div>
     ),
@@ -313,7 +313,7 @@ export function SmartOutreachPreview() {
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1">
             <Chip>UNC &apos;24</Chip>
-            <Chip>Chi Phi</Chip>
+            <Chip>Greek Life</Chip>
             <Chip>Kenan-Flagler</Chip>
           </div>
         </div>

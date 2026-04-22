@@ -32,7 +32,7 @@ export function IntroRequest() {
             <div className="mt-1 font-heading text-3xl font-bold text-slate-900">
               Jake Bennett
             </div>
-            <div className="mt-0.5 text-sm text-slate-500">Chi Phi &apos;24 &middot; UNC</div>
+            <div className="mt-0.5 text-sm text-slate-500">Greek Life &middot; UNC &apos;24</div>
           </div>
           <div className="flex items-center gap-2 rounded-full bg-[#D7F548] px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-[#0E2BB8]">
             <motion.span

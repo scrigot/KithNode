@@ -262,3 +262,4 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
     </section>
   );
 }
+

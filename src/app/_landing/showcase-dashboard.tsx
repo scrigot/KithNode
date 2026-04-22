@@ -45,7 +45,7 @@ const ROWS: Row[] = [
     title: "Associate",
     firm: "Goldman Sachs",
     score: 84,
-    warmPath: "Via Jake Bennett (Chi Phi) → Associate at Goldman",
+    warmPath: "Via Jake Bennett (Greek Life) → Associate at Goldman",
   },
   {
     tier: "WARM",

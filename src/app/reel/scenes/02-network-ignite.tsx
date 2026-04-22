@@ -23,7 +23,7 @@ for (let cx = 1; cx <= COLS; cx++) {
 const YOU = { x: 1920 / 2, y: 1080 / 2 };
 const ALUMNI = [
   { x: YOU.x - 380, y: YOU.y - 220, label: "UNC", delay: 0.35 },
-  { x: YOU.x + 360, y: YOU.y - 200, label: "Chi Phi", delay: 0.55 },
+  { x: YOU.x + 360, y: YOU.y - 200, label: "Greek Life", delay: 0.55 },
   { x: YOU.x - 340, y: YOU.y + 240, label: "NC", delay: 0.75 },
   { x: YOU.x + 400, y: YOU.y + 220, label: "Goldman", delay: 0.95 },
 ];

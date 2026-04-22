@@ -1,11 +1,12 @@
 import { auth } from "@/lib/auth";
+import { LogoIcon } from "@/components/logo";
 import { redirect } from "next/navigation";
 import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { ProductCards } from "./_landing/product-cards";
 import { Showcase } from "./_landing/showcase";
-// import { Testimonials } from "./_landing/testimonials"; // re-enable once Fortune 500 offer is formal
+import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
 import { ReelEmbed } from "./_landing/reel-embed";
 
@@ -29,7 +30,7 @@ export default async function Home() {
       </section>
       <ProductCards />
       <Showcase />
-      {/* <Testimonials /> -- re-enable once Fortune 500 offer is formal */}
+      <Testimonials />
       <CTASection />
 
       {/* Footer */}
@@ -37,9 +38,11 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="flex flex-col gap-3">
-            <span className="font-heading text-lg font-bold tracking-tight">
-              <span className="text-slate-900">Kith</span>
-              <span className="text-accent-teal">Node</span>
+            <span className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight text-slate-900">
+              <LogoIcon className="h-7 w-7" />
+              <span>
+                Kith<span className="text-accent-teal">Node</span>
+              </span>
             </span>
             <p className="text-sm text-slate-600">
               AI-powered networking intelligence for ambitious students breaking into finance.
@@ -67,7 +70,7 @@ export default async function Home() {
           </div>
         </div>
         <div className="mx-auto mt-12 max-w-6xl border-t border-slate-200 pt-8">
-          <p className="text-xs text-slate-400">&copy; {new Date().getFullYear()} KithNode. A UNC Chapel Hill startup by Sam Rigot.</p>
+          <p className="text-xs text-slate-400">&copy; {new Date().getFullYear()} KithNode &middot; Warm-path recruiting intelligence for 2026.</p>
         </div>
       </footer>
     </main>
