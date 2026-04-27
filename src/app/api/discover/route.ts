@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 import { findWarmPaths } from "@/lib/warm-paths";
 
 export async function GET(request: NextRequest) {
-  const userId = await getUserId();
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
   const query = request.nextUrl.searchParams.get("q") || "";
   const tier = request.nextUrl.searchParams.get("tier") || "";
   const source = request.nextUrl.searchParams.get("source") || "alumni";
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
     .eq("userId", userId);
   const ratedIds = (rated || []).map((r) => r.contactId);
 
-  // Build query — prefer other users' contacts (shared pool)
+  // Build query: prefer other users' contacts (shared pool)
   let builder = supabase
     .from("AlumniContact")
     .select("*")

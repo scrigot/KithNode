@@ -1,8 +1,8 @@
-// POST /api/discover/run — Stage 6 of the discover pipeline.
+// POST /api/discover/run: Stage 6 of the discover pipeline.
 //
 // Streams NDJSON progress events back to the dashboard so the user sees
 // the pipeline advancing in real time (one line per event, content-type
-// application/x-ndjson). Quick mode runs ~60–100s end-to-end so a
+// application/x-ndjson). Quick mode runs roughly 60 to 100s end-to-end so a
 // blocking single-fetch with no feedback is unacceptable; the streamed
 // shape lets the modal overlay render a real progress bar and a kill
 // switch wired to AbortController on the client side.
@@ -21,8 +21,8 @@
 // streaming reader. Anything past validation is streamed.
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { findContacts, type CompanyInput } from "@/lib/discover/contact-finder";
 import { detectSignals } from "@/lib/discover/signal-detector";
@@ -53,7 +53,7 @@ interface DiscoverRunBody {
 // ── Event taxonomy ──────────────────────────────────────────────────
 //
 // Every line emitted on the wire is one of these JSON shapes followed by
-// a newline. The client treats `progress` (0–100) as monotonically
+// a newline. The client treats `progress` (0 to 100) as monotonically
 // non-decreasing within a single run.
 
 export type DiscoverEvent =
@@ -90,8 +90,8 @@ function makeEmitter(controller: ReadableStreamDefaultController<Uint8Array>) {
     try {
       controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
     } catch {
-      // Controller may have closed mid-emit if the client aborted —
-      // swallow so the pipeline can exit cleanly without an unhandled
+      // Controller may have closed mid-emit if the client aborted.
+      // Swallow so the pipeline can exit cleanly without an unhandled
       // rejection.
     }
   };
@@ -99,10 +99,11 @@ function makeEmitter(controller: ReadableStreamDefaultController<Uint8Array>) {
 
 export async function POST(request: NextRequest) {
   // ── Pre-stream validation (still plain JSON) ────────────────────────
-  const userId = await getUserId();
-  if (!userId || userId === "anonymous") {
+  const session = await auth();
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const userId = session.user.email;
 
   const body = (await request.json().catch(() => ({}))) as DiscoverRunBody;
   const mode: "quick" | "deep" = body.mode === "deep" ? "deep" : "quick";
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
             send({
               type: "stage",
               stage: "scanning",
-              message: `Scanned ${company.name} (${index + 1}/${total}) — found ${foundForCompany}, ${foundTotal} total`,
+              message: `Scanned ${company.name} (${index + 1}/${total}): found ${foundForCompany}, ${foundTotal} total`,
               progress: pct,
             });
           },
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
           send({
             type: "stage",
             stage: "enriching",
-            message: `Enriched ${candidate.name} (${i + 1}/${candidates.length}) — ${email.source}`,
+            message: `Enriched ${candidate.name} (${i + 1}/${candidates.length}): ${email.source}`,
             progress: pct,
           });
         }
@@ -340,7 +341,7 @@ export async function POST(request: NextRequest) {
         try {
           controller.close();
         } catch {
-          // Already closed by the runtime on abort — ignore.
+          // Already closed by the runtime on abort. Ignore.
         }
       }
     },
