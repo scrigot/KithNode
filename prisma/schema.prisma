@@ -8,43 +8,63 @@ datasource db {
 }
 
 model User {
-  id             String       @id @default(cuid())
-  email          String       @unique
-  name           String
-  image          String       @default("")
-  university     String       @default("")
-  targetIndustry String       @default("")
-  createdAt      DateTime     @default(now())
-  connections    Connection[]
+  id                  String        @id @default(cuid())
+  email               String        @unique
+  name                String
+  image               String        @default("")
+  university          String        @default("")
+  targetIndustry      String        @default("")
+  hometown            String        @default("")
+  greekOrg            String        @default("")
+  targetIndustries    String        @default("")
+  targetFirms         String        @default("")
+  targetLocations     String        @default("")
+  recruitingDate      DateTime?
+  weeklyGoalTarget    Int           @default(3)
+  stripeCustomerId    String?       @default("")
+  subscriptionStatus  String?       @default("trial")
+  subscriptionPlan    String?       @default("")
+  trialEndsAt         DateTime?     @default(dbgenerated("(now() + '7 days'::interval)"))
+  subscriptionEndsAt  DateTime?
+  createdAt           DateTime      @default(now())
+  connections         Connection[]
 }
 
 model AlumniContact {
-  id             String       @id @default(cuid())
-  name           String
-  firmName       String
-  title          String
-  linkedInUrl    String       @unique @default("")
-  university     String
-  graduationYear Int
-  education      String       @default("")
-  location       String       @default("")
-  affiliations   String       @default("")
-  warmthScore    Float        @default(0)
-  tier           String       @default("cold")
-  source         String       @default("manual")
-  connections    Connection[]
+  id               String         @id @default(cuid())
+  name             String
+  firmName         String
+  title            String
+  linkedInUrl      String         @unique @default("")
+  university       String
+  graduationYear   Int
+  education        String         @default("")
+  location         String         @default("")
+  affiliations     String         @default("")
+  warmthScore      Float          @default(0)
+  tier             String         @default("cold")
+  source           String         @default("manual")
+  email            String         @default("")
+  importedByUserId String         @default("")
+  industry         String         @default("")
+  seniorityLevel   String         @default("")
+  enrichedAt       DateTime?
+  enrichmentSource String         @default("")
+  connections      Connection[]
+  pipelineEntries  PipelineEntry[]
+  discovers        UserDiscover[]
 }
 
 model Connection {
-  id            String        @id @default(cuid())
-  userId        String
-  alumniId      String
-  strengthScore Float         @default(0)
+  id               String        @id @default(cuid())
+  userId           String
+  alumniId         String
+  strengthScore    Float         @default(0)
   status           String        @default("NEW")
   automationPaused Boolean       @default(false)
   createdAt        DateTime      @default(now())
-  user          User          @relation(fields: [userId], references: [id])
-  alumni        AlumniContact @relation(fields: [alumniId], references: [id])
+  user             User          @relation(fields: [userId], references: [id])
+  alumni           AlumniContact @relation(fields: [alumniId], references: [id])
 
   @@unique([userId, alumniId])
 }
@@ -56,4 +76,54 @@ model AuditLog {
   action    String
   detail    String   @default("")
   createdAt DateTime @default(now())
+}
+
+model PipelineEntry {
+  id        String        @id @default(cuid())
+  contactId String
+  stage     String        @default("RESEARCHED")
+  notes     String        @default("")
+  addedAt   DateTime      @default(now())
+  updatedAt DateTime      @default(now())
+  userId    String        @default("")
+  contact   AlumniContact @relation(fields: [contactId], references: [id])
+}
+
+model UserDiscover {
+  id        String        @id @default(cuid())
+  userId    String
+  contactId String
+  rating    String
+  createdAt DateTime      @default(now())
+  contact   AlumniContact @relation(fields: [contactId], references: [id])
+}
+
+model WaitlistSignup {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  email              String
+  full_name          String
+  university         String
+  grad_year          Int
+  target_track       String
+  linkedin_url       String?
+  greek_affiliation  String?
+  current_prep       String?
+  referred_by        String?
+  ref_code           String?
+
+  @@map("waitlist_signups")
+}
+
+model IntroRequest {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_user_id       String
+  intermediary_name  String
+  intermediary_email String?
+  target_contact_id  String
+  message            String
+  status             String?   @default("pending")
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("intro_requests")
 }
