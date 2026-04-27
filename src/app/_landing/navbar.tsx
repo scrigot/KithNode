@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { signIn } from "next-auth/react";
 import { LogoIcon } from "@/components/logo";
 
 export function Navbar() {
@@ -53,9 +54,9 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <motion.a
-          href="/api/auth/signin/google?callbackUrl=%2Fdashboard"
-          className="text-sm font-medium transition-colors"
+        <motion.button
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          className="cursor-pointer text-sm font-medium transition-colors"
           style={{
             color: useTransform(scrolled, (v) =>
               v > 0.5 ? "#0f172a" : "rgba(255,255,255,0.85)"
@@ -63,7 +64,7 @@ export function Navbar() {
           }}
         >
           Sign in
-        </motion.a>
+        </motion.button>
         <Link
           href="/waitlist"
           className="rounded-lg bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"
