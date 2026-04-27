@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { redactName } from "@/lib/redact";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -17,6 +18,7 @@ interface OverdueContact {
   firmName: string;
   stage: string;
   days: number;
+  isRedacted?: boolean;
 }
 
 interface TopUnrated {
@@ -117,7 +119,7 @@ export async function GET() {
     if (topOverdueIds.length > 0) {
       const { data: overdueContacts } = await supabase
         .from("AlumniContact")
-        .select("id, name, firmName")
+        .select("id, name, firmName, importedByUserId")
         .in(
           "id",
           topOverdueIds.map((e) => e.id),
@@ -126,12 +128,16 @@ export async function GET() {
         .map((e) => {
           const c = (overdueContacts || []).find((x) => x.id === e.id);
           if (!c) return null;
+          // Pipeline entries can reference contacts another user imported (via Discover).
+          // Redact PII for those.
+          const isOwn = c.importedByUserId === userId;
           return {
             contactId: c.id,
-            contactName: c.name || "",
+            contactName: isOwn ? (c.name || "") : redactName(c.name || ""),
             firmName: c.firmName || "",
             stage: e.stage,
             days: e.days,
+            ...(isOwn ? {} : { isRedacted: true }),
           };
         })
         .filter((x): x is OverdueContact => x !== null);

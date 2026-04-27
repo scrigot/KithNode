@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
-import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw } from "lucide-react";
+import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw, Lock } from "lucide-react";
 import { IntroModal } from "./intro-modal";
 
 const TIER_STYLES: Record<string, string> = {
@@ -46,6 +46,7 @@ interface Contact {
   affiliations: string;
   source: string;
   warmPaths?: WarmPath[];
+  isRedacted?: boolean;
 }
 
 type ViewMode = "browse" | "search";
@@ -138,7 +139,19 @@ function ContactCard({
       </div>
 
       <div className="flex-1 px-4 py-3">
-        <h3 className="truncate text-[13px] font-bold text-foreground">{contact.name}</h3>
+        <h3
+          className={`flex items-center gap-1 truncate text-[13px] font-bold ${
+            contact.isRedacted ? "text-muted-foreground/80" : "text-foreground"
+          }`}
+        >
+          {contact.isRedacted && <Lock className="h-3 w-3 shrink-0 opacity-70" />}
+          <span className="truncate">{contact.name}</span>
+        </h3>
+        {contact.isRedacted && (
+          <span className="mt-0.5 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
+            Blurred · Import to unlock
+          </span>
+        )}
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {contact.title}
           {contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : ""}
@@ -222,7 +235,17 @@ function ContactCard({
 
       {variant === "explore" && (
         <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
-          {contact.linkedInUrl ? (
+          {contact.isRedacted ? (
+            <button
+              type="button"
+              disabled
+              className="flex flex-1 cursor-default items-center justify-center gap-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground/60"
+              title="Import contacts to reveal this profile"
+            >
+              <Lock className="h-3 w-3" />
+              IMPORT TO REVEAL
+            </button>
+          ) : contact.linkedInUrl ? (
             <a
               href={contact.linkedInUrl}
               target="_blank"

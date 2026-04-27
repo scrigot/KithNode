@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
+import { maybeRedact } from "@/lib/redact";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -92,8 +93,13 @@ export async function GET(request: NextRequest) {
     }),
   );
 
+  // Redact PII for contacts not imported by the current user.
+  // Warm paths reference the user's OWN imports (see src/lib/warm-paths.ts),
+  // so they stay clear.
+  const redacted = enriched.map((c) => maybeRedact(c, userId));
+
   return NextResponse.json({
-    contacts: enriched,
-    total: enriched.length,
+    contacts: redacted,
+    total: redacted.length,
   });
 }

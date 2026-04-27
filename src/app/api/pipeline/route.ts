@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
+import { redactName, redactLinkedInUrl } from "@/lib/redact";
 
 const STAGES = [
   "researched",
@@ -63,6 +64,7 @@ export async function GET() {
       added_at: string;
       affiliations: string[];
       warmPaths: Array<{ intermediaryName: string; intermediaryRelation: string; firmName: string; title: string }>;
+      isRedacted?: boolean;
     }>> = {};
 
     for (const stage of STAGES) {
@@ -85,12 +87,20 @@ export async function GET() {
         firmPathCache.set(contact.firmName || "", warmPaths);
       }
 
+      // Redact PII when the underlying contact wasn't imported by the current user.
+      // Pipeline entries can reference contacts another user imported (added via Discover).
+      const isOwn = contact.importedByUserId === userId;
+      const safeName = isOwn ? (contact.name || "") : redactName(contact.name || "");
+      const safeLinkedIn = isOwn
+        ? (contact.linkedInUrl || "")
+        : (contact.linkedInUrl ? redactLinkedInUrl(contact.linkedInUrl) : "");
+
       grouped[stage].push({
         id: contact.id,
-        name: contact.name || "",
+        name: safeName,
         title: contact.title || "",
         email: "",
-        linkedin_url: contact.linkedInUrl || "",
+        linkedin_url: safeLinkedIn,
         education: contact.education || "",
         company_name: contact.firmName || "",
         company_location: contact.location || "",
@@ -103,6 +113,7 @@ export async function GET() {
           ? contact.affiliations.split(",").map((a: string) => a.trim()).filter(Boolean)
           : [],
         warmPaths: warmPaths.filter((wp) => wp.intermediaryName !== contact.name),
+        ...(isOwn ? {} : { isRedacted: true }),
       });
     }
 

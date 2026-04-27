@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedContact } from "@/lib/api";
+
+type WarmSignalContact = RankedContact & { isRedacted?: boolean };
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/15 text-red-400 border-red-500/20",
@@ -60,32 +63,53 @@ export function WarmSignalCard({
   onAddToPipeline,
   pipelineAdded,
 }: {
-  contact: RankedContact;
+  contact: WarmSignalContact;
   onDraftOutreach?: (id: string) => void;
   onAddToPipeline?: (id: string) => void;
   pipelineAdded?: boolean;
 }) {
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
+  const isRedacted = !!contact.isRedacted;
+
+  const NameBlock = (
+    <>
+      <h3
+        className={`flex items-center gap-1 truncate text-sm font-bold ${
+          isRedacted ? "text-muted-foreground/80" : "text-foreground"
+        }`}
+      >
+        {isRedacted && <Lock className="h-3 w-3 shrink-0 opacity-70" />}
+        <span className="truncate">{contact.name}</span>
+      </h3>
+      {isRedacted && (
+        <span className="mt-0.5 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
+          Blurred · Import to unlock
+        </span>
+      )}
+      <p className="truncate text-xs text-muted-foreground">
+        {contact.title}
+        {contact.title && contact.company.name ? " @ " : ""}
+        {contact.company.name}
+      </p>
+    </>
+  );
 
   return (
     <div className="group border border-white/[0.06] bg-bg-card p-4 transition-all duration-200 hover:-translate-y-[1px] hover:border-white/[0.12] hover:bg-bg-hover hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
       <div className="flex items-start justify-between gap-4">
         {/* Left: Name + Company */}
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/contact/${contact.id}`}
-            className="block hover:text-primary"
-          >
-            <h3 className="truncate text-sm font-bold text-foreground">
-              {contact.name}
-            </h3>
-            <p className="truncate text-xs text-muted-foreground">
-              {contact.title}
-              {contact.title && contact.company.name ? " @ " : ""}
-              {contact.company.name}
-            </p>
-          </Link>
+          {isRedacted ? (
+            <div className="block">{NameBlock}</div>
+          ) : (
+            <Link
+              href={`/contact/${contact.id}`}
+              className="block hover:text-primary"
+            >
+              {NameBlock}
+            </Link>
+          )}
 
           {/* WHY NOW */}
           {contact.why_now && (
@@ -171,54 +195,66 @@ export function WarmSignalCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {contact.company.name && (
-            <a
-              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-muted-foreground hover:text-accent-blue"
-              title="Check mutual connections"
+          {isRedacted ? (
+            <span
+              className="flex items-center gap-1 text-[10px] text-muted-foreground/60"
+              title="Import contacts to reveal this profile"
             >
-              MUTUAL
-            </a>
-          )}
-          {contact.linkedin_url && (
-            <a
-              href={contact.linkedin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-muted-foreground hover:text-accent-blue"
-              title={contact.linkedin_url}
-            >
-              LI
-            </a>
-          )}
-          {onAddToPipeline && (
-            <Button
-              size="sm"
-              variant="outline"
-              className={`h-6 px-2 text-[10px] ${pipelineAdded ? "text-green-400 border-green-500/30 cursor-default" : "text-accent-amber hover:bg-accent-amber/20"}`}
-              disabled={pipelineAdded}
-              onClick={(e) => {
-                e.preventDefault();
-                if (!pipelineAdded) onAddToPipeline(contact.id);
-              }}
-            >
-              {pipelineAdded ? "IN PIPELINE" : "+ PIPELINE"}
-            </Button>
-          )}
-          {onDraftOutreach && process.env.NEXT_PUBLIC_ENABLE_OUTREACH_DRAFTS !== 'false' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-[10px] text-primary hover:bg-primary hover:text-primary-foreground"
-              onClick={(e) => {
-                e.preventDefault();
-                onDraftOutreach(contact.id);
-              }}
-            >
-              DRAFT
-            </Button>
+              <Lock className="h-3 w-3" />
+              IMPORT TO REVEAL
+            </span>
+          ) : (
+            <>
+              {contact.company.name && (
+                <a
+                  href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-muted-foreground hover:text-accent-blue"
+                  title="Check mutual connections"
+                >
+                  MUTUAL
+                </a>
+              )}
+              {contact.linkedin_url && (
+                <a
+                  href={contact.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-muted-foreground hover:text-accent-blue"
+                  title={contact.linkedin_url}
+                >
+                  LI
+                </a>
+              )}
+              {onAddToPipeline && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`h-6 px-2 text-[10px] ${pipelineAdded ? "text-green-400 border-green-500/30 cursor-default" : "text-accent-amber hover:bg-accent-amber/20"}`}
+                  disabled={pipelineAdded}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!pipelineAdded) onAddToPipeline(contact.id);
+                  }}
+                >
+                  {pipelineAdded ? "IN PIPELINE" : "+ PIPELINE"}
+                </Button>
+              )}
+              {onDraftOutreach && process.env.NEXT_PUBLIC_ENABLE_OUTREACH_DRAFTS !== 'false' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] text-primary hover:bg-primary hover:text-primary-foreground"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onDraftOutreach(contact.id);
+                  }}
+                >
+                  DRAFT
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

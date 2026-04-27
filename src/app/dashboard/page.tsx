@@ -14,6 +14,7 @@ import {
   Star,
   Activity,
   Clock,
+  Lock,
 } from "lucide-react";
 
 interface RecentActivity {
@@ -30,6 +31,7 @@ interface OverdueContact {
   firmName: string;
   stage: string;
   days: number;
+  isRedacted?: boolean;
 }
 interface TopUnrated {
   contactId: string;
@@ -457,7 +459,17 @@ export default function DashboardPage() {
                       className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1.5 text-[11px] hover:border-amber-500/30"
                     >
                       <Clock className="h-3 w-3 shrink-0 text-amber-400" />
-                      <span className="truncate font-bold text-foreground">
+                      {o.isRedacted && (
+                        <Lock
+                          className="h-3 w-3 shrink-0 text-muted-foreground/70"
+                          aria-label="Blurred contact"
+                        />
+                      )}
+                      <span
+                        className={`truncate font-bold ${
+                          o.isRedacted ? "text-muted-foreground/80" : "text-foreground"
+                        }`}
+                      >
                         {o.contactName}
                       </span>
                       <span className="truncate text-muted-foreground">
