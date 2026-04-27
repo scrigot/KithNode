@@ -5,6 +5,7 @@ import { WarmSignalCard } from "./warm-signal-card";
 import { FilterBar, type SortOption } from "./filter-bar";
 import { OutreachSheet } from "./outreach-sheet";
 import { trackEvent } from "@/lib/posthog";
+import { apiFetch } from "@/lib/api-client";
 import { Users } from "lucide-react";
 import type { RankedContact } from "@/lib/api";
 import Link from "next/link";
@@ -25,7 +26,7 @@ export function ContactsList() {
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch("/api/contacts?curated=true")
+    apiFetch("/api/contacts?curated=true")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch");
         return res.json();
@@ -153,7 +154,7 @@ export function ContactsList() {
             }}
             pipelineAdded={pipelineAdded.has(contact.id)}
             onAddToPipeline={async (id) => {
-              const res = await fetch(`/api/pipeline/${id}`, { method: "POST" });
+              const res = await apiFetch(`/api/pipeline/${id}`, { method: "POST" });
               if (res.ok) {
                 setPipelineAdded((prev) => new Set(prev).add(String(id)));
               }

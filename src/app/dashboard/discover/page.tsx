@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
+import { apiFetch } from "@/lib/api-client";
 import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw } from "lucide-react";
 import { IntroModal } from "./intro-modal";
 
@@ -55,7 +56,7 @@ async function rateContact(
   rating: "high_value" | "skip",
 ): Promise<boolean> {
   try {
-    const res = await fetch("/api/discover/rate", {
+    const res = await apiFetch("/api/discover/rate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contactId, rating }),
@@ -68,20 +69,34 @@ async function rateContact(
 
 const warmPathFiredRef = { current: false };
 
-function BrowseCard({
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex min-w-[18px] items-center justify-center border border-white/[0.12] bg-muted px-1 py-0.5 font-mono text-[10px] font-bold text-foreground">
+      {children}
+    </kbd>
+  );
+}
+
+// Shared card used in both Browse (triage) and Search (explore) modes.
+// Variant controls the footer buttons.
+function ContactCard({
   contact,
-  direction,
+  variant,
+  focused,
   onRate,
   onAskIntro,
-  sourceFilter,
+  onAddToPipeline,
+  pipelineState,
 }: {
   contact: Contact;
-  direction: "left" | "right" | "enter" | null;
-  onRate: (rating: "high_value" | "skip") => void;
-  onAskIntro: (contact: Contact, warmPath: WarmPath) => void;
-  sourceFilter: SourceFilter;
+  variant: "rate" | "explore";
+  focused?: boolean;
+  onRate?: (rating: "high_value" | "skip") => void;
+  onAskIntro?: (contact: Contact, warmPath: WarmPath) => void;
+  onAddToPipeline?: (contactId: string) => void;
+  pipelineState?: "idle" | "pending" | "added";
 }) {
-  const isProfessor = sourceFilter === "professor" || contact.source === "professor";
+  const isProfessor = contact.source === "professor";
   if (
     contact.warmPaths &&
     contact.warmPaths.length > 0 &&
@@ -98,164 +113,153 @@ function BrowseCard({
   const affiliationList = contact.affiliations
     ? contact.affiliations.split(",").filter(Boolean)
     : [];
-
-  const animClass =
-    direction === "left"
-      ? "animate-slide-out-left"
-      : direction === "right"
-        ? "animate-slide-out-right"
-        : direction === "enter"
-          ? "animate-slide-in"
-          : "";
+  const extraChipCount = Math.max(0, affiliationList.length - 3);
 
   return (
     <div
-      className={`w-full max-w-lg border border-white/[0.06] bg-card shadow-lg shadow-primary/5 ${animClass}`}
+      className={`flex flex-col border bg-card transition-colors ${
+        focused
+          ? "border-primary shadow-sm shadow-primary/20"
+          : "border-white/[0.06] hover:border-white/[0.12]"
+      }`}
     >
-      {/* Header row: tier + score */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
         <Badge
           variant="outline"
-          className={`text-[10px] font-bold ${TIER_STYLES[tierKey] || TIER_STYLES.cold}`}
+          className={`text-[9px] font-bold ${TIER_STYLES[tierKey] || TIER_STYLES.cold}`}
         >
           {(contact.tier || "COLD").toUpperCase()}
         </Badge>
         <span
-          className={`text-2xl font-bold tabular-nums ${SCORE_STYLES[tierKey] || "text-zinc-400"}`}
+          className={`text-xl font-bold tabular-nums ${SCORE_STYLES[tierKey] || "text-zinc-400"}`}
         >
           {Math.round(contact.warmthScore || 0)}
         </span>
       </div>
 
-      {/* Body */}
-      <div className="px-6 py-6">
-        {/* Name + title */}
-        <h3 className="text-xl font-bold text-foreground">{contact.name}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="flex-1 px-4 py-3">
+        <h3 className="truncate text-[13px] font-bold text-foreground">{contact.name}</h3>
+        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {contact.title}
           {contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : ""}
           <span className="text-foreground">{contact.firmName}</span>
         </p>
-        {isProfessor && contact.firmName && (
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-              DEPT
-            </span>
-            <span className="text-[11px] text-muted-foreground">{contact.firmName}</span>
-          </div>
-        )}
 
-        {/* Warm path chain */}
         {contact.warmPaths && contact.warmPaths.length > 0 && (
-          <div className="mt-3 border border-primary/20 bg-primary/5 px-4 py-3">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-              WARM PATH
-            </span>
-            <div className="mt-1.5 space-y-1">
-              {contact.warmPaths.slice(0, 3).map((wp) => (
-                <p key={`${wp.intermediaryName}-${wp.title}`} className="font-mono text-[11px]">
-                  <span className="text-muted-foreground">Via </span>
-                  <span className="text-primary">{wp.intermediaryName}</span>
-                  <span className="text-muted-foreground"> ({wp.intermediaryRelation})</span>
-                  <span className="text-muted-foreground"> -&gt; </span>
-                  <span className="text-primary">{wp.title}</span>
-                  <span className="text-muted-foreground"> at </span>
-                  <span className="text-primary">{wp.firmName}</span>
-                </p>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => onAskIntro(contact, contact.warmPaths![0])}
-              className="mt-2 w-full border border-primary/30 bg-primary/10 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
-            >
-              ASK FOR INTRO
-            </button>
-          </div>
-        )}
-
-        {/* Affiliation chips / Research areas */}
-        {affiliationList.length > 0 && (
-          <div className="mt-4">
-            {isProfessor && (
-              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                RESEARCH AREAS
+          <button
+            type="button"
+            onClick={() =>
+              onAskIntro && onAskIntro(contact, contact.warmPaths![0])
+            }
+            disabled={!onAskIntro}
+            title={contact.warmPaths
+              .map(
+                (wp) =>
+                  `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.title} at ${wp.firmName}`,
+              )
+              .join(" · ")}
+            className="mt-2 block w-full truncate border border-primary/20 bg-primary/5 px-2 py-1 text-left font-mono text-[10px] text-primary enabled:hover:bg-primary/10 disabled:cursor-default"
+          >
+            <span className="text-muted-foreground">via </span>
+            {contact.warmPaths[0].intermediaryName}
+            <span className="text-muted-foreground"> -&gt; </span>
+            {contact.warmPaths[0].firmName}
+            {contact.warmPaths.length > 1 && (
+              <span className="text-muted-foreground">
+                {" "}
+                (+{contact.warmPaths.length - 1})
               </span>
             )}
-            <div className="flex flex-wrap gap-2">
-              {affiliationList.map((a) => (
-                <span
-                  key={a}
-                  className="border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary"
-                >
-                  {a.trim()}
-                </span>
-              ))}
-            </div>
+          </button>
+        )}
+
+        {affiliationList.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {affiliationList.slice(0, 3).map((a) => (
+              <span
+                key={a}
+                className="border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary"
+              >
+                {a.trim()}
+              </span>
+            ))}
+            {extraChipCount > 0 && (
+              <span className="px-1 py-0.5 text-[9px] text-muted-foreground/60">
+                +{extraChipCount}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Details */}
-        <div className="mt-5 space-y-2 text-sm text-muted-foreground">
-          {contact.education && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                Education
-              </span>
-              <span>{contact.education}</span>
-            </div>
-          )}
-          {contact.location && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                Location
-              </span>
-              <span>{contact.location}</span>
-            </div>
-          )}
-          {contact.email && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                Email
-              </span>
-              <span>{contact.email}</span>
-            </div>
-          )}
-          {contact.linkedInUrl && (
-            <div className="flex items-start gap-2">
-              <span className="w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                LinkedIn
-              </span>
-              <a
-                href={contact.linkedInUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-primary hover:underline"
-              >
-                View Profile
-              </a>
-            </div>
-          )}
-        </div>
+        {(contact.education || contact.location) && (
+          <div className="mt-2 space-y-0.5 text-[10px] text-muted-foreground">
+            {contact.education && <p className="truncate">{contact.education}</p>}
+            {contact.location && <p className="truncate">{contact.location}</p>}
+          </div>
+        )}
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-3 border-t border-white/[0.06] px-6 py-4">
-        <button
-          onClick={() => onRate("skip")}
-          className="flex flex-1 items-center justify-center gap-2 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:bg-red-500/10 hover:text-red-400"
-        >
-          <X className="h-4 w-4" />
-          SKIP
-        </button>
-        <button
-          onClick={() => onRate("high_value")}
-          className="flex flex-1 items-center justify-center gap-2 bg-primary py-3 text-[12px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80"
-        >
-          <Star className="h-4 w-4" />
-          HIGH VALUE
-        </button>
-      </div>
+      {variant === "rate" && onRate && (
+        <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
+          <button
+            onClick={() => onRate("skip")}
+            className="flex flex-1 items-center justify-center gap-1 border border-white/[0.12] py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+            aria-label={`Skip ${contact.name}`}
+          >
+            <X className="h-3 w-3" />
+            SKIP
+          </button>
+          <button
+            onClick={() => onRate("high_value")}
+            className="flex flex-1 items-center justify-center gap-1 bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80"
+            aria-label={`Rate ${contact.name} high value`}
+          >
+            <Star className="h-3 w-3" />
+            HIGH VALUE
+          </button>
+        </div>
+      )}
+
+      {variant === "explore" && (
+        <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
+          {contact.linkedInUrl ? (
+            <a
+              href={contact.linkedInUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
+            >
+              VIEW PROFILE
+            </a>
+          ) : (
+            <a
+              href={`https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(contact.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
+            >
+              SEARCH PROFILE
+            </a>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className={`flex-1 text-[10px] font-bold ${
+              pipelineState === "added"
+                ? "border-green-500/30 text-green-400"
+                : "border-primary/30 text-primary hover:bg-primary/20"
+            }`}
+            disabled={pipelineState === "pending" || pipelineState === "added"}
+            onClick={() => onAddToPipeline && onAddToPipeline(contact.id)}
+          >
+            {pipelineState === "added"
+              ? "ADDED"
+              : pipelineState === "pending"
+                ? "..."
+                : "+ PIPELINE"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,7 +280,8 @@ export default function DiscoverPage() {
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
   const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
-  // Discover pipeline modal state — streamed NDJSON progress.
+
+  // Discover pipeline modal state: streamed NDJSON progress.
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverResult, setDiscoverResult] = useState<string | null>(null);
   const [discoverProgress, setDiscoverProgress] = useState(0);
@@ -286,7 +291,7 @@ export default function DiscoverPage() {
   const [discoverError, setDiscoverError] = useState<string | null>(null);
   const discoverAbortRef = useRef<AbortController | null>(null);
 
-  // Seed Professors modal state — streamed NDJSON progress.
+  // Seed Professors modal state: streamed NDJSON progress.
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedProgress, setSeedProgress] = useState(0);
@@ -303,61 +308,53 @@ export default function DiscoverPage() {
   } | null>(null);
   const [userName, setUserName] = useState("");
 
-  // Browse mode state
+  // Browse mode: list of unrated contacts. Rated cards are spliced out of state.
   const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [slideDirection, setSlideDirection] = useState<
-    "left" | "right" | "enter" | null
-  >(null);
   const [allRated, setAllRated] = useState(false);
-  const animatingRef = useRef(false);
+  const ratingLockRef = useRef(false);
 
-  const search = useCallback(async (q: string, tier: string, src: SourceFilter) => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (tier) params.set("tier", tier.toLowerCase());
-    params.set("source", src);
-    const qs = params.toString();
+  const search = useCallback(
+    async (q: string, tier: string, src: SourceFilter) => {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (tier) params.set("tier", tier.toLowerCase());
+      params.set("source", src);
+      const qs = params.toString();
 
-    try {
-      const res = await fetch(`/api/discover${qs ? `?${qs}` : ""}`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setContacts(data.contacts || []);
-      setTotal(data.total || 0);
+      try {
+        const res = await apiFetch(`/api/discover${qs ? `?${qs}` : ""}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setContacts(data.contacts || []);
+        setTotal(data.total || 0);
 
-      if (!q && !tier && (data.contacts || []).length === 0) {
-        setHasAnyContacts(false);
-      } else {
-        setHasAnyContacts(true);
+        if (!q && !tier && (data.contacts || []).length === 0) {
+          setHasAnyContacts(false);
+        } else {
+          setHasAnyContacts(true);
+        }
+      } catch {
+        setContacts([]);
+        setTotal(0);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setContacts([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
-  // Fetch unrated contacts for browse mode (API already filters out rated + own imports)
   const fetchBrowseContacts = useCallback(async (src: SourceFilter) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/discover?source=${src}`);
+      const res = await apiFetch(`/api/discover?source=${src}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       const unrated: Contact[] = data.contacts || [];
 
-      if (unrated.length === 0) {
-        setAllRated(true);
-        setBrowseContacts([]);
-      } else {
-        setAllRated(false);
-        setBrowseContacts(unrated);
-      }
-
-      setHasAnyContacts(unrated.length > 0 || data.total > 0);
+      setAllRated(unrated.length === 0);
+      setBrowseContacts(unrated);
+      setHasAnyContacts(unrated.length > 0 || (data.total || 0) > 0);
     } catch {
       setBrowseContacts([]);
     } finally {
@@ -377,65 +374,49 @@ export default function DiscoverPage() {
   // Browse mode: load contacts
   useEffect(() => {
     if (mode !== "browse") return;
-    setCurrentIndex(0);
-    setSlideDirection("enter");
     fetchBrowseContacts(sourceFilter);
   }, [mode, fetchBrowseContacts, sourceFilter]);
 
-  // Clear enter animation after mount
-  useEffect(() => {
-    if (slideDirection === "enter") {
-      const timer = setTimeout(() => setSlideDirection(null), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [slideDirection]);
-
   const handleRate = useCallback(
-    (rating: "high_value" | "skip") => {
-      if (animatingRef.current) return;
-      const current = browseContacts[currentIndex];
-      if (!current) return;
+    (contactId: string, rating: "high_value" | "skip") => {
+      if (ratingLockRef.current) return;
+      ratingLockRef.current = true;
 
-      animatingRef.current = true;
+      rateContact(contactId, rating);
+      trackEvent("discover_rate", { contact_id: contactId, rating });
 
-      // Persist rating to Supabase via API
-      rateContact(current.id, rating);
-      trackEvent("discover_rate", {
-        contact_id: current.id,
-        rating,
+      setBrowseContacts((prev) => {
+        const next = prev.filter((c) => c.id !== contactId);
+        if (next.length === 0) setAllRated(true);
+        return next;
       });
 
-      // Slide out
-      setSlideDirection(rating === "skip" ? "left" : "right");
-
       setTimeout(() => {
-        const nextIndex = currentIndex + 1;
-        if (nextIndex >= browseContacts.length) {
-          setAllRated(true);
-        } else {
-          setCurrentIndex(nextIndex);
-          setSlideDirection("enter");
-          setTimeout(() => setSlideDirection(null), 300);
-        }
-        animatingRef.current = false;
-      }, 300);
+        ratingLockRef.current = false;
+      }, 80);
     },
-    [browseContacts, currentIndex],
+    [],
   );
 
-  // Keyboard shortcuts for browse mode
+  // Keyboard: act on the top (first) unrated contact.
   useEffect(() => {
     if (mode !== "browse" || allRated || browseContacts.length === 0) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" || e.key === "j") {
-        handleRate("skip");
-      } else if (e.key === "ArrowRight" || e.key === "k") {
-        handleRate("high_value");
+      const target = e.target as HTMLElement | null;
+      if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
+      const top = browseContacts[0];
+      if (!top) return;
+      if (e.key === "ArrowLeft" || e.key === "j" || e.key === "3") {
+        e.preventDefault();
+        handleRate(top.id, "skip");
+      } else if (e.key === "ArrowRight" || e.key === "k" || e.key === "1") {
+        e.preventDefault();
+        handleRate(top.id, "high_value");
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [mode, allRated, browseContacts.length, handleRate]);
+  }, [mode, allRated, browseContacts, handleRate]);
 
   // Fetch user name for intro modal
   useEffect(() => {
@@ -468,14 +449,13 @@ export default function DiscoverPage() {
     setDiscoverLog([]);
 
     try {
-      const res = await fetch("/api/discover/run", {
+      const res = await apiFetch("/api/discover/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "quick" }),
         signal: abort.signal,
       });
 
-      // Validation errors come back as JSON, not stream.
       const ct = res.headers.get("content-type") || "";
       if (!res.ok || !ct.includes("application/x-ndjson")) {
         const data = await res.json().catch(() => ({}));
@@ -485,7 +465,6 @@ export default function DiscoverPage() {
         return;
       }
 
-      // Stream NDJSON line-by-line.
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -541,7 +520,6 @@ export default function DiscoverPage() {
           imported: finalEvent.imported,
           updated: finalEvent.updated,
         });
-        // Refresh whichever pane is active
         if (mode === "browse") {
           await fetchBrowseContacts(sourceFilter);
         } else {
@@ -556,8 +534,6 @@ export default function DiscoverPage() {
       }
     } finally {
       discoverAbortRef.current = null;
-      // Keep modal open briefly so the user sees the final state, then
-      // auto-close on success. On error, leave it open until they dismiss.
       setTimeout(() => {
         setDiscoverLoading(false);
       }, 1200);
@@ -590,7 +566,6 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  // Lock body scroll + block escape key while the discover modal is open.
   useEffect(() => {
     if (!discoverLoading) return;
     const prevOverflow = document.body.style.overflow;
@@ -621,7 +596,7 @@ export default function DiscoverPage() {
     setSeedLog([]);
 
     try {
-      const res = await fetch("/api/professors/seed", {
+      const res = await apiFetch("/api/professors/seed", {
         method: "POST",
         signal: abort.signal,
       });
@@ -719,7 +694,6 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  // Lock body scroll + block escape key while the seed modal is open.
   useEffect(() => {
     if (!seedLoading) return;
     const prevOverflow = document.body.style.overflow;
@@ -740,7 +714,7 @@ export default function DiscoverPage() {
   const handleAddToPipeline = async (contactId: string) => {
     setAddingToPipeline(contactId);
     try {
-      const res = await fetch(`/api/pipeline/${contactId}`, {
+      const res = await apiFetch(`/api/pipeline/${contactId}`, {
         method: "POST",
       });
       if (res.ok) {
@@ -752,6 +726,12 @@ export default function DiscoverPage() {
     } finally {
       setAddingToPipeline(null);
     }
+  };
+
+  const pipelineStateFor = (contactId: string): "idle" | "pending" | "added" => {
+    if (pipelineAdded.has(contactId)) return "added";
+    if (addingToPipeline === contactId) return "pending";
+    return "idle";
   };
 
   // Empty state: no contacts imported at all
@@ -789,25 +769,24 @@ export default function DiscoverPage() {
 
   return (
     <div className="flex min-h-full flex-col p-5">
-      {/* Header */}
-      <div className="mb-1 flex items-end justify-between">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-            {sourceFilter === "professor" ? "PROFESSORS" : "DISCOVER"}
-          </h2>
-          <p className="text-[10px] text-muted-foreground">
-            {mode === "browse"
-              ? sourceFilter === "professor"
-                ? "RATE PROFESSORS FROM THE SHARED POOL"
-                : "RATE CONTACTS FROM THE SHARED POOL"
-              : sourceFilter === "professor"
-                ? "SEARCH THE PROFESSOR NETWORK"
-                : "SEARCH THE SHARED NETWORK"}
-          </p>
-        </div>
+      {/* ─── Header: title + source filter (left)   primary action (right) ─── */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-end gap-4">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
+              {sourceFilter === "professor" ? "PROFESSORS" : "DISCOVER"}
+            </h2>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              {mode === "browse"
+                ? sourceFilter === "professor"
+                  ? "Rate professors from the shared pool"
+                  : "Rate contacts from the shared pool"
+                : sourceFilter === "professor"
+                  ? "Search the professor network"
+                  : "Search the shared network"}
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          {/* Source filter: Alumni / Professors */}
           <div className="flex overflow-hidden border border-white/[0.06]">
             <button
               onClick={() => handleSourceFilter("alumni")}
@@ -831,44 +810,52 @@ export default function DiscoverPage() {
               Professors
             </button>
           </div>
+        </div>
 
-          {/* Action button — Discover New (alumni) or Seed Professors (professor) */}
-          {sourceFilter === "professor" ? (
-            <button
-              onClick={runSeedProfessors}
-              disabled={seedLoading}
-              className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-            >
-              {seedLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              {seedLoading ? "Seeding" : "Seed Professors"}
-            </button>
-          ) : (
-            <button
-              onClick={runDiscover}
-              disabled={discoverLoading}
-              className="flex items-center gap-1.5 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-            >
-              {discoverLoading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3" />
-              )}
-              {discoverLoading ? "Discovering" : "Discover New"}
-            </button>
-          )}
+        {sourceFilter === "professor" ? (
+          <button
+            onClick={runSeedProfessors}
+            disabled={seedLoading}
+            className="flex items-center gap-1.5 bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80 disabled:opacity-50"
+          >
+            {seedLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3 w-3" />
+            )}
+            {seedLoading ? "Seeding" : "Seed Professors"}
+          </button>
+        ) : (
+          <button
+            onClick={runDiscover}
+            disabled={discoverLoading}
+            className="flex items-center gap-1.5 bg-primary px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80 disabled:opacity-50"
+          >
+            {discoverLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            {discoverLoading ? "Discovering" : "Discover New"}
+          </button>
+        )}
+      </div>
 
-        {/* Mode toggle */}
-        <div className="flex overflow-hidden border border-white/[0.06]">
+      {(discoverResult || seedResult) && (
+        <div className="mt-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+          {discoverResult || seedResult}
+        </div>
+      )}
+
+      {/* ─── Mode tab strip (Browse | Search) ─── */}
+      <div className="mt-3 flex items-center justify-between border-b border-white/[0.06]">
+        <div className="flex">
           <button
             onClick={() => setMode("browse")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
               mode === "browse"
-                ? "bg-primary text-white"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <Layers className="h-3 w-3" />
@@ -876,50 +863,54 @@ export default function DiscoverPage() {
           </button>
           <button
             onClick={() => setMode("search")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
               mode === "search"
-                ? "bg-primary text-white"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <Search className="h-3 w-3" />
             Search
           </button>
         </div>
-        </div>
-      </div>
-      {discoverResult && (
-        <div className="mb-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-          {discoverResult}
-        </div>
-      )}
-      {seedResult && (
-        <div className="mb-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-          {seedResult}
-        </div>
-      )}
-      <div className="mb-4 h-px bg-border" />
 
-      {/* ═══════ BROWSE MODE ═══════ */}
+        {mode === "browse" && !loading && !allRated && browseContacts.length > 0 && (
+          <div className="flex items-center gap-2 py-1 text-[10px] text-muted-foreground">
+            <span className="tabular-nums">{browseContacts.length} unrated</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
+              <Kbd>1</Kbd>
+              <Kbd>→</Kbd>
+              <span className="text-muted-foreground">high value</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
+              <Kbd>3</Kbd>
+              <Kbd>←</Kbd>
+              <span className="text-muted-foreground">skip</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ═══════ BROWSE MODE: triage grid ═══════ */}
       {mode === "browse" && (
-        <>
+        <div className="mt-4 flex-1">
           {loading && (
-            <div className="flex flex-1 items-center justify-center">
+            <div className="flex h-full items-center justify-center">
               <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
             </div>
           )}
 
           {!loading && allRated && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4">
+            <div className="flex h-full flex-col items-center justify-center gap-4">
               <div className="border border-white/[0.06] bg-card px-10 py-8 text-center">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center border border-primary/30 bg-primary/10">
                   <Star className="h-6 w-6 text-primary" />
                 </div>
-                <p className="text-lg font-bold text-foreground">
-                  All Caught Up!
-                </p>
+                <p className="text-lg font-bold text-foreground">All Caught Up!</p>
                 <p className="mt-1 text-[12px] text-muted-foreground">
-                  You&apos;ve rated all your contacts.
+                  You&apos;ve rated every contact in the pool.
                 </p>
                 <a
                   href="/dashboard/contacts"
@@ -932,35 +923,26 @@ export default function DiscoverPage() {
           )}
 
           {!loading && !allRated && browseContacts.length > 0 && (
-            <div className="flex flex-1 flex-col items-center justify-center">
-              <div className="relative w-full max-w-lg overflow-hidden">
-                <BrowseCard
-                  key={browseContacts[currentIndex].id}
-                  contact={browseContacts[currentIndex]}
-                  direction={slideDirection}
-                  onRate={handleRate}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {browseContacts.map((c, i) => (
+                <ContactCard
+                  key={c.id}
+                  contact={c}
+                  variant="rate"
+                  focused={i === 0}
+                  onRate={(rating) => handleRate(c.id, rating)}
                   onAskIntro={handleAskIntro}
-                  sourceFilter={sourceFilter}
                 />
-              </div>
-              <div className="mt-4 flex items-center gap-3">
-                <p className="text-[11px] tabular-nums text-muted-foreground">
-                  {currentIndex + 1} of {browseContacts.length} contacts
-                </p>
-                <span className="text-[10px] text-muted-foreground/40">
-                  Arrow keys or J/K to rate
-                </span>
-              </div>
+              ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* ═══════ SEARCH MODE ═══════ */}
+      {/* ═══════ SEARCH MODE: explore grid ═══════ */}
       {mode === "search" && (
-        <>
-          {/* Search bar */}
-          <div className="relative mb-4">
+        <div className="mt-4 flex flex-1 flex-col">
+          <div className="relative mb-3">
             <svg
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               fill="none"
@@ -983,8 +965,7 @@ export default function DiscoverPage() {
             />
           </div>
 
-          {/* Filter chips */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTier("")}
               className={`border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
@@ -1000,7 +981,7 @@ export default function DiscoverPage() {
                 key={t}
                 onClick={() =>
                   setActiveTier(
-                    activeTier === t.toLowerCase() ? "" : t.toLowerCase()
+                    activeTier === t.toLowerCase() ? "" : t.toLowerCase(),
                   )
                 }
                 className={`border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
@@ -1019,14 +1000,12 @@ export default function DiscoverPage() {
             )}
           </div>
 
-          {/* Loading */}
           {loading && (
             <div className="flex flex-1 items-center justify-center">
               <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
             </div>
           )}
 
-          {/* No results */}
           {!loading && contacts.length === 0 && hasAnyContacts && (
             <div className="flex flex-1 items-center justify-center">
               <p className="text-sm text-muted-foreground">
@@ -1035,136 +1014,21 @@ export default function DiscoverPage() {
             </div>
           )}
 
-          {/* Results grid */}
           {!loading && contacts.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {contacts.map((c) => {
-                const affiliationList = c.affiliations
-                  ? c.affiliations.split(",").filter(Boolean)
-                  : [];
-                const tierKey = (c.tier || "cold").toLowerCase();
-
-                return (
-                  <div
-                    key={c.id}
-                    className="flex flex-col border border-border bg-card p-4"
-                  >
-                    {/* Top row: name + score */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-foreground">
-                          {c.name}
-                        </p>
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {c.title}
-                          {c.title && c.firmName
-                            ? c.source === "professor"
-                              ? " · "
-                              : " @ "
-                            : ""}
-                          {c.firmName}
-                        </p>
-                        {c.source === "professor" && c.firmName && (
-                          <p className="truncate text-[9px] text-muted-foreground/60">
-                            DEPT: {c.firmName}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <span
-                          className={`text-lg font-bold tabular-nums ${SCORE_STYLES[tierKey] || "text-zinc-400"}`}
-                        >
-                          {Math.round(c.warmthScore || 0)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Tier badge */}
-                    <div className="mt-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-[8px] font-bold ${TIER_STYLES[tierKey] || TIER_STYLES.cold}`}
-                      >
-                        {(c.tier || "COLD").toUpperCase()}
-                      </Badge>
-                    </div>
-
-                    {/* Details */}
-                    <div className="mt-2 space-y-0.5 text-[10px] text-muted-foreground">
-                      {c.education && <p>{c.education}</p>}
-                      {c.location && <p>{c.location}</p>}
-                      {c.email && <p>{c.email}</p>}
-                    </div>
-
-                    {/* Affiliations / Research areas */}
-                    {affiliationList.length > 0 && (
-                      <div className="mt-2">
-                        {c.source === "professor" && (
-                          <p className="mb-1 text-[8px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                            Research
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-1">
-                          {affiliationList.map((a) => (
-                            <Badge
-                              key={a}
-                              variant="outline"
-                              className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
-                            >
-                              {a.trim()}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="mt-auto flex gap-2 pt-3">
-                      {c.linkedInUrl ? (
-                        <a
-                          href={c.linkedInUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
-                        >
-                          VIEW PROFILE
-                        </a>
-                      ) : (
-                        <a
-                          href={`https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(c.name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
-                        >
-                          SEARCH PROFILE
-                        </a>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={`flex-1 text-[10px] font-bold ${
-                          pipelineAdded.has(c.id)
-                            ? "border-green-500/30 text-green-400"
-                            : "border-primary/30 text-primary hover:bg-primary/20"
-                        }`}
-                        disabled={
-                          addingToPipeline === c.id || pipelineAdded.has(c.id)
-                        }
-                        onClick={() => handleAddToPipeline(c.id)}
-                      >
-                        {pipelineAdded.has(c.id)
-                          ? "ADDED"
-                          : addingToPipeline === c.id
-                            ? "..."
-                            : "+ PIPELINE"}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {contacts.map((c) => (
+                <ContactCard
+                  key={c.id}
+                  contact={c}
+                  variant="explore"
+                  onAskIntro={handleAskIntro}
+                  onAddToPipeline={handleAddToPipeline}
+                  pipelineState={pipelineStateFor(c.id)}
+                />
+              ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* ═══════ INTRO REQUEST MODAL ═══════ */}
@@ -1191,7 +1055,6 @@ export default function DiscoverPage() {
           aria-labelledby="seed-modal-title"
         >
           <div className="w-full max-w-md border border-primary/30 bg-card shadow-2xl shadow-primary/20">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4 text-primary" />
@@ -1207,7 +1070,6 @@ export default function DiscoverPage() {
               </span>
             </div>
 
-            {/* Progress bar */}
             <div className="h-1 w-full bg-muted">
               <div
                 className={`h-full transition-all duration-300 ease-out ${
@@ -1217,14 +1079,13 @@ export default function DiscoverPage() {
               />
             </div>
 
-            {/* Stage label + current message */}
             <div className="space-y-3 px-5 py-5">
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
                   Stage
                 </p>
                 <p className="font-mono text-sm font-bold text-foreground">
-                  {seedStage.toUpperCase() || "—"}
+                  {seedStage.toUpperCase() || "-"}
                 </p>
               </div>
 
@@ -1236,12 +1097,11 @@ export default function DiscoverPage() {
                   {seedError ? (
                     <span className="text-red-400">{seedError}</span>
                   ) : (
-                    seedMessage || "—"
+                    seedMessage || "-"
                   )}
                 </p>
               </div>
 
-              {/* Activity log — last 6 lines */}
               {seedLog.length > 0 && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
@@ -1258,7 +1118,6 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Footer — cancel or dismiss */}
             <div className="flex gap-2 border-t border-white/[0.06] px-5 py-3">
               {seedError || seedStage === "done" ? (
                 <button
@@ -1290,7 +1149,6 @@ export default function DiscoverPage() {
           aria-labelledby="discover-modal-title"
         >
           <div className="w-full max-w-md border border-primary/30 bg-card shadow-2xl shadow-primary/20">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
@@ -1306,7 +1164,6 @@ export default function DiscoverPage() {
               </span>
             </div>
 
-            {/* Progress bar */}
             <div className="h-1 w-full bg-muted">
               <div
                 className={`h-full transition-all duration-300 ease-out ${
@@ -1316,14 +1173,13 @@ export default function DiscoverPage() {
               />
             </div>
 
-            {/* Stage label + current message */}
             <div className="space-y-3 px-5 py-5">
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
                   Stage
                 </p>
                 <p className="font-mono text-sm font-bold text-foreground">
-                  {discoverStage.toUpperCase() || "—"}
+                  {discoverStage.toUpperCase() || "-"}
                 </p>
               </div>
 
@@ -1335,12 +1191,11 @@ export default function DiscoverPage() {
                   {discoverError ? (
                     <span className="text-red-400">{discoverError}</span>
                   ) : (
-                    discoverMessage || "—"
+                    discoverMessage || "-"
                   )}
                 </p>
               </div>
 
-              {/* Activity log — last 6 lines */}
               {discoverLog.length > 0 && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
@@ -1357,7 +1212,6 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Footer — cancel or dismiss */}
             <div className="flex gap-2 border-t border-white/[0.06] px-5 py-3">
               {discoverError || discoverStage === "done" ? (
                 <button

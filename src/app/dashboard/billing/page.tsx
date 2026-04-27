@@ -1,9 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CreditCard, Check, Sparkles, Loader2 } from "lucide-react";
+import {
+  CreditCard,
+  Check,
+  Sparkles,
+  Loader2,
+  Users,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 
 type PlanType = "monthly" | "annual";
+
+interface BillingData {
+  subscription_status: "trial" | "active" | "past_due" | "canceled" | string;
+  subscription_plan: "monthly" | "annual" | null;
+  subscription_ends_at: string | null;
+  trial_ends_at: string | null;
+  trial_days_left: number | null;
+  has_stripe_customer: boolean;
+  referral_count: number;
+  pipeline_total: number;
+  ratings: { high_value: number; total: number };
+  stats: { contacts: number };
+}
 
 const PLANS: {
   id: PlanType;
@@ -22,7 +45,7 @@ const PLANS: {
     price: "$15",
     perMonth: "$15/mo",
     badge: "Flexible",
-    buttonText: "Subscribe — $15/mo",
+    buttonText: "Subscribe · $15/mo",
     features: [
       "Unlimited warm signals",
       "AI outreach drafts",
@@ -37,7 +60,7 @@ const PLANS: {
     price: "$120",
     perMonth: "$10/mo",
     badge: "Save $60",
-    trialBadge: "7-DAY FREE TRIAL",
+    trialBadge: "7-Day Free Trial",
     buttonText: "Start 7-day free trial",
     buttonSubtext: "then $120/yr ($10/mo)",
     features: [
@@ -50,24 +73,44 @@ const PLANS: {
   },
 ];
 
+function formatDate(iso: string | null): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function BillingPage() {
   const [loading, setLoading] = useState<PlanType | null>(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string>("trial");
-  const [subscriptionPlan, setSubscriptionPlan] = useState<string>("");
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [data, setData] = useState<BillingData | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/dashboard/overview")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.subscription_status) setSubscriptionStatus(data.subscription_status);
+    apiFetch("/api/dashboard/overview")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setData(d);
       })
       .catch(() => {});
   }, []);
 
-  const isSubscribed =
-    subscriptionStatus === "active" && !!subscriptionPlan;
-
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const status = data?.subscription_status ?? "trial";
+  const plan = data?.subscription_plan ?? null;
+  const isActive = status === "active" && !!plan;
+  const isPastDue = status === "past_due";
+  const isCanceled = status === "canceled";
+  const trialDaysLeft = data?.trial_days_left ?? null;
+  const periodEnd =
+    data?.subscription_ends_at ||
+    data?.trial_ends_at ||
+    null;
 
   async function handleCheckout(plan: PlanType) {
     setLoading(plan);
@@ -78,180 +121,329 @@ export default function BillingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const d = await res.json();
+      if (d.url) {
+        window.location.href = d.url;
       } else {
-        setCheckoutError(data.error || "Unable to start checkout. Please try again.");
+        setCheckoutError(d.error || "Unable to start checkout. Please try again.");
         setLoading(null);
       }
     } catch {
-      setCheckoutError("Unable to reach payment server. Check your connection and try again.");
+      setCheckoutError(
+        "Unable to reach payment server. Check your connection and try again.",
+      );
       setLoading(null);
     }
   }
 
   async function handlePortal() {
-    setLoading("monthly"); // reuse loading state
+    setPortalLoading(true);
     try {
-      const res = await fetch("/api/stripe/portal", {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const res = await fetch("/api/stripe/portal", { method: "POST" });
+      const d = await res.json();
+      if (d.url) {
+        window.location.href = d.url;
       } else {
-        console.error("Portal error:", data.error);
-        setLoading(null);
+        setCheckoutError(d.error || "Unable to open billing portal.");
+        setPortalLoading(false);
       }
-    } catch (err) {
-      console.error("Portal error:", err);
-      setLoading(null);
+    } catch {
+      setCheckoutError("Unable to reach billing portal.");
+      setPortalLoading(false);
     }
   }
 
+  const statusBadge = (() => {
+    if (isActive) {
+      return {
+        label: "ACTIVE",
+        className: "border-green-500/30 bg-green-500/10 text-green-400",
+        icon: <CheckCircle2 className="h-3 w-3" />,
+      };
+    }
+    if (isPastDue) {
+      return {
+        label: "PAST DUE",
+        className: "border-red-500/30 bg-red-500/10 text-red-400",
+        icon: <AlertTriangle className="h-3 w-3" />,
+      };
+    }
+    if (isCanceled) {
+      return {
+        label: "CANCELED",
+        className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
+        icon: <Clock className="h-3 w-3" />,
+      };
+    }
+    return {
+      label: `TRIAL${trialDaysLeft != null ? ` · ${trialDaysLeft}d left` : ""}`,
+      className: "border-accent-teal/30 bg-accent-teal/10 text-accent-teal",
+      icon: <Sparkles className="h-3 w-3" />,
+    };
+  })();
+
   return (
-    <div className="p-5">
+    <div className="flex min-h-full flex-col p-5">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-primary">BILLING</h2>
-        <p className="mt-1 text-xs text-text-secondary">
-          Manage your subscription and billing details
-        </p>
-      </div>
-
-      {/* Current Status */}
-      <div className="mb-6 border border-white/[0.10] bg-bg-card p-5">
-        <div className="flex items-center gap-3">
-          <CreditCard size={20} className="text-accent-teal" />
-          <div>
-            <p className="text-[13px] font-medium text-white">
-              {isSubscribed
-                ? `${subscriptionPlan === "annual" ? "Annual" : "Monthly"} Plan`
-                : "Free Trial"}
-            </p>
-            <p className="text-[12px] text-text-secondary">
-              {isSubscribed
-                ? "Your subscription is active"
-                : "7 days remaining in your trial"}
-            </p>
-          </div>
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
+            BILLING
+          </h2>
+          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+            Subscription + usage
+          </p>
         </div>
-        {isSubscribed && (
-          <button
-            onClick={handlePortal}
-            className="mt-4 border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white transition-all duration-150 hover:bg-white/[0.08]"
-          >
-            Manage Subscription
-          </button>
-        )}
+        <span
+          className={`flex items-center gap-1.5 border px-2 py-1 text-[9px] font-bold uppercase tracking-wider ${statusBadge.className}`}
+        >
+          {statusBadge.icon}
+          {statusBadge.label}
+        </span>
       </div>
 
-      {/* Checkout Error */}
+      <div className="mt-3 h-px bg-border" />
+
+      {/* Status strip: plan + renewal + actions */}
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div className="border border-white/[0.06] bg-card px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Current Plan
+          </p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <CreditCard className="h-4 w-4 shrink-0 text-accent-teal" />
+            <span className="text-[15px] font-bold text-foreground">
+              {isActive
+                ? plan === "annual"
+                  ? "Annual · $120/yr"
+                  : "Monthly · $15/mo"
+                : isCanceled
+                  ? "Canceled"
+                  : "Free Trial"}
+            </span>
+          </div>
+          {isActive && plan === "annual" && (
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              Effective $10/mo billed annually
+            </p>
+          )}
+        </div>
+
+        <div className="border border-white/[0.06] bg-card px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            {isActive ? "Renews" : "Trial Ends"}
+          </p>
+          <p className="mt-1 font-mono text-lg font-bold tabular-nums text-foreground">
+            {periodEnd ? formatDate(periodEnd) : "—"}
+          </p>
+          {trialDaysLeft != null && status === "trial" && (
+            <p
+              className={`mt-0.5 text-[10px] ${
+                trialDaysLeft <= 2
+                  ? "text-accent-amber"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {trialDaysLeft} {trialDaysLeft === 1 ? "day" : "days"} remaining
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col border border-white/[0.06] bg-card px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Manage
+          </p>
+          {isActive || data?.has_stripe_customer ? (
+            <button
+              onClick={handlePortal}
+              disabled={portalLoading}
+              className="mt-1 flex items-center justify-center gap-1.5 border border-white/[0.12] bg-muted py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground transition-colors hover:bg-white/[0.08] disabled:opacity-50"
+            >
+              {portalLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <CreditCard className="h-3 w-3" />
+              )}
+              Stripe Portal
+            </button>
+          ) : (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Start a subscription to open the billing portal.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Error */}
       {checkoutError && (
-        <div className="mb-4 border border-accent-amber/20 bg-accent-amber/5 p-4">
-          <p className="text-sm font-medium text-accent-amber">{checkoutError}</p>
+        <div className="mt-3 flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
+          <p className="text-[11px] text-amber-400">{checkoutError}</p>
         </div>
       )}
 
-      {/* Pricing Cards */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-accent-teal" />
-          <h3 className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
-            Choose Your Plan
-          </h3>
+      {/* Usage strip */}
+      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Discovered
+          </p>
+          <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-foreground">
+            {data?.stats.contacts ?? 0}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            total contacts
+          </p>
+        </div>
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Warm Signals
+          </p>
+          <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-accent-green">
+            {data?.ratings.high_value ?? 0}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            hot + warm
+          </p>
+        </div>
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            In Pipeline
+          </p>
+          <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-accent-teal">
+            {data?.pipeline_total ?? 0}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            active outreach
+          </p>
+        </div>
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Referrals
+          </p>
+          <p className="mt-0.5 flex items-baseline gap-1 font-mono text-lg font-bold tabular-nums text-accent-blue">
+            <Users className="h-3 w-3" />
+            {data?.referral_count ?? 0}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            signed up from your link
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {PLANS.map((plan) => {
-          const isCurrentPlan =
-            isSubscribed && subscriptionPlan === plan.id;
-          const isLoading = loading === plan.id;
+      {/* Past due banner */}
+      {isPastDue && (
+        <div className="mt-3 flex items-center gap-2 border border-red-500/30 bg-red-500/5 px-3 py-2">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-red-400" />
+          <p className="flex-1 text-[11px] text-red-400">
+            Your last payment failed. Update your card in the Stripe portal to
+            keep access.
+          </p>
+          <button
+            onClick={handlePortal}
+            className="border border-red-500/30 bg-red-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/20"
+          >
+            Update Card
+          </button>
+        </div>
+      )}
+
+      {/* Pricing cards */}
+      <div className="mt-4 flex items-center gap-2">
+        <Sparkles className="h-3 w-3 text-accent-teal" />
+        <h3 className="text-[10px] font-bold uppercase tracking-wider text-accent-teal">
+          {isActive ? "Change Plan" : "Choose Your Plan"}
+        </h3>
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+        {PLANS.map((p) => {
+          const isCurrentPlan = isActive && plan === p.id;
+          const isLoading = loading === p.id;
+          const isAnnual = p.id === "annual";
 
           return (
             <div
-              key={plan.id}
-              className={`relative border bg-bg-card p-6 transition-all duration-150 ${
-                plan.id === "annual"
-                  ? "border-accent-teal/40 shadow-[0_0_30px_-5px_rgba(14,165,233,0.15)]"
-                  : "border-white/[0.10]"
+              key={p.id}
+              className={`relative flex flex-col border bg-card ${
+                isAnnual
+                  ? "border-accent-teal/40 shadow-[0_0_20px_-4px_rgba(14,165,233,0.15)]"
+                  : "border-white/[0.08]"
               }`}
             >
-              {/* Badges */}
-              <div className="absolute right-4 top-4 flex flex-col items-end gap-1.5">
-                {plan.trialBadge && (
-                  <span className="bg-accent-teal px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-                    {plan.trialBadge}
-                  </span>
-                )}
-                {plan.badge && (
-                  <span className={`px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider ${plan.id === "annual" ? "bg-accent-teal/15 font-bold text-accent-teal" : "border border-white/[0.10] text-text-muted"}`}>
-                    {plan.badge}
-                  </span>
-                )}
-              </div>
-
-              <h4 className="text-[13px] font-medium uppercase tracking-wider text-text-muted">
-                {plan.name}
-              </h4>
-
-              <div className="mt-3 flex items-end gap-1.5">
-                <span className="font-mono text-4xl font-bold text-white">
-                  {plan.price}
-                </span>
-                <span className="mb-1 text-sm text-text-secondary">
-                  /{plan.id === "annual" ? "yr" : "mo"}
-                </span>
-              </div>
-
-              {plan.id === "annual" && (
-                <p className="mt-1 text-[12px] text-accent-teal">
-                  {plan.perMonth} billed annually
-                </p>
+              {p.trialBadge && (
+                <div className="absolute right-3 top-3 bg-accent-teal px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                  {p.trialBadge}
+                </div>
               )}
 
-              <ul className="mt-5 space-y-2.5">
-                {plan.features.map((feature) => (
+              <div className="border-b border-white/[0.06] px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {p.name}
+                </p>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="font-mono text-3xl font-bold text-foreground">
+                    {p.price}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    /{isAnnual ? "yr" : "mo"}
+                  </span>
+                  {p.badge && (
+                    <span
+                      className={`ml-auto px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        isAnnual
+                          ? "bg-accent-teal/15 text-accent-teal"
+                          : "border border-white/[0.1] text-muted-foreground"
+                      }`}
+                    >
+                      {p.badge}
+                    </span>
+                  )}
+                </div>
+                {isAnnual && (
+                  <p className="mt-0.5 text-[10px] text-accent-teal">
+                    {p.perMonth} billed annually
+                  </p>
+                )}
+              </div>
+
+              <ul className="flex-1 space-y-1.5 px-4 py-3">
+                {p.features.map((f) => (
                   <li
-                    key={feature}
-                    className="flex items-center gap-2.5 text-[13px] text-text-secondary"
+                    key={f}
+                    className="flex items-center gap-2 text-[12px] text-muted-foreground"
                   >
-                    <Check
-                      size={14}
-                      className="shrink-0 text-accent-teal"
-                    />
-                    {feature}
+                    <Check className="h-3 w-3 shrink-0 text-accent-teal" />
+                    {f}
                   </li>
                 ))}
               </ul>
 
-              <div className="mt-6">
+              <div className="border-t border-white/[0.06] px-4 py-3">
                 <button
                   onClick={() =>
-                    isCurrentPlan ? handlePortal() : handleCheckout(plan.id)
+                    isCurrentPlan ? handlePortal() : handleCheckout(p.id)
                   }
-                  disabled={isLoading}
-                  className={`flex w-full items-center justify-center gap-2 py-3 text-[13px] font-semibold transition-all duration-150 ${
+                  disabled={isLoading || (isCurrentPlan && portalLoading)}
+                  className={`flex w-full items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${
                     isCurrentPlan
-                      ? "border border-white/[0.10] bg-white/[0.04] text-text-secondary"
-                      : plan.id === "annual"
-                        ? "bg-accent-teal text-white hover:bg-accent-teal/90"
+                      ? "border border-white/[0.12] bg-muted text-muted-foreground"
+                      : isAnnual
+                        ? "bg-accent-teal text-white hover:bg-accent-teal/80"
                         : "border border-accent-teal/40 text-accent-teal hover:bg-accent-teal/10"
                   }`}
                 >
                   {isLoading ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : isCurrentPlan ? (
                     "Current Plan"
                   ) : (
-                    plan.buttonText
+                    p.buttonText
                   )}
                 </button>
-                {plan.buttonSubtext && !isCurrentPlan && (
-                  <p className="mt-1.5 text-center text-[11px] text-text-muted">
-                    {plan.buttonSubtext}
+                {p.buttonSubtext && !isCurrentPlan && (
+                  <p className="mt-1 text-center text-[10px] text-muted-foreground">
+                    {p.buttonSubtext}
                   </p>
                 )}
               </div>
@@ -260,13 +452,13 @@ export default function BillingPage() {
         })}
       </div>
 
-      {/* FAQ / Note */}
-      <div className="mt-6 border border-white/[0.06] bg-bg-card p-5">
-        <p className="text-[12px] text-text-muted leading-relaxed">
-          The annual plan includes a 7-day free trial — you won&apos;t be
-          charged until your trial ends. The monthly plan is charged
-          immediately. Cancel anytime from the billing portal. Payments are
-          securely processed by Stripe.
+      {/* Fine print */}
+      <div className="mt-3 border border-white/[0.06] bg-card px-4 py-3">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          The annual plan includes a 7-day free trial. You won&apos;t be charged
+          until the trial ends. The monthly plan is charged immediately. Cancel
+          anytime from the Stripe portal. Payments are securely processed by
+          Stripe.
         </p>
       </div>
     </div>
