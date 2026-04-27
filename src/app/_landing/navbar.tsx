@@ -54,7 +54,7 @@ export function Navbar() {
       </div>
       <div className="flex items-center gap-4">
         <motion.a
-          href="/api/auth/signin"
+          href="/api/auth/signin/google?callbackUrl=%2Fdashboard"
           className="text-sm font-medium transition-colors"
           style={{
             color: useTransform(scrolled, (v) =>
