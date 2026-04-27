@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/get-user";
 import { scrapeAllDepartments } from "@/lib/professors/scraper";
 import { classifyBatch } from "@/lib/professors/classifier";
+import { requireSubscription } from "@/lib/subscription";
 
 // ── Event taxonomy ──────────────────────────────────────────────────
 
@@ -55,6 +56,9 @@ export async function POST(request: NextRequest) {
   if (!userId || userId === "anonymous") {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  const gate = await requireSubscription(userId);
+  if (gate) return gate;
 
   // ── Streaming pipeline ──────────────────────────────────────────────
   const stream = new ReadableStream<Uint8Array>({

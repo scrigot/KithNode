@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs, type UserPrefs } from "@/lib/user-prefs";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { requireSubscription } from "@/lib/subscription";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -47,16 +48,22 @@ function getPlaceholderDraft(
           : "shared connection";
 
   return {
-    subject: `Quick coffee chat — ${userMascot} reaching out`,
+    subject: `Quick coffee chat, ${userMascot} reaching out`,
     body: `Hi ${contactName.split(" ")[0]},\n\nI'm a student at ${userSchool} and came across your profile through our ${warmHook}. Your work really stood out to me, and I'd love to hear about your experience.\n\nWould you have 15 minutes for a quick coffee chat sometime in the next couple weeks? I'd be grateful for any insight you could share.\n\nThanks so much,\n${senderFirstName}`,
   };
 }
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  const userEmail = session?.user?.email || "";
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userEmail = session.user.email;
   const senderFullName = session?.user?.name || "";
   const senderFirstName = senderFullName.split(" ")[0] || "Me";
+
+  const gate = await requireSubscription(userEmail);
+  if (gate) return gate;
 
   const prefs = await getUserPrefs(userEmail);
 
@@ -117,7 +124,7 @@ ${userGreek ? `- Member of ${userGreek}` : ""}
 
 TONE REQUIREMENTS:
 - Authentic and warm, NOT spammy or templated
-- Concise — max 150 words for the body
+- Concise, max 150 words for the body
 - Reference the specific warm connection if one exists (e.g., "fellow ${userMascot}"${userGreek ? `, "${userGreek} brother"` : ""})
 - Humble and curious, not presumptuous
 - Clear ask: 15-minute coffee chat / virtual call
@@ -144,7 +151,7 @@ The subject should be casual and warm, under 60 characters. The body should feel
         draft = parsed.body || "";
       }
     } catch {
-      subject = `Coffee chat — ${warmConnections || "reaching out"}`;
+      subject = `Coffee chat, ${warmConnections || "reaching out"}`;
       draft = text;
     }
 

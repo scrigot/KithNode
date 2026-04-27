@@ -29,6 +29,7 @@ import { detectSignals } from "@/lib/discover/signal-detector";
 import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
 import { seedsForIndustries, seedsForSchool } from "@/lib/discover/seeds";
+import { requireSubscription } from "@/lib/subscription";
 
 function dedupeSeeds(seeds: import("@/lib/discover/seeds").FirmSeed[]) {
   const seen = new Set<string>();
@@ -104,6 +105,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const userId = session.user.email;
+
+  const gate = await requireSubscription(userId);
+  if (gate) return gate;
 
   const body = (await request.json().catch(() => ({}))) as DiscoverRunBody;
   const mode: "quick" | "deep" = body.mode === "deep" ? "deep" : "quick";

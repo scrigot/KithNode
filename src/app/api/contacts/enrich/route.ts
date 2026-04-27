@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
+import { requireSubscription } from "@/lib/subscription";
 
 const BATCH_LIMIT = 25;
 
@@ -77,6 +78,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.email;
+
+  const gate = await requireSubscription(userId);
+  if (gate) return gate;
 
   try {
     const body = await req.json().catch(() => ({}));
