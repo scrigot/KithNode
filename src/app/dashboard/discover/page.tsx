@@ -459,7 +459,11 @@ export default function DiscoverPage() {
       const ct = res.headers.get("content-type") || "";
       if (!res.ok || !ct.includes("application/x-ndjson")) {
         const data = await res.json().catch(() => ({}));
-        setDiscoverError(data.message || data.error || `HTTP ${res.status}`);
+        if (res.status === 402) {
+          setDiscoverError("UPGRADE_REQUIRED");
+        } else {
+          setDiscoverError(data.message || data.error || `HTTP ${res.status}`);
+        }
         setDiscoverLoading(false);
         discoverAbortRef.current = null;
         return;
@@ -604,7 +608,11 @@ export default function DiscoverPage() {
       const ct = res.headers.get("content-type") || "";
       if (!res.ok || !ct.includes("application/x-ndjson")) {
         const data = await res.json().catch(() => ({}));
-        setSeedError(data.message || data.error || `HTTP ${res.status}`);
+        if (res.status === 402) {
+          setSeedError("UPGRADE_REQUIRED");
+        } else {
+          setSeedError(data.message || data.error || `HTTP ${res.status}`);
+        }
         setSeedLoading(false);
         seedAbortRef.current = null;
         return;
@@ -1094,7 +1102,17 @@ export default function DiscoverPage() {
                   Status
                 </p>
                 <p className="text-[12px] text-foreground">
-                  {seedError ? (
+                  {seedError === "UPGRADE_REQUIRED" ? (
+                    <span className="text-accent-teal">
+                      Seed Professors is a Pro feature.{" "}
+                      <a
+                        href="/dashboard/billing"
+                        className="font-bold uppercase tracking-wider hover:underline"
+                      >
+                        Upgrade →
+                      </a>
+                    </span>
+                  ) : seedError ? (
                     <span className="text-red-400">{seedError}</span>
                   ) : (
                     seedMessage || "-"
@@ -1188,7 +1206,17 @@ export default function DiscoverPage() {
                   Status
                 </p>
                 <p className="text-[12px] text-foreground">
-                  {discoverError ? (
+                  {discoverError === "UPGRADE_REQUIRED" ? (
+                    <span className="text-accent-teal">
+                      Discover is a Pro feature.{" "}
+                      <a
+                        href="/dashboard/billing"
+                        className="font-bold uppercase tracking-wider hover:underline"
+                      >
+                        Upgrade →
+                      </a>
+                    </span>
+                  ) : discoverError ? (
                     <span className="text-red-400">{discoverError}</span>
                   ) : (
                     discoverMessage || "-"

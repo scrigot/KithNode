@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -17,6 +17,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -28,13 +29,40 @@ const NAV_ITEMS = [
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
+function SubBadge({
+  status,
+  trialDaysLeft,
+}: {
+  status: string | null;
+  trialDaysLeft: number | null;
+}) {
+  if (!status || status === "active") return null;
+  const isTrial = status === "trial" && trialDaysLeft != null && trialDaysLeft > 0;
+  const label = isTrial ? `TRIAL · ${trialDaysLeft}d` : "FREE TIER";
+  const className = isTrial
+    ? "border-accent-teal/30 bg-accent-teal/10 text-accent-teal"
+    : "border-amber-500/30 bg-amber-500/10 text-amber-400";
+  return (
+    <Link
+      href="/dashboard/billing"
+      className={`mt-0.5 inline-flex w-fit items-center border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider transition-colors hover:opacity-80 ${className}`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 function NavContent({
   pathname,
   userName,
+  subscriptionStatus,
+  trialDaysLeft,
   onNavClick,
 }: {
   pathname: string;
   userName: string;
+  subscriptionStatus: string | null;
+  trialDaysLeft: number | null;
   onNavClick?: () => void;
 }) {
   const initials =
@@ -106,6 +134,7 @@ function NavContent({
           </div>
           <div className="flex-1 min-w-0">
             <p className="truncate text-[12px] font-medium text-white">{userName}</p>
+            <SubBadge status={subscriptionStatus} trialDaysLeft={trialDaysLeft} />
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               className="flex items-center gap-1 text-[11px] text-text-muted hover:text-accent-red transition-colors duration-150"
@@ -123,15 +152,37 @@ function NavContent({
 export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/dashboard/overview")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        setSubscriptionStatus(d.subscription_status ?? null);
+        setTrialDaysLeft(d.trial_days_left ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
-      {/* Desktop sidebar — hidden below lg */}
+      {/* Desktop sidebar: hidden below lg */}
       <aside className="hidden lg:flex w-[220px] flex-col border-r border-white/[0.06] bg-bg-secondary">
-        <NavContent pathname={pathname} userName={userName} />
+        <NavContent
+          pathname={pathname}
+          userName={userName}
+          subscriptionStatus={subscriptionStatus}
+          trialDaysLeft={trialDaysLeft}
+        />
       </aside>
 
-      {/* Mobile top bar — visible below lg */}
+      {/* Mobile top bar: visible below lg */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-white/[0.06] bg-bg-secondary px-4 py-3">
         <h1 className="font-heading text-lg font-bold tracking-tight text-white">
           Kith<span className="text-accent-teal">Node</span>
@@ -172,6 +223,8 @@ export function Sidebar({ userName }: { userName: string }) {
         <NavContent
           pathname={pathname}
           userName={userName}
+          subscriptionStatus={subscriptionStatus}
+          trialDaysLeft={trialDaysLeft}
           onNavClick={() => setOpen(false)}
         />
       </aside>

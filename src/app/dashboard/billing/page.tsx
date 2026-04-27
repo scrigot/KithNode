@@ -107,6 +107,11 @@ export default function BillingPage() {
   const isPastDue = status === "past_due";
   const isCanceled = status === "canceled";
   const trialDaysLeft = data?.trial_days_left ?? null;
+  const isFreeTier =
+    !isActive &&
+    !isPastDue &&
+    !isCanceled &&
+    !(status === "trial" && trialDaysLeft != null && trialDaysLeft > 0);
   const periodEnd =
     data?.subscription_ends_at ||
     data?.trial_ends_at ||
@@ -172,6 +177,13 @@ export default function BillingPage() {
       return {
         label: "CANCELED",
         className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
+        icon: <Clock className="h-3 w-3" />,
+      };
+    }
+    if (isFreeTier) {
+      return {
+        label: "FREE TIER",
+        className: "border-amber-500/30 bg-amber-500/10 text-amber-400",
         icon: <Clock className="h-3 w-3" />,
       };
     }

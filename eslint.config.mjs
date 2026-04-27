@@ -28,8 +28,11 @@ export default [
         window: "readonly",
         navigator: "readonly",
         setTimeout: "readonly",
+        clearTimeout: "readonly",
         URLSearchParams: "readonly",
         RequestInit: "readonly",
+        Event: "readonly",
+        CustomEvent: "readonly",
       },
     },
     rules: {

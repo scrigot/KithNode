@@ -17,7 +17,7 @@ export default function ContactsPage() {
   const [rescoring, setRescoring] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{
-    kind: "success" | "error";
+    kind: "success" | "error" | "upgrade";
     text: string;
   } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,6 +75,13 @@ export default function ContactsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
+      if (res.status === 402) {
+        setStatusMsg({
+          kind: "upgrade",
+          text: "Enrich is a Pro feature. Upgrade to use it.",
+        });
+        return;
+      }
       if (!res.ok) throw new Error("Enrich failed");
       const data = await res.json();
       const failedSuffix = data.failed > 0 ? ` (${data.failed} failed)` : "";
@@ -175,10 +182,22 @@ export default function ContactsPage() {
       {statusMsg && (
         <p
           className={`mt-2 text-[11px] ${
-            statusMsg.kind === "error" ? "text-red-400" : "text-green-400"
+            statusMsg.kind === "error"
+              ? "text-red-400"
+              : statusMsg.kind === "upgrade"
+                ? "text-accent-teal"
+                : "text-green-400"
           }`}
         >
           {statusMsg.text}
+          {statusMsg.kind === "upgrade" && (
+            <a
+              href="/dashboard/billing"
+              className="ml-2 font-bold uppercase tracking-wider text-accent-teal hover:underline"
+            >
+              Upgrade →
+            </a>
+          )}
         </p>
       )}
 

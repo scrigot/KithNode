@@ -83,6 +83,7 @@ function DraftModal({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [upgradeRequired, setUpgradeRequired] = useState(false);
   const [copied, setCopied] = useState<"subject" | "body" | null>(null);
 
   useEffect(() => {
@@ -94,6 +95,10 @@ function DraftModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contact_id: contact.id }),
         });
+        if (res.status === 402) {
+          if (!cancelled) setUpgradeRequired(true);
+          return;
+        }
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           if (!cancelled) setError(data.error || data.detail || `HTTP ${res.status}`);
@@ -150,7 +155,24 @@ function DraftModal({
           </div>
         )}
 
-        {!loading && error && (
+        {!loading && upgradeRequired && (
+          <div className="px-5 py-6 text-center">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-accent-teal">
+              Pro Feature
+            </p>
+            <p className="mt-2 text-[13px] text-foreground">
+              AI outreach drafts require a KithNode Pro subscription.
+            </p>
+            <a
+              href="/dashboard/billing"
+              className="mt-3 inline-block border border-accent-teal bg-accent-teal/10 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-accent-teal hover:bg-accent-teal hover:text-white"
+            >
+              View Plans →
+            </a>
+          </div>
+        )}
+
+        {!loading && !upgradeRequired && error && (
           <div className="px-5 py-5">
             <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">
               Error
@@ -159,7 +181,7 @@ function DraftModal({
           </div>
         )}
 
-        {!loading && !error && (
+        {!loading && !upgradeRequired && !error && (
           <div className="space-y-4 px-5 py-5">
             <div>
               <div className="flex items-center justify-between">
