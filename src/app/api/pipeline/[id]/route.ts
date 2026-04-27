@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 
 const STAGES = [
   "researched",
@@ -11,13 +11,18 @@ const STAGES = [
   "meeting_set",
 ];
 
-/** POST — Add a contact to the pipeline (idempotent) */
+/** POST: Add a contact to the pipeline (idempotent) */
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
   const { id: contactId } = await params;
-  const userId = await getUserId();
 
   try {
     // Check if already in pipeline for this user
@@ -66,13 +71,18 @@ export async function POST(
   }
 }
 
-/** PATCH — Advance a contact to the next stage (or set a specific stage) */
+/** PATCH: Advance a contact to the next stage (or set a specific stage) */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
   const { id: contactId } = await params;
-  const userId = await getUserId();
 
   try {
     const body = await request.json();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
+import { findWarmPaths } from "@/lib/warm-paths";
 
 const STAGES = [
   "researched",
@@ -12,9 +13,13 @@ const STAGES = [
 ];
 
 export async function GET() {
-  try {
-    const userId = await getUserId();
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
 
+  try {
     // Fetch pipeline entries for current user
     const { data: entries, error: entryError } = await supabase
       .from("PipelineEntry")
@@ -57,11 +62,15 @@ export async function GET() {
       notes: string;
       added_at: string;
       affiliations: string[];
+      warmPaths: Array<{ intermediaryName: string; intermediaryRelation: string; firmName: string; title: string }>;
     }>> = {};
 
     for (const stage of STAGES) {
       grouped[stage] = [];
     }
+
+    // Pre-fetch warm paths per unique firm (cache by normalized firm name)
+    const firmPathCache = new Map<string, Awaited<ReturnType<typeof findWarmPaths>>>();
 
     for (const entry of entries) {
       const contact = contactMap.get(entry.contactId);
@@ -69,6 +78,12 @@ export async function GET() {
 
       const stage = (entry.stage || "researched").toLowerCase();
       if (!grouped[stage]) grouped[stage] = [];
+
+      let warmPaths = firmPathCache.get(contact.firmName || "");
+      if (warmPaths === undefined) {
+        warmPaths = await findWarmPaths(userId, contact.firmName || "");
+        firmPathCache.set(contact.firmName || "", warmPaths);
+      }
 
       grouped[stage].push({
         id: contact.id,
@@ -87,6 +102,7 @@ export async function GET() {
         affiliations: contact.affiliations
           ? contact.affiliations.split(",").map((a: string) => a.trim()).filter(Boolean)
           : [],
+        warmPaths: warmPaths.filter((wp) => wp.intermediaryName !== contact.name),
       });
     }
 

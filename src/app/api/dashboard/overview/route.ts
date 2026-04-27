@@ -1,33 +1,59 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
+
+interface RecentActivity {
+  type: "rate" | "pipeline_add" | "pipeline_move";
+  contactId: string;
+  contactName: string;
+  firmName: string;
+  detail: string;
+  timestamp: string;
+}
+
+interface OverdueContact {
+  contactId: string;
+  contactName: string;
+  firmName: string;
+  stage: string;
+  days: number;
+}
+
+interface TopUnrated {
+  contactId: string;
+  contactName: string;
+  firmName: string;
+  score: number;
+  tier: string;
+  hasWarmPath: boolean;
+}
 
 export async function GET() {
-  try {
-    const userId = await getUserId();
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
 
-    // Start of current week (Monday 00:00 UTC)
+  try {
     const now = new Date();
-    const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const dayOfWeek = now.getUTCDay();
     const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const weekStart = new Date(now);
     weekStart.setUTCDate(now.getUTCDate() - daysFromMonday);
     weekStart.setUTCHours(0, 0, 0, 0);
 
-    // Total contacts (this user's only)
     const { count: totalContacts } = await supabase
       .from("AlumniContact")
       .select("*", { count: "exact", head: true })
       .eq("importedByUserId", userId);
 
-    // High-value (hot + warm tier) contacts
     const { count: highValue } = await supabase
       .from("AlumniContact")
       .select("*", { count: "exact", head: true })
       .eq("importedByUserId", userId)
       .in("tier", ["hot", "warm"]);
 
-    // Average warmth score
     const { data: scoreData } = await supabase
       .from("AlumniContact")
       .select("warmthScore")
@@ -45,10 +71,11 @@ export async function GET() {
       }
     }
 
-    // Pipeline counts
     const { data: pipelineEntries } = await supabase
       .from("PipelineEntry")
-      .select("stage");
+      .select("*")
+      .eq("userId", userId)
+      .order("addedAt", { ascending: false });
 
     const pipelineTotal = pipelineEntries?.length || 0;
     const pipelineByStage: Record<string, number> = {};
@@ -57,23 +84,152 @@ export async function GET() {
       pipelineByStage[stage] = (pipelineByStage[stage] || 0) + 1;
     }
 
-    // Reminders / action needed (pipeline contacts older than 7 days without stage change)
-    const { count: remindersCount } = await supabase
-      .from("PipelineEntry")
-      .select("*", { count: "exact", head: true })
-      .lt("updatedAt", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+    // Response rate: responded + meeting_set / total
+    const respondedCount =
+      (pipelineByStage["responded"] || 0) + (pipelineByStage["meeting_set"] || 0);
+    const responseRate =
+      pipelineTotal > 0 ? Math.round((respondedCount / pipelineTotal) * 100) : 0;
 
-    // Recruiting date + weekly goal target + subscription info from User row
+    // Overdue list: pipeline entries >=7 days not in responded/meeting_set
+    const overdueEntries = (pipelineEntries || []).filter((e) => {
+      const stage = (e.stage || "researched").toLowerCase();
+      if (stage === "responded" || stage === "meeting_set") return false;
+      const days =
+        (Date.now() - new Date(e.addedAt || Date.now()).getTime()) / 86_400_000;
+      return days >= 7;
+    });
+
+    const remindersCount = overdueEntries.length;
+
+    const topOverdueIds = overdueEntries
+      .map((e) => ({
+        id: e.contactId,
+        stage: (e.stage || "researched").toLowerCase(),
+        days: Math.floor(
+          (Date.now() - new Date(e.addedAt || Date.now()).getTime()) /
+            86_400_000,
+        ),
+      }))
+      .sort((a, b) => b.days - a.days)
+      .slice(0, 5);
+
+    let topOverdue: OverdueContact[] = [];
+    if (topOverdueIds.length > 0) {
+      const { data: overdueContacts } = await supabase
+        .from("AlumniContact")
+        .select("id, name, firmName")
+        .in(
+          "id",
+          topOverdueIds.map((e) => e.id),
+        );
+      topOverdue = topOverdueIds
+        .map((e) => {
+          const c = (overdueContacts || []).find((x) => x.id === e.id);
+          if (!c) return null;
+          return {
+            contactId: c.id,
+            contactName: c.name || "",
+            firmName: c.firmName || "",
+            stage: e.stage,
+            days: e.days,
+          };
+        })
+        .filter((x): x is OverdueContact => x !== null);
+    }
+
+    // Recent activity: last 5 rates + last 5 pipeline entries
+    const { data: recentRatings } = await supabase
+      .from("UserDiscover")
+      .select("contactId, rating, createdAt")
+      .eq("userId", userId)
+      .order("createdAt", { ascending: false })
+      .limit(5);
+
+    const recentPipeline = (pipelineEntries || []).slice(0, 5);
+
+    const activityContactIds = new Set<string>();
+    for (const r of recentRatings || []) activityContactIds.add(r.contactId);
+    for (const p of recentPipeline) activityContactIds.add(p.contactId);
+
+    let activityContacts: Array<{ id: string; name: string; firmName: string }> = [];
+    if (activityContactIds.size > 0) {
+      const { data } = await supabase
+        .from("AlumniContact")
+        .select("id, name, firmName")
+        .in("id", Array.from(activityContactIds));
+      activityContacts = data || [];
+    }
+
+    const activity: RecentActivity[] = [];
+    for (const r of recentRatings || []) {
+      const c = activityContacts.find((x) => x.id === r.contactId);
+      if (!c) continue;
+      activity.push({
+        type: "rate",
+        contactId: c.id,
+        contactName: c.name,
+        firmName: c.firmName,
+        detail: r.rating === "high_value" ? "rated high value" : "skipped",
+        timestamp: r.createdAt || new Date().toISOString(),
+      });
+    }
+    for (const p of recentPipeline) {
+      const c = activityContacts.find((x) => x.id === p.contactId);
+      if (!c) continue;
+      activity.push({
+        type: "pipeline_add",
+        contactId: c.id,
+        contactName: c.name,
+        firmName: c.firmName,
+        detail: `added to ${(p.stage || "researched").toLowerCase()}`,
+        timestamp: p.addedAt || new Date().toISOString(),
+      });
+    }
+    activity.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+    const recentActivity = activity.slice(0, 8);
+
+    // Top unrated by warmth
+    const { data: ratedIds } = await supabase
+      .from("UserDiscover")
+      .select("contactId")
+      .eq("userId", userId);
+    const ratedSet = new Set((ratedIds || []).map((r) => r.contactId));
+
+    const { data: unratedTop } = await supabase
+      .from("AlumniContact")
+      .select("id, name, firmName, warmthScore, tier")
+      .eq("importedByUserId", userId)
+      .order("warmthScore", { ascending: false })
+      .limit(30);
+
+    const topUnrated: TopUnrated[] = (unratedTop || [])
+      .filter((c) => !ratedSet.has(c.id))
+      .slice(0, 5)
+      .map((c) => ({
+        contactId: c.id,
+        contactName: c.name || "",
+        firmName: c.firmName || "",
+        score: c.warmthScore || 0,
+        tier: c.tier || "cold",
+        hasWarmPath: false,
+      }));
+
     const { data: userRow } = await supabase
       .from("User")
-      .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, trialEndsAt")
+      .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
       .eq("id", userId)
       .single();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
     const weeklyGoalTarget: number = userRow?.weeklyGoalTarget ?? 3;
     const subscriptionStatus: string = userRow?.subscriptionStatus ?? "trial";
+    const subscriptionPlan: string | null = userRow?.subscriptionPlan ?? null;
     const trialEndsAt: string | null = userRow?.trialEndsAt ?? null;
+    const subscriptionEndsAt: string | null = userRow?.subscriptionEndsAt ?? null;
+    const hasStripeCustomer = !!userRow?.stripeCustomerId;
 
     let trialDaysLeft: number | null = null;
     if (subscriptionStatus === "trial" && trialEndsAt) {
@@ -87,7 +243,6 @@ export async function GET() {
       daysUntilRecruiting = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
     }
 
-    // Weekly goal done: pipeline entries with outreach stages added this week
     const { count: weeklyGoalDone } = await supabase
       .from("PipelineEntry")
       .select("*", { count: "exact", head: true })
@@ -95,7 +250,6 @@ export async function GET() {
       .in("stage", ["EMAIL_SENT", "FOLLOW_UP", "RESPONDED", "MEETING_SET"])
       .gte("addedAt", weekStart.toISOString());
 
-    // Referral count: look up this user's waitlist ref_code, then count signups that used it
     let referralCount = 0;
     const { data: waitlistRow } = await supabase
       .from("waitlist_signups")
@@ -121,12 +275,20 @@ export async function GET() {
       avg_warmth: avgWarmth,
       pipeline_total: pipelineTotal,
       pipeline_by_stage: pipelineByStage,
-      reminders_count: remindersCount || 0,
+      response_rate: responseRate,
+      reminders_count: remindersCount,
+      top_overdue: topOverdue,
+      top_unrated: topUnrated,
+      recent_activity: recentActivity,
       recruiting_date: recruitingDate,
       days_until_recruiting: daysUntilRecruiting,
       weekly_goal_done: weeklyGoalDone || 0,
       weekly_goal_target: weeklyGoalTarget,
       subscription_status: subscriptionStatus,
+      subscription_plan: subscriptionPlan,
+      subscription_ends_at: subscriptionEndsAt,
+      trial_ends_at: trialEndsAt,
+      has_stripe_customer: hasStripeCustomer,
       trial_days_left: trialDaysLeft,
       referral_count: referralCount,
     });
@@ -137,7 +299,11 @@ export async function GET() {
       avg_warmth: 0,
       pipeline_total: 0,
       pipeline_by_stage: {},
+      response_rate: 0,
       reminders_count: 0,
+      top_overdue: [],
+      top_unrated: [],
+      recent_activity: [],
     });
   }
 }

@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 import { sendWeeklyDigest } from "@/lib/email/weekly-digest";
 
 /** POST - Send digest to the authenticated user (manual trigger / testing) */
 export async function POST() {
-  try {
-    const userId = await getUserId();
-    if (!userId || userId === "anonymous") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
 
+  try {
     const { data: user } = await supabase
       .from("User")
       .select("email, name")
