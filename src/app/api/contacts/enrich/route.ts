@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 
@@ -29,7 +29,7 @@ const ALLOWED_INDUSTRIES = [
 const ALLOWED_SENIORITY = ["Incoming", "Analyst", "Associate", "VP", "Senior"];
 
 function buildPrompt(c: { name: string; title: string; firmName: string }): string {
-  return `You are an enrichment engine for a finance-recruiting CRM. Given a contact's name, company, and current title, infer the most likely INDUSTRY, SENIORITY, probable UNIVERSITY (only if the name/company strongly suggests one — otherwise ""), and LOCATION (company HQ city if unknown).
+  return `You are an enrichment engine for a finance-recruiting CRM. Given a contact's name, company, and current title, infer the most likely INDUSTRY, SENIORITY, probable UNIVERSITY (only if the name/company strongly suggests one, otherwise ""), and LOCATION (company HQ city if unknown).
 
 Contact:
 - Name: ${c.name}
@@ -72,12 +72,13 @@ async function enrichOne(contact: {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const userId = await getUserId();
-    if (!userId || userId === "anonymous") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
 
+  try {
     const body = await req.json().catch(() => ({}));
     const contactId: string | undefined = body.contactId;
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Build meta with enriched fields layered on top of existing data
-      // Don't overwrite non-empty fields — enrichment fills gaps, not replaces
+      // Don't overwrite non-empty fields. Enrichment fills gaps, not replaces.
       const meta = {
         name: c.name || "",
         education: c.education || fields.education,

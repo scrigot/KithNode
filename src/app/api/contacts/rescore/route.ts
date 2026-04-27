@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 
 export async function POST() {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
   try {
-    const userId = await getUserId();
     const prefs = await getUserPrefs(userId);
 
     const { data: contacts, error } = await supabase

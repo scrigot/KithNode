@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserId } from "@/lib/get-user";
 
 export async function GET() {
-  try {
-    const userId = await getUserId();
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
 
+  try {
     // Get user's own imports
     const { data: ownContacts } = await supabase
       .from("AlumniContact")

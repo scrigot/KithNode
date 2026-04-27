@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
   const { id } = await params;
 
+  // Scope reads to contacts the user owns OR has rated as high_value.
+  // Anything outside that set is treated as not-found to avoid leaking IDs.
   const { data: contact, error } = await supabase
     .from("AlumniContact")
     .select("*")
@@ -15,6 +24,18 @@ export async function GET(
 
   if (error || !contact) {
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  }
+
+  if (contact.importedByUserId && contact.importedByUserId !== userId) {
+    const { data: rating } = await supabase
+      .from("UserDiscover")
+      .select("rating")
+      .eq("userId", userId)
+      .eq("contactId", id)
+      .maybeSingle();
+    if (!rating) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
   }
 
   return NextResponse.json({
