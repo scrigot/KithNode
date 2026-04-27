@@ -220,16 +220,28 @@ export async function GET() {
     const { data: userRow } = await supabase
       .from("User")
       .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
-      .eq("id", userId)
-      .single();
+      .eq("email", userId)
+      .maybeSingle();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
     const weeklyGoalTarget: number = userRow?.weeklyGoalTarget ?? 3;
-    const subscriptionStatus: string = userRow?.subscriptionStatus ?? "trial";
+    let subscriptionStatus: string = userRow?.subscriptionStatus ?? "trial";
     const subscriptionPlan: string | null = userRow?.subscriptionPlan ?? null;
-    const trialEndsAt: string | null = userRow?.trialEndsAt ?? null;
+    let trialEndsAt: string | null = userRow?.trialEndsAt ?? null;
     const subscriptionEndsAt: string | null = userRow?.subscriptionEndsAt ?? null;
     const hasStripeCustomer = !!userRow?.stripeCustomerId;
+
+    // Bootstrap trial for users created before the trial-defaults rollout.
+    // Idempotent: only writes when both fields are missing.
+    if (!userRow?.subscriptionStatus && !userRow?.trialEndsAt) {
+      const newTrialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase
+        .from("User")
+        .update({ subscriptionStatus: "trial", trialEndsAt: newTrialEndsAt })
+        .eq("email", userId);
+      subscriptionStatus = "trial";
+      trialEndsAt = newTrialEndsAt;
+    }
 
     let trialDaysLeft: number | null = null;
     if (subscriptionStatus === "trial" && trialEndsAt) {

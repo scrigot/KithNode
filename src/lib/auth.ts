@@ -14,9 +14,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return false;
       }
 
-      // Upsert user row so billing/settings routes can find the user
+      // Upsert user row so billing/settings routes can find the user.
+      // ignoreDuplicates ensures trial defaults only land on first insert,
+      // not on every sign-in (idempotent).
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from("User").upsert(
-        { email: user.email, name: user.name ?? "", image: user.image ?? "" },
+        {
+          email: user.email,
+          name: user.name ?? "",
+          image: user.image ?? "",
+          subscriptionStatus: "trial",
+          trialEndsAt,
+        },
         { onConflict: "email", ignoreDuplicates: true }
       );
 
