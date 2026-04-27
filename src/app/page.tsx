@@ -10,16 +10,28 @@ import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
 import { ReelEmbed } from "./_landing/reel-embed";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ signin?: string }>;
+}) {
   const session = await auth();
 
   if (session?.user) {
     redirect("/dashboard");
   }
 
+  const params = await searchParams;
+  const signinRequired = params.signin === "required";
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-white">
       <Navbar />
+      {signinRequired && (
+        <div className="fixed inset-x-0 top-16 z-30 border-b border-amber-300/40 bg-amber-50/95 px-6 py-2 text-center text-[13px] font-medium text-amber-900 backdrop-blur-sm">
+          Your session expired. Sign in to continue.
+        </div>
+      )}
       <HeroSection>
         <SignInButton />
       </HeroSection>
@@ -65,8 +77,8 @@ export default async function Home() {
           {/* Legal */}
           <div className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold text-slate-900">Legal</h4>
-            <a href="#" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Privacy</a>
-            <a href="#" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Terms</a>
+            <a href="/privacy" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Privacy</a>
+            <a href="/terms" className="text-sm text-slate-600 transition-colors hover:text-slate-900">Terms</a>
           </div>
         </div>
         <div className="mx-auto mt-12 max-w-6xl border-t border-slate-200 pt-8">
