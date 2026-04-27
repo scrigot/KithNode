@@ -24,6 +24,8 @@ const PREFS: UserPrefs = {
   targetIndustries: ["Investment Banking"],
   targetFirms: ["Goldman Sachs"],
   targetLocations: ["New York, NY"],
+  recruitingDate: null,
+  weeklyGoalTarget: 3,
 };
 
 const TEAM_CONTACT: ContactCandidate = {
@@ -92,7 +94,7 @@ describe("namesPlausiblyMatch", () => {
   });
 });
 
-describe("detectSignals — synthetic-meta path (no LinkedIn URL)", () => {
+describe("detectSignals: synthetic-meta path (no LinkedIn URL)", () => {
   it("emits firm-tier + seniority + affinity from team-page contact", async () => {
     const signals = await detectSignals(TEAM_CONTACT, PREFS);
     const labels = signals.map((s) => s.label);
@@ -116,7 +118,7 @@ describe("detectSignals — synthetic-meta path (no LinkedIn URL)", () => {
   });
 });
 
-describe("detectSignals — LinkedIn verified path", () => {
+describe("detectSignals: LinkedIn verified path", () => {
   it("uses scraped meta when scraped name matches the candidate name", async () => {
     vi.mocked(scrapeLinkedInMeta).mockResolvedValueOnce({
       name: "Alice Johnson",
