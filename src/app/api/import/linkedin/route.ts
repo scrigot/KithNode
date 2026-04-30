@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import {
   scrapeLinkedInMeta,
@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.email;
+  const supabase = getSupabaseAdmin();
 
   const prefs = await getUserPrefs(userId);
   const body = await request.json();
