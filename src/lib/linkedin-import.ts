@@ -112,7 +112,17 @@ export async function scrapeLinkedInMeta(url: string): Promise<LinkedInMeta> {
 
 // ── Affiliation Detection ─────────────────────────────────────────────────────
 
-// Universal firm tier categories (objectively high-signal regardless of user)
+// Universal firm tier categories (objectively high-signal regardless of user).
+// FIRM_TIERS order = priority, first match wins. AI tiers sit at the top
+// because a frontier-lab match should win even if the company name loosely
+// brushes a finance pattern.
+
+// AI / ML
+const FRONTIER_LAB = [/\banthropic\b/i, /\bopenai\b/i, /\bgoogle\s*deepmind\b|\bdeepmind\b/i, /\bmistral\s*ai\b/i, /\bcohere\b/i, /\bxai\b/i, /\binflection\s*ai\b/i, /\badept\s*ai\b/i, /\bcharacter\.?ai\b/i, /\bperplexity\b/i, /\bsafe\s*superintelligence\b|\bssi\s*inc\b/i];
+const AI_UNICORN = [/\bhugging\s*face\b/i, /\blangchain\b/i, /\banysphere\b|\bcursor\s*ai\b/i, /\breplicate\b/i, /\bvercel\b/i, /\bmodal\s*labs\b/i, /\btogether\s*ai\b/i, /\bdatabricks\b/i, /\bscale\s*ai\b/i, /\bharvey\s*ai\b/i, /\bweights\s*(?:&|and)?\s*biases\b/i, /\breplit\b/i, /\bnotion\s*labs\b/i, /\brunway\s*ml\b/i, /\bmidjourney\b/i, /\beleven\s*labs\b/i, /\bsuno\b/i];
+const BIG_TECH_AI = [/\bmeta\s*(?:ai|fair)\b|\bfacebook\s*ai\b/i, /\bapple\s*intelligence\b/i, /\bmicrosoft\s*research\b|\bmsr\b/i, /\bgoogle\s*brain\b/i, /\bnvidia\b/i, /\bsalesforce\s*research\b/i, /\bibm\s*research\b/i, /\bamazon\s*(?:agi|science)\b/i];
+
+// Finance / Consulting
 const BULGE_BRACKET = [/goldman\s*sachs/i, /jpmorgan/i, /morgan\s*stanley/i, /bank of america/i, /citi(?:group|bank)?/i, /barclays/i, /deutsche\s*bank/i, /ubs\b/i, /credit\s*suisse/i, /hsbc/i, /wells\s*fargo/i];
 const ELITE_BOUTIQUE = [/evercore/i, /lazard/i, /centerview/i, /moelis/i, /perella/i, /pjt/i, /guggenheim/i, /greenhill/i, /rothschild/i, /qatalyst/i, /houlihan/i, /jefferies/i, /raymond\s*james/i, /william\s*blair/i, /piper\s*sandler/i, /robert\s*w\.?\s*baird/i];
 const MEGA_PE = [/blackstone/i, /kkr\b/i, /carlyle/i, /apollo\s*(?:global)?/i, /warburg/i, /tpg\b/i, /thoma\s*bravo/i, /vista\s*equity/i, /silver\s*lake/i, /bain\s*capital/i, /general\s*atlantic/i, /advent\s*international/i, /hellman/i, /leonard\s*green/i, /ares\s*management/i, /providence\s*equity/i, /welsh\s*carson/i];
@@ -120,7 +130,14 @@ const HEDGE_FUNDS = [/citadel/i, /point72/i, /two\s*sigma/i, /bridgewater/i, /mi
 const MBB = [/mckinsey/i, /boston\s*consulting|bcg\b/i, /\bbain\b(?!\s*capital)/i];
 const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|ey\b/i, /kpmg/i];
 
+// CS-strong schools, applied as a separate affiliation chip when the contact's
+// education field matches. Independent of user's "Same School" boost.
+const CS_TOP_SCHOOL = [/\bMIT\b|\bMassachusetts\s+Institute\b/, /\bStanford\b/, /\bCarnegie\s*Mellon\b|\bCMU\b/, /\bUC\s+Berkeley\b|\bberkeley\b/i, /\bHarvard\b/, /\bPrinceton\b/, /\bCaltech\b/, /\bCornell\b/, /\bU(niversity)?\s*of\s*Washington\b|\buw\s*allen\b/i, /\bGeorgia\s*Tech\b|\bgatech\b/i, /\bUIUC\b|\bIllinois.*Urbana\b/i, /\b(University\s*of\s*)?Michigan\b|\bumich\b/i, /\bUT\s*Austin\b|\bTexas\s*at\s*Austin\b/i, /\bToronto\b/];
+
 const FIRM_TIERS: { patterns: RegExp[]; label: string; boost: number }[] = [
+  { patterns: FRONTIER_LAB, label: "Frontier AI Lab", boost: 22 },
+  { patterns: AI_UNICORN, label: "AI Unicorn", boost: 18 },
+  { patterns: BIG_TECH_AI, label: "Big Tech AI", boost: 14 },
   { patterns: MEGA_PE, label: "Mega PE", boost: 20 },
   { patterns: BULGE_BRACKET, label: "Bulge Bracket", boost: 18 },
   { patterns: HEDGE_FUNDS, label: "Hedge Fund", boost: 18 },
@@ -131,7 +148,15 @@ const FIRM_TIERS: { patterns: RegExp[]; label: string; boost: number }[] = [
 
 function detectSeniority(title: string): { level: string; boost: number } {
   const t = title.toLowerCase();
-  if (/managing\s*director|partner|principal|founder|ceo|cfo|coo/i.test(t)) return { level: "Senior", boost: 10 };
+  // Senior leadership (universal)
+  if (/managing\s*director|partner|principal|founder|ceo|cfo|coo|cto/i.test(t)) return { level: "Senior", boost: 10 };
+  // AI-specific roles (matter for frontier labs / startups)
+  if (/research\s*scientist|staff\s*research/i.test(t)) return { level: "Research Scientist", boost: 12 };
+  if (/founding\s*engineer/i.test(t)) return { level: "Founding Engineer", boost: 11 };
+  if (/member\s*of\s*technical\s*staff|\bmts\b/i.test(t)) return { level: "MTS", boost: 11 };
+  if (/forward\s*deployed\s*(?:engineer|eng|ai)/i.test(t)) return { level: "Forward Deployed", boost: 10 };
+  if (/(?:ml|machine\s*learning|ai|applied\s*ai)\s*(?:engineer|researcher)/i.test(t)) return { level: "ML Engineer", boost: 9 };
+  // Generic finance / corp seniority
   if (/vice\s*president|\bvp\b|director(?!\s*of\s*operations)/i.test(t)) return { level: "VP", boost: 7 };
   if (/\bassociate\b(?!\s*analyst)/i.test(t)) return { level: "Associate", boost: 5 };
   if (/\banalyst\b(?!.*incoming)/i.test(t)) return { level: "Analyst", boost: 3 };
@@ -191,11 +216,14 @@ function universityAliases(name: string): string[] {
 
 /**
  * Maps a firm tier label back to a canonical industry name.
- * Used when a contact's company matches a firm tier — we infer the
+ * Used when a contact's company matches a firm tier. We infer the
  * industry from the tier instead of asking the user to set it manually.
  */
 function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
   for (const a of affiliations) {
+    if (a.name.startsWith("Frontier AI Lab")) return "AI/ML";
+    if (a.name.startsWith("AI Unicorn")) return "AI/ML";
+    if (a.name.startsWith("Big Tech AI")) return "AI/ML";
     if (a.name.startsWith("Bulge Bracket")) return "Investment Banking";
     if (a.name.startsWith("Elite Boutique")) return "Investment Banking";
     if (a.name.startsWith("Mega PE")) return "Private Equity";
@@ -211,7 +239,7 @@ function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
 /**
  * Detect affiliations between a contact and a user's preferences.
  *
- * Universal layer (always applied): firm tier + seniority — these reflect
+ * Universal layer (always applied): firm tier + seniority. These reflect
  * objective signal that any user would value.
  *
  * Per-user layer (only when prefs supplied): target firm match (+25),
@@ -251,14 +279,19 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
     affiliations.push({ name: seniority.level, boost: seniority.boost });
   }
 
+  // ── CS-strong school (universal, independent of user's school) ──
+  if (educationText && CS_TOP_SCHOOL.some((p) => p.test(educationText))) {
+    affiliations.push({ name: "CS Top School", boost: 5 });
+  }
+
   // ── Per-user match layer ──
   if (prefs) {
-    // Target firm — biggest single boost since it's the user's actual recruiting target
+    // Target firm, biggest single boost since it's the user's actual recruiting target
     if (prefs.targetFirms.length && containsAny(companyText, prefs.targetFirms)) {
       affiliations.push({ name: "Target Firm", boost: 25 });
     }
 
-    // Same school — alias-aware fuzzy match against education + experience text
+    // Same school, alias-aware fuzzy match against education + experience text
     if (prefs.university) {
       const aliases = universityAliases(prefs.university);
       const schoolBlob = norm(`${educationText} ${companyText}`);
@@ -275,7 +308,7 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       }
     }
 
-    // Target industry — prefer explicit enrichment field, fall back to firm tier inference
+    // Target industry, prefer explicit enrichment field, fall back to firm tier inference
     const contactIndustry = meta.industry || inferIndustryFromAffiliations(affiliations);
     if (contactIndustry && prefs.targetIndustries.some((i) => norm(i) === norm(contactIndustry))) {
       affiliations.push({ name: "Target Industry", boost: 10 });
@@ -286,7 +319,7 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       affiliations.push({ name: "Target Location", boost: 8 });
     }
 
-    // Hometown match — split city/state and look for either token in contact's location
+    // Hometown match, split city/state and look for either token in contact's location
     if (prefs.hometown) {
       const tokens = prefs.hometown.split(",").map((t) => norm(t)).filter((t) => t.length > 1);
       if (tokens.some((t) => norm(locationText).includes(t))) {

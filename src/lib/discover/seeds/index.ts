@@ -3,7 +3,7 @@
 // Each seed is { name, domain, website }. Names are derived from the
 // firm tier regex arrays in src/lib/linkedin-import.ts (so the affiliation
 // detector and the seed list stay in sync). Domains are hand-picked
-// canonical corporate sites — verified via DNS at the time of writing,
+// canonical corporate sites, verified via DNS at the time of writing,
 // best-effort for the legacy entities. The website field is just
 // `https://${domain}` and is exposed pre-built so callers don't have to
 // concatenate.
@@ -17,7 +17,8 @@ export type IndustryKey =
   | "Private Equity"
   | "Hedge Fund"
   | "Consulting"
-  | "Big 4";
+  | "Big 4"
+  | "AI/ML";
 
 export interface FirmSeed {
   name: string;
@@ -113,6 +114,51 @@ const BIG4: readonly FirmSeed[] = [
   s("KPMG", "kpmg.com"),
 ];
 
+const FRONTIER_LAB: readonly FirmSeed[] = [
+  s("Anthropic", "anthropic.com"),
+  s("OpenAI", "openai.com"),
+  s("Google DeepMind", "deepmind.google"),
+  s("Mistral AI", "mistral.ai"),
+  s("Cohere", "cohere.com"),
+  s("xAI", "x.ai"),
+  s("Inflection AI", "inflection.ai"),
+  s("Adept AI", "adept.ai"),
+  s("Character.AI", "character.ai"),
+  s("Perplexity", "perplexity.ai"),
+  s("Safe Superintelligence", "ssi.inc"),
+];
+
+const AI_UNICORN: readonly FirmSeed[] = [
+  s("Hugging Face", "huggingface.co"),
+  s("LangChain", "langchain.com"),
+  s("Anysphere (Cursor)", "cursor.com"),
+  s("Replicate", "replicate.com"),
+  s("Vercel", "vercel.com"),
+  s("Modal Labs", "modal.com"),
+  s("Together AI", "together.ai"),
+  s("Databricks", "databricks.com"),
+  s("Scale AI", "scale.com"),
+  s("Harvey AI", "harvey.ai"),
+  s("Weights & Biases", "wandb.ai"),
+  s("Replit", "replit.com"),
+  s("Notion Labs", "notion.so"),
+  s("Runway ML", "runwayml.com"),
+  s("Midjourney", "midjourney.com"),
+  s("ElevenLabs", "elevenlabs.io"),
+  s("Suno", "suno.com"),
+];
+
+const BIG_TECH_AI: readonly FirmSeed[] = [
+  s("Meta AI / FAIR", "ai.meta.com"),
+  s("Apple", "apple.com"),
+  s("Microsoft Research", "microsoft.com/research"),
+  s("Google Brain", "research.google"),
+  s("NVIDIA", "nvidia.com"),
+  s("Salesforce Research", "salesforce.com/research"),
+  s("IBM Research", "research.ibm.com"),
+  s("Amazon Science", "amazon.science"),
+];
+
 /**
  * Public seed map. Used by the entity-finder (Stage 2) and the
  * contact-finder (Stage 3) to enumerate target companies for a given
@@ -124,6 +170,7 @@ export const FIRM_SEEDS: Record<IndustryKey, readonly FirmSeed[]> = {
   "Hedge Fund": [...HEDGE_FUNDS],
   "Consulting": [...MBB],
   "Big 4": [...BIG4],
+  "AI/ML": [...FRONTIER_LAB, ...AI_UNICORN, ...BIG_TECH_AI],
 };
 
 /**

@@ -16,12 +16,14 @@ import {
   X,
   Pencil,
   RotateCcw,
+  CalendarDays,
 } from "lucide-react";
 import { trackEvent } from "@/lib/posthog";
 
 const TOTAL_STEPS = 5;
 
 const INDUSTRY_OPTIONS = [
+  "AI/ML",
   "Investment Banking",
   "Private Equity",
   "Consulting",
@@ -31,6 +33,22 @@ const INDUSTRY_OPTIONS = [
 ];
 
 const FIRM_OPTIONS = [
+  // AI / ML
+  "Anthropic",
+  "OpenAI",
+  "Google DeepMind",
+  "Mistral AI",
+  "Cohere",
+  "xAI",
+  "Perplexity",
+  "Hugging Face",
+  "Cursor",
+  "Vercel",
+  "Databricks",
+  "Scale AI",
+  "Replit",
+  "NVIDIA",
+  // Finance / Consulting
   "Goldman Sachs",
   "JPMorgan",
   "Morgan Stanley",
@@ -73,6 +91,8 @@ interface Preferences {
   targetIndustries: string[];
   targetFirms: string[];
   customFirms: string[];
+  recruitingDate: string;
+  weeklyGoalTarget: number;
 }
 
 const STORAGE_KEY = "kithnode_preferences";
@@ -88,6 +108,8 @@ function getDefaults(): Preferences {
     targetIndustries: [],
     targetFirms: [],
     customFirms: [],
+    recruitingDate: "",
+    weeklyGoalTarget: 3,
   };
 }
 
@@ -138,6 +160,8 @@ async function syncToAPI(prefs: Preferences) {
             ? [...prefs.targetFirms, ...prefs.customFirms]
             : null,
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+        recruiting_date: prefs.recruitingDate || null,
+        weekly_goal_target: prefs.weeklyGoalTarget || 3,
       }),
     });
   } catch {
@@ -228,6 +252,56 @@ function EditPanel({
       </div>
 
       <div className="space-y-6">
+        {/* Recruiting timeline + weekly goal */}
+        <section className="border border-white/[0.06] bg-bg-card p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <CalendarDays size={15} className="text-accent-teal" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+              Recruiting
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Target recruiting date
+              </label>
+              <Input
+                type="date"
+                value={local.recruitingDate}
+                onChange={(e) =>
+                  setLocal({ ...local, recruitingDate: e.target.value })
+                }
+                className="bg-muted text-sm"
+              />
+              <p className="mt-1 text-[10px] text-text-muted">
+                Drives the countdown on Overview.
+              </p>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Weekly coffee-chat goal
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                value={local.weeklyGoalTarget}
+                onChange={(e) =>
+                  setLocal({
+                    ...local,
+                    weeklyGoalTarget:
+                      Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                  })
+                }
+                className="bg-muted text-sm"
+              />
+              <p className="mt-1 text-[10px] text-text-muted">
+                Appears as the target in the weekly progress bar.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* School */}
         <section className="border border-white/[0.06] bg-bg-card p-5">
           <div className="mb-4 flex items-center gap-2">
@@ -860,7 +934,7 @@ export default function SettingsPage() {
         const res = await fetch("/api/user/preferences");
         if (res.ok) {
           const data = await res.json();
-          if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length)) {
+          if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length || data.recruitingDate)) {
             const merged: Preferences = {
               university: data.university || "",
               greekLifeEnabled: !!data.greekOrg,
@@ -871,6 +945,13 @@ export default function SettingsPage() {
               targetIndustries: Array.isArray(data.targetIndustries) ? data.targetIndustries : [],
               targetFirms: Array.isArray(data.targetFirms) ? data.targetFirms : [],
               customFirms: [],
+              recruitingDate: data.recruitingDate
+                ? String(data.recruitingDate).slice(0, 10)
+                : "",
+              weeklyGoalTarget:
+                typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0
+                  ? data.weeklyGoalTarget
+                  : 3,
             };
             setPrefs(merged);
             savePreferences(merged);
