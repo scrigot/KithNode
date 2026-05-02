@@ -14,6 +14,7 @@
 
 import * as cheerio from "cheerio";
 import { DEPARTMENT_SEEDS, type DepartmentSeed } from "./seeds";
+import { scrapeKenanFaculty } from "./kenan-directory";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -443,6 +444,9 @@ export async function scrapeDepartment(
   try {
     if (seed.strategy === "wp-api") {
       return await scrapeWpApi(seed, throttleMs);
+    }
+    if (seed.strategy === "live-directory") {
+      return await scrapeKenanFaculty({ throttleMs });
     }
     return await scrapeDdg(seed, throttleMs);
   } catch (err) {

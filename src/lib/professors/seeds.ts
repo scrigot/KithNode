@@ -2,18 +2,18 @@
 //
 // Each entry declares which scraping strategy to use and the
 // parameters that strategy needs. Strategy is picked by scraper.ts
-// at runtime — this file is pure config, no I/O.
+// at runtime. This file is pure config, no I/O.
 
 export interface DepartmentSeed {
   slug: "cs" | "econ" | "kenan" | "stats";
   name: string;
   /** Goes into Professor.department (mirrors AlumniContact.firmName). */
   firmName: string;
-  strategy: "wp-api" | "ddg-scrape";
+  strategy: "wp-api" | "ddg-scrape" | "live-directory";
   baseUrl: string;
-  /** WP REST API path — only required for "wp-api" strategy. */
+  /** WP REST API path, only required for "wp-api" strategy. */
   apiEndpoint?: string;
-  /** DDG query string — only required for "ddg-scrape" strategy. */
+  /** DDG query string, only required for "ddg-scrape" strategy. */
   ddgQuery?: string;
   /** Validates profile URLs surfaced by DDG. */
   profileUrlPattern?: RegExp;
@@ -40,10 +40,8 @@ export const DEPARTMENT_SEEDS: readonly DepartmentSeed[] = [
     slug: "kenan",
     name: "UNC Kenan-Flagler Business School",
     firmName: "UNC Kenan-Flagler",
-    strategy: "ddg-scrape",
+    strategy: "live-directory",
     baseUrl: "https://www.kenan-flagler.unc.edu",
-    ddgQuery: "site:kenan-flagler.unc.edu/faculty/",
-    profileUrlPattern: /kenan-flagler\.unc\.edu\/faculty\/[a-z-]+\/?$/,
   },
   {
     slug: "stats",

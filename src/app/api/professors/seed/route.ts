@@ -11,11 +11,38 @@
 //   5. done summary             (event: type "done", progress 100)
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { getUserId } from "@/lib/get-user";
 import { scrapeAllDepartments } from "@/lib/professors/scraper";
-import { classifyBatch } from "@/lib/professors/classifier";
+import { classifyBatch, type ClassifierOutput } from "@/lib/professors/classifier";
 import { requireSubscription } from "@/lib/subscription";
+import { upsertAlumniContact } from "@/lib/connections/upsert";
+import type { AlumniSeed } from "@/lib/connections/types";
+import type { Professor } from "@/lib/professors/scraper";
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function professorToSeed(prof: Professor, cls: ClassifierOutput): AlumniSeed {
+  const affiliations = [
+    `proftype:${cls.profType}`,
+    ...cls.researchAreas,
+    cls.recentPaper ? `paper:${cls.recentPaper}` : "",
+  ]
+    .filter(Boolean)
+    .join(",");
+
+  return {
+    name: prof.name,
+    title: prof.title,
+    firmName: prof.department,
+    email: prof.email,
+    sourceUrl: prof.profileUrl || "",
+    bio: prof.bio,
+    university: "UNC",
+    location: "Chapel Hill, NC",
+    affiliations,
+    source: "kenan_faculty",
+  };
+}
 
 // ── Event taxonomy ──────────────────────────────────────────────────
 
@@ -143,67 +170,12 @@ export async function POST(request: NextRequest) {
           const cls = classifications[i];
 
           try {
-            const affiliations = [
-              `proftype:${cls.profType}`,
-              ...cls.researchAreas,
-              cls.recentPaper ? `paper:${cls.recentPaper}` : "",
-            ]
-              .filter(Boolean)
-              .join(",");
-
-            const record = {
-              name: prof.name,
-              title: prof.title,
-              firmName: prof.department,
-              email: prof.email,
-              linkedInUrl: prof.profileUrl || "",
-              university: "UNC",
-              education: "",
-              location: "Chapel Hill, NC",
-              affiliations,
-              warmthScore: 0.5,
-              tier: "warm",
-              source: "professor",
-              importedByUserId: userId,
-              enrichedAt: new Date().toISOString(),
-              enrichmentSource: "professor_scraper",
-            };
-
-            // Dedup: email first, then name+firmName+importedByUserId
-            let existingId: string | undefined;
-            if (prof.email) {
-              const { data } = await supabase
-                .from("AlumniContact")
-                .select("id")
-                .eq("email", prof.email)
-                .eq("importedByUserId", userId)
-                .maybeSingle();
-              existingId = data?.id;
-            }
-            if (!existingId) {
-              const { data } = await supabase
-                .from("AlumniContact")
-                .select("id")
-                .eq("name", prof.name)
-                .eq("firmName", prof.department)
-                .eq("importedByUserId", userId)
-                .maybeSingle();
-              existingId = data?.id;
-            }
-
-            if (existingId) {
-              const { error } = await supabase
-                .from("AlumniContact")
-                .update(record)
-                .eq("id", existingId);
-              if (error) throw new Error(error.message);
-              updated++;
-            } else {
-              const { error } = await supabase
-                .from("AlumniContact")
-                .insert({ ...record, graduationYear: 0 });
-              if (error) throw new Error(error.message);
+            const seed = professorToSeed(prof, cls);
+            const result = await upsertAlumniContact(seed, userId);
+            if (result === "inserted") {
               inserted++;
+            } else {
+              updated++;
             }
 
             contactSummaries.push({
