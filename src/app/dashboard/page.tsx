@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api-client";
 import {
   Upload,
@@ -15,7 +16,35 @@ import {
   Activity,
   Clock,
   Lock,
+  GitBranch,
+  PieChart as PieIcon,
+  Building2,
+  TrendingUp,
 } from "lucide-react";
+
+// Recharts is heavy + client-only; lazy load to keep dashboard TTI snappy
+const ResponsiveContainer = dynamic(
+  () => import("recharts").then((m) => m.ResponsiveContainer),
+  { ssr: false },
+);
+const BarChart = dynamic(
+  () => import("recharts").then((m) => m.BarChart),
+  { ssr: false },
+);
+const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
+const XAxis = dynamic(() => import("recharts").then((m) => m.XAxis), { ssr: false });
+const YAxis = dynamic(() => import("recharts").then((m) => m.YAxis), { ssr: false });
+const Cell = dynamic(() => import("recharts").then((m) => m.Cell), { ssr: false });
+const Tooltip = dynamic(() => import("recharts").then((m) => m.Tooltip), { ssr: false });
+const PieChart = dynamic(
+  () => import("recharts").then((m) => m.PieChart),
+  { ssr: false },
+);
+const Pie = dynamic(() => import("recharts").then((m) => m.Pie), { ssr: false });
+const LabelList = dynamic(
+  () => import("recharts").then((m) => m.LabelList),
+  { ssr: false },
+);
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -40,6 +69,17 @@ interface TopUnrated {
   score: number;
   tier: string;
 }
+interface TopFirm {
+  firmName: string;
+  count: number;
+  hotCount: number;
+}
+interface TierCounts {
+  hot: number;
+  warm: number;
+  monitor: number;
+  cold: number;
+}
 
 interface OverviewData {
   ratings: { high_value: number; total: number };
@@ -52,6 +92,8 @@ interface OverviewData {
   top_overdue: OverdueContact[];
   top_unrated: TopUnrated[];
   recent_activity: RecentActivity[];
+  tier_counts: TierCounts;
+  top_firms: TopFirm[];
   recruiting_date: string | null;
   days_until_recruiting: number | null;
   weekly_goal_done: number;
@@ -69,6 +111,15 @@ const QUICK_NAV = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
+const STAGE_ORDER = [
+  "researched",
+  "connected",
+  "email_sent",
+  "follow_up",
+  "responded",
+  "meeting_set",
+] as const;
+
 const STAGE_LABEL: Record<string, string> = {
   researched: "RESEARCHED",
   connected: "CONNECTED",
@@ -78,11 +129,28 @@ const STAGE_LABEL: Record<string, string> = {
   meeting_set: "MEETING SET",
 };
 
+// Match /dashboard/pipeline header colors (zinc/blue/sky/amber/green/purple)
+const STAGE_FILL: Record<string, string> = {
+  researched: "#a1a1aa",
+  connected: "#60a5fa",
+  email_sent: "#38bdf8",
+  follow_up: "#fbbf24",
+  responded: "#4ade80",
+  meeting_set: "#a78bfa",
+};
+
 const TIER_COLOR: Record<string, string> = {
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
+};
+
+const TIER_FILL: Record<string, string> = {
+  hot: "#f87171",
+  warm: "#60a5fa",
+  monitor: "#fbbf24",
+  cold: "#a1a1aa",
 };
 
 function timeAgo(iso: string): string {
@@ -94,6 +162,28 @@ function timeAgo(iso: string): string {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   return `${d}d ago`;
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; payload?: { name?: string } }>;
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const item = payload[0];
+  const name = label ?? item.payload?.name ?? item.name;
+  return (
+    <div className="border border-white/[0.18] bg-bg-primary px-2 py-1 font-mono text-[10px] tabular-nums text-foreground shadow-lg">
+      <span className="uppercase tracking-wider text-muted-foreground/80">
+        {name}
+      </span>{" "}
+      <span className="font-bold text-foreground">{item.value}</span>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -135,18 +225,48 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [data]);
 
+  const pipelineFunnelData = useMemo(() => {
+    if (!data) return [];
+    return STAGE_ORDER.map((stage) => ({
+      name: STAGE_LABEL[stage],
+      stage,
+      value: data.pipeline_by_stage[stage] || 0,
+    }));
+  }, [data]);
+
+  const tierData = useMemo(() => {
+    if (!data) return [];
+    const tc = data.tier_counts || { hot: 0, warm: 0, monitor: 0, cold: 0 };
+    return [
+      { name: "HOT", key: "hot", value: tc.hot },
+      { name: "WARM", key: "warm", value: tc.warm },
+      { name: "MONITOR", key: "monitor", value: tc.monitor },
+      { name: "COLD", key: "cold", value: tc.cold },
+    ];
+  }, [data]);
+
+  const tierTotal = useMemo(
+    () => tierData.reduce((s, d) => s + d.value, 0),
+    [tierData],
+  );
+
   if (loading) {
     return (
-      <div className="p-5">
+      <div className="p-4">
         <div className="h-4 w-32 animate-pulse bg-muted" />
-        <div className="mt-4 grid grid-cols-6 gap-2">
+        <div className="mt-3 grid grid-cols-6 gap-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse bg-muted" />
+            <div key={i} className="h-14 animate-pulse bg-muted" />
           ))}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="h-64 animate-pulse bg-muted" />
-          <div className="h-64 animate-pulse bg-muted" />
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <div className="h-16 animate-pulse bg-muted" />
+          <div className="h-16 animate-pulse bg-muted" />
+          <div className="h-16 animate-pulse bg-muted" />
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="h-48 animate-pulse bg-muted" />
+          <div className="h-48 animate-pulse bg-muted" />
         </div>
       </div>
     );
@@ -264,8 +384,12 @@ export default function DashboardPage() {
     },
   ];
 
+  const recentActivity = data?.recent_activity ?? [];
+  const topFirms = data?.top_firms ?? [];
+  const maxFirmCount = Math.max(1, ...topFirms.map((f) => f.count));
+
   return (
-    <div className="flex min-h-full flex-col p-5">
+    <div className="flex min-h-full flex-col gap-2 p-4">
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
@@ -314,14 +438,52 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Hero strip: warmth + recruiting + weekly */}
-      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-        <div className="border border-white/[0.06] bg-card px-4 py-3">
+      {/* Row 1: KPI strip (6 cols) */}
+      <div className="grid grid-cols-3 gap-1 md:grid-cols-6">
+        {KPI.map((kpi) => {
+          const inner = (
+            <>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                {kpi.label}
+              </p>
+              <p className="mt-0.5 font-mono text-lg font-bold leading-tight tabular-nums text-foreground">
+                {kpi.value}
+                {kpi.suffix && (
+                  <span className="text-xs text-muted-foreground">
+                    {kpi.suffix}
+                  </span>
+                )}
+              </p>
+              <p className={`text-[10px] leading-tight ${kpi.subColor}`}>{kpi.sub}</p>
+            </>
+          );
+          return kpi.href ? (
+            <Link
+              key={kpi.label}
+              href={kpi.href}
+              className="border border-white/[0.06] bg-card px-2.5 py-1.5 hover:border-white/[0.18]"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div
+              key={kpi.label}
+              className="border border-white/[0.06] bg-card px-2.5 py-1.5"
+            >
+              {inner}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Row 2: Hero strip (warmth + recruiting + weekly) */}
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-3">
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
             Network Warmth
           </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
+          <div className="mt-0.5 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
               {displayScore}
             </span>
             <span className="text-[10px] text-muted-foreground">
@@ -330,13 +492,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="border border-white/[0.06] bg-card px-4 py-3">
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
             Recruiting Timeline
           </p>
           {data?.days_until_recruiting != null ? (
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
+            <div className="mt-0.5 flex items-baseline gap-2">
+              <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
                 {data.days_until_recruiting}
               </span>
               <span className="text-[10px] text-muted-foreground">
@@ -356,14 +518,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="border border-white/[0.06] bg-card px-4 py-3">
+        <div className="border border-white/[0.06] bg-card px-3 py-2">
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
             Weekly Coffee Chats
           </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
+          <div className="mt-0.5 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
               {weeklyDone}
-              <span className="text-base text-muted-foreground">/{weeklyTarget}</span>
+              <span className="text-sm text-muted-foreground">/{weeklyTarget}</span>
             </span>
             <span
               className={`text-[10px] ${
@@ -377,7 +539,7 @@ export default function DashboardPage() {
                 : `${weeklyTarget - weeklyDone} to go`}
             </span>
           </div>
-          <div className="mt-2 h-1 w-full overflow-hidden bg-white/[0.06]">
+          <div className="mt-1.5 h-1 w-full overflow-hidden bg-white/[0.06]">
             <div
               className="h-full bg-primary transition-all"
               style={{
@@ -388,75 +550,251 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="mt-2 grid grid-cols-3 gap-2 md:grid-cols-6">
-        {KPI.map((kpi) => {
-          const inner = (
-            <>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                {kpi.label}
-              </p>
-              <p className="mt-1 font-mono text-xl font-bold tabular-nums text-foreground">
-                {kpi.value}
-                {kpi.suffix && (
-                  <span className="text-sm text-muted-foreground">
-                    {kpi.suffix}
-                  </span>
-                )}
-              </p>
-              <p className={`mt-0.5 text-[10px] ${kpi.subColor}`}>{kpi.sub}</p>
-            </>
-          );
-          return kpi.href ? (
+      {/* Row 3: Charts (pipeline funnel + tier distribution) */}
+      <div className="grid grid-cols-1 gap-1 lg:grid-cols-2">
+        {/* Pipeline funnel */}
+        <div className="flex flex-col border border-white/[0.06] bg-card">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              <GitBranch className="h-3 w-3" />
+              Pipeline Funnel
+            </span>
             <Link
-              key={kpi.label}
-              href={kpi.href}
-              className="border border-white/[0.06] bg-card px-3 py-2 hover:border-white/[0.18]"
+              href="/dashboard/pipeline"
+              className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
             >
-              {inner}
+              {pipelineTotal} total &middot; open
             </Link>
-          ) : (
-            <div
-              key={kpi.label}
-              className="border border-white/[0.06] bg-card px-3 py-2"
-            >
-              {inner}
+          </div>
+          <div className="h-[170px] px-1 py-1">
+            {pipelineTotal === 0 ? (
+              <div className="flex h-full items-center justify-center px-3 text-[11px] text-muted-foreground">
+                Add contacts to your pipeline to see the funnel.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  layout="vertical"
+                  data={pipelineFunnelData}
+                  margin={{ top: 4, right: 28, left: 4, bottom: 4 }}
+                  barCategoryGap={4}
+                >
+                  <XAxis
+                    type="number"
+                    hide
+                    domain={[0, "dataMax"]}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tickLine={false}
+                    axisLine={false}
+                    width={92}
+                    tick={{
+                      fill: "#a1a1aa",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      fontFamily:
+                        "ui-monospace, SFMono-Regular, monospace",
+                    }}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                    content={<ChartTooltip />}
+                  />
+                  <Bar dataKey="value" barSize={14} isAnimationActive={false}>
+                    {pipelineFunnelData.map((d) => (
+                      <Cell key={d.stage} fill={STAGE_FILL[d.stage]} />
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="right"
+                      style={{
+                        fill: "#e5e5e5",
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, monospace",
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Tier distribution */}
+        <div className="flex flex-col border border-white/[0.06] bg-card">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              <PieIcon className="h-3 w-3" />
+              Tier Distribution
+            </span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+              {tierTotal} contacts
+            </span>
+          </div>
+          <div className="grid h-[170px] grid-cols-5 items-center gap-2 px-3 py-1">
+            <div className="col-span-2 h-full">
+              {tierTotal === 0 ? (
+                <div className="flex h-full items-center justify-center text-[11px] text-muted-foreground">
+                  No tier data.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={tierData.filter((d) => d.value > 0)}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={42}
+                      outerRadius={68}
+                      paddingAngle={1}
+                      stroke="none"
+                      isAnimationActive={false}
+                    >
+                      {tierData
+                        .filter((d) => d.value > 0)
+                        .map((d) => (
+                          <Cell key={d.key} fill={TIER_FILL[d.key]} />
+                        ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
-          );
-        })}
+            <div className="col-span-3 flex flex-col gap-1">
+              {tierData.map((d) => {
+                const pct = tierTotal > 0 ? Math.round((d.value / tierTotal) * 100) : 0;
+                return (
+                  <div
+                    key={d.key}
+                    className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1"
+                  >
+                    <span
+                      className="h-2 w-2"
+                      style={{ background: TIER_FILL[d.key] }}
+                    />
+                    <span
+                      className={`text-[9px] font-bold uppercase tracking-wider ${TIER_COLOR[d.key]}`}
+                    >
+                      {d.name}
+                    </span>
+                    <span className="ml-auto font-mono text-[11px] font-bold tabular-nums text-foreground">
+                      {d.value}
+                    </span>
+                    <span className="font-mono text-[9px] tabular-nums text-muted-foreground">
+                      {pct}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Two-column: Today's Focus + Recent Activity */}
-      <div className="mt-3 grid flex-1 grid-cols-1 gap-2 lg:grid-cols-2">
-        {/* Today's Focus */}
-        <div className="flex flex-col border border-white/[0.06] bg-card">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
+      {/* Row 4: Activity timeline (8) | Today's Focus (4) */}
+      <div className="grid flex-1 grid-cols-1 gap-1 lg:grid-cols-12">
+        {/* Activity timeline */}
+        <div className="flex flex-col border border-white/[0.06] bg-card lg:col-span-8">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              <Activity className="h-3 w-3" />
+              Activity Timeline
+            </span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+              Last {recentActivity.length || 0}
+            </span>
+          </div>
+          <div className="flex-1 overflow-auto p-2">
+            {recentActivity.length === 0 ? (
+              <p className="px-2 py-3 text-[11px] text-muted-foreground">
+                No activity yet. Rate some contacts in Discover.
+              </p>
+            ) : (
+              <ol className="relative space-y-1">
+                {/* Vertical rail */}
+                <span
+                  aria-hidden
+                  className="absolute left-[7px] top-1 bottom-1 w-px bg-white/[0.06]"
+                />
+                {recentActivity.map((a, i) => {
+                  const dotColor =
+                    a.type === "rate"
+                      ? "bg-accent-teal"
+                      : a.type === "pipeline_add"
+                        ? "bg-accent-green"
+                        : "bg-accent-amber";
+                  const href =
+                    a.type === "rate"
+                      ? `/dashboard/contacts/${a.contactId}`
+                      : "/dashboard/pipeline";
+                  return (
+                    <li key={`${a.contactId}-${i}`} className="relative pl-5">
+                      <span
+                        className={`absolute left-[3px] top-2 h-2 w-2 ${dotColor} ring-2 ring-card`}
+                        aria-hidden
+                      />
+                      <Link
+                        href={href}
+                        className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1 text-[11px] hover:border-white/[0.18]"
+                      >
+                        <span className="truncate font-bold text-foreground">
+                          {a.contactName}
+                        </span>
+                        <span className="truncate text-muted-foreground">
+                          {a.firmName}
+                        </span>
+                        <span className="ml-auto truncate text-[10px] text-muted-foreground/80">
+                          {a.detail}
+                        </span>
+                        <span className="font-mono text-[10px] tabular-nums text-muted-foreground/60">
+                          {timeAgo(a.timestamp)}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+        </div>
+
+        {/* Today's Focus right rail */}
+        <div className="flex flex-col border border-white/[0.06] bg-card lg:col-span-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
               <AlertTriangle className="h-3 w-3" />
               Today&apos;s Focus
             </span>
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-              Overdue + top unrated
+              Overdue + unrated
             </span>
           </div>
 
-          <div className="flex flex-col gap-3 p-3">
+          <div className="flex flex-col gap-2 p-2">
             {/* Overdue */}
             <div>
-              <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
-                Overdue follow-ups · {data?.top_overdue?.length ?? 0}
+              <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                Overdue · {data?.top_overdue?.length ?? 0}
               </p>
               {(data?.top_overdue ?? []).length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="px-1 text-[10px] text-muted-foreground">
                   Nothing overdue. Nice.
                 </p>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {data!.top_overdue.map((o) => (
                     <Link
                       key={o.contactId}
                       href="/dashboard/pipeline"
-                      className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1.5 text-[11px] hover:border-amber-500/30"
+                      className="flex items-center gap-1.5 border border-white/[0.06] bg-background px-1.5 py-1 text-[10px] hover:border-amber-500/30"
                     >
                       <Clock className="h-3 w-3 shrink-0 text-amber-400" />
                       {o.isRedacted && (
@@ -475,8 +813,8 @@ export default function DashboardPage() {
                       <span className="truncate text-muted-foreground">
                         {o.firmName}
                       </span>
-                      <span className="ml-auto font-mono text-[10px] tabular-nums text-amber-400">
-                        {o.days}d · {STAGE_LABEL[o.stage] || o.stage}
+                      <span className="ml-auto font-mono text-[9px] tabular-nums text-amber-400">
+                        {o.days}d
                       </span>
                     </Link>
                   ))}
@@ -486,20 +824,20 @@ export default function DashboardPage() {
 
             {/* Top Unrated */}
             <div>
-              <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-primary/80">
-                Top unrated · rate these next
+              <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-wider text-primary/80">
+                Top unrated
               </p>
               {(data?.top_unrated ?? []).length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="px-1 text-[10px] text-muted-foreground">
                   All rated. Discover more.
                 </p>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {data!.top_unrated.map((u) => (
                     <Link
                       key={u.contactId}
                       href="/dashboard/discover"
-                      className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1.5 text-[11px] hover:border-primary/30"
+                      className="flex items-center gap-1.5 border border-white/[0.06] bg-background px-1.5 py-1 text-[10px] hover:border-primary/30"
                     >
                       <Star className="h-3 w-3 shrink-0 text-primary" />
                       <span className="truncate font-bold text-foreground">
@@ -509,7 +847,7 @@ export default function DashboardPage() {
                         {u.firmName}
                       </span>
                       <span
-                        className={`ml-auto font-mono text-[11px] font-bold tabular-nums ${TIER_COLOR[u.tier.toLowerCase()] || "text-zinc-400"}`}
+                        className={`ml-auto font-mono text-[10px] font-bold tabular-nums ${TIER_COLOR[u.tier.toLowerCase()] || "text-zinc-400"}`}
                       >
                         {Math.round(u.score)}
                       </span>
@@ -520,66 +858,76 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Recent Activity */}
-        <div className="flex flex-col border border-white/[0.06] bg-card">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              <Activity className="h-3 w-3" />
-              Recent Activity
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-              Last 8
-            </span>
-          </div>
-          <div className="flex-1 p-3">
-            {(data?.recent_activity ?? []).length === 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                No activity yet. Rate some contacts in Discover.
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {data!.recent_activity.map((a, i) => (
-                  <div
-                    key={`${a.contactId}-${i}`}
-                    className="flex items-center gap-2 border border-white/[0.06] bg-background px-2 py-1.5 text-[11px]"
+      {/* Row 6: Top firms */}
+      <div className="border border-white/[0.06] bg-card">
+        <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-1.5">
+          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+            <Building2 className="h-3 w-3" />
+            Top Firms by Contact Count
+          </span>
+          <Link
+            href="/dashboard/contacts"
+            className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+          >
+            See all
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-1 p-2 sm:grid-cols-4 lg:grid-cols-8">
+          {topFirms.length === 0 ? (
+            <p className="col-span-full px-1 py-1 text-[10px] text-muted-foreground">
+              No firms yet. Import or discover contacts to populate this.
+            </p>
+          ) : (
+            topFirms.map((f) => {
+              const widthPct = Math.max(
+                6,
+                Math.round((f.count / maxFirmCount) * 100),
+              );
+              return (
+                <Link
+                  key={f.firmName}
+                  href={`/dashboard/contacts?firm=${encodeURIComponent(f.firmName)}`}
+                  className="flex flex-col gap-0.5 border border-white/[0.06] bg-background px-2 py-1.5 hover:border-white/[0.18]"
+                >
+                  <p
+                    className="truncate text-[10px] font-bold uppercase tracking-wider text-foreground"
+                    title={f.firmName}
                   >
-                    <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        a.type === "rate"
-                          ? "bg-primary"
-                          : a.type === "pipeline_add"
-                            ? "bg-accent-green"
-                            : "bg-amber-400"
-                      }`}
-                    />
-                    <span className="truncate font-bold text-foreground">
-                      {a.contactName}
+                    {f.firmName}
+                  </p>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="font-mono text-base font-bold tabular-nums text-foreground">
+                      {f.count}
                     </span>
-                    <span className="truncate text-muted-foreground">
-                      {a.firmName}
-                    </span>
-                    <span className="ml-auto text-[10px] text-muted-foreground/80">
-                      {a.detail}
-                    </span>
-                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground/60">
-                      {timeAgo(a.timestamp)}
-                    </span>
+                    {f.hotCount > 0 && (
+                      <span className="flex items-center gap-0.5 font-mono text-[9px] font-bold tabular-nums text-red-400">
+                        <TrendingUp className="h-2.5 w-2.5" />
+                        {f.hotCount} hot
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="h-1 w-full bg-white/[0.04]">
+                    <div
+                      className="h-full bg-accent-teal/70"
+                      style={{ width: `${widthPct}%` }}
+                    />
+                  </div>
+                </Link>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Quick nav strip */}
-      <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-5">
+      {/* Row 7: Quick nav strip */}
+      <div className="grid grid-cols-2 gap-1 sm:grid-cols-5">
         {QUICK_NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
-            className="group flex items-center justify-between gap-2 border border-white/[0.06] bg-card px-3 py-2 text-[11px] text-muted-foreground hover:border-white/[0.18] hover:text-foreground"
+            className="group flex items-center justify-between gap-2 border border-white/[0.06] bg-card px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:border-white/[0.18] hover:text-foreground"
           >
             <span className="flex items-center gap-1.5">
               <Icon className="h-3 w-3" />

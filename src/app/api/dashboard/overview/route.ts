@@ -143,6 +143,33 @@ export async function GET() {
         .filter((x): x is OverdueContact => x !== null);
     }
 
+    // Tier distribution + top firms (single fetch for efficiency)
+    const { data: allTieredContacts } = await supabase
+      .from("AlumniContact")
+      .select("tier, firmName")
+      .eq("importedByUserId", userId);
+
+    const tierCounts = { hot: 0, warm: 0, monitor: 0, cold: 0 };
+    const firmMap = new Map<string, { count: number; hotCount: number }>();
+    for (const c of allTieredContacts || []) {
+      const tier = (c.tier || "cold").toLowerCase();
+      if (tier === "hot") tierCounts.hot++;
+      else if (tier === "warm") tierCounts.warm++;
+      else if (tier === "monitor") tierCounts.monitor++;
+      else tierCounts.cold++;
+
+      const firm = (c.firmName || "").trim();
+      if (!firm) continue;
+      const cur = firmMap.get(firm) || { count: 0, hotCount: 0 };
+      cur.count++;
+      if (tier === "hot") cur.hotCount++;
+      firmMap.set(firm, cur);
+    }
+    const topFirms = Array.from(firmMap.entries())
+      .map(([firmName, v]) => ({ firmName, count: v.count, hotCount: v.hotCount }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
     // Recent activity: last 5 rates + last 5 pipeline entries
     const { data: recentRatings } = await supabase
       .from("UserDiscover")
@@ -195,7 +222,7 @@ export async function GET() {
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
-    const recentActivity = activity.slice(0, 8);
+    const recentActivity = activity.slice(0, 12);
 
     // Top unrated by warmth
     const { data: ratedIds } = await supabase
@@ -298,6 +325,8 @@ export async function GET() {
       top_overdue: topOverdue,
       top_unrated: topUnrated,
       recent_activity: recentActivity,
+      tier_counts: tierCounts,
+      top_firms: topFirms,
       recruiting_date: recruitingDate,
       days_until_recruiting: daysUntilRecruiting,
       weekly_goal_done: weeklyGoalDone || 0,
@@ -322,6 +351,8 @@ export async function GET() {
       top_overdue: [],
       top_unrated: [],
       recent_activity: [],
+      tier_counts: { hot: 0, warm: 0, monitor: 0, cold: 0 },
+      top_firms: [],
     });
   }
 }
