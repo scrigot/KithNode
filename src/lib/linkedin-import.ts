@@ -148,6 +148,17 @@ const FIRM_TIERS: { patterns: RegExp[]; label: string; boost: number }[] = [
 
 function detectSeniority(title: string): { level: string; boost: number } {
   const t = title.toLowerCase();
+  // Network-multiplier roles: department heads / deans / chairs are
+  // structural-hole nodes — they introduce dozens of students per year.
+  if (/\bdean\s+of\b|\b(?:vice|associate)\s*dean\b/i.test(t)) return { level: "Dean", boost: 18 };
+  if (/\bdepartment\s*chair\b|\bchair\s+of\s+(?:the\s+)?(?:department|division|marketing|finance|economics|computer\s*science|cs|business)/i.test(t)) return { level: "Department Chair", boost: 18 };
+  if (/\bhead\s+of\s+(?:department|marketing|engineering|product|sales|research|growth|operations|finance|hr|people|design|data|analytics|partnerships)/i.test(t)) return { level: "Department Head", boost: 18 };
+  // Faculty: senior professors are recruiting goldmines (every alum they ever taught)
+  if (/\b(?:full\s+|tenured\s+)?professor\b/i.test(t)) return { level: "Professor", boost: 14 };
+  if (/\bassoc(?:iate)?\s*professor\b/i.test(t)) return { level: "Associate Professor", boost: 13 };
+  if (/\bassist(?:ant)?\s*professor\b/i.test(t)) return { level: "Assistant Professor", boost: 11 };
+  if (/\blecturer\b|\bteaching\s*professor\b|\bclinical\s*professor\b|\bprofessor\s*of\s*practice\b/i.test(t)) return { level: "Lecturer", boost: 9 };
+  if (/\bphd\s*candidate\b|\bdoctoral\s*candidate\b|\bphd\s*student\b/i.test(t)) return { level: "PhD Candidate", boost: 6 };
   // Senior leadership (universal)
   if (/managing\s*director|partner|principal|founder|ceo|cfo|coo|cto/i.test(t)) return { level: "Senior", boost: 10 };
   // AI-specific roles (matter for frontier labs / startups)
