@@ -50,7 +50,7 @@ interface Contact {
 }
 
 type ViewMode = "browse" | "search";
-type SourceFilter = "alumni" | "professor";
+type SourceFilter = "alumni" | "professor" | "student";
 
 async function rateContact(
   contactId: string,
@@ -292,9 +292,11 @@ export default function DiscoverPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<ViewMode>("browse");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
-    searchParams.get("source") === "professor" ? "professor" : "alumni",
-  );
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(() => {
+    const s = searchParams.get("source");
+    if (s === "professor" || s === "student") return s;
+    return "alumni";
+  });
   const [query, setQuery] = useState("");
   const [activeTier, setActiveTier] = useState<string>("");
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -805,16 +807,24 @@ export default function DiscoverPage() {
         <div className="flex items-end gap-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-              {sourceFilter === "professor" ? "PROFESSORS" : "DISCOVER"}
+              {sourceFilter === "professor"
+                ? "PROFESSORS"
+                : sourceFilter === "student"
+                  ? "ACTIVE STUDENTS"
+                  : "ALUMNI"}
             </h2>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {mode === "browse"
                 ? sourceFilter === "professor"
                   ? "Rate professors from the shared pool"
-                  : "Rate contacts from the shared pool"
+                  : sourceFilter === "student"
+                    ? "Rate active students from the shared pool"
+                    : "Rate contacts from the shared pool"
                 : sourceFilter === "professor"
                   ? "Search the professor network"
-                  : "Search the shared network"}
+                  : sourceFilter === "student"
+                    ? "Search the student network"
+                    : "Search the shared network"}
             </p>
           </div>
 
@@ -839,6 +849,16 @@ export default function DiscoverPage() {
             >
               <GraduationCap className="h-3 w-3" />
               Professors
+            </button>
+            <button
+              onClick={() => handleSourceFilter("student")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                sourceFilter === "student"
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Active Students
             </button>
           </div>
         </div>

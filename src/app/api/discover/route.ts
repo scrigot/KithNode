@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { maybeRedact } from "@/lib/redact";
+import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -13,7 +14,11 @@ export async function GET(request: NextRequest) {
 
   const query = request.nextUrl.searchParams.get("q") || "";
   const tier = request.nextUrl.searchParams.get("tier") || "";
-  const source = request.nextUrl.searchParams.get("source") || "alumni";
+  const rawSource = request.nextUrl.searchParams.get("source") || "alumni";
+  const category: DiscoverCategory = ALL_CATEGORIES.includes(rawSource as DiscoverCategory)
+    ? (rawSource as DiscoverCategory)
+    : "alumni";
+  const allowedSources = sourcesForCategory(category);
 
   // Get IDs user already rated
   const { data: rated } = await supabase
@@ -37,11 +42,7 @@ export async function GET(request: NextRequest) {
   if (tier) {
     builder = builder.eq("tier", tier);
   }
-  if (source === "professor") {
-    builder = builder.eq("source", "professor");
-  } else {
-    builder = builder.neq("source", "professor");
-  }
+  builder = builder.in("source", allowedSources);
 
   const { data: otherData, error: otherError } = await builder
     .order("warmthScore", { ascending: false })
@@ -69,11 +70,7 @@ export async function GET(request: NextRequest) {
     if (tier) {
       ownBuilder = ownBuilder.eq("tier", tier);
     }
-    if (source === "professor") {
-      ownBuilder = ownBuilder.eq("source", "professor");
-    } else {
-      ownBuilder = ownBuilder.neq("source", "professor");
-    }
+    ownBuilder = ownBuilder.in("source", allowedSources);
 
     const { data: ownData } = await ownBuilder
       .order("warmthScore", { ascending: false })
