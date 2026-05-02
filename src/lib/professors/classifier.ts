@@ -45,7 +45,7 @@ const DEFAULT_FALLBACK = (prof: ProfessorInput): ClassifierOutput => ({
 export async function classifyProfessor(prof: ProfessorInput): Promise<ClassifierOutput> {
   try {
     const { object } = await generateObject({
-      model: gateway("anthropic/claude-haiku-4-5"),
+      model: gateway("anthropic/claude-haiku-4.5"),
       schema: ClassifierSchema,
       system: SYSTEM_PROMPT,
       prompt: buildPrompt(prof),

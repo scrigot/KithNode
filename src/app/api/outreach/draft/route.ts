@@ -136,7 +136,7 @@ Return ONLY valid JSON with exactly two keys:
 The subject should be casual and warm, under 60 characters. The body should feel like a real person wrote it, not AI.`;
 
     const { text } = await generateText({
-      model: gateway("anthropic/claude-sonnet-4.6"),
+      model: gateway("anthropic/claude-sonnet-4.5"),
       prompt,
     });
 

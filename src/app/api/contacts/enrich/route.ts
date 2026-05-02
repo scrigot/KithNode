@@ -51,11 +51,17 @@ async function enrichOne(contact: {
 }): Promise<EnrichedFields | null> {
   try {
     const { text } = await generateText({
-      model: gateway("anthropic/claude-sonnet-4.6"),
+      model: gateway("anthropic/claude-sonnet-4.5"),
       prompt: buildPrompt(contact),
     });
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    if (!jsonMatch) {
+      console.error("enrichOne: no JSON in model output", {
+        name: contact.name,
+        sample: text.slice(0, 200),
+      });
+      return null;
+    }
     const parsed = JSON.parse(jsonMatch[0]);
     return {
       industry: ALLOWED_INDUSTRIES.includes(String(parsed.industry || ""))
@@ -67,7 +73,11 @@ async function enrichOne(contact: {
       education: String(parsed.education || ""),
       location: String(parsed.location || ""),
     };
-  } catch {
+  } catch (err) {
+    console.error("enrichOne: gateway call failed", {
+      name: contact.name,
+      err: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
