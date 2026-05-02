@@ -16,7 +16,7 @@ export interface AlumniSeed {
   location: string;
   /** CSV of tags: proftype:X, research areas, paper:X, etc. */
   affiliations: string;
-  source: "kenan_faculty" | "kenan_news_alumni" | "unc_greek_clubs" | "industry_adjunct";
+  source: "kenan_faculty" | "kenan_news_alumni" | "unc_greek_clubs" | "unc_student_orgs" | "industry_adjunct";
   seniorityLevel?: string;
   researchAreas?: string[];
 }
