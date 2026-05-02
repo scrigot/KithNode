@@ -69,25 +69,44 @@ export default function ContactsPage() {
   const handleEnrich = async () => {
     setEnriching(true);
     setStatusMsg(null);
+    let totalEnriched = 0;
+    let totalFailed = 0;
+    let safetyCap = 0;
     try {
-      const res = await apiFetch("/api/contacts/enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (res.status === 402) {
-        setStatusMsg({
-          kind: "upgrade",
-          text: "Enrich is a Pro feature. Upgrade to use it.",
+      // Loop client-side until the server reports zero unenriched left,
+      // or the safety cap (40 batches × 25 = 1000 contacts) trips.
+      while (safetyCap < 40) {
+        const res = await apiFetch("/api/contacts/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
         });
-        return;
+        if (res.status === 402) {
+          setStatusMsg({
+            kind: "upgrade",
+            text: "Enrich is a Pro feature. Upgrade to use it.",
+          });
+          return;
+        }
+        if (!res.ok) throw new Error("Enrich failed");
+        const data = await res.json();
+        totalEnriched += data.enriched || 0;
+        totalFailed += data.failed || 0;
+        // Server returns total=0 when there's nothing left to enrich.
+        // Stop also if a batch returned no successes (avoid infinite loop on persistent failures).
+        if ((data.total || 0) === 0 || (data.enriched || 0) === 0) break;
+        // Progress update during the loop.
+        setStatusMsg({
+          kind: "success",
+          text: `Enriching... ${totalEnriched} done so far`,
+        });
+        setRefreshKey((k) => k + 1);
+        safetyCap += 1;
       }
-      if (!res.ok) throw new Error("Enrich failed");
-      const data = await res.json();
-      const failedSuffix = data.failed > 0 ? ` (${data.failed} failed)` : "";
+      const failedSuffix = totalFailed > 0 ? ` (${totalFailed} failed)` : "";
       setStatusMsg({
         kind: "success",
-        text: `Enriched ${data.enriched} of ${data.total} contacts${failedSuffix}`,
+        text: `Enriched ${totalEnriched} contacts${failedSuffix}`,
       });
       setRefreshKey((k) => k + 1);
     } catch {
