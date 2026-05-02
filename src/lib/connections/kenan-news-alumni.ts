@@ -15,10 +15,19 @@ const NEWS_BASE = `${BASE_URL}/news/`;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// Matches "First Last (BSBA '09)", "First Last (MBA 2018)", etc.
-// Group 1: full name, Group 2: degree, Group 3: year
+// Matches Kenan-Flagler alumni mentions in news bodies.
+//
+// Real-world formats observed on /news/ pages:
+//   "Lisa Yuan (MBA ’09)"           — curly apostrophe ’ (U+2019)
+//   "Some Person (PhD ‘20)"         — curly apostrophe ‘ (U+2018)
+//   "Some Person (MBA '09)"         — ASCII straight quote
+//   "Some Person (MBA 2018)"        — full year, no apostrophe
+//   "Some Person (BA ’89, MBA ’20)" — multi-degree, captures FIRST degree's year
+//
+// Group 1: full name (2-3 capitalized words). Group 2: 2 or 4 digit year.
+// Year normalization to 4-digit happens downstream.
 const ALUMNI_RE =
-  /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)\s*\(\s*(?:BSBA|BBA|MBA|PhD|MAC)\s*['']?(\d{2,4})\s*\)/g;
+  /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s*\(\s*(?:BA|BSBA|BBA|EMBA|MBA|PhD|MAC)[\s'‘’]*(\d{2,4})/g;
 
 // Matches story links on the news index page
 const STORY_LINK_RE = /^https?:\/\/www\.kenan-flagler\.unc\.edu\/news\/[^?#]+\/?$/;
