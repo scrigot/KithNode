@@ -61,10 +61,8 @@ export function extractProfileUrls(html: string): string[] {
     const href = $(el).attr("href") || "";
     // Resolve relative URLs
     let full = href.startsWith("http") ? href : `${BASE_URL}${href}`;
-    // Strip trailing slash for dedup normalisation
-    full = full.replace(/\/$/, "");
-    const withSlash = full + "/";
-    if (PROFILE_URL_RE.test(withSlash) || PROFILE_URL_RE.test(full)) {
+    full = full.replace(/\/?$/, "/");
+    if (PROFILE_URL_RE.test(full)) {
       urls.push(full);
     }
   });
