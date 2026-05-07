@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { apiFetch } from "@/lib/api-client";
 import {
   Upload,
@@ -21,30 +20,22 @@ import {
   Building2,
   TrendingUp,
 } from "lucide-react";
-
-// Recharts is heavy + client-only; lazy load to keep dashboard TTI snappy
-const ResponsiveContainer = dynamic(
-  () => import("recharts").then((m) => m.ResponsiveContainer),
-  { ssr: false },
-);
-const BarChart = dynamic(
-  () => import("recharts").then((m) => m.BarChart),
-  { ssr: false },
-);
-const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
-const XAxis = dynamic(() => import("recharts").then((m) => m.XAxis), { ssr: false });
-const YAxis = dynamic(() => import("recharts").then((m) => m.YAxis), { ssr: false });
-const Cell = dynamic(() => import("recharts").then((m) => m.Cell), { ssr: false });
-const Tooltip = dynamic(() => import("recharts").then((m) => m.Tooltip), { ssr: false });
-const PieChart = dynamic(
-  () => import("recharts").then((m) => m.PieChart),
-  { ssr: false },
-);
-const Pie = dynamic(() => import("recharts").then((m) => m.Pie), { ssr: false });
-const LabelList = dynamic(
-  () => import("recharts").then((m) => m.LabelList),
-  { ssr: false },
-);
+// Direct imports — recharts uses runtime introspection of <Cell> children,
+// which breaks when Cell is wrapped by next/dynamic (the wrapper isn't
+// recognized as a Cell, so per-bar/per-slice fills get dropped, hence the
+// previously all-black/all-grey charts).
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Cell,
+  Tooltip,
+  PieChart,
+  Pie,
+  LabelList,
+} from "recharts";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";

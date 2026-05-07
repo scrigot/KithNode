@@ -128,7 +128,9 @@ const ELITE_BOUTIQUE = [/evercore/i, /lazard/i, /centerview/i, /moelis/i, /perel
 const MEGA_PE = [/blackstone/i, /kkr\b/i, /carlyle/i, /apollo\s*(?:global)?/i, /warburg/i, /tpg\b/i, /thoma\s*bravo/i, /vista\s*equity/i, /silver\s*lake/i, /bain\s*capital/i, /general\s*atlantic/i, /advent\s*international/i, /hellman/i, /leonard\s*green/i, /ares\s*management/i, /providence\s*equity/i, /welsh\s*carson/i];
 const HEDGE_FUNDS = [/citadel/i, /point72/i, /two\s*sigma/i, /bridgewater/i, /millennium/i, /de\s*shaw/i, /jane\s*street/i, /hudson\s*river/i, /jump\s*trading/i, /tower\s*research/i, /renaissance/i, /man\s*group/i, /aqr/i, /elliott/i, /baupost/i];
 const MBB = [/mckinsey/i, /boston\s*consulting|bcg\b/i, /\bbain\b(?!\s*capital)/i];
-const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|ey\b/i, /kpmg/i];
+// Note: \bEY\b on BOTH sides — without leading boundary, /ey\b/ matches the
+// trailing "ey" of any word ending that way (e.g. "Bentley", "honey").
+const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|\bey\b/i, /kpmg/i];
 
 // CS-strong schools, applied as a separate affiliation chip when the contact's
 // education field matches. Independent of user's "Same School" boost.
@@ -266,13 +268,32 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
   const educationText = meta.education || "";
   const locationText = meta.location || "";
 
+  // Detect K-12 students from the education field. We never want a high
+  // schooler whose self-reported title is "Founder" of a teen project to
+  // get the same +10 leadership boost as a Goldman MD.
+  const isPreCollege =
+    /\bhigh\s*school\b/i.test(educationText) ||
+    /\bcountry\s*day(\s*school)?\b/i.test(educationText) ||
+    /\bpreparatory(\s*school)?\b/i.test(educationText) ||
+    /\bprep\s*school\b/i.test(educationText) ||
+    /\bcharter\s*school\b/i.test(educationText) ||
+    /\bjunior\s*high\b/i.test(educationText) ||
+    /\bmiddle\s*school\b/i.test(educationText);
+
   // Detect "current student / incoming" so we don't credit them as full-time
   const isCurrentStudent =
+    isPreCollege ||
     /\buniversity\b/i.test(companyText) ||
     /\bstudent\b/i.test(titleText) ||
     /\bincoming\b/i.test(titleText) ||
     /\bintern\b/i.test(titleText) ||
     /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText);
+
+  // Surface the pre-college signal so the user sees it instead of guessing
+  // why a fancy-sounding founder-titled contact is rated low.
+  if (isPreCollege) {
+    affiliations.push({ name: "Pre-College", boost: 0 });
+  }
 
   // ── Universal firm tier ──
   for (const tier of FIRM_TIERS) {
