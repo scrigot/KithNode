@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef } from "react";
 import {
   motion,
@@ -220,16 +221,12 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             }}
           >
             {children}
-            <button
-              onClick={() => {
-                document
-                  .getElementById("how-it-works")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
+            <Link
+              href="/demo"
               className="rounded-lg border border-white/40 px-10 py-4 text-base font-medium text-white transition-all hover:bg-white/10"
             >
               Watch the 90-second demo
-            </button>
+            </Link>
           </motion.div>
 
           {/* Footer credit */}
