@@ -172,7 +172,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
                     : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
                 }
               />
-              Private alpha &middot; free for founding users
+              Private alpha &middot; 17 of 50 founding seats left
             </span>
           </motion.div>
 
@@ -182,10 +182,10 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               Break into finance
             </motion.span>
             <motion.span className="block text-white/90" variants={LV}>
-              through the people
+              through the alumni
             </motion.span>
-            <motion.span className="block text-white/90" variants={LV}>
-              you already know.
+            <motion.span className="block text-[#D7F548]" variants={LV}>
+              who&apos;d take your call.
             </motion.span>
           </h1>
 
@@ -201,9 +201,9 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            KithNode maps every UNC alum, Greek life brother, and NC native
-            across 50+ target firms &mdash; scores the warmest paths &mdash;
-            and drafts outreach that actually gets replies.
+            Every alum, every mutual, every classmate at every firm on your
+            target list. Mapped, scored, and drafted. Your first warm intro
+            ships in 90 seconds.
           </motion.p>
 
           {/* CTA buttons */}
@@ -228,7 +228,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               }}
               className="rounded-lg border border-white/40 px-10 py-4 text-base font-medium text-white transition-all hover:bg-white/10"
             >
-              See it in action
+              Watch the 90-second demo
             </button>
           </motion.div>
 
@@ -244,9 +244,8 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            Built on a proven playbook by a Fortune 500 intern &mdash; 500+ real
-            alumni mapped, scored, and activated before writing a single line of
-            outreach.
+            500+ alumni mapped. 32% reply rate. 23 founding students already
+            shipping intros.
           </motion.p>
         </motion.div>
       </motion.div>
