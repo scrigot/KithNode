@@ -75,7 +75,7 @@ const STAGE_FILL: Record<string, string> = {
   email_sent: "#38bdf8",
   follow_up: "#fbbf24",
   responded: "#4ade80",
-  meeting_set: "#a78bfa",
+  meeting_set: "#22D3EE",
 };
 
 const TIER_COLOR: Record<string, string> = {
@@ -119,7 +119,7 @@ const QUICK_NAV = [
 ];
 
 function timeAgo(iso: string): string {
-  const diff = new Date("2026-05-14T20:00:00Z").getTime() - new Date(iso).getTime();
+  const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60_000);
   if (m < 1) return "now";
   if (m < 60) return `${m}m ago`;
@@ -547,7 +547,7 @@ export default function SandboxOverviewPage() {
                 OVERVIEW
               </h2>
               <span className="flex items-center gap-1 border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                <span className="h-1.5 w-1.5 animate-pulse bg-primary" />
                 LIVE DEMO
               </span>
             </div>

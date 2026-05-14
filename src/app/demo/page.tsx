@@ -129,7 +129,7 @@ export default function DemoPage() {
       {/* Panel preview band */}
       <section className="relative border-t border-white/[0.06] bg-black py-16">
         <div className="relative mx-auto max-w-[1200px] px-6">
-          <div className="mb-10 text-center">
+          <div className="mb-10">
             <h2 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
               How it works, end to end.
             </h2>

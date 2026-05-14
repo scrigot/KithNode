@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Bell, Mail } from "lucide-react";
+import { Search, Bell, Compass } from "lucide-react";
 import { SANDBOX_OVERVIEW } from "../_data";
 
 export function SandboxTopBar() {
@@ -44,7 +44,7 @@ export function SandboxTopBar() {
           aria-label="Unrated discoveries"
           className="relative border border-white/[0.06] bg-card p-1.5 hover:border-white/[0.18]"
         >
-          <Mail size={14} className="text-text-secondary" />
+          <Compass size={14} className="text-text-secondary" />
           {unread > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center border border-bg-secondary bg-accent-teal px-1 font-mono text-[9px] font-bold tabular-nums text-bg-primary">
               {unread}
