@@ -36,6 +36,8 @@ import {
   Pie,
   LabelList,
 } from "recharts";
+import { NetworkGrowthChart } from "./_components/network-growth-chart";
+import { QuickActionRail } from "./_components/quick-action-rail";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -181,13 +183,21 @@ export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayScore, setDisplayScore] = useState(0);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchOverview = useCallback(async () => {
     try {
       const res = await apiFetch("/api/dashboard/overview");
-      if (res.ok) setData(await res.json());
-    } catch {
-      // silent
+      if (res.ok) {
+        setData(await res.json());
+        setFetchError(null);
+      } else {
+        setFetchError(`Overview unavailable (HTTP ${res.status}). Retry?`);
+      }
+    } catch (err) {
+      setFetchError(
+        err instanceof Error ? err.message : "Network error loading overview."
+      );
     }
     setLoading(false);
   }, []);
@@ -258,6 +268,32 @@ export default function DashboardPage() {
         <div className="mt-2 grid grid-cols-2 gap-2">
           <div className="h-48 animate-pulse bg-muted" />
           <div className="h-48 animate-pulse bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError && !data) {
+    return (
+      <div className="p-5">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
+          OVERVIEW
+        </h2>
+        <div className="mt-3 h-px bg-border" />
+        <div className="mt-6 border border-amber-500/30 bg-amber-500/10 p-5">
+          <p className="text-[12px] font-bold uppercase tracking-wider text-amber-300">
+            Overview failed to load
+          </p>
+          <p className="mt-2 text-[12px] text-muted-foreground">{fetchError}</p>
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetchOverview();
+            }}
+            className="mt-4 border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground hover:bg-white/10"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -380,7 +416,8 @@ export default function DashboardPage() {
   const maxFirmCount = Math.max(1, ...topFirms.map((f) => f.count));
 
   return (
-    <div className="flex min-h-full flex-col gap-2 p-4">
+    <div className="flex min-h-full">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
@@ -428,6 +465,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Row 0: Hero growth chart */}
+      <NetworkGrowthChart />
 
       {/* Row 1: KPI strip (6 cols) */}
       <div className="grid grid-cols-3 gap-1 md:grid-cols-6">
@@ -928,6 +968,8 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+      </div>
+      <QuickActionRail />
     </div>
   );
 }
