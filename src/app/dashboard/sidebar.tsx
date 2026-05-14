@@ -16,17 +16,33 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronRight,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/contacts", label: "Warm Signals", icon: Users },
-  { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch },
-  { href: "/dashboard/discover", label: "Discover", icon: Compass },
-  { href: "/dashboard/import", label: "Import", icon: Upload },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+const NAV_GROUPS = [
+  {
+    label: "PAGES",
+    items: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard, countKey: null },
+      { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, countKey: "warm_signals" },
+      { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, countKey: "pipeline" },
+      { href: "/dashboard/discover", label: "Discover", icon: Compass, countKey: "discover" },
+    ],
+  },
+  {
+    label: "DATA",
+    items: [
+      { href: "/dashboard/import", label: "Import", icon: Upload, countKey: null },
+    ],
+  },
+  {
+    label: "ACCOUNT",
+    items: [
+      { href: "/dashboard/settings", label: "Settings", icon: Settings, countKey: null },
+      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, countKey: null },
+    ],
+  },
 ];
 
 function SubBadge({
@@ -57,12 +73,14 @@ function NavContent({
   userName,
   subscriptionStatus,
   trialDaysLeft,
+  counts,
   onNavClick,
 }: {
   pathname: string;
   userName: string;
   subscriptionStatus: string | null;
   trialDaysLeft: number | null;
+  counts: Record<string, number>;
   onNavClick?: () => void;
 }) {
   const initials =
@@ -87,34 +105,43 @@ function NavContent({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-2">
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href;
-          const Icon = item.icon;
-          const showSeparator = item.label === "Import";
-          return (
-            <div key={item.href}>
-              {showSeparator && (
-                <div className="mx-3 my-1.5 border-t border-white/[0.06]" />
-              )}
-              <Link
-                href={item.href}
-                onClick={onNavClick}
-                className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-200 border-l-2 ${
-                  active
-                    ? "bg-accent-teal/10 text-accent-teal font-medium border-accent-teal shadow-[inset_4px_0_12px_-6px_rgba(14,165,233,0.3)]"
-                    : "border-transparent text-text-secondary hover:bg-white/[0.04] hover:text-white"
-                }`}
-              >
-                <Icon
-                  size={18}
-                  strokeWidth={active ? 2.2 : 1.8}
-                  className={active ? "text-accent-teal drop-shadow-[0_0_8px_rgba(14,165,233,0.4)]" : ""}
-                />
-                {item.label}
-              </Link>
-            </div>
-          );
-        })}
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="mb-3">
+            <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
+              {group.label}
+            </p>
+            {group.items.map((item) => {
+              const active = pathname === item.href;
+              const Icon = item.icon;
+              const count = item.countKey != null ? (counts[item.countKey] ?? 0) : 0;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavClick}
+                  className={`mb-0.5 flex items-center gap-3 px-3 py-2.5 text-[13px] transition-all duration-200 border-l-2 ${
+                    active
+                      ? "bg-accent-teal/10 text-accent-teal font-medium border-accent-teal shadow-[inset_4px_0_12px_-6px_rgba(14,165,233,0.3)]"
+                      : "border-transparent text-text-secondary hover:bg-white/[0.04] hover:text-white"
+                  }`}
+                >
+                  <Icon
+                    size={18}
+                    strokeWidth={active ? 2.2 : 1.8}
+                    className={active ? "text-accent-teal drop-shadow-[0_0_8px_rgba(14,165,233,0.4)]" : ""}
+                  />
+                  <span className="flex-1">{item.label}</span>
+                  {count > 0 && (
+                    <span className="ml-auto border border-white/[0.08] bg-white/[0.04] px-1 font-mono text-[9px] font-bold tabular-nums text-foreground">
+                      {count}
+                    </span>
+                  )}
+                  <ChevronRight size={12} className="text-text-muted" />
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* User section */}
@@ -154,6 +181,7 @@ export function Sidebar({ userName }: { userName: string }) {
   const [open, setOpen] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +191,12 @@ export function Sidebar({ userName }: { userName: string }) {
         if (cancelled || !d) return;
         setSubscriptionStatus(d.subscription_status ?? null);
         setTrialDaysLeft(d.trial_days_left ?? null);
+        const tc = d.tier_counts ?? { hot: 0, warm: 0, monitor: 0, cold: 0 };
+        setCounts({
+          warm_signals: (tc.hot || 0) + (tc.warm || 0),
+          pipeline: d.reminders_count || 0,
+          discover: (d.top_unrated || []).length,
+        });
       })
       .catch(() => {});
     return () => {
@@ -179,6 +213,7 @@ export function Sidebar({ userName }: { userName: string }) {
           userName={userName}
           subscriptionStatus={subscriptionStatus}
           trialDaysLeft={trialDaysLeft}
+          counts={counts}
         />
       </aside>
 
@@ -225,6 +260,7 @@ export function Sidebar({ userName }: { userName: string }) {
           userName={userName}
           subscriptionStatus={subscriptionStatus}
           trialDaysLeft={trialDaysLeft}
+          counts={counts}
           onNavClick={() => setOpen(false)}
         />
       </aside>
