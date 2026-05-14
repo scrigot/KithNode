@@ -76,29 +76,14 @@ export function QuickActionRail() {
     });
   }
 
-  async function updateTarget(delta: number) {
+  function updateTarget(delta: number) {
     const next = Math.max(1, Math.min(20, target + delta));
     setLocalTarget(next);
-    try {
-      const res = await apiFetch("/api/user", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weekly_goal_target: next }),
-      });
-      if (!res.ok) {
-        setSaveHint("Saved locally, sync TBD");
-      } else {
-        setSaveHint(null);
-      }
-    } catch {
-      setSaveHint("Saved locally, sync TBD");
-    }
+    setSaveHint("Local only — persistence coming soon");
   }
 
   function applyFilter() {
-    const tiers = Array.from(selectedTiers).join(",");
-    if (tiers) router.push(`/dashboard/contacts?tier=${tiers}`);
-    else router.push("/dashboard/contacts");
+    router.push("/dashboard/contacts");
   }
 
   return (

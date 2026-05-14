@@ -83,7 +83,7 @@ export function NetworkGrowthChart() {
             WARM SIGNALS GROWTH
           </p>
           <div className="mt-0.5 flex items-baseline gap-3">
-            <span className="font-mono text-3xl font-bold tabular-nums text-accent-green">
+            <span className="font-mono text-3xl font-bold tabular-nums text-accent-teal">
               {series?.total ?? 0}
             </span>
             <span
@@ -131,8 +131,8 @@ export function NetworkGrowthChart() {
             >
               <defs>
                 <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22C55E" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="#22C55E" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -164,7 +164,7 @@ export function NetworkGrowthChart() {
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="#22C55E"
+                stroke="#0EA5E9"
                 strokeWidth={1.5}
                 fill="url(#growthFill)"
                 isAnimationActive={false}
