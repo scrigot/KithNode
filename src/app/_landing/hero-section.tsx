@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { Suspense, useRef } from "react";
 import {
   motion,
   useReducedMotion,
@@ -9,9 +9,7 @@ import {
   useTransform,
 } from "framer-motion";
 import { HeroNetwork } from "./hero-network";
-
-const NOISE_URI =
-  "url(\"data:image/svg+xml;utf8,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+import { Starfield } from "./starfield";
 
 const lineVariants = {
   hidden: { opacity: 0, y: 14, filter: "blur(8px)" },
@@ -28,6 +26,15 @@ const reducedLineVariants = {
   visible: { opacity: 1, transition: { duration: 0.3 } },
 };
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: "easeOut" as const },
+  },
+};
+
 export function HeroSection({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
@@ -36,119 +43,59 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
     target: ref,
     offset: ["start start", "end start"],
   });
-
-  const shapesY = useTransform(scrollYProgress, [0, 1], [0, 120]);
-  const contentY = useTransform(scrollYProgress, [0, 1], [0, -30]);
+  const contentY = useTransform(scrollYProgress, [0, 1], [0, -40]);
 
   const LV = reduce ? reducedLineVariants : lineVariants;
 
   return (
-    <section ref={ref} className="relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0369A1] via-[#0EA5E9] to-[#06B6D4]" />
+    <section
+      ref={ref}
+      className="relative min-h-screen overflow-hidden bg-black"
+    >
+      {/* Twinkling starfield */}
+      <Starfield />
 
-      <div className="absolute inset-0">
-        <HeroNetwork />
-      </div>
-
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        style={{ y: reduce ? 0 : shapesY }}
-      >
-        <motion.div
-          className="absolute -right-20 -top-20 h-[600px] w-[600px] rotate-12 bg-gradient-to-br from-[#06B6D4]/60 to-[#22D3EE]/40"
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, 14, -8, 0], y: [0, -10, 6, 0], rotate: [12, 13.5, 11, 12] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : { duration: 22, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
-        <motion.div
-          className="absolute -left-40 bottom-0 h-[500px] w-[700px] -rotate-6 bg-gradient-to-tr from-[#0284C7]/50 to-[#0EA5E9]/30"
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, -12, 8, 0], y: [0, 8, -6, 0], rotate: [-6, -4.5, -7, -6] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : { duration: 25, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
-        <motion.div
-          className="absolute right-10 bottom-20 h-[400px] w-[400px] rotate-45 bg-gradient-to-bl from-[#22D3EE]/30 to-transparent"
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, 10, -6, 0], y: [0, -8, 4, 0], rotate: [45, 46.5, 43.5, 45] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : { duration: 18, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
-        <motion.div
-          className="absolute -left-10 -top-10 h-[300px] w-[500px] rotate-3 bg-gradient-to-r from-[#0369A1]/40 to-transparent"
-          animate={
-            reduce
-              ? undefined
-              : { x: [0, 8, -4, 0], y: [0, 4, -2, 0], rotate: [3, 4, 2, 3] }
-          }
-          transition={
-            reduce
-              ? undefined
-              : { duration: 20, repeat: Infinity, ease: "easeInOut" }
-          }
-        />
-      </motion.div>
-
+      {/* Soft cyan glow behind the network column */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
+        className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block"
         style={{
           background:
-            "radial-gradient(ellipse 60% 50% at 50% 45%, rgba(255,255,255,0.18), rgba(255,255,255,0) 70%)",
+            "radial-gradient(ellipse 55% 55% at 60% 50%, rgba(34,211,238,0.18), rgba(34,211,238,0) 70%)",
         }}
       />
 
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 mix-blend-overlay"
-        style={{ backgroundImage: NOISE_URI, opacity: 0.05 }}
-      />
-
+      {/* Two-column hero */}
       <motion.div
-        className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4"
+        className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col items-center gap-12 px-6 py-24 lg:flex-row lg:items-center lg:gap-12 lg:px-12 lg:py-0"
         style={{ y: reduce ? 0 : contentY }}
       >
+        {/* LEFT: copy column */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={{
             hidden: {},
-            visible: { transition: { staggerChildren: 0.14, delayChildren: 0.05 } },
+            visible: {
+              transition: { staggerChildren: 0.14, delayChildren: 0.05 },
+            },
           }}
-          className="flex flex-col items-center text-center"
+          className="flex flex-col items-start text-left lg:flex-[3]"
         >
+          {/* Pill badge */}
           <motion.div
             variants={{
               hidden: { opacity: 0, y: -10 },
               visible: {
                 opacity: 1,
                 y: 0,
-                transition: { duration: 0.5, ease: "easeOut" },
+                transition: { duration: 0.5, ease: "easeOut" as const },
               },
             }}
           >
-            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
               <motion.span
-                className="h-1.5 w-1.5 rounded-full bg-[#D7F548]"
+                className="h-1.5 w-1.5 rounded-full bg-cyan-300"
                 animate={
                   reduce
                     ? undefined
@@ -167,28 +114,26 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             </span>
           </motion.div>
 
-          <h1 className="font-heading text-5xl font-bold tracking-tight text-white sm:text-7xl">
+          {/* Headline with gradient on the third line */}
+          <h1 className="font-heading text-5xl font-bold tracking-tight text-white sm:text-6xl xl:text-7xl">
             <motion.span className="block" variants={LV}>
               Find a warm path
             </motion.span>
-            <motion.span className="block text-white/90" variants={LV}>
+            <motion.span className="block text-white/80" variants={LV}>
               into every firm
             </motion.span>
-            <motion.span className="block text-[#D7F548]" variants={LV}>
+            <motion.span
+              className="block bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-500 bg-clip-text text-transparent"
+              variants={LV}
+            >
               on your target list.
             </motion.span>
           </h1>
 
+          {/* Subhead */}
           <motion.p
-            className="mt-8 max-w-2xl text-xl leading-relaxed text-white/85"
-            variants={{
-              hidden: { opacity: 0, y: 16 },
-              visible: {
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.6, ease: "easeOut" },
-              },
-            }}
+            className="mt-8 max-w-xl text-lg leading-relaxed text-white/70 lg:text-xl"
+            variants={fadeUp}
           >
             KithNode maps every alum at the firms you care about, ranks each
             warm path by shared signals (school, club, Greek, hometown), and
@@ -196,42 +141,36 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             cold emails.
           </motion.p>
 
+          {/* CTAs */}
           <motion.div
-            className="mt-12 flex flex-col items-center gap-4 sm:flex-row"
-            variants={{
-              hidden: { opacity: 0, y: 16, scale: 0.95 },
-              visible: {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
-              },
-            }}
+            className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center"
+            variants={fadeUp}
           >
             {children}
             <Link
               href="/demo"
-              className="rounded-lg border border-white/40 px-10 py-4 text-base font-medium text-white transition-all hover:bg-white/10"
+              className="rounded-lg border border-white/20 bg-white/5 px-10 py-4 text-center text-base font-medium text-white backdrop-blur-sm transition-all hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-100"
             >
               Watch a warm path get found
             </Link>
           </motion.div>
 
+          {/* Footer credit */}
           <motion.p
-            className="mt-10 max-w-xl text-sm text-white/70"
-            variants={{
-              hidden: { opacity: 0, y: 10 },
-              visible: {
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.6, ease: "easeOut" },
-              },
-            }}
+            className="mt-10 max-w-xl text-sm text-white/50"
+            variants={fadeUp}
           >
             500+ alumni mapped. 32% reply rate. 23 founding students already
             shipping intros.
           </motion.p>
         </motion.div>
+
+        {/* RIGHT: spinning 3D node network */}
+        <div className="relative h-[420px] w-full lg:h-[640px] lg:flex-[2]">
+          <Suspense fallback={<div className="h-full w-full" />}>
+            <HeroNetwork />
+          </Suspense>
+        </div>
       </motion.div>
     </section>
   );

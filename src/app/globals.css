@@ -241,3 +241,32 @@
     opacity: 1;
   }
 }
+
+@keyframes kn-twinkle {
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes kn-shoot {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--kn-dx, 0), var(--kn-dy, 0));
+    opacity: 0;
+  }
+}
