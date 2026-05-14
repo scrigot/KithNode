@@ -10,7 +10,6 @@ import {
 } from "framer-motion";
 import { HeroNetwork } from "./hero-network";
 
-// Inline SVG noise as a data URI. Small, crisp, no network hit.
 const NOISE_URI =
   "url(\"data:image/svg+xml;utf8,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
@@ -38,24 +37,19 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
     offset: ["start start", "end start"],
   });
 
-  // Parallax: shapes drift slower/farther than the network.
   const shapesY = useTransform(scrollYProgress, [0, 1], [0, 120]);
-  const networkY = useTransform(scrollYProgress, [0, 1], [0, 60]);
   const contentY = useTransform(scrollYProgress, [0, 1], [0, -30]);
 
   const LV = reduce ? reducedLineVariants : lineVariants;
 
   return (
     <section ref={ref} className="relative overflow-hidden">
-      {/* Base gradient — unchanged palette */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0369A1] via-[#0EA5E9] to-[#06B6D4]" />
 
-      {/* Network graph sits above base gradient, BEHIND accent shapes */}
       <div className="absolute inset-0">
-        <HeroNetwork parallaxY={networkY} />
+        <HeroNetwork />
       </div>
 
-      {/* Rotated accent shapes with slow drift + scroll parallax */}
       <motion.div
         className="pointer-events-none absolute inset-0"
         style={{ y: reduce ? 0 : shapesY }}
@@ -114,7 +108,6 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
         />
       </motion.div>
 
-      {/* Soft radial glow behind the headline */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -124,14 +117,12 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
         }}
       />
 
-      {/* Grain overlay — above gradient, below content */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 mix-blend-overlay"
         style={{ backgroundImage: NOISE_URI, opacity: 0.05 }}
       />
 
-      {/* Hero text content — vertically centered in viewport */}
       <motion.div
         className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4"
         style={{ y: reduce ? 0 : contentY }}
@@ -145,7 +136,6 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
           }}
           className="flex flex-col items-center text-center"
         >
-          {/* Pill badge */}
           <motion.div
             variants={{
               hidden: { opacity: 0, y: -10 },
@@ -177,20 +167,18 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             </span>
           </motion.div>
 
-          {/* Headline — line-by-line blur-to-sharp */}
           <h1 className="font-heading text-5xl font-bold tracking-tight text-white sm:text-7xl">
             <motion.span className="block" variants={LV}>
-              Break into finance
+              Find a warm path
             </motion.span>
             <motion.span className="block text-white/90" variants={LV}>
-              through the alumni
+              into every firm
             </motion.span>
             <motion.span className="block text-[#D7F548]" variants={LV}>
-              who&apos;d take your call.
+              on your target list.
             </motion.span>
           </h1>
 
-          {/* Subheading */}
           <motion.p
             className="mt-8 max-w-2xl text-xl leading-relaxed text-white/85"
             variants={{
@@ -202,12 +190,12 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            Every alum, every mutual, every classmate at every firm on your
-            target list. Mapped, scored, and drafted. Your first warm intro
-            ships in 90 seconds.
+            KithNode maps every alum at the firms you care about, ranks each
+            warm path by shared signals (school, club, Greek, hometown), and
+            drafts the message. Warm intros land replies 5x more often than
+            cold emails.
           </motion.p>
 
-          {/* CTA buttons */}
           <motion.div
             className="mt-12 flex flex-col items-center gap-4 sm:flex-row"
             variants={{
@@ -225,11 +213,10 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               href="/demo"
               className="rounded-lg border border-white/40 px-10 py-4 text-base font-medium text-white transition-all hover:bg-white/10"
             >
-              Watch the 90-second demo
+              Watch a warm path get found
             </Link>
           </motion.div>
 
-          {/* Footer credit */}
           <motion.p
             className="mt-10 max-w-xl text-sm text-white/70"
             variants={{
@@ -249,4 +236,3 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
     </section>
   );
 }
-
