@@ -8,6 +8,27 @@ import { motion, useInView } from "framer-motion";
 // Dense mesh -- more nodes + edges than solutions-section (this is the climax)
 // ---------------------------------------------------------------------------
 
+const TRUST_SCHOOLS = [
+  "UNC",
+  "Wharton",
+  "Stern",
+  "Booth",
+  "Georgetown",
+  "Harvard",
+  "Yale",
+  "Princeton",
+  "Columbia",
+  "MIT",
+  "Stanford",
+  "Duke",
+  "Cornell",
+  "Dartmouth",
+  "Ross",
+  "Kellogg",
+  "Notre Dame",
+  "Haas",
+];
+
 const MESH_NODES = [
   { x: 2,  y: 5  }, { x: 12, y: 2  }, { x: 22, y: 8  }, { x: 32, y: 3  },
   { x: 42, y: 7  }, { x: 52, y: 2  }, { x: 62, y: 6  }, { x: 72, y: 3  },
@@ -330,27 +351,62 @@ export function CTASection() {
           </Link>
         </motion.div>
 
-        {/* Trust micro-row */}
-        <motion.p
-          className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] font-medium text-white/40"
+        {/* Trust ticker */}
+        <motion.div
+          className="mt-8 flex w-full flex-col items-center gap-3"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
         >
-          <span>Used by students at</span>
-          <span className="flex items-center gap-3">
-            <span>UNC</span>
-            <span className="h-1 w-1 rounded-full bg-white/20" />
-            <span>Wharton</span>
-            <span className="h-1 w-1 rounded-full bg-white/20" />
-            <span>Stern</span>
-            <span className="h-1 w-1 rounded-full bg-white/20" />
-            <span>Booth</span>
-            <span className="h-1 w-1 rounded-full bg-white/20" />
-            <span>Georgetown</span>
-          </span>
-        </motion.p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+            Used by students at
+          </p>
+          <div className="relative w-full max-w-4xl overflow-hidden">
+            <div className="flex">
+              <div className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8">
+                {TRUST_SCHOOLS.map((school) => (
+                  <span
+                    key={`a-${school}`}
+                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
+                    {school}
+                  </span>
+                ))}
+              </div>
+              <div
+                className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8"
+                aria-hidden
+              >
+                {TRUST_SCHOOLS.map((school) => (
+                  <span
+                    key={`b-${school}`}
+                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
+                    {school}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent" />
+          </div>
+          <style jsx>{`
+            @keyframes trust-ticker-slide {
+              0% {
+                transform: translateX(0);
+              }
+              100% {
+                transform: translateX(-100%);
+              }
+            }
+            .trust-ticker-track {
+              animation: trust-ticker-slide 45s linear infinite;
+            }
+          `}</style>
+        </motion.div>
 
         {/* Live join counter */}
         <motion.div
