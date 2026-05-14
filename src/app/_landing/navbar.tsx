@@ -37,10 +37,14 @@ export function Navbar() {
           </span>
         </motion.span>
         <div className="hidden items-center gap-6 md:flex">
-          {["Products", "Solutions", "How It Works"].map((label) => (
+          {(["Products", "Solutions", "How It Works"] as const).map((label) => (
             <motion.a
               key={label}
-              href={`#${label.toLowerCase().replace(/ /g, "-")}`}
+              href={
+                label === "How It Works"
+                  ? "/demo"
+                  : `#${label.toLowerCase().replace(/ /g, "-")}`
+              }
               className="text-sm font-medium transition-colors"
               style={{
                 color: useTransform(scrolled, (v) =>

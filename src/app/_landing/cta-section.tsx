@@ -344,7 +344,7 @@ export function CTASection() {
 
           {/* Secondary -- ghost border matching hero */}
           <Link
-            href="#solutions"
+            href="/demo"
             className="rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-lg font-semibold text-white/80 backdrop-blur-sm transition-all duration-300 hover:border-white/40 hover:bg-white/[0.08] hover:text-white"
           >
             See How It Works
