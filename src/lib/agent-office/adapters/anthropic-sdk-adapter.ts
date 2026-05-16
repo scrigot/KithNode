@@ -3,6 +3,13 @@
 //
 // Phase 1: wired exclusively to the Code Review Desk. Model defaults to
 // claude-sonnet-4.5 via the gateway; override via env if needed.
+//
+// Env vars:
+//   AI_GATEWAY_API_KEY              — required locally; on Vercel the
+//                                     platform OIDC token authenticates.
+//   AGENT_OFFICE_ANTHROPIC_MODEL    — optional override of the default
+//                                     anthropic/claude-sonnet-4.5 (e.g.
+//                                     anthropic/claude-haiku-4.5 for dev).
 
 import { streamText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
