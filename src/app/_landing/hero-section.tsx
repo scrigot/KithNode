@@ -67,7 +67,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
 
       {/* Two-column hero */}
       <motion.div
-        className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col items-center gap-12 px-6 py-24 lg:flex-row lg:items-center lg:gap-12 lg:px-12 lg:py-0"
+        className="relative z-10 mx-auto flex min-h-[640px] w-full max-w-[1400px] flex-col items-center gap-10 px-6 pt-24 pb-12 lg:min-h-screen lg:flex-row lg:items-center lg:gap-16 lg:px-12 lg:pt-32 lg:pb-12"
         style={{ y: reduce ? 0 : contentY }}
       >
         {/* LEFT: copy column */}
@@ -80,7 +80,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               transition: { staggerChildren: 0.14, delayChildren: 0.05 },
             },
           }}
-          className="flex flex-col items-start text-left lg:flex-[3]"
+          className="flex w-full flex-col text-left lg:flex-1"
         >
           {/* Pill badge */}
           <motion.div
@@ -93,7 +93,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               },
             }}
           >
-            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
+            <span className="mb-6 inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
               <motion.span
                 className="h-1.5 w-1.5 rounded-full bg-cyan-300"
                 animate={
@@ -115,7 +115,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
           </motion.div>
 
           {/* Headline with gradient on the third line */}
-          <h1 className="font-heading text-5xl font-bold tracking-tight text-white sm:text-6xl xl:text-7xl">
+          <h1 className="font-heading text-[2rem] font-bold leading-[1.05] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
             <motion.span className="block" variants={LV}>
               Find a warm path
             </motion.span>
@@ -132,7 +132,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
 
           {/* Subhead */}
           <motion.p
-            className="mt-8 max-w-xl text-lg leading-relaxed text-white/70 lg:text-xl"
+            className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg lg:mt-8 lg:text-xl"
             variants={fadeUp}
           >
             KithNode maps every alum at the firms you care about, ranks each
@@ -166,7 +166,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
         </motion.div>
 
         {/* RIGHT: spinning 3D node network */}
-        <div className="relative h-[420px] w-full lg:h-[640px] lg:flex-[2]">
+        <div className="relative h-[320px] w-full sm:h-[380px] lg:h-[600px] lg:flex-1">
           <Suspense fallback={<div className="h-full w-full" />}>
             <HeroNetwork />
           </Suspense>
