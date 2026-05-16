@@ -8,48 +8,48 @@ datasource db {
 }
 
 model User {
-  id                  String        @id @default(cuid())
-  email               String        @unique
-  name                String
-  image               String        @default("")
-  university          String        @default("")
-  targetIndustry      String        @default("")
-  hometown            String        @default("")
-  greekOrg            String        @default("")
-  targetIndustries    String        @default("")
-  targetFirms         String        @default("")
-  targetLocations     String        @default("")
-  recruitingDate      DateTime?
-  weeklyGoalTarget    Int           @default(3)
-  stripeCustomerId    String?       @default("")
-  subscriptionStatus  String?       @default("trial")
-  subscriptionPlan    String?       @default("")
-  trialEndsAt         DateTime?     @default(dbgenerated("(now() + '7 days'::interval)"))
-  subscriptionEndsAt  DateTime?
-  createdAt           DateTime      @default(now())
-  connections         Connection[]
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  name               String
+  image              String       @default("")
+  university         String       @default("")
+  targetIndustry     String       @default("")
+  hometown           String       @default("")
+  greekOrg           String       @default("")
+  targetIndustries   String       @default("")
+  targetFirms        String       @default("")
+  targetLocations    String       @default("")
+  recruitingDate     DateTime?
+  weeklyGoalTarget   Int          @default(3)
+  stripeCustomerId   String?      @default("")
+  subscriptionStatus String?      @default("trial")
+  subscriptionPlan   String?      @default("")
+  trialEndsAt        DateTime?    @default(dbgenerated("(now() + '7 days'::interval)"))
+  subscriptionEndsAt DateTime?
+  createdAt          DateTime     @default(now())
+  connections        Connection[]
 }
 
 model AlumniContact {
-  id               String         @id @default(cuid())
+  id               String          @id @default(cuid())
   name             String
   firmName         String
   title            String
-  linkedInUrl      String         @unique @default("")
+  linkedInUrl      String          @unique @default("")
   university       String
   graduationYear   Int
-  education        String         @default("")
-  location         String         @default("")
-  affiliations     String         @default("")
-  warmthScore      Float          @default(0)
-  tier             String         @default("cold")
-  source           String         @default("manual")
-  email            String         @default("")
-  importedByUserId String         @default("")
-  industry         String         @default("")
-  seniorityLevel   String         @default("")
+  education        String          @default("")
+  location         String          @default("")
+  affiliations     String          @default("")
+  warmthScore      Float           @default(0)
+  tier             String          @default("cold")
+  source           String          @default("manual")
+  email            String          @default("")
+  importedByUserId String          @default("")
+  industry         String          @default("")
+  seniorityLevel   String          @default("")
   enrichedAt       DateTime?
-  enrichmentSource String         @default("")
+  enrichmentSource String          @default("")
   connections      Connection[]
   pipelineEntries  PipelineEntry[]
   discovers        UserDiscover[]
@@ -99,18 +99,18 @@ model UserDiscover {
 }
 
 model WaitlistSignup {
-  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at         DateTime  @default(now()) @db.Timestamptz(6)
-  email              String
-  full_name          String
-  university         String
-  grad_year          Int
-  target_track       String
-  linkedin_url       String?
-  greek_affiliation  String?
-  current_prep       String?
-  referred_by        String?
-  ref_code           String?
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  email             String
+  full_name         String
+  university        String
+  grad_year         Int
+  target_track      String
+  linkedin_url      String?
+  greek_affiliation String?
+  current_prep      String?
+  referred_by       String?
+  ref_code          String?
 
   @@map("waitlist_signups")
 }
@@ -126,4 +126,49 @@ model IntroRequest {
   created_at         DateTime? @default(now()) @db.Timestamptz(6)
 
   @@map("intro_requests")
+}
+
+// ─── AgentOffice (Phase 1: Floor 4 Engineering) ────────────────────────────
+model AgentRoom {
+  id            String         @id @default(cuid())
+  userId        String
+  floor         Int
+  slug          String
+  name          String
+  role          String
+  systemPrompt  String
+  adapterType   String         @default("stub")
+  adapterConfig Json?
+  position      Json
+  createdAt     DateTime       @default(now())
+  events        AgentEvent[]
+  messages      AgentMessage[]
+
+  @@unique([userId, floor, slug])
+  @@index([userId, floor])
+}
+
+model AgentMessage {
+  id        String    @id @default(cuid())
+  roomId    String
+  room      AgentRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime  @default(now())
+
+  @@index([roomId, createdAt])
+}
+
+model AgentEvent {
+  id        String    @id @default(cuid())
+  userId    String
+  roomId    String
+  room      AgentRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  kind      String
+  summary   String
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([roomId, createdAt])
 }
