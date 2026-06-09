@@ -138,7 +138,7 @@ export default function DemoPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="flex flex-col gap-8">
             {[
               { Component: PanelDiscover, label: "01 Discover" },
               { Component: PanelSignal, label: "02 Signal" },
@@ -147,7 +147,7 @@ export default function DemoPage() {
             ].map(({ Component, label }) => (
               <div
                 key={label}
-                className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-sm"
+                className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-sm"
               >
                 <p className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#0EA5E9]">
                   {label}
