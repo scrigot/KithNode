@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { ContactsList } from "./contacts-list";
 import { RefreshCw, Sparkles, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
@@ -38,7 +39,8 @@ export default function ContactsPage() {
           counts.total++;
         }
         setTierCounts(counts);
-      } catch {
+      } catch (err) {
+      Sentry.captureException(err);
         // silent
       }
     })();
@@ -59,7 +61,8 @@ export default function ContactsPage() {
         text: `Rescored ${data.rescored} of ${data.total} contacts`,
       });
       setRefreshKey((k) => k + 1);
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err);
       setStatusMsg({ kind: "error", text: "Rescore failed. Try again later." });
     } finally {
       setRescoring(false);
@@ -109,7 +112,8 @@ export default function ContactsPage() {
         text: `Enriched ${totalEnriched} contacts${failedSuffix}`,
       });
       setRefreshKey((k) => k + 1);
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err);
       setStatusMsg({ kind: "error", text: "Enrich failed. Try again later." });
     } finally {
       setEnriching(false);
