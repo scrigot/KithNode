@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { CopyRefButton } from "./copy-ref-button";
 
 export const metadata = {
-  title: "You're on the list — KithNode",
+  title: "You're on the list",
 };
 
 export default function ThanksPage() {
@@ -18,7 +18,9 @@ export default function ThanksPage() {
             Thanks for requesting access.
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-white/90">
-            Sam is hand-picking the first 50 alpha users over the next few weeks. Expect a personal email shortly. In the meantime, two things help you skip the queue.
+            Sam is hand-picking the first 50 alpha users over the next few
+            weeks. Expect a personal email shortly. In the meantime, two things
+            help you skip the queue.
           </p>
 
           <div className="mt-10 flex flex-col gap-4">
@@ -27,7 +29,8 @@ export default function ThanksPage() {
                 Share your spot
               </div>
               <p className="mt-2 text-sm text-white/90">
-                Referrals move you up the list. Send this link to anyone you&apos;d vouch for.
+                Referrals move you up the list. Send this link to anyone
+                you&apos;d vouch for.
               </p>
               <Suspense
                 fallback={
@@ -43,7 +46,8 @@ export default function ThanksPage() {
                 Tell Sam what&apos;s broken
               </div>
               <p className="mt-2 text-sm text-white/90">
-                What was the last cold LinkedIn message you sent that didn&apos;t land? Reply to the confirmation email or ping{" "}
+                What was the last cold LinkedIn message you sent that
+                didn&apos;t land? Reply to the confirmation email or ping{" "}
                 <a
                   href="https://www.linkedin.com/in/samrigot"
                   target="_blank"
