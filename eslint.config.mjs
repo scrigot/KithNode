@@ -29,6 +29,7 @@ export default [
         HTMLDivElement: "readonly",
         HTMLSpanElement: "readonly",
         HTMLCanvasElement: "readonly",
+        CanvasRenderingContext2D: "readonly",
         HTMLElement: "readonly",
         window: "readonly",
         navigator: "readonly",
