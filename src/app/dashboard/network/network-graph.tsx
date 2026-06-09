@@ -75,11 +75,17 @@ export function NetworkGraph({
     const nodes = new Set<string>();
     const links = new Set<string>();
     if (!active) return { litNodes: nodes, litLinks: links };
+    // react-force-graph's d3 engine mutates link.source/target from string ids
+    // into node objects after the sim inits — normalize to an id before compare.
+    const eid = (e: unknown): string =>
+      e !== null && typeof e === "object" ? (e as GraphNode).id : (e as string);
     nodes.add(active);
     for (const l of data.links) {
-      if (l.source === active || l.target === active) {
-        nodes.add(l.source);
-        nodes.add(l.target);
+      const s = eid(l.source);
+      const t = eid(l.target);
+      if (s === active || t === active) {
+        nodes.add(s);
+        nodes.add(t);
         links.add(l.id);
       }
     }
@@ -88,9 +94,11 @@ export function NetworkGraph({
       (id) => data.nodeMap.get(id)?.kind === "intermediary",
     );
     for (const l of data.links) {
+      const s = eid(l.source);
+      const t = eid(l.target);
       if (
-        (l.source === "you" && interm.includes(l.target)) ||
-        (l.target === "you" && interm.includes(l.source))
+        (s === "you" && interm.includes(t)) ||
+        (t === "you" && interm.includes(s))
       ) {
         nodes.add("you");
         links.add(l.id);

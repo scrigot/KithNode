@@ -114,6 +114,7 @@ export function buildGraph(
   // Collect affiliations -> intermediary node ids (deduped by trimmed name).
   const affId = new Map<string, string>(); // affName -> nodeId
   const affTargets = new Map<string, Set<string>>(); // affNodeId -> contactIds
+  const targetScore = new Map<string, number>(); // targetId -> score (O(1) lookup)
 
   const tiers = { hot: 0, warm: 0, monitor: 0, cold: 0 };
   let scoreSum = 0;
@@ -126,6 +127,7 @@ export function buildGraph(
     scoreSum += score;
 
     const targetId = `c:${c.id}`;
+    const isRedacted = (c as RankedContact & { isRedacted?: boolean }).isRedacted;
     const affs = (c.affiliations ?? [])
       .map((a) => a.name?.trim())
       .filter((n): n is string => !!n);
@@ -135,11 +137,13 @@ export function buildGraph(
       kind: "target",
       label: c.name || "Unknown",
       sub: `${c.company?.name || "—"} · ${score}`,
-      glyph: initials(c.name || "?"),
+      // Redacted (non-own) contacts have block-char names — don't derive garbage initials.
+      glyph: isRedacted ? "?" : initials(c.name || "?"),
       val: tierRadius(tier, score),
       tier,
       score,
     });
+    targetScore.set(targetId, score);
 
     const chains: string[][] = [];
     if (affs.length > 0) {
@@ -183,7 +187,7 @@ export function buildGraph(
       affiliations: affs,
       chains,
       hops: affs.length > 0 ? 2 : 1,
-      isRedacted: (c as RankedContact & { isRedacted?: boolean }).isRedacted,
+      isRedacted,
     });
   }
 
@@ -197,8 +201,7 @@ export function buildGraph(
       strength: Math.min(1, 0.5 + targets.size * 0.08),
     });
     for (const t of targets) {
-      const tNode = nodes.find((n) => n.id === t);
-      const sc = tNode?.score ?? 0;
+      const sc = targetScore.get(t) ?? 0;
       links.push({
         id: `l:${nodeId}-${t}`,
         source: nodeId,

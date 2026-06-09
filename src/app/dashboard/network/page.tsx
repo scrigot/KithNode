@@ -42,7 +42,7 @@ export default function NetworkPage() {
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch("/api/contacts?curated=true")
+    apiFetch("/api/contacts")
       .then((r) => (r.ok ? r.json() : []))
       .then((d: RankedContact[]) => {
         if (!cancelled) setContacts(Array.isArray(d) ? d : []);
@@ -316,7 +316,7 @@ function DetailPanel({
         {/* Identity */}
         <div className="mb-4 flex items-start gap-3">
           <div
-            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border text-[13px] font-bold ${TIER_CHIP[detail.tier]}`}
+            className={`flex h-10 w-10 flex-shrink-0 items-center justify-center border text-[13px] font-bold ${TIER_CHIP[detail.tier]}`}
           >
             {detail.name
               .split(/\s+/)
