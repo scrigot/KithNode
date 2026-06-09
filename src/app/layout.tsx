@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, DM_Sans } from "next/font/google";
 import { Providers } from "./providers";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,49 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "KithNode",
-  description: "AI-driven warm signals intelligence platform",
+  metadataBase: new globalThis.URL("https://kithnode.ai"),
+  title: {
+    default: "KithNode | Warm-path finance recruiting for students",
+    template: "%s | KithNode",
+  },
+  description:
+    "KithNode helps ambitious students find warm paths into finance by mapping alumni, scoring the strongest connections, and drafting authentic outreach.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://kithnode.ai",
+    siteName: "KithNode",
+    title: "KithNode | Warm-path finance recruiting for students",
+    description:
+      "Find alumni, score warm paths, and draft outreach that helps students break into finance.",
+    images: [
+      {
+        url: "/icon.svg",
+        width: 1200,
+        height: 1200,
+        alt: "KithNode",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "KithNode | Warm-path finance recruiting for students",
+    description:
+      "Find alumni, score warm paths, and draft outreach that helps students break into finance.",
+    images: ["/icon.svg"],
+  },
+  icons: {
+    icon: "/icon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0369A1",
 };
 
 export default function RootLayout({
@@ -25,7 +66,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("dark", spaceGrotesk.variable, dmSans.variable)}>
+    <html
+      lang="en"
+      className={cn("dark", spaceGrotesk.variable, dmSans.variable)}
+    >
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <Providers>{children}</Providers>
       </body>
