@@ -14,7 +14,7 @@ export const authConfig: NextAuthConfig = {
   ],
   session: { strategy: "jwt" },
   pages: {
-    signIn: "/",
+    signIn: "/sign-in",
   },
   callbacks: {
     authorized: ({ auth, request }) => {
@@ -43,10 +43,7 @@ export const authConfig: NextAuthConfig = {
       // handle the failure gracefully (apiFetch flips to /?signin=required).
       if (pathname.startsWith("/api/")) {
         if (isLoggedIn) return true;
-        return Response.json(
-          { error: "Unauthorized" },
-          { status: 401 },
-        );
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
       }
 
       return true;
