@@ -9,8 +9,7 @@
 ## What This Is
 KithNode is an AI-driven recruitment networking intelligence platform for high-ambition students in IB, PE, and Consulting. Active deployment, daily user. Pre-launch. Sam is the only user.
 
-## Active goals (as of 2026-04-08)
-- **E-@Ccelerator application due 2026-04-10** — protect this above all other work
+## Active goals (as of 2026-06-09)
 - Fix Discover scoring bugs and the vertical pipeline UI
 - Backend (FastAPI on Railway) — keep it healthy, it powers enrichment + AI calls
 - Ship validated features only — Sam tests every change before it merges
