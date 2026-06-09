@@ -158,17 +158,22 @@ The subject should be casual and warm, under 60 characters. The body should feel
     // .catch'd. service-role supabase client (already imported) bypasses the
     // deny-all RLS on api_cost_log.
     const model = response?.modelId ?? "claude-sonnet-4.5";
-    void supabase
-      .from("api_cost_log")
-      .insert({
-        provider: "anthropic",
-        endpoint: "gateway:generateText",
-        tokens_in: usage?.inputTokens ?? 0,
-        tokens_out: usage?.outputTokens ?? 0,
-        cost_usd: anthropicCost(model, usage),
-        meta: { model, contact_id: contactId, source: "frontend" },
-      })
-      .then(() => {}, () => {});
+    // Bulletproof: even a synchronous client error must never break a draft.
+    try {
+      void supabase
+        .from("api_cost_log")
+        .insert({
+          provider: "anthropic",
+          endpoint: "gateway:generateText",
+          tokens_in: usage?.inputTokens ?? 0,
+          tokens_out: usage?.outputTokens ?? 0,
+          cost_usd: anthropicCost(model, usage),
+          meta: { model, contact_id: contactId, source: "frontend" },
+        })
+        .then(() => {}, () => {});
+    } catch {
+      // cost telemetry is never load-bearing
+    }
 
     let subject = "";
     let draft = "";

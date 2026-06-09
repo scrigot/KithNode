@@ -56,6 +56,8 @@ vi.mock("@/lib/supabase", () => ({
           })),
         })),
       })),
+      // api_cost_log fire-and-forget cost telemetry insert
+      insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
     })),
   },
 }));
