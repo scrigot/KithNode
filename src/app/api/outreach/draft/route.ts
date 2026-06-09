@@ -5,6 +5,7 @@ import { getUserPrefs, type UserPrefs } from "@/lib/user-prefs";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
+import { anthropicCost } from "@/lib/ai-cost";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -135,10 +136,27 @@ Return ONLY valid JSON with exactly two keys:
 
 The subject should be casual and warm, under 60 characters. The body should feel like a real person wrote it, not AI.`;
 
-    const { text } = await generateText({
+    const { text, usage, response } = await generateText({
       model: gateway("anthropic/claude-sonnet-4.5"),
       prompt,
     });
+
+    // Fire-and-forget cost telemetry → api_cost_log (founder-ops cost-burn tile).
+    // Best-effort: insert failure MUST never break a draft, so it's voided +
+    // .catch'd. service-role supabase client (already imported) bypasses the
+    // deny-all RLS on api_cost_log.
+    const model = response?.modelId ?? "claude-sonnet-4.5";
+    void supabase
+      .from("api_cost_log")
+      .insert({
+        provider: "anthropic",
+        endpoint: "gateway:generateText",
+        tokens_in: usage?.inputTokens ?? 0,
+        tokens_out: usage?.outputTokens ?? 0,
+        cost_usd: anthropicCost(model, usage),
+        meta: { model, contact_id: contactId, source: "frontend" },
+      })
+      .then(() => {}, () => {});
 
     let subject = "";
     let draft = "";

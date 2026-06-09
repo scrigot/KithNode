@@ -17,6 +17,8 @@ import {
   Menu,
   X,
   ChevronRight,
+  Building,
+  Gauge,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
@@ -24,6 +26,7 @@ const NAV_GROUPS = [
   {
     label: "PAGES",
     items: [
+      { href: "/office", label: "Office", icon: Building, countKey: null },
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, countKey: null },
       { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, countKey: "warm_signals" },
       { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, countKey: "pipeline" },
@@ -44,6 +47,14 @@ const NAV_GROUPS = [
     ],
   },
 ];
+
+// Founder-only nav group, appended in NavContent when isFounderUser is true.
+const FOUNDER_NAV_GROUP = {
+  label: "FOUNDER",
+  items: [
+    { href: "/dashboard/ops", label: "Ops", icon: Gauge, countKey: null },
+  ],
+};
 
 function SubBadge({
   status,
@@ -74,6 +85,7 @@ function NavContent({
   subscriptionStatus,
   trialDaysLeft,
   counts,
+  isFounderUser,
   onNavClick,
 }: {
   pathname: string;
@@ -81,8 +93,12 @@ function NavContent({
   subscriptionStatus: string | null;
   trialDaysLeft: number | null;
   counts: Record<string, number>;
+  isFounderUser: boolean;
   onNavClick?: () => void;
 }) {
+  const navGroups = isFounderUser
+    ? [...NAV_GROUPS, FOUNDER_NAV_GROUP]
+    : NAV_GROUPS;
   const initials =
     userName
       .split(" ")
@@ -105,7 +121,7 @@ function NavContent({
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-2">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.label} className="mb-3">
             <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
               {group.label}
@@ -176,7 +192,13 @@ function NavContent({
   );
 }
 
-export function Sidebar({ userName }: { userName: string }) {
+export function Sidebar({
+  userName,
+  isFounderUser,
+}: {
+  userName: string;
+  isFounderUser: boolean;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
@@ -214,6 +236,7 @@ export function Sidebar({ userName }: { userName: string }) {
           subscriptionStatus={subscriptionStatus}
           trialDaysLeft={trialDaysLeft}
           counts={counts}
+          isFounderUser={isFounderUser}
         />
       </aside>
 
@@ -261,6 +284,7 @@ export function Sidebar({ userName }: { userName: string }) {
           subscriptionStatus={subscriptionStatus}
           trialDaysLeft={trialDaysLeft}
           counts={counts}
+          isFounderUser={isFounderUser}
           onNavClick={() => setOpen(false)}
         />
       </aside>

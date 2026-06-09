@@ -44,7 +44,7 @@ const ROOMS: RoomSeed[] = [
     role: "code_reviewer",
     systemPrompt:
       "You're a code reviewer. Read diffs critically. Severity-rated feedback. Catch bugs, security issues, and style violations. Reference file:line.",
-    adapterType: "stub", // flipped to anthropic_sdk in commit 5
+    adapterType: "anthropic_sdk", // LIVE in Phase 1 (others remain stub).
     position: { x: 4, y: 0, w: 1, h: 1 },
   },
   {
