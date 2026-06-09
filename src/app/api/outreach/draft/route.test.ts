@@ -28,19 +28,32 @@ vi.mock("@/lib/subscription", () => ({
 
 const supabaseResults: Array<{ data: unknown; error: unknown }> = [];
 let supabaseCallIndex = 0;
+const ratingResults: Array<{ data: unknown; error: unknown }> = [];
+let ratingCallIndex = 0;
+function nextResult() {
+  const result = supabaseResults[supabaseCallIndex] ?? { data: null, error: { message: "no mock" } };
+  supabaseCallIndex++;
+  if (result && (result as Record<string, unknown>).__throw) {
+    return Promise.reject(new Error("db down"));
+  }
+  return Promise.resolve(result);
+}
+function nextRating() {
+  const result = ratingResults[ratingCallIndex] ?? { data: null, error: null };
+  ratingCallIndex++;
+  return Promise.resolve(result);
+}
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          single: vi.fn(() => {
-            const result = supabaseResults[supabaseCallIndex] ?? { data: null, error: { message: "no mock" } };
-            supabaseCallIndex++;
-            if (result && (result as Record<string, unknown>).__throw) {
-              return Promise.reject(new Error("db down"));
-            }
-            return Promise.resolve(result);
-          }),
+          // AlumniContact fetch: .select().eq().single()
+          single: vi.fn(() => nextResult()),
+          // UserDiscover ownership lookup: .select().eq().eq().maybeSingle()
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(() => nextRating()),
+          })),
         })),
       })),
     })),
@@ -71,6 +84,8 @@ describe("POST /api/outreach/draft", () => {
     vi.clearAllMocks();
     supabaseResults.length = 0;
     supabaseCallIndex = 0;
+    ratingResults.length = 0;
+    ratingCallIndex = 0;
     mockGetUserPrefs.mockResolvedValue(DEFAULT_PREFS);
     mockRequireSubscription.mockResolvedValue(null);
   });
@@ -114,6 +129,27 @@ describe("POST /api/outreach/draft", () => {
     expect(response.status).toBe(200);
     expect(body.subject).toBe("Test Subject");
     expect(body.draft).toBe("Test body");
+  });
+
+  it("returns 404 when the contact is owned by another user and unrated", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    supabaseResults.push({
+      data: {
+        id: "99",
+        name: "Other Owner Contact",
+        title: "Analyst",
+        firmName: "Goldman Sachs",
+        affiliations: "",
+        importedByUserId: "someone-else@unc.edu",
+      },
+      error: null,
+    });
+    // UserDiscover ownership lookup returns no rating -> 404
+    ratingResults.push({ data: null, error: null });
+
+    const response = await POST(makeRequest({ contactId: "99" }));
+    expect(response.status).toBe(404);
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   it("returns 500 on backend error", async () => {

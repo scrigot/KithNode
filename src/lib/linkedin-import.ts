@@ -5,7 +5,7 @@
 
 import type { UserPrefs } from "@/lib/user-prefs";
 
-const LINKEDIN_URL_REGEX = /https?:\/\/(www\.)?linkedin\.com\/in\/([\w-]+)\/?/;
+const LINKEDIN_URL_REGEX = /^https:\/\/(www\.)?linkedin\.com\/in\/([\w-]+)\/?$/;
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -51,10 +51,14 @@ export async function scrapeLinkedInMeta(url: string): Promise<LinkedInMeta> {
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ");
 
+  // Build a canonical URL from the validated slug and fetch THAT, never the
+  // raw input. Prevents SSRF via crafted hosts/paths and disables redirects.
+  const canonicalUrl = `https://www.linkedin.com/in/${slug}`;
+
   try {
-    const res = await fetch(url, {
+    const res = await fetch(canonicalUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
-      redirect: "follow",
+      redirect: "error",
     });
 
     if (!res.ok) {

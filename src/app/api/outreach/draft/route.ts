@@ -85,6 +85,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
+    if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+      const { data: rating } = await supabase
+        .from("UserDiscover")
+        .select("rating")
+        .eq("userId", userEmail)
+        .eq("contactId", contactId)
+        .maybeSingle();
+      if (!rating) {
+        return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+      }
+    }
+
     const affiliationNames: string[] = contact.affiliations
       ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())
       : [];

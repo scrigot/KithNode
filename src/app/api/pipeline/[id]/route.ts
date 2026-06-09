@@ -148,9 +148,24 @@ export async function PATCH(
     if (isConversion) {
       const { data: contact } = await supabase
         .from("AlumniContact")
-        .select("source, affiliations")
+        .select("source, affiliations, importedByUserId")
         .eq("id", contactId)
         .maybeSingle();
+
+      if (contact?.importedByUserId && contact.importedByUserId !== userId) {
+        const { data: rating } = await supabase
+          .from("UserDiscover")
+          .select("rating")
+          .eq("userId", userId)
+          .eq("contactId", contactId)
+          .maybeSingle();
+        if (!rating) {
+          return NextResponse.json(
+            { error: "Contact not found" },
+            { status: 404 },
+          );
+        }
+      }
 
       conversion = {
         contactId,

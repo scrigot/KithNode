@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   }
   const userId = session.user.email;
 
-  const query = request.nextUrl.searchParams.get("q") || "";
+  const raw = request.nextUrl.searchParams.get("q") || "";
+  const query = raw.replace(/[^\p{L}\p{N}\s.-]/gu, "").slice(0, 100);
   const tier = request.nextUrl.searchParams.get("tier") || "";
   const rawSource = request.nextUrl.searchParams.get("source") || "alumni";
   const category: DiscoverCategory = ALL_CATEGORIES.includes(rawSource as DiscoverCategory)
