@@ -80,7 +80,10 @@ export interface Professor {
 async function fetchText(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/json" },
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "text/html,application/json",
+      },
       redirect: "follow",
     });
     if (!res.ok) return null;
@@ -175,7 +178,7 @@ interface WpTerm {
  */
 async function fetchWpTermMap(
   baseUrl: string,
-  taxonomy: string,
+  taxonomy: string
 ): Promise<Map<number, string>> {
   const url = `${baseUrl}/wp-json/wp/v2/${taxonomy}?per_page=100`;
   const terms = await fetchJson<WpTerm[]>(url);
@@ -216,7 +219,7 @@ function getTermIds(post: WpPost, taxonomy: string): number[] {
 
 async function scrapeWpApi(
   seed: DepartmentSeed,
-  throttleMs: number,
+  throttleMs: number
 ): Promise<Professor[]> {
   const apiUrl = `${seed.baseUrl}${seed.apiEndpoint}`;
   const posts = await fetchJson<WpPost[]>(apiUrl);
@@ -258,7 +261,11 @@ async function scrapeWpApi(
 
     const rawBio = post.content.rendered || post.excerpt.rendered || "";
     const bio = stripHtml(rawBio);
-    const title = inferTitle(seed.firmName, designationMap, getTermIds(post, "designation"));
+    const title = inferTitle(
+      seed.firmName,
+      designationMap,
+      getTermIds(post, "designation")
+    );
 
     // Throttle before profile page fetch (skip for first item).
     if (i > 0 && throttleMs > 0) await wait(throttleMs);
@@ -284,9 +291,15 @@ async function scrapeWpApi(
  * Build a human-readable title from designation taxonomy slugs.
  * Falls back to "Faculty, <dept>" when no recognised slug maps.
  */
-function inferTitle(firmName: string, designationMap: Map<number, string>, ids: number[]): string {
+function inferTitle(
+  firmName: string,
+  designationMap: Map<number, string>,
+  ids: number[]
+): string {
   if (ids.length === 0) return `Faculty, ${firmName}`;
-  const slugs = ids.map((id) => designationMap.get(id) ?? "").filter((s) => s.length > 0);
+  const slugs = ids
+    .map((id) => designationMap.get(id) ?? "")
+    .filter((s) => s.length > 0);
   const ranked = [
     "distinguished-professor",
     "professor-emeritus",
@@ -324,13 +337,15 @@ function slugToTitle(slug: string): string {
 
 async function scrapeDdg(
   seed: DepartmentSeed,
-  throttleMs: number,
+  throttleMs: number
 ): Promise<Professor[]> {
   let candidateUrls: string[];
   try {
     candidateUrls = await ddgSearch(seed.ddgQuery ?? "", 50);
   } catch {
-    console.warn(`[professors] DDG search failed for ${seed.slug} -- returning []`);
+    console.warn(
+      `[professors] DDG search failed for ${seed.slug} -- returning []`
+    );
     return [];
   }
 
@@ -344,7 +359,9 @@ async function scrapeDdg(
     : candidateUrls;
 
   if (profileUrls.length === 0) {
-    console.warn(`[professors] No profile URLs matched pattern for ${seed.slug}`);
+    console.warn(
+      `[professors] No profile URLs matched pattern for ${seed.slug}`
+    );
     return [];
   }
 
@@ -380,7 +397,7 @@ async function scrapeDdg(
 function extractProfileFromHtml(
   html: string,
   profileUrl: string,
-  department: string,
+  department: string
 ): Professor | null {
   const $ = cheerio.load(html);
 
@@ -390,12 +407,14 @@ function extractProfileFromHtml(
   const rawName = ogTitle || h1Text;
   if (!rawName) return null;
   // Strip site suffix patterns like " | UNC STOR" or " - Kenan-Flagler"
-  const name = rawName.split(/\s*[|\u2013\-]\s*/)[0].trim();
+  const name = rawName.split(/\s*[|\u2013-]\s*/)[0].trim();
   if (!name) return null;
 
   // Title: dedicated selector first, then h2.
-  const subtitleText =
-    $(".faculty-title, .position, .job-title, .subtitle").first().text().trim();
+  const subtitleText = $(".faculty-title, .position, .job-title, .subtitle")
+    .first()
+    .text()
+    .trim();
   const h2Text = $("h2").first().text().trim();
   const title = subtitleText || h2Text || `Faculty, ${department}`;
 
@@ -403,7 +422,9 @@ function extractProfileFromHtml(
 
   // Bio: visible paragraphs in main content area, capped at 2000 chars.
   let bio = "";
-  const mainEl = $("main, article, .entry-content, .faculty-bio, #content").first();
+  const mainEl = $(
+    "main, article, .entry-content, .faculty-bio, #content"
+  ).first();
   const paragraphSource = mainEl.length ? mainEl : $("body");
   paragraphSource.find("p").each((_, el) => {
     if (bio.length >= 2000) return false;
@@ -415,7 +436,10 @@ function extractProfileFromHtml(
   // Research areas from meta keywords (best-effort).
   const metaKeywords = $('meta[name="keywords"]').attr("content") || "";
   const researchAreas = metaKeywords
-    ? metaKeywords.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+    ? metaKeywords
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
     : [];
 
   return {
@@ -438,7 +462,7 @@ function extractProfileFromHtml(
  */
 export async function scrapeDepartment(
   seed: DepartmentSeed,
-  opts: { throttleMs?: number } = {},
+  opts: { throttleMs?: number } = {}
 ): Promise<Professor[]> {
   const throttleMs = opts.throttleMs ?? 1000;
   try {
@@ -461,7 +485,7 @@ export async function scrapeDepartment(
  * hammering UNC servers simultaneously.
  */
 export async function scrapeAllDepartments(
-  opts: { throttleMs?: number } = {},
+  opts: { throttleMs?: number } = {}
 ): Promise<Professor[]> {
   const all: Professor[] = [];
   const seen = new Set<string>();

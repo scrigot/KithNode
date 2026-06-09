@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockGetUserId = vi.fn();
-vi.mock("@/lib/get-user", () => ({
-  getUserId: () => mockGetUserId(),
+// Route authenticates via auth() (NextAuth). Mock it here — importing the real
+// @/lib/auth pulls NextAuth + next/server into Vitest and breaks collection.
+const mockAuth = vi.fn();
+vi.mock("@/lib/auth", () => ({
+  auth: () => mockAuth(),
 }));
 
 vi.mock("@/lib/supabase", () => {
@@ -24,7 +26,10 @@ vi.mock("@/lib/supabase", () => {
         if (callCount === 1) {
           // AlumniContact own contacts
           return makeChain([
-            { id: "1", name: "Jane Doe", title: "Analyst", warmthScore: 65, tier: "warm", linkedInUrl: "", education: "", location: "", affiliations: "", university: "", firmName: "GS" },
+            // importedByUserId matches the authed user so the row is "own" and
+            // the route returns it un-redacted (PII redaction only applies to
+            // shared-pool contacts the user didn't import).
+            { id: "1", name: "Jane Doe", title: "Analyst", warmthScore: 65, tier: "warm", linkedInUrl: "", education: "", location: "", affiliations: "", university: "", firmName: "GS", importedByUserId: "test@unc.edu" },
           ]);
         }
         if (callCount === 2) {
@@ -50,8 +55,14 @@ describe("GET /api/contacts", () => {
     vi.clearAllMocks();
   });
 
+  it("returns 401 when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null);
+    const response = await GET();
+    expect(response.status).toBe(401);
+  });
+
   it("returns contacts from Supabase", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     const response = await GET();
     const body = await response.json();
     expect(response.status).toBe(200);

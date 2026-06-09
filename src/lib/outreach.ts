@@ -5,6 +5,9 @@
  * specific references, genuine curiosity.
  */
 
+import { lastName } from "./name-utils";
+import { FIRM_INDUSTRY } from "./scoring";
+
 export interface OutreachContext {
   userName: string;
   userUniversity: string;
@@ -27,7 +30,7 @@ interface SharedSignal {
   detail: string;
 }
 
-function detectSharedSignals(ctx: OutreachContext): SharedSignal[] {
+export function detectSharedSignals(ctx: OutreachContext): SharedSignal[] {
   const signals: SharedSignal[] = [];
 
   if (
@@ -38,7 +41,11 @@ function detectSharedSignals(ctx: OutreachContext): SharedSignal[] {
     signals.push({ type: "university", detail: ctx.userUniversity });
   }
 
-  if (ctx.userTargetIndustry && ctx.alumniFirm) {
+  if (
+    ctx.userTargetIndustry &&
+    ctx.alumniFirm &&
+    FIRM_INDUSTRY[ctx.alumniFirm] === ctx.userTargetIndustry
+  ) {
     signals.push({ type: "industry", detail: ctx.userTargetIndustry });
   }
 
@@ -93,18 +100,7 @@ function buildClosing(ctx: OutreachContext): string {
 
 /** Extracts the last name, ignoring common suffixes like "Jr." and "Sr.". */
 export function getLastName(name: string): string {
-  if (!name || !name.trim()) return "";
-  const suffixes = new Set(["jr.", "sr.", "ii", "iii", "iv"]);
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0];
-  // Walk backwards, skip suffix tokens
-  for (let i = parts.length - 1; i >= 0; i--) {
-    if (!suffixes.has(parts[i].toLowerCase().replace(/\.$/, "") + ".") &&
-        !suffixes.has(parts[i].toLowerCase())) {
-      return parts[i];
-    }
-  }
-  return parts[parts.length - 1];
+  return lastName(name);
 }
 
 function buildProfessorClosing(ctx: OutreachContext): string {

@@ -64,9 +64,16 @@ function reachabilityFor(emailConfidence: number, title: string): number {
   else if (/\b(md|managing director|partner|principal|director)\b/i.test(t)) role = 40;
   else if (/\b(ceo|cfo|coo|founder|president)\b/i.test(t)) role = 25;
 
+  // emailConfidence is an untyped trust boundary (from email-finder): a
+  // non-finite value would propagate NaN through the whole score. Coerce
+  // garbage to 0 and clamp to [0, 1] before use.
+  const ec = Number.isFinite(emailConfidence)
+    ? Math.min(1, Math.max(0, emailConfidence))
+    : 0;
+
   // 70% email, 30% accessibility — a verified email at any title beats an
   // unverified address at the perfect title.
-  return Math.round(emailConfidence * 100 * 0.7 + role * 0.3);
+  return Math.round(ec * 100 * 0.7 + role * 0.3);
 }
 
 /**

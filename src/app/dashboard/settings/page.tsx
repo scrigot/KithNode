@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { searchCities } from "@/lib/us-cities";
 import {
   GraduationCap,
   MapPin,
@@ -118,7 +120,8 @@ function loadPreferences(): Preferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return { ...getDefaults(), ...JSON.parse(raw) };
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err);
     // ignore
   }
   return getDefaults();
@@ -127,7 +130,8 @@ function loadPreferences(): Preferences {
 function savePreferences(prefs: Preferences) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err);
     // ignore
   }
 }
@@ -164,9 +168,106 @@ async function syncToAPI(prefs: Preferences) {
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
       }),
     });
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err);
     // localStorage is source of truth
   }
+}
+
+// ── City Autocomplete ─────────────────────────────────────────────────────────
+
+function CityAutocomplete({
+  value,
+  onChange,
+  onCommit,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit?: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(-1);
+
+  const suggestions = useMemo(() => searchCities(value), [value]);
+
+  const select = (city: string) => {
+    if (onCommit) onCommit(city);
+    else onChange(city);
+    setOpen(false);
+    setHighlighted(-1);
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          setHighlighted(-1);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (open && suggestions.length > 0) {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setHighlighted((h) => Math.min(h + 1, suggestions.length - 1));
+              return;
+            }
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHighlighted((h) => Math.max(h - 1, -1));
+              return;
+            }
+            if (e.key === "Escape") {
+              setOpen(false);
+              setHighlighted(-1);
+              return;
+            }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (highlighted >= 0) {
+                select(suggestions[highlighted]);
+                return;
+              }
+            }
+          }
+          if (e.key === "Enter" && onCommit) {
+            e.preventDefault();
+            onCommit(value);
+          }
+        }}
+        className={className}
+      />
+      {open && suggestions.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto border border-white/[0.06] bg-bg-card shadow-lg">
+          {suggestions.map((city, i) => (
+            <li
+              key={city}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                select(city);
+              }}
+              onMouseEnter={() => setHighlighted(i)}
+              className={`cursor-pointer px-3 py-2 text-sm ${
+                i === highlighted
+                  ? "bg-accent-teal/15 text-accent-teal"
+                  : "text-text-secondary hover:bg-muted"
+              }`}
+            >
+              {city}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 // ── Edit Panel ────────────────────────────────────────────────────────────────
@@ -217,8 +318,8 @@ function EditPanel({
         : [...p.targetLocations, loc],
     }));
 
-  const addCustomLocation = () => {
-    const loc = customLocationInput.trim();
+  const addCustomLocation = (raw?: string) => {
+    const loc = (raw ?? customLocationInput).trim();
     if (!loc || local.customLocations.includes(loc) || local.targetLocations.includes(loc) || LOCATION_OPTIONS.includes(loc)) return;
     setLocal((p) => ({ ...p, customLocations: [...p.customLocations, loc] }));
     setCustomLocationInput("");
@@ -374,10 +475,10 @@ function EditPanel({
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Hometown
               </label>
-              <Input
+              <CityAutocomplete
                 placeholder="Charlotte, NC"
                 value={local.hometown}
-                onChange={(e) => setLocal({ ...local, hometown: e.target.value })}
+                onChange={(v) => setLocal({ ...local, hometown: v })}
                 className="bg-muted text-sm"
               />
             </div>
@@ -421,14 +522,16 @@ function EditPanel({
                 <p className="mt-2 text-[11px] text-text-muted">{allLocations.length} selected</p>
               )}
               <div className="mt-3 flex gap-2">
-                <Input
-                  placeholder="Add a location..."
-                  value={customLocationInput}
-                  onChange={(e) => setCustomLocationInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomLocation(); } }}
-                  className="bg-muted text-sm"
-                />
-                <Button size="sm" variant="outline" onClick={addCustomLocation} className="shrink-0">
+                <div className="flex-1">
+                  <CityAutocomplete
+                    placeholder="Add a location..."
+                    value={customLocationInput}
+                    onChange={setCustomLocationInput}
+                    onCommit={addCustomLocation}
+                    className="bg-muted text-sm"
+                  />
+                </div>
+                <Button size="sm" variant="outline" onClick={() => addCustomLocation()} className="shrink-0">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -959,7 +1062,8 @@ export default function SettingsPage() {
             return;
           }
         }
-      } catch {
+      } catch (err) {
+    Sentry.captureException(err);
         // fall through
       }
       // Check localStorage as fallback

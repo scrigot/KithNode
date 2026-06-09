@@ -78,4 +78,22 @@ describe("rank()", () => {
     expect(result.confidence).toBe(1);
     expect(result.score).toBeGreaterThan(0);
   });
+
+  it("coerces non-finite emailConfidence to a finite score and valid tier", () => {
+    const validTiers = ["hot", "warm", "monitor", "cold"];
+    const signals = [linkedinSignal("firm-tier", "Bulge Bracket", 18)];
+
+    for (const bad of [NaN, undefined as unknown as number]) {
+      const result = rank({ title: "Analyst", emailConfidence: bad, signals });
+      expect(Number.isFinite(result.score)).toBe(true);
+      expect(Number.isFinite(result.reachability)).toBe(true);
+      expect(validTiers).toContain(result.tier);
+    }
+
+    // A NaN emailConfidence must behave like 0 (no email evidence), so it
+    // scores strictly below the same contact with a fully-verified email.
+    const nanResult = rank({ title: "Analyst", emailConfidence: NaN, signals });
+    const verified = rank({ title: "Analyst", emailConfidence: 1.0, signals });
+    expect(nanResult.reachability).toBeLessThan(verified.reachability);
+  });
 });

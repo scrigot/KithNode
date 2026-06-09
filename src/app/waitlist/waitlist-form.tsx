@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { submitWaitlist } from "./actions";
@@ -33,7 +34,6 @@ export function WaitlistForm() {
       grad_year: Number(fd.get("grad_year") || 0),
       target_track: String(fd.get("target_track") || ""),
       linkedin_url: String(fd.get("linkedin_url") || ""),
-      greek_affiliation: String(fd.get("greek_affiliation") || ""),
       current_prep: String(fd.get("current_prep") || ""),
       referred_by: params.get("ref") || undefined,
     };
@@ -85,18 +85,31 @@ export function WaitlistForm() {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Field label="Graduation year" required>
           <select name="grad_year" required defaultValue="" className="input">
-            <option value="" disabled>Select</option>
+            <option value="" disabled>
+              Select
+            </option>
             {GRAD_YEARS.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
         </Field>
 
         <Field label="Target track" required>
-          <select name="target_track" required defaultValue="" className="input">
-            <option value="" disabled>Select</option>
+          <select
+            name="target_track"
+            required
+            defaultValue=""
+            className="input"
+          >
+            <option value="" disabled>
+              Select
+            </option>
             {TRACKS.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </select>
         </Field>
@@ -130,13 +143,28 @@ export function WaitlistForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-[#0EA5E9] px-6 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-[#0284C7] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-lg bg-[#0369A1] px-6 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-[#075985] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Submitting..." : "Request Access"}
       </button>
 
       <p className="text-center text-xs text-slate-500">
-        Private alpha opening to 50 students this spring. We only use this to pick the first cohort.
+        We only use this to pick the first cohort. By submitting, you agree to
+        the{" "}
+        <Link
+          href="/terms"
+          className="font-medium text-[#0369A1] hover:underline"
+        >
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link
+          href="/privacy"
+          className="font-medium text-[#0369A1] hover:underline"
+        >
+          Privacy Policy
+        </Link>
+        .
       </p>
 
       <style jsx>{`
@@ -149,7 +177,9 @@ export function WaitlistForm() {
           font-size: 15px;
           color: #0f172a;
           outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s;
+          transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
         }
         .input:focus {
           border-color: #0ea5e9;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle } from "lucide-react";
+import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-client";
@@ -385,7 +386,8 @@ export default function PipelinePage() {
     try {
       const res = await apiFetch("/api/pipeline");
       if (res.ok) setData(await res.json());
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err);
       // silent
     }
     setLoading(false);

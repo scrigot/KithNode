@@ -19,11 +19,15 @@ const SERVICE_ROLE_KEY =
   "";
 
 if (!SERVICE_ROLE_KEY) {
-  throw new Error(
-    "SUPABASE_SERVICE_ROLE_KEY is not set. Server-side writes will fail under RLS.",
+  console.warn(
+    "SUPABASE_SERVICE_ROLE_KEY is not set. Server-side writes will fail under RLS."
   );
 }
 
-export const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+export const supabase = createClient(
+  SUPABASE_URL,
+  SERVICE_ROLE_KEY || "missing-service-role-key",
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }
+);

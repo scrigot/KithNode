@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   // Look up target contact for the email subject
   const { data: target } = await supabase
     .from("AlumniContact")
-    .select("name, title, firmName")
+    .select("name, title, firmName, importedByUserId")
     .eq("id", targetContactId)
     .single();
 
@@ -142,6 +142,21 @@ export async function POST(request: NextRequest) {
       { error: "Target contact not found" },
       { status: 404 },
     );
+  }
+
+  if (target.importedByUserId && target.importedByUserId !== userId) {
+    const { data: rating } = await supabase
+      .from("UserDiscover")
+      .select("rating")
+      .eq("userId", userId)
+      .eq("contactId", targetContactId)
+      .maybeSingle();
+    if (!rating) {
+      return NextResponse.json(
+        { error: "Target contact not found" },
+        { status: 404 },
+      );
+    }
   }
 
   // Insert intro request record

@@ -3,8 +3,9 @@ import { Suspense } from "react";
 import { WaitlistForm } from "./waitlist-form";
 
 export const metadata = {
-  title: "Request Access — KithNode",
-  description: "Private alpha opening to 50 students this spring.",
+  title: "Request Access",
+  description:
+    "Join the KithNode founding cohort for warm-path finance recruiting.",
 };
 
 export default function WaitlistPage() {
@@ -26,7 +27,8 @@ export default function WaitlistPage() {
             Request Access
           </h1>
           <p className="mt-4 text-lg text-slate-600">
-            Private alpha opening to 50 students this spring. Tell us where you&apos;re recruiting and Sam will reach out personally.
+            Founding access is open to 50 serious students. Tell us where
+            you&apos;re recruiting and Sam will reach out personally.
           </p>
         </div>
 

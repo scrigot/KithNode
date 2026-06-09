@@ -26,14 +26,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not set");
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 }
+    );
+  }
+
   let event: Stripe.Event;
 
   try {
-    event = getStripe().webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET || ""
-    );
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Webhook signature verification failed:", message);
@@ -43,21 +48,54 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Map raw Stripe subscription statuses to the app's narrower vocabulary.
+  // UI in dashboard/billing only knows trial | active | past_due | canceled.
+  function normalizeStatus(raw: Stripe.Subscription.Status): string {
+    switch (raw) {
+      case "active":
+        return "active";
+      case "trialing":
+        return "trial";
+      case "past_due":
+        return "past_due";
+      case "canceled":
+      case "unpaid":
+      case "incomplete_expired":
+        return "canceled";
+      case "incomplete":
+        return "incomplete";
+      case "paused":
+        return "paused";
+      default:
+        return raw;
+    }
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const customerId = session.customer as string;
         const plan = session.metadata?.plan || "";
+        const userEmail = session.metadata?.userId || ""; // checkout writes email to metadata.userId
 
-        await supabase
+        const update = {
+          stripeCustomerId: customerId,
+          subscriptionStatus: "active",
+          subscriptionPlan: plan,
+        };
+
+        // Primary lookup by stripeCustomerId; fall back to email if no match
+        // (covers customers created out-of-band via portal/dashboard/import).
+        const { data: byCustomer } = await supabase
           .from("User")
-          .update({
-            stripeCustomerId: customerId,
-            subscriptionStatus: "active",
-            subscriptionPlan: plan,
-          })
-          .eq("stripeCustomerId", customerId);
+          .update(update)
+          .eq("stripeCustomerId", customerId)
+          .select("id");
+
+        if ((!byCustomer || byCustomer.length === 0) && userEmail) {
+          await supabase.from("User").update(update).eq("email", userEmail);
+        }
 
         break;
       }
@@ -66,8 +104,7 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
 
-        const status = subscription.status === "active" ? "active" : subscription.status;
-        // Get current period end from the first item's period
+        const status = normalizeStatus(subscription.status);
         const items = subscription.items?.data;
         const periodEnd = items?.[0]?.current_period_end;
         const currentPeriodEnd = periodEnd

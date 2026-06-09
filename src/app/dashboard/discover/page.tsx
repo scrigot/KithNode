@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
@@ -63,7 +64,8 @@ async function rateContact(
       body: JSON.stringify({ contactId, rating }),
     });
     return res.ok;
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err);
     return false;
   }
 }
@@ -359,7 +361,8 @@ export default function DiscoverPage() {
         } else {
           setHasAnyContacts(true);
         }
-      } catch {
+      } catch (err) {
+    Sentry.captureException(err);
         setContacts([]);
         setTotal(0);
       } finally {
@@ -380,7 +383,8 @@ export default function DiscoverPage() {
       setAllRated(unrated.length === 0);
       setBrowseContacts(unrated);
       setHasAnyContacts(unrated.length > 0 || (data.total || 0) > 0);
-    } catch {
+    } catch (err) {
+    Sentry.captureException(err);
       setBrowseContacts([]);
     } finally {
       setLoading(false);
@@ -511,7 +515,8 @@ export default function DiscoverPage() {
           let event: { type: string; stage?: string; message?: string; progress?: number; imported?: number; updated?: number; failed?: number; candidatesFound?: number; mode?: string };
           try {
             event = JSON.parse(line);
-          } catch {
+          } catch (err) {
+    Sentry.captureException(err);
             continue;
           }
           if (event.type === "stage") {
@@ -660,7 +665,8 @@ export default function DiscoverPage() {
           let event: { type: string; stage?: string; message?: string; progress?: number; scraped?: number; classified?: number; inserted?: number; updated?: number; failed?: number };
           try {
             event = JSON.parse(line);
-          } catch {
+          } catch (err) {
+    Sentry.captureException(err);
             continue;
           }
           if (event.type === "stage") {
@@ -754,7 +760,8 @@ export default function DiscoverPage() {
         setPipelineAdded((prev) => new Set(prev).add(contactId));
         trackEvent("discover_add_pipeline", { contact_id: contactId });
       }
-    } catch {
+    } catch (err) {
+    Sentry.captureException(err);
       // silently fail
     } finally {
       setAddingToPipeline(null);

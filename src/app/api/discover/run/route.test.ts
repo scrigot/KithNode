@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ────────────────────────────────────────────────────────────
 // Build a minimal supabase chainable that records inserts/updates so the
@@ -73,9 +73,17 @@ vi.mock("@/lib/supabase", () => {
   };
 });
 
-const mockGetUserId = vi.fn();
-vi.mock("@/lib/get-user", () => ({
-  getUserId: () => mockGetUserId(),
+// Route authenticates via auth() (NextAuth). Mock it here — importing the real
+// @/lib/auth pulls NextAuth + next/server into Vitest and breaks collection.
+const mockAuth = vi.fn();
+vi.mock("@/lib/auth", () => ({
+  auth: () => mockAuth(),
+}));
+
+// Subscription gate: allow by default; a dedicated test asserts the 402 deny path.
+const mockRequireSubscription = vi.fn();
+vi.mock("@/lib/subscription", () => ({
+  requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
 const mockGetUserPrefs = vi.fn();
@@ -168,6 +176,8 @@ beforeEach(() => {
   delete process.env.HUNTER_API_KEY;
   // Default: no school-specific seeds so route falls through to industry seeds
   mockSeedsForSchool.mockReturnValue([]);
+  // Default: subscription allows. Individual tests override for the deny path.
+  mockRequireSubscription.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -176,13 +186,22 @@ afterEach(() => {
 
 describe("POST /api/discover/run", () => {
   it("returns 401 when no user is authed", async () => {
-    mockGetUserId.mockResolvedValue("anonymous");
+    mockAuth.mockResolvedValue(null);
     const res = await POST(makeRequest({ mode: "quick" }));
     expect(res.status).toBe(401);
   });
 
+  it("returns 402 when the subscription gate denies", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockRequireSubscription.mockResolvedValue(
+      NextResponse.json({ error: "Payment required", reason: "no_sub" }, { status: 402 }),
+    );
+    const res = await POST(makeRequest({ mode: "quick" }));
+    expect(res.status).toBe(402);
+  });
+
   it("returns 400 with friendly message when no industries are set", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue({ ...PREFS, targetIndustries: [] });
     mockSeedsForIndustries.mockReturnValue([]);
 
@@ -194,7 +213,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("runs the full pipeline and inserts new contacts", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -259,7 +278,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("updates instead of inserting when LinkedIn URL is already in DB", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -289,7 +308,7 @@ describe("POST /api/discover/run", () => {
 
   it("flips skipHunter to true once the budget is exhausted", async () => {
     process.env.HUNTER_API_KEY = "test-key";
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "X", domain: "x.com", website: "https://x.com" },
@@ -336,7 +355,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("counts insert failures without throwing", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "X", domain: "x.com", website: "https://x.com" },
@@ -366,7 +385,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("emits stage events for prefs, seeds, scanning, enriching, saving, then done", async () => {
-    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
