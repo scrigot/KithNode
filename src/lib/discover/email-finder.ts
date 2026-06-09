@@ -21,6 +21,8 @@
 // part of the email. The waterfall result carries `source` so the UI can
 // show whether an address was verified or guessed.
 
+import { lastName } from "../name-utils";
+
 const HUNTER_BASE = "https://api.hunter.io/v2";
 
 // In-memory pattern cache. Lives for the lifetime of the Lambda warm
@@ -180,7 +182,7 @@ export interface FindEmailOptions {
 function splitName(fullName: string): { first: string; last: string } {
   const tokens = fullName.trim().split(/\s+/).filter(Boolean);
   if (tokens.length < 2) return { first: tokens[0] || "", last: "" };
-  return { first: tokens[0], last: tokens[tokens.length - 1] };
+  return { first: tokens[0], last: lastName(fullName) };
 }
 
 /**

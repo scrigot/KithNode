@@ -169,4 +169,16 @@ describe("findEmail (waterfall)", () => {
     const result = await findEmail("Alice Marie Johnson", "acme.com", { skipHunter: true });
     expect(result.email).toBe("alice.johnson@acme.com");
   });
+
+  it("skips generational suffixes when picking the last name", async () => {
+    _setPatternCacheEntry("acme.com", "{first}.{last}");
+    const result = await findEmail("Elena Ramirez Jr.", "acme.com", { skipHunter: true });
+    expect(result.email).toBe("elena.ramirez@acme.com");
+  });
+
+  it("skips roman-numeral suffixes when picking the last name", async () => {
+    _setPatternCacheEntry("acme.com", "{first}.{last}");
+    const result = await findEmail("Robert W Baird III", "acme.com", { skipHunter: true });
+    expect(result.email).toBe("robert.baird@acme.com");
+  });
 });

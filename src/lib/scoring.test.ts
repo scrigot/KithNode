@@ -45,6 +45,20 @@ describe("scoreConnection", () => {
     expect(score).toBe(10); // only tier 3
   });
 
+  it("awards cohort bonus across a decade boundary (2019 vs 2020)", () => {
+    const user = { ...baseUser, graduationYear: 2019 };
+    const alumni = { ...baseAlumni, graduationYear: 2020 };
+    const score = scoreConnection(user, alumni);
+    expect(score).toBe(20); // 10 (cohort, 1 yr apart) + 10 (tier 3)
+  });
+
+  it("does not award cohort bonus when years are more than 4 apart (2020 vs 2026)", () => {
+    const user = { ...baseUser, graduationYear: 2020 };
+    const alumni = { ...baseAlumni, graduationYear: 2026 };
+    const score = scoreConnection(user, alumni);
+    expect(score).toBe(10); // only tier 3, 6 yrs apart
+  });
+
   it("skips decade scoring when user has no graduation year", () => {
     const user = { ...baseUser, graduationYear: undefined };
     const alumni = { ...baseAlumni, graduationYear: 2025 };

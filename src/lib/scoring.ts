@@ -41,7 +41,7 @@ const PRESTIGE_TIER_2 = new Set([
   "Warburg Pincus",
 ]);
 
-const FIRM_INDUSTRY: Record<string, string> = {
+export const FIRM_INDUSTRY: Record<string, string> = {
   "Goldman Sachs": "Investment Banking",
   "Morgan Stanley": "Investment Banking",
   "J.P. Morgan": "Investment Banking",
@@ -80,11 +80,9 @@ export function scoreConnection(
     score += 20;
   }
 
-  // Shared graduation decade: +10
+  // Shared cohort (graduation years within 4): +10
   if (user.graduationYear && alumni.graduationYear) {
-    const userDecade = Math.floor(user.graduationYear / 10);
-    const alumniDecade = Math.floor(alumni.graduationYear / 10);
-    if (userDecade === alumniDecade) {
+    if (Math.abs(user.graduationYear - alumni.graduationYear) <= 4) {
       score += 10;
     }
   }

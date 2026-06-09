@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateOutreachDraft, getLastName, OutreachContext } from "./outreach";
+import { detectSharedSignals, generateOutreachDraft, getLastName, OutreachContext } from "./outreach";
 
 const baseContext: OutreachContext = {
   userName: "John Smith",
@@ -78,6 +78,38 @@ describe("generateOutreachDraft", () => {
     const draft = generateOutreachDraft(ctx);
     expect(draft.length).toBeGreaterThan(0);
   });
+
+  it("fires the industry signal when the firm matches the target industry", () => {
+    // Goldman Sachs maps to Investment Banking in FIRM_INDUSTRY.
+    const ctx = {
+      ...baseContext,
+      alumniFirm: "Goldman Sachs",
+      userTargetIndustry: "Investment Banking",
+    };
+    const signals = detectSharedSignals(ctx);
+    expect(signals.some((s) => s.type === "industry")).toBe(true);
+  });
+
+  it("does not fire the industry signal when the firm's industry differs", () => {
+    // Goldman Sachs is Investment Banking, not Consulting.
+    const ctx = {
+      ...baseContext,
+      alumniFirm: "Goldman Sachs",
+      userTargetIndustry: "Consulting",
+    };
+    const signals = detectSharedSignals(ctx);
+    expect(signals.some((s) => s.type === "industry")).toBe(false);
+  });
+
+  it("does not fire the industry signal for an unmapped firm", () => {
+    const ctx = {
+      ...baseContext,
+      alumniFirm: "Tiny Boutique LLC",
+      userTargetIndustry: "Investment Banking",
+    };
+    const signals = detectSharedSignals(ctx);
+    expect(signals.some((s) => s.type === "industry")).toBe(false);
+  });
 });
 
 const baseProfCtx: OutreachContext = {
@@ -109,6 +141,14 @@ describe("getLastName", () => {
 
   it("returns the only word for a single-word name", () => {
     expect(getLastName("Madonna")).toBe("Madonna");
+  });
+
+  it("ignores Sr. suffix and returns preceding name", () => {
+    expect(getLastName("Mary Jo Sr.")).toBe("Jo");
+  });
+
+  it("ignores roman-numeral suffix and returns preceding name", () => {
+    expect(getLastName("David II")).toBe("David");
   });
 });
 
