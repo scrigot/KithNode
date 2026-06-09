@@ -17,6 +17,7 @@ import requests
 
 import database as db
 from config import HUNTER_API_KEY
+from cost_log import log_cost, _APOLLO_COST_PER_CALL
 
 # Apollo API key (optional, free tier gives 5 email credits/mo but unlimited search)
 APOLLO_API_KEY = os.getenv("APOLLO_API_KEY", "")
@@ -60,6 +61,15 @@ def _enrich_from_apollo(name: str, domain: str) -> dict:
 
         if resp.status_code != 200:
             return {}
+
+        # Best-effort cost telemetry — a 200 is a real billed call (free tier $0,
+        # still counted for credit-burn). Never raises.
+        log_cost(
+            "apollo",
+            "people.match",
+            cost_usd=_APOLLO_COST_PER_CALL,
+            meta={"source": "backend"},
+        )
 
         data = resp.json().get("person", {})
         if not data:
