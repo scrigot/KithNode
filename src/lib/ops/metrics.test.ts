@@ -10,6 +10,11 @@ import {
   distinctUnionCount,
   computeActiveUsers,
   computeRevenue,
+  taskHealth,
+  computeCost,
+  computeTotalBurn,
+  DAILY_COST_BUDGET_USD,
+  type CostRow,
 } from "./metrics";
 
 // Minimal Session-shaped object. We import only the Session *type* (type-only,
@@ -241,5 +246,117 @@ describe("computeRevenue", () => {
     ], { monthly: 20 });
     expect(r.pastDue).toBe(1);
     expect(r.health).toBe("bad");
+  });
+});
+
+describe("taskHealth (open-count)", () => {
+  it("0 open is neutral", () => {
+    expect(taskHealth(0)).toBe("neutral");
+  });
+  it("<= 5 open is good", () => {
+    expect(taskHealth(1)).toBe("good");
+    expect(taskHealth(5)).toBe("good");
+  });
+  it("6-10 open is warn", () => {
+    expect(taskHealth(6)).toBe("warn");
+    expect(taskHealth(10)).toBe("warn");
+  });
+  it("> 10 open is bad (overloaded)", () => {
+    expect(taskHealth(11)).toBe("bad");
+  });
+});
+
+describe("computeCost (cost bucketing + budget health)", () => {
+  const now = new Date("2026-06-09T12:00:00.000Z");
+
+  const rows: CostRow[] = [
+    // today
+    { cost_usd: "0.50", provider: "anthropic", created_at: "2026-06-09T01:00:00.000Z", meta: { contact_id: "c1" } },
+    { cost_usd: 0.25, provider: "anthropic", created_at: "2026-06-09T08:00:00.000Z", meta: { contact_id: "c2" } },
+    // earlier in window
+    { cost_usd: "0.10", provider: "hunter", created_at: "2026-06-07T10:00:00.000Z", meta: {} },
+    { cost_usd: 0, provider: "apollo", created_at: "2026-06-06T10:00:00.000Z", meta: {} },
+    // outside the 7d window — ignored
+    { cost_usd: 99, provider: "anthropic", created_at: "2026-05-01T00:00:00.000Z", meta: {} },
+  ];
+
+  it("sums today and 7d totals, parses numeric strings", () => {
+    const r = computeCost(rows, 7, now);
+    expect(r.today).toBeCloseTo(0.75, 6);
+    expect(r.last7d).toBeCloseTo(0.85, 6);
+    expect(r.avgPerDay).toBeCloseTo(0.85 / 7, 6);
+    expect(r.series).toHaveLength(7);
+    expect(r.series[6].date).toBe("2026-06-09");
+    expect(r.series[6].cost).toBeCloseTo(0.75, 6);
+  });
+
+  it("breaks down by provider with call counts", () => {
+    const r = computeCost(rows, 7, now);
+    const anthropic = r.byProvider.find((p) => p.provider === "anthropic");
+    expect(anthropic?.cost).toBeCloseTo(0.75, 6);
+    expect(anthropic?.calls).toBe(2);
+    expect(r.byProvider.find((p) => p.provider === "apollo")?.calls).toBe(1);
+  });
+
+  it("computes cost-per-draft grouped by contact_id", () => {
+    const r = computeCost(rows, 7, now);
+    // c1 = 0.50, c2 = 0.25 -> avg 0.375
+    expect(r.costPerDraft).toBeCloseTo(0.375, 6);
+  });
+
+  it("null cost-per-draft when no attributed rows", () => {
+    const r = computeCost(
+      [{ cost_usd: 1, provider: "hunter", created_at: "2026-06-09T01:00:00.000Z", meta: {} }],
+      7,
+      now,
+    );
+    expect(r.costPerDraft).toBeNull();
+  });
+
+  it("today health: <= budget good, 1-2x warn, > 2x bad", () => {
+    const at = (cost: number) =>
+      computeCost(
+        [{ cost_usd: cost, provider: "anthropic", created_at: "2026-06-09T01:00:00.000Z", meta: {} }],
+        7,
+        now,
+      ).todayHealth;
+    expect(at(DAILY_COST_BUDGET_USD)).toBe("good");
+    expect(at(DAILY_COST_BUDGET_USD * 1.5)).toBe("warn");
+    expect(at(DAILY_COST_BUDGET_USD * 2.5)).toBe("bad");
+  });
+
+  it("empty rows are neutral with zero totals", () => {
+    const r = computeCost([], 7, now);
+    expect(r.today).toBe(0);
+    expect(r.last7d).toBe(0);
+    expect(r.todayHealth).toBe("neutral");
+    expect(r.byProvider).toEqual([]);
+  });
+});
+
+describe("computeTotalBurn (fixed + variable vs budget)", () => {
+  it("sums fixed subs + 30d variable and compares to monthly budget", () => {
+    const r = computeTotalBurn(
+      [{ monthlyUsd: 20 }, { monthlyUsd: 5 }],
+      10,
+      DAILY_COST_BUDGET_USD,
+    );
+    expect(r.fixedMonthly).toBe(25);
+    expect(r.variable30d).toBe(10);
+    expect(r.totalMonthly).toBe(35);
+    expect(r.monthlyBudget).toBe(DAILY_COST_BUDGET_USD * 30); // 60
+    expect(r.health).toBe("good"); // 35 <= 60
+  });
+
+  it("over 2x monthly budget is bad", () => {
+    const r = computeTotalBurn([{ monthlyUsd: 100 }], 50, DAILY_COST_BUDGET_USD);
+    expect(r.totalMonthly).toBe(150);
+    expect(r.health).toBe("bad"); // 150 > 120
+  });
+
+  it("$0 fixed + $0 variable is good (within budget)", () => {
+    const r = computeTotalBurn([{ monthlyUsd: 0 }], 0, DAILY_COST_BUDGET_USD);
+    expect(r.totalMonthly).toBe(0);
+    expect(r.health).toBe("good");
   });
 });

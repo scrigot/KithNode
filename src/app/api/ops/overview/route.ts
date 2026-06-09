@@ -7,10 +7,18 @@ import {
   computeFunnel,
   computeActiveUsers,
   computeRevenue,
+  computeCost,
+  computeTotalBurn,
+  taskHealth,
+  FIXED_SUBSCRIPTIONS,
   type VelocityResult,
   type FunnelResult,
   type ActiveUsersResult,
   type RevenueResult,
+  type CostResult,
+  type TotalBurnResult,
+  type CostRow,
+  type Health,
 } from "@/lib/ops/metrics";
 
 // ─── Response shape (shared with the client cockpit) ─────────────────────────
@@ -22,6 +30,20 @@ export interface RecentSignup {
   source: "referral" | "organic";
 }
 
+export interface OpsTask {
+  id: string;
+  title: string;
+  done: boolean;
+  sort: number;
+  createdAt: string;
+}
+
+export interface TasksResult {
+  tasks: OpsTask[];
+  openCount: number;
+  health: Health;
+}
+
 export interface OpsOverview {
   velocity: VelocityResult;
   recentSignups: RecentSignup[];
@@ -30,6 +52,9 @@ export interface OpsOverview {
   funnel: FunnelResult;
   activeUsers: ActiveUsersResult;
   revenue: RevenueResult;
+  tasks: TasksResult;
+  cost: CostResult;
+  totalBurn: TotalBurnResult;
 }
 
 const DAY_MS = 86_400_000;
@@ -57,6 +82,17 @@ function emptyOverview(): OpsOverview {
     },
     activeUsers: { active7d: 0, priorActive7d: 0, health: "neutral" },
     revenue: { active: 0, trial: 0, pastDue: 0, canceled: 0, mrr: 0, health: "neutral" },
+    tasks: { tasks: [], openCount: 0, health: "neutral" },
+    cost: {
+      today: 0,
+      last7d: 0,
+      avgPerDay: 0,
+      series: [],
+      byProvider: [],
+      costPerDraft: null,
+      todayHealth: "neutral",
+    },
+    totalBurn: computeTotalBurn(FIXED_SUBSCRIPTIONS, 0),
   };
 }
 
@@ -73,6 +109,8 @@ export async function GET() {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * DAY_MS).toISOString();
     // Boundary between the prior-7d and current-7d active-user windows.
     const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS).toISOString();
+    // Total-burn variable window (trailing 30d).
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS).toISOString();
 
     const [
       velocityRows,
@@ -83,6 +121,8 @@ export async function GET() {
       auditWindowRows,
       discoverWindowRows,
       revenueRows,
+      taskRows,
+      costRows,
     ] = await Promise.all([
       // (a) signups velocity — 14d window of created_at
       supabase
@@ -113,6 +153,18 @@ export async function GET() {
         .gte("createdAt", fourteenDaysAgo),
       // (h) revenue stub — subscription tallies
       supabase.from("User").select("subscriptionStatus, subscriptionPlan"),
+      // (e) tasks — open first, then by sort, then created (matches the spec order)
+      supabase
+        .from("ops_tasks")
+        .select("id, title, done, sort, created_at")
+        .order("done", { ascending: true })
+        .order("sort", { ascending: true })
+        .order("created_at", { ascending: true }),
+      // (g) cost — last 30d of api_cost_log (covers both the 7d tile + 30d burn)
+      supabase
+        .from("api_cost_log")
+        .select("cost_usd, provider, created_at, meta")
+        .gte("created_at", thirtyDaysAgo),
     ]);
 
     // (a) velocity
@@ -173,6 +225,33 @@ export async function GET() {
       })),
     );
 
+    // (e) tasks
+    const tasks: OpsTask[] = (taskRows.data ?? []).map((r) => ({
+      id: r.id as string,
+      title: (r.title as string) ?? "",
+      done: !!r.done,
+      sort: (r.sort as number) ?? 0,
+      createdAt: (r.created_at as string) ?? new Date().toISOString(),
+    }));
+    const openCount = tasks.filter((t) => !t.done).length;
+    const tasksResult: TasksResult = {
+      tasks,
+      openCount,
+      health: taskHealth(openCount),
+    };
+
+    // (g) cost-burn — 7d tile from the 30d selection; total-burn over the full 30d
+    const allCostRows = (costRows.data ?? []) as CostRow[];
+    const cost = computeCost(allCostRows, 7, now);
+    const variable30d = allCostRows.reduce((sum, row) => {
+      const c =
+        typeof row.cost_usd === "string"
+          ? parseFloat(row.cost_usd)
+          : row.cost_usd ?? 0;
+      return sum + (Number.isFinite(c) ? (c as number) : 0);
+    }, 0);
+    const totalBurn = computeTotalBurn(FIXED_SUBSCRIPTIONS, variable30d);
+
     const payload: OpsOverview = {
       velocity,
       recentSignups,
@@ -181,6 +260,9 @@ export async function GET() {
       funnel,
       activeUsers,
       revenue,
+      tasks: tasksResult,
+      cost,
+      totalBurn,
     };
     return NextResponse.json(payload);
   } catch {

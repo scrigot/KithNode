@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -17,10 +17,13 @@ import {
   ListChecks,
   Inbox,
   Map as MapIcon,
+  Plus,
+  Flame,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import type { OpsOverview } from "@/app/api/ops/overview/route";
 import { healthColor, type Health } from "@/lib/ops/metrics";
+import { addOpsTask, toggleOpsTask } from "../actions";
 import { OpsTile, OpsEmpty } from "./ops-tile";
 import { healthChip, relativeTime } from "./state";
 
@@ -71,6 +74,15 @@ function DeltaLine({
 export function OpsCockpit() {
   const [data, setData] = useState<OpsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    try {
+      const r = await apiFetch("/api/ops/overview");
+      if (r.ok) setData(await r.json());
+    } catch {
+      // keep stale data on a transient failure
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,19 +155,22 @@ export function OpsCockpit() {
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <VelocityTile data={data} />
             <ActiveUsersTile data={data} />
-            <CostBurnStubTile />
+            <CostBurnTile data={data} />
           </div>
 
           {/* ─── Row 2: funnel | revenue | tasks ─────────────────────────── */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <FunnelTile data={data} />
             <RevenueTile data={data} />
-            <TasksStubTile />
+            <TasksTile data={data} onChange={refetch} />
           </div>
 
-          {/* ─── Row 3: recent signups feed (full width) ─────────────────── */}
-          <div className="mt-4">
-            <RecentSignupsTile data={data} />
+          {/* ─── Row 3: recent signups feed (2/3) | total burn (1/3) ─────── */}
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <RecentSignupsTile data={data} />
+            </div>
+            <TotalBurnTile data={data} />
           </div>
         </>
       )}
@@ -340,20 +355,147 @@ function ActiveUsersTile({ data }: { data: OpsOverview | null }) {
   );
 }
 
-// ─── (g) Cost-burn — STUB (increment 4) ──────────────────────────────────────
-function CostBurnStubTile() {
+// ─── Money formatter ──────────────────────────────────────────────────────────
+function usd(n: number, dp = 2): string {
+  return `$${n.toFixed(dp)}`;
+}
+
+// ─── (g) Cost-burn — variable API spend (Anthropic / Hunter / Apollo) ─────────
+function CostBurnTile({ data }: { data: OpsOverview | null }) {
+  const c = data?.cost;
+  const empty = !c || c.last7d === 0;
   return (
     <OpsTile
       label="Cost Burn"
-      subtitle="API / infra runway"
-      badge="soon"
-      badgeHealth="neutral"
+      subtitle="API spend · last 7 days"
+      badge={c ? `${usd(c.today)} today` : undefined}
+      badgeHealth={c?.todayHealth ?? "neutral"}
     >
-      <OpsEmpty
-        icon={<DollarSign size={20} />}
-        heading="No spend logged yet"
-        description="Per-call cost telemetry lands in a later increment. Coming soon."
-      />
+      {empty ? (
+        <OpsEmpty
+          icon={<DollarSign size={20} />}
+          heading="No spend logged yet"
+          description="Variable API cost appears here once a draft or enrichment runs."
+        />
+      ) : (
+        <>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text-primary">
+              {usd(c.today)}
+            </span>
+            <DeltaLine health={c.todayHealth}>
+              today · vs {usd(c.avgPerDay)}/day 7d-avg
+            </DeltaLine>
+          </div>
+          {c.costPerDraft != null && (
+            <p className="mt-1 font-mono text-[10px] text-text-muted">
+              {usd(c.costPerDraft, 4)} avg per draft
+            </p>
+          )}
+          <div className="mt-3 h-12">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={c.series}
+                margin={{ top: 2, right: 2, left: 2, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="opsCostFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Tooltip
+                  content={<CostTooltip />}
+                  cursor={{ stroke: "rgba(255,255,255,0.1)" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cost"
+                  stroke="#0EA5E9"
+                  strokeWidth={1.5}
+                  fill="url(#opsCostFill)"
+                  isAnimationActive={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {c.byProvider.map((p) => (
+              <span
+                key={p.provider}
+                className="border border-white/[0.12] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-text-muted"
+              >
+                {p.provider} {usd(p.cost, 4)} · {p.calls}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </OpsTile>
+  );
+}
+
+function CostTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="border border-white/[0.18] bg-bg-primary px-2 py-1 font-mono text-[10px] tabular-nums text-text-primary shadow-lg">
+      <span className="uppercase tracking-wider text-text-muted">{label}</span>{" "}
+      <span className="font-bold">{usd(payload[0].value, 4)}</span>
+    </div>
+  );
+}
+
+// ─── (g) Total burn — fixed subscriptions + 30d variable vs monthly budget ────
+function TotalBurnTile({ data }: { data: OpsOverview | null }) {
+  const b = data?.totalBurn;
+  return (
+    <OpsTile
+      label="Total Burn"
+      subtitle="Fixed + variable · monthly"
+      badge={b ? `vs ${usd(b.monthlyBudget, 0)}/mo` : undefined}
+      badgeHealth={b?.health ?? "neutral"}
+    >
+      {!b ? (
+        <OpsEmpty icon={<Flame size={20} />} heading="No burn data" />
+      ) : (
+        <>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-2xl font-bold tabular-nums text-text-primary">
+              {usd(b.totalMonthly)}
+            </span>
+            <DeltaLine health={b.health}>
+              /mo · budget {usd(b.monthlyBudget, 0)}
+            </DeltaLine>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-1.5 text-[11px]">
+            <div className="flex items-baseline justify-between border border-white/[0.06] px-2 py-1">
+              <span className="uppercase tracking-wider text-text-muted">Fixed</span>
+              <span className="font-mono font-bold tabular-nums text-text-secondary">
+                {usd(b.fixedMonthly)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between border border-white/[0.06] px-2 py-1">
+              <span className="uppercase tracking-wider text-text-muted">Variable 30d</span>
+              <span className="font-mono font-bold tabular-nums text-text-secondary">
+                {usd(b.variable30d, 4)}
+              </span>
+            </div>
+          </div>
+          {b.fixedMonthly === 0 && (
+            <p className="mt-2 text-[10px] text-text-muted">
+              Fixed subs are $0 placeholders — set real monthly figures to track runway.
+            </p>
+          )}
+        </>
+      )}
     </OpsTile>
   );
 }
@@ -497,20 +639,104 @@ function StatCell({
   );
 }
 
-// ─── (e) Tasks — STUB (increment 3) ──────────────────────────────────────────
-function TasksStubTile() {
+// ─── (e) Next-actions task list (add + toggle via server action) ──────────────
+function TasksTile({
+  data,
+  onChange,
+}: {
+  data: OpsOverview | null;
+  onChange: () => Promise<void>;
+}) {
+  const t = data?.tasks;
+  const tasks = t?.tasks ?? [];
+  const open = t?.openCount ?? 0;
+  const [title, setTitle] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function handleAdd() {
+    const value = title.trim();
+    if (!value || pending) return;
+    setPending(true);
+    const res = await addOpsTask(value);
+    if (res.ok) {
+      setTitle("");
+      await onChange();
+    }
+    setPending(false);
+  }
+
+  async function handleToggle(id: string, done: boolean) {
+    if (pending) return;
+    setPending(true);
+    const res = await toggleOpsTask(id, done);
+    if (res.ok) await onChange();
+    setPending(false);
+  }
+
   return (
     <OpsTile
       label="Next Actions"
       subtitle="Run-the-business to-do"
-      badge="soon"
-      badgeHealth="neutral"
+      badge={tasks.length > 0 ? `${open} open` : undefined}
+      badgeHealth={t?.health ?? "neutral"}
     >
-      <OpsEmpty
-        icon={<ListChecks size={20} />}
-        heading="Task list coming soon"
-        description="Add and check off ops tasks once the table ships in a later increment."
-      />
+      <div className="flex items-center gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAdd();
+          }}
+          placeholder="Add a task…"
+          disabled={pending}
+          className="min-w-0 flex-1 border border-white/[0.12] bg-bg-primary px-2 py-1 text-[12px] text-text-primary placeholder:text-text-muted focus:border-accent-teal/50 focus:outline-none disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={pending || !title.trim()}
+          aria-label="Add task"
+          className="flex shrink-0 items-center justify-center border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-accent-teal hover:bg-accent-teal/20 disabled:opacity-40"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+
+      {tasks.length === 0 ? (
+        <div className="mt-3">
+          <OpsEmpty
+            icon={<ListChecks size={20} />}
+            heading="No open tasks"
+            description="Add the next thing to clear for running the business."
+          />
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-col divide-y divide-white/[0.06]">
+          {tasks.map((task) => (
+            <label
+              key={task.id}
+              className="flex cursor-pointer items-center gap-2 py-1.5 first:pt-0 last:pb-0"
+            >
+              <input
+                type="checkbox"
+                checked={task.done}
+                disabled={pending}
+                onChange={() => handleToggle(task.id, !task.done)}
+                className="h-3.5 w-3.5 shrink-0 accent-accent-teal"
+              />
+              <span
+                className={`min-w-0 flex-1 truncate text-[12px] ${
+                  task.done
+                    ? "text-text-muted line-through"
+                    : "text-text-primary"
+                }`}
+              >
+                {task.title}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
     </OpsTile>
   );
 }
