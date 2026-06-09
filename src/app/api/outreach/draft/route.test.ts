@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const mockAuth = vi.fn();
 vi.mock("@/lib/auth", () => ({
@@ -18,6 +18,12 @@ vi.mock("ai", () => ({
 
 vi.mock("@ai-sdk/gateway", () => ({
   gateway: vi.fn(() => "mock-model"),
+}));
+
+// Subscription gate: allow by default; a dedicated test asserts the 402 deny path.
+const mockRequireSubscription = vi.fn();
+vi.mock("@/lib/subscription", () => ({
+  requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
 const supabaseResults: Array<{ data: unknown; error: unknown }> = [];
@@ -66,12 +72,22 @@ describe("POST /api/outreach/draft", () => {
     supabaseResults.length = 0;
     supabaseCallIndex = 0;
     mockGetUserPrefs.mockResolvedValue(DEFAULT_PREFS);
+    mockRequireSubscription.mockResolvedValue(null);
   });
 
   it("returns 400 when contactId is missing", async () => {
     mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
     const response = await POST(makeRequest({}));
     expect(response.status).toBe(400);
+  });
+
+  it("returns 402 when the subscription gate denies", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockRequireSubscription.mockResolvedValue(
+      NextResponse.json({ error: "Payment required", reason: "no_sub" }, { status: 402 }),
+    );
+    const response = await POST(makeRequest({ contactId: "1" }));
+    expect(response.status).toBe(402);
   });
 
   it("returns draft for valid contact", async () => {

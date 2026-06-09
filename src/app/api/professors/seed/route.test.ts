@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ────────────────────────────────────────────────────────────
 
@@ -80,6 +80,13 @@ vi.mock("@/lib/professors/scraper", () => ({
 const mockClassifyBatch = vi.fn();
 vi.mock("@/lib/professors/classifier", () => ({
   classifyBatch: (...args: unknown[]) => mockClassifyBatch(...args),
+}));
+
+// Subscription gate: the route calls requireSubscription() after auth. Mock it
+// to allow by default; a dedicated test below asserts the 402 deny path.
+const mockRequireSubscription = vi.fn();
+vi.mock("@/lib/subscription", () => ({
+  requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
 import { POST, type SeedEvent } from "./route";
@@ -165,6 +172,8 @@ const MOCK_CLASSIFICATIONS = [
 beforeEach(() => {
   supabaseState.reset();
   vi.clearAllMocks();
+  // Default: subscription allows. Individual tests override for the deny path.
+  mockRequireSubscription.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -186,6 +195,17 @@ describe("POST /api/professors/seed", () => {
     mockGetUserId.mockResolvedValue(null);
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
+  });
+
+  it("returns 402 when the subscription gate denies", async () => {
+    mockGetUserId.mockResolvedValue("test@unc.edu");
+    mockRequireSubscription.mockResolvedValue(
+      NextResponse.json({ error: "Payment required", reason: "no_sub" }, { status: 402 }),
+    );
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(402);
+    // Gate runs before the stream opens — plain JSON, no scrape.
+    expect(mockScrapeAllDepartments).not.toHaveBeenCalled();
   });
 
   it("happy path: 3 profs scraped, classified, inserted", async () => {
@@ -292,8 +312,11 @@ describe("POST /api/professors/seed", () => {
 
     const responsePromise = POST(request);
 
-    // Let the route reach the scrape await, then abort, then resolve scrape.
-    await Promise.resolve(); // flush microtasks so route starts
+    // Flush past the pre-stream awaits (getUserId + requireSubscription) with a
+    // macrotask so the ReadableStream's start() has attached the abort listener
+    // before we abort. A single microtask flush is not enough now that the
+    // subscription gate adds an extra await ahead of the stream.
+    await new Promise((r) => setTimeout(r, 0));
     abort();
     resolveScrape(MOCK_PROFESSORS);
 
