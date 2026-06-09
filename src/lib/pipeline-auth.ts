@@ -40,7 +40,7 @@ export function scopedSelect(
   userId: string,
   columns = "*",
 ) {
-  return supabase.from(table).select(columns).eq("userId", userId);
+  return supabase.from(table as string).select(columns as "*").eq("userId", userId);
 }
 
 /**
@@ -55,7 +55,7 @@ export function scopedInsert<T extends Record<string, unknown>>(
   const withOwner = Array.isArray(rows)
     ? rows.map((r) => ({ ...r, userId }))
     : { ...rows, userId };
-  return supabase.from(table).insert(withOwner);
+  return supabase.from(table as string).insert(withOwner);
 }
 
 /**
@@ -68,12 +68,12 @@ export function scopedUpdate(
   userId: string,
   patch: Record<string, unknown>,
 ) {
-  return supabase.from(table).update(patch).eq("userId", userId);
+  return supabase.from(table as string).update(patch).eq("userId", userId);
 }
 
 /**
  * DELETE scoped to the current user. Always appends `.eq("userId", userId)`.
  */
 export function scopedDelete(table: UserScopedTable, userId: string) {
-  return supabase.from(table).delete().eq("userId", userId);
+  return supabase.from(table as string).delete().eq("userId", userId);
 }

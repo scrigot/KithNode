@@ -1,38 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { requireUser, scopedSelect, scopedInsert } from "@/lib/pipeline-auth";
 
-const STAGES = [
-  "researched",
-  "connected",
-  "email_sent",
-  "follow_up",
-  "responded",
-  "meeting_set",
-];
+interface StageMeta {
+  key: string;
+  label: string;
+  color: string;
+  universalPhase?: string;
+}
 
-/** POST: Add a contact to the pipeline (idempotent) */
+function parseStages(raw: unknown): StageMeta[] {
+  if (Array.isArray(raw)) return raw as StageMeta[];
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+async function loadPipeline(userId: string, pipelineId: string) {
+  const { data } = await scopedSelect("Pipeline", userId).eq("id", pipelineId).maybeSingle();
+  if (!data) return null;
+  return { ...data, stages: parseStages(data.stages) as StageMeta[] };
+}
+
+/** POST: add an existing contact to a specific pipeline (idempotent per pipeline). */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.email;
-
+  const userId = await requireUser();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: contactId } = await params;
 
   try {
-    // Check if already in pipeline for this user
-    const { data: existing } = await supabase
-      .from("PipelineEntry")
-      .select("*")
-      .eq("contactId", contactId)
-      .eq("userId", userId)
-      .maybeSingle();
+    const body = await request.json().catch(() => ({}));
+    const pipelineId: string | undefined = body.pipelineId;
+    if (!pipelineId) {
+      return NextResponse.json({ error: "pipelineId required" }, { status: 400 });
+    }
+    const pipeline = await loadPipeline(userId, pipelineId);
+    if (!pipeline) {
+      return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
+    }
 
+    // Idempotent: one entry per (contact, pipeline, user).
+    const { data: existing } = await scopedSelect("PipelineEntry", userId)
+      .eq("contactId", contactId)
+      .eq("pipelineId", pipelineId)
+      .maybeSingle();
     if (existing) {
       return NextResponse.json({
         contact_id: contactId,
@@ -42,20 +62,19 @@ export async function POST(
       });
     }
 
-    // Create new pipeline entry with userId
-    const { data: entry, error } = await supabase
-      .from("PipelineEntry")
-      .insert({
-        contactId,
-        userId,
-        stage: "researched",
-        notes: "",
-        addedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
+    const firstStage = pipeline.stages[0]?.key || "researched";
+    const now = new Date().toISOString();
+    const { data: entry, error } = await scopedInsert("PipelineEntry", userId, {
+      contactId,
+      pipelineId,
+      stage: firstStage,
+      notes: "",
+      addedAt: now,
+      updatedAt: now,
+      lastTouchAt: now,
+    })
       .select()
       .single();
-
     if (error) throw new Error(error.message);
 
     return NextResponse.json({
@@ -64,109 +83,83 @@ export async function POST(
       stage: entry.stage,
     });
   } catch {
-    return NextResponse.json(
-      { error: "Failed to add to pipeline" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to add to pipeline" }, { status: 500 });
   }
 }
 
-/** PATCH: Advance a contact to the next stage (or set a specific stage) */
+/** PATCH: advance/regress a contact within its pipeline, or set a specific stage. */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.email;
-
+  const userId = await requireUser();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id: contactId } = await params;
 
   try {
     const body = await request.json();
+    const pipelineId: string | undefined = body.pipelineId;
 
-    // Get current pipeline entry for this user
-    const { data: existing, error: fetchError } = await supabase
-      .from("PipelineEntry")
-      .select("*")
-      .eq("contactId", contactId)
-      .eq("userId", userId)
-      .single();
-
+    // Locate the entry. pipelineId disambiguates when a contact is in >1 pipeline.
+    let q = scopedSelect("PipelineEntry", userId).eq("contactId", contactId);
+    if (pipelineId) q = q.eq("pipelineId", pipelineId);
+    const { data: existing, error: fetchError } = await q.maybeSingle();
     if (fetchError || !existing) {
-      return NextResponse.json(
-        { error: "Contact not in pipeline" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Contact not in pipeline" }, { status: 404 });
     }
 
-    let newStage: string;
+    const pipeline = existing.pipelineId
+      ? await loadPipeline(userId, existing.pipelineId)
+      : null;
+    const stages = pipeline?.stages || [];
+    const stageKeys = stages.map((s: StageMeta) => s.key);
 
+    let newStage: string;
     if (body.stage) {
-      // Explicit stage provided
-      newStage = body.stage.toLowerCase();
-    } else {
-      // Advance to next stage
-      const currentIdx = STAGES.indexOf(
-        (existing.stage || "researched").toLowerCase(),
-      );
-      if (currentIdx >= STAGES.length - 1) {
+      newStage = String(body.stage).toLowerCase();
+      // Orphan guard: reject a target stage that isn't in this pipeline.
+      if (stageKeys.length && !stageKeys.includes(newStage)) {
         return NextResponse.json(
-          { error: "Already at final stage" },
+          { error: `Unknown stage "${newStage}" for this pipeline` },
           { status: 400 },
         );
       }
-      newStage = STAGES[currentIdx + 1];
+    } else {
+      const dir = body.direction === "backward" ? -1 : 1;
+      const curIdx = stageKeys.indexOf((existing.stage || "").toLowerCase());
+      const nextIdx = curIdx + dir;
+      if (curIdx < 0 || nextIdx < 0 || nextIdx >= stageKeys.length) {
+        return NextResponse.json({ error: "No further stage" }, { status: 400 });
+      }
+      newStage = stageKeys[nextIdx];
     }
 
-    // Update the entry
+    const now = new Date().toISOString();
     const { data: updated, error: updateError } = await supabase
       .from("PipelineEntry")
       .update({
         stage: newStage,
         notes: body.notes ?? existing.notes,
-        updatedAt: new Date().toISOString(),
+        lastTouchAt: now,
+        updatedAt: now,
       })
       .eq("id", existing.id)
+      .eq("userId", userId) // IDOR guard on the write too
       .select()
       .single();
-
     if (updateError) throw new Error(updateError.message);
 
-    // Build conversion data for RESPONDED / MEETING_SET transitions
-    const isConversion =
-      newStage === "responded" || newStage === "meeting_set";
-    let conversion: {
-      contactId: string;
-      source: string;
-      stage: string;
-      warmPathCount: number;
-    } | undefined;
-
-    if (isConversion) {
+    // Conversion tracking: reaching the pipeline's final stage.
+    const terminalKey = stageKeys[stageKeys.length - 1];
+    let conversion:
+      | { contactId: string; source: string; stage: string; warmPathCount: number; pipelineKind: string }
+      | undefined;
+    if (newStage === terminalKey) {
       const { data: contact } = await supabase
         .from("AlumniContact")
-        .select("source, affiliations, importedByUserId")
+        .select("source, affiliations")
         .eq("id", contactId)
         .maybeSingle();
-
-      if (contact?.importedByUserId && contact.importedByUserId !== userId) {
-        const { data: rating } = await supabase
-          .from("UserDiscover")
-          .select("rating")
-          .eq("userId", userId)
-          .eq("contactId", contactId)
-          .maybeSingle();
-        if (!rating) {
-          return NextResponse.json(
-            { error: "Contact not found" },
-            { status: 404 },
-          );
-        }
-      }
-
       conversion = {
         contactId,
         source: contact?.source ?? "unknown",
@@ -174,6 +167,7 @@ export async function PATCH(
         warmPathCount: contact?.affiliations
           ? contact.affiliations.split(",").filter(Boolean).length
           : 0,
+        pipelineKind: pipeline?.kind || "",
       };
     }
 
@@ -184,9 +178,6 @@ export async function PATCH(
       ...(conversion ? { conversion } : {}),
     });
   } catch {
-    return NextResponse.json(
-      { error: "Failed to update stage" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update stage" }, { status: 500 });
   }
 }
