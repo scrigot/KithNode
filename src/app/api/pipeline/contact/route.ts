@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // F9: linkedInUrl is @unique @default(""). Two manual contacts with no URL
     // would collide on "". Insert a unique sentinel when none is provided.
     const linkedInUrl =
-      (body.linkedInUrl || "").trim() || `manual:${crypto.randomUUID()}`;
+      (body.linkedInUrl || "").trim() || `manual:${globalThis.crypto.randomUUID()}`;
 
     const { data: contact, error: cErr } = await supabase
       .from("AlumniContact")
