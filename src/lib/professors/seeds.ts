@@ -7,8 +7,8 @@
 export interface DepartmentSeed {
   slug: "cs" | "econ" | "kenan" | "stats";
   name: string;
-  /** Goes into Professor.department (mirrors AlumniContact.firmName). */
-  firmName: string;
+  /** Goes into Professor.department (mirrors AlumniContact.organization). */
+  organization: string;
   strategy: "wp-api" | "ddg-scrape" | "live-directory";
   baseUrl: string;
   /** WP REST API path, only required for "wp-api" strategy. */
@@ -23,7 +23,7 @@ export const DEPARTMENT_SEEDS: readonly DepartmentSeed[] = [
   {
     slug: "cs",
     name: "UNC Computer Science",
-    firmName: "UNC CS",
+    organization: "UNC CS",
     strategy: "wp-api",
     baseUrl: "https://cs.unc.edu",
     apiEndpoint: "/wp-json/wp/v2/person?per_page=100&_embed",
@@ -31,7 +31,7 @@ export const DEPARTMENT_SEEDS: readonly DepartmentSeed[] = [
   {
     slug: "econ",
     name: "UNC Economics",
-    firmName: "UNC Econ",
+    organization: "UNC Econ",
     strategy: "wp-api",
     baseUrl: "https://econ.unc.edu",
     apiEndpoint: "/wp-json/wp/v2/people?per_page=100&_embed",
@@ -39,14 +39,14 @@ export const DEPARTMENT_SEEDS: readonly DepartmentSeed[] = [
   {
     slug: "kenan",
     name: "UNC Kenan-Flagler Business School",
-    firmName: "UNC Kenan-Flagler",
+    organization: "UNC Kenan-Flagler",
     strategy: "live-directory",
     baseUrl: "https://www.kenan-flagler.unc.edu",
   },
   {
     slug: "stats",
     name: "UNC Statistics & Operations Research",
-    firmName: "UNC STOR",
+    organization: "UNC STOR",
     strategy: "ddg-scrape",
     baseUrl: "https://stor.unc.edu",
     ddgQuery: "site:stor.unc.edu/people/",

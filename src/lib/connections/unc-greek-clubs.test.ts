@@ -86,7 +86,7 @@ describe("extractSeedFromState", () => {
     expect(seed).not.toBeNull();
     expect(seed!.name).toBe("Jane Smith");
     expect(seed!.title).toBe("President | Carolina Investment Club");
-    expect(seed!.firmName).toBe("Carolina Investment Club");
+    expect(seed!.organization).toBe("Carolina Investment Club");
     expect(seed!.email).toBe("jsmith@email.unc.edu");
     expect(seed!.university).toBe("UNC");
     expect(seed!.location).toBe("Chapel Hill, NC");

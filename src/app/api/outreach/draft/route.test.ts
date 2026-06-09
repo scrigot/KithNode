@@ -112,7 +112,7 @@ describe("POST /api/outreach/draft", () => {
         id: "1",
         name: "Jane Doe",
         title: "Analyst",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         location: "New York",
         education: "UNC",
         affiliations: "Same School,Target Firm",
@@ -138,7 +138,7 @@ describe("POST /api/outreach/draft", () => {
         id: "99",
         name: "Other Owner Contact",
         title: "Analyst",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         affiliations: "",
         importedByUserId: "someone-else@unc.edu",
       },
@@ -156,7 +156,7 @@ describe("POST /api/outreach/draft", () => {
     mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
     // First contact fetch succeeds so route proceeds to generateText
     supabaseResults.push({
-      data: { id: "1", name: "Jane Doe", title: "Analyst", firmName: "GS", affiliations: "" },
+      data: { id: "1", name: "Jane Doe", title: "Analyst", organization: "GS", affiliations: "" },
       error: null,
     });
     // generateText throws, route enters catch block

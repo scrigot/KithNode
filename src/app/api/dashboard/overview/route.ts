@@ -7,7 +7,7 @@ interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   detail: string;
   timestamp: string;
 }
@@ -15,7 +15,7 @@ interface RecentActivity {
 interface OverdueContact {
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   stage: string;
   days: number;
   isRedacted?: boolean;
@@ -24,7 +24,7 @@ interface OverdueContact {
 interface TopUnrated {
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   score: number;
   tier: string;
   hasWarmPath: boolean;
@@ -119,7 +119,7 @@ export async function GET() {
     if (topOverdueIds.length > 0) {
       const { data: overdueContacts } = await supabase
         .from("AlumniContact")
-        .select("id, name, firmName, importedByUserId")
+        .select("id, name, organization, importedByUserId")
         .in(
           "id",
           topOverdueIds.map((e) => e.id),
@@ -134,7 +134,7 @@ export async function GET() {
           return {
             contactId: c.id,
             contactName: isOwn ? (c.name || "") : redactName(c.name || ""),
-            firmName: c.firmName || "",
+            organization: c.organization || "",
             stage: e.stage,
             days: e.days,
             ...(isOwn ? {} : { isRedacted: true }),
@@ -146,7 +146,7 @@ export async function GET() {
     // Tier distribution + top firms (single fetch for efficiency)
     const { data: allTieredContacts } = await supabase
       .from("AlumniContact")
-      .select("tier, firmName")
+      .select("tier, organization")
       .eq("importedByUserId", userId);
 
     const tierCounts = { hot: 0, warm: 0, monitor: 0, cold: 0 };
@@ -158,7 +158,7 @@ export async function GET() {
       else if (tier === "monitor") tierCounts.monitor++;
       else tierCounts.cold++;
 
-      const firm = (c.firmName || "").trim();
+      const firm = (c.organization || "").trim();
       if (!firm) continue;
       const cur = firmMap.get(firm) || { count: 0, hotCount: 0 };
       cur.count++;
@@ -166,7 +166,7 @@ export async function GET() {
       firmMap.set(firm, cur);
     }
     const topFirms = Array.from(firmMap.entries())
-      .map(([firmName, v]) => ({ firmName, count: v.count, hotCount: v.hotCount }))
+      .map(([organization, v]) => ({ organization, count: v.count, hotCount: v.hotCount }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
@@ -184,11 +184,11 @@ export async function GET() {
     for (const r of recentRatings || []) activityContactIds.add(r.contactId);
     for (const p of recentPipeline) activityContactIds.add(p.contactId);
 
-    let activityContacts: Array<{ id: string; name: string; firmName: string }> = [];
+    let activityContacts: Array<{ id: string; name: string; organization: string }> = [];
     if (activityContactIds.size > 0) {
       const { data } = await supabase
         .from("AlumniContact")
-        .select("id, name, firmName")
+        .select("id, name, organization")
         .in("id", Array.from(activityContactIds));
       activityContacts = data || [];
     }
@@ -201,7 +201,7 @@ export async function GET() {
         type: "rate",
         contactId: c.id,
         contactName: c.name,
-        firmName: c.firmName,
+        organization: c.organization,
         detail: r.rating === "high_value" ? "rated high value" : "skipped",
         timestamp: r.createdAt || new Date().toISOString(),
       });
@@ -213,7 +213,7 @@ export async function GET() {
         type: "pipeline_add",
         contactId: c.id,
         contactName: c.name,
-        firmName: c.firmName,
+        organization: c.organization,
         detail: `added to ${(p.stage || "researched").toLowerCase()}`,
         timestamp: p.addedAt || new Date().toISOString(),
       });
@@ -233,7 +233,7 @@ export async function GET() {
 
     const { data: unratedTop } = await supabase
       .from("AlumniContact")
-      .select("id, name, firmName, warmthScore, tier")
+      .select("id, name, organization, warmthScore, tier")
       .eq("importedByUserId", userId)
       .order("warmthScore", { ascending: false })
       .limit(30);
@@ -244,7 +244,7 @@ export async function GET() {
       .map((c) => ({
         contactId: c.id,
         contactName: c.name || "",
-        firmName: c.firmName || "",
+        organization: c.organization || "",
         score: c.warmthScore || 0,
         tier: c.tier || "cold",
         hasWarmPath: false,

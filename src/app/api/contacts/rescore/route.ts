@@ -31,7 +31,7 @@ export async function POST() {
         name: c.name || "",
         education: c.education || "",
         location: c.location || "",
-        experience: c.firmName || "",
+        experience: c.organization || "",
         title: c.title || "",
         industry: c.industry || "",
         seniorityLevel: c.seniorityLevel || "",

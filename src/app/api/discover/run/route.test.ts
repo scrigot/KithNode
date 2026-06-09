@@ -51,7 +51,7 @@ vi.mock("@/lib/supabase", () => {
           select: vi.fn(() => {
             chainCounter++;
             // First select call in the route is for linkedInUrl,
-            // second is for name+firmName+importedByUserId.
+            // second is for name+organization+importedByUserId.
             if (chainCounter === 1) {
               return linkedinChain._setNext({ data: supabaseState.existingByLinkedIn });
             }

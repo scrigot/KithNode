@@ -47,7 +47,7 @@ export async function GET(
     education: contact.education,
     linkedin_location: contact.location,
     company: {
-      name: contact.firmName,
+      name: contact.organization,
       domain: "",
       website: "",
       location: contact.location,

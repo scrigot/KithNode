@@ -28,7 +28,7 @@ interface OverviewData {
   top_unrated: Array<{
     contactId: string;
     contactName: string;
-    firmName: string;
+    organization: string;
     score: number;
     tier: string;
   }>;
@@ -103,7 +103,7 @@ export function QuickActionRail() {
                 {nextBest.contactName}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {nextBest.firmName}
+                {nextBest.organization}
               </p>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60">

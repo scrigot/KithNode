@@ -11,7 +11,7 @@ import type { PipelineContact, PipelineResponse } from "@/lib/api";
 interface WarmPath {
   intermediaryName: string;
   intermediaryRelation: string;
-  firmName: string;
+  organization: string;
   title: string;
 }
 interface EnrichedPipelineContact extends PipelineContact {
@@ -312,7 +312,7 @@ function PipelineCard({
           title={contact.warmPaths
             .map(
               (wp) =>
-                `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.firmName}`,
+                `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.organization}`,
             )
             .join(" · ")}
         >

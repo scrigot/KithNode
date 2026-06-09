@@ -10,7 +10,7 @@ const client = API_KEY ? new Resend(API_KEY) : null;
 
 interface DigestContact {
   name: string;
-  firmName: string;
+  organization: string;
   title: string;
   affiliations: string | null;
 }
@@ -24,7 +24,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
   const map = new Map<string, DigestContact[]>();
 
   for (const c of contacts) {
-    const key = normalizeFirmName(c.firmName) || c.firmName || "Unknown";
+    const key = normalizeFirmName(c.organization) || c.organization || "Unknown";
     const list = map.get(key) || [];
     list.push(c);
     map.set(key, list);
@@ -32,7 +32,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
 
   return Array.from(map.entries())
     .map(([firm, contacts]) => ({
-      firm: contacts[0].firmName || firm,
+      firm: contacts[0].organization || firm,
       contacts,
     }))
     .sort((a, b) => b.contacts.length - a.contacts.length);
@@ -40,7 +40,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
 
 function buildChainText(c: DigestContact): string {
   const affiliation = c.affiliations?.split(",")[0]?.trim() || "Connection";
-  return `Via ${c.name} (${affiliation}) - ${c.title} at ${c.firmName}`;
+  return `Via ${c.name} (${affiliation}) - ${c.title} at ${c.organization}`;
 }
 
 function buildEmailHtml(
@@ -195,7 +195,7 @@ export async function sendWeeklyDigest(
 
   const { data: contacts, error: queryError } = await supabase
     .from("AlumniContact")
-    .select("name, firmName, title, affiliations")
+    .select("name, organization, title, affiliations")
     .eq("importedByUserId", userId)
     .gte("createdAt", sevenDaysAgo.toISOString())
     .order("createdAt", { ascending: false })

@@ -33,7 +33,7 @@ model User {
 model AlumniContact {
   id               String          @id @default(cuid())
   name             String
-  firmName         String
+  organization         String
   title            String
   linkedInUrl      String          @unique @default("")
   university       String
@@ -79,14 +79,30 @@ model AuditLog {
 }
 
 model PipelineEntry {
-  id        String        @id @default(cuid())
-  contactId String
-  stage     String        @default("RESEARCHED")
-  notes     String        @default("")
-  addedAt   DateTime      @default(now())
-  updatedAt DateTime      @default(now())
-  userId    String        @default("")
-  contact   AlumniContact @relation(fields: [contactId], references: [id])
+  id          String        @id @default(cuid())
+  contactId   String
+  pipelineId  String?
+  stage       String        @default("RESEARCHED")
+  notes       String        @default("")
+  addedAt     DateTime      @default(now())
+  updatedAt   DateTime      @default(now())
+  lastTouchAt DateTime?
+  userId      String        @default("")
+  contact     AlumniContact @relation(fields: [contactId], references: [id])
+  pipeline    Pipeline?     @relation(fields: [pipelineId], references: [id])
+}
+
+model Pipeline {
+  id          String          @id @default(cuid())
+  userId      String
+  name        String
+  kind        String // FUNDING | PROFESSORS | WORK | RECRUITING
+  stages      Json            @default("[]") // [{ key, label, color, universalPhase }]
+  cadenceDays Int? // nurture threshold in days
+  createdAt   DateTime        @default(now())
+  entries     PipelineEntry[]
+
+  @@index([userId])
 }
 
 model UserDiscover {

@@ -30,21 +30,21 @@ describe("findWarmPaths", () => {
       {
         name: "Jake Bennett",
         title: "Analyst",
-        firmName: "Moelis & Company",
+        organization: "Moelis & Company",
         affiliations: "Chi Phi,UNC",
         importedByUserId: "user-1",
       },
       {
         name: "Sarah Lee",
         title: "Associate",
-        firmName: "Moelis",
+        organization: "Moelis",
         affiliations: "Duke",
         importedByUserId: "user-1",
       },
       {
         name: "Bob Jones",
         title: "VP",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         affiliations: "",
         importedByUserId: "user-1",
       },
@@ -56,13 +56,13 @@ describe("findWarmPaths", () => {
     expect(paths[0]).toEqual({
       intermediaryName: "Jake Bennett",
       intermediaryRelation: "Chi Phi,UNC",
-      firmName: "Moelis & Company",
+      organization: "Moelis & Company",
       title: "Analyst",
     });
     expect(paths[1]).toEqual({
       intermediaryName: "Sarah Lee",
       intermediaryRelation: "Duke",
-      firmName: "Moelis",
+      organization: "Moelis",
       title: "Associate",
     });
   });
@@ -72,7 +72,7 @@ describe("findWarmPaths", () => {
       {
         name: "Bob Jones",
         title: "VP",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         affiliations: "",
         importedByUserId: "user-1",
       },
@@ -107,7 +107,7 @@ describe("findWarmPaths", () => {
       {
         name: "Alice Chen",
         title: "Analyst",
-        firmName: "Goldman Sachs Group",
+        organization: "Goldman Sachs Group",
         affiliations: "Wharton",
         importedByUserId: "user-1",
       },
@@ -124,7 +124,7 @@ describe("findWarmPaths", () => {
       {
         name: "Tom Park",
         title: "MD",
-        firmName: "GS",
+        organization: "GS",
         affiliations: "",
         importedByUserId: "user-1",
       },
@@ -141,21 +141,21 @@ describe("findWarmPaths", () => {
       {
         name: "Person A",
         title: "Analyst",
-        firmName: "Evercore",
+        organization: "Evercore",
         affiliations: "UNC",
         importedByUserId: "user-1",
       },
       {
         name: "Person B",
         title: "Associate",
-        firmName: "Evercore ISI",
+        organization: "Evercore ISI",
         affiliations: "Duke",
         importedByUserId: "user-1",
       },
       {
         name: "Person C",
         title: "VP",
-        firmName: "Evercore",
+        organization: "Evercore",
         affiliations: "",
         importedByUserId: "user-1",
       },
@@ -176,7 +176,7 @@ describe("findWarmPaths", () => {
       {
         name: "No Affil",
         title: "Analyst",
-        firmName: "Lazard",
+        organization: "Lazard",
         affiliations: "",
         importedByUserId: "user-1",
       },

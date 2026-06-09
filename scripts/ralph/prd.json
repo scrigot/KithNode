@@ -25,7 +25,7 @@
       "acceptanceCriteria": [
         "Prisma schema with User, AlumniContact, Connection models",
         "User: id, email, name, university, targetIndustry, createdAt",
-        "AlumniContact: id, name, firmName, title, linkedInUrl, university, graduationYear",
+        "AlumniContact: id, name, organization, title, linkedInUrl, university, graduationYear",
         "Connection: id, userId, alumniId, strengthScore (float), status (enum: NEW/CONTACTED/RESPONDED/CONVERTED)",
         "Migration runs successfully",
         "Seed script creates 5 test users and 20 test alumni"

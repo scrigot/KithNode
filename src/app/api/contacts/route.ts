@@ -72,7 +72,7 @@ export async function GET() {
               .map((name: string) => ({ name: name.trim(), boost: 10 }))
           : [],
         company: {
-          name: c.firmName || "",
+          name: c.organization || "",
           domain: "",
           website: "",
           location: c.location || "",

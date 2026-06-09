@@ -4,7 +4,7 @@
 //
 // Dedup order:
 //   1. email + importedByUserId  (most reliable when email is present)
-//   2. name + firmName + importedByUserId  (fallback for no-email records)
+//   2. name + organization + importedByUserId  (fallback for no-email records)
 //
 // Throws on Supabase error so callers can catch + increment failed counter.
 
@@ -20,7 +20,7 @@ export async function upsertAlumniContact(
   const record = {
     name: seed.name,
     title: seed.title,
-    firmName: seed.firmName,
+    organization: seed.organization,
     email: seed.email,
     linkedInUrl: seed.sourceUrl,
     university: seed.university,
@@ -48,13 +48,13 @@ export async function upsertAlumniContact(
     existingId = data?.id;
   }
 
-  // Step 2: dedup by name + firmName
+  // Step 2: dedup by name + organization
   if (!existingId) {
     const { data, error } = await supabase
       .from("AlumniContact")
       .select("id")
       .eq("name", seed.name)
-      .eq("firmName", seed.firmName)
+      .eq("organization", seed.organization)
       .eq("importedByUserId", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);

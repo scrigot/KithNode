@@ -12,7 +12,7 @@ import {
 interface CsvContact {
   name: string;
   title: string;
-  firmName: string;
+  organization: string;
   email: string;
   education: string;
   location: string;
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
           name: contact.name || "",
           education: contact.education || "",
           location: contact.location || "",
-          experience: contact.firmName || "",
+          experience: contact.organization || "",
           title: contact.title || "",
         };
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         const record = {
           name: meta.name,
           title: meta.title,
-          firmName: meta.experience,
+          organization: meta.experience,
           email: contact.email || "",
           linkedInUrl,
           university: meta.education,
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
             .update({
               name: meta.name,
               title: meta.title,
-              firmName: meta.experience,
+              organization: meta.experience,
               university: meta.education,
               education: meta.education,
               location: meta.location,
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
             .insert({
               name: meta.name,
               title: meta.title,
-              firmName: meta.experience,
+              organization: meta.experience,
               linkedInUrl: url,
               university: meta.education,
               graduationYear: 0,

@@ -9,7 +9,7 @@ export interface Contact {
   id: string;
   alumniId: string;
   name: string;
-  firmName: string;
+  organization: string;
   title: string;
   university: string;
   strengthScore: number;
@@ -17,7 +17,7 @@ export interface Contact {
   automationPaused: boolean;
 }
 
-type SortField = "name" | "firmName" | "title" | "university" | "strengthScore" | "status";
+type SortField = "name" | "organization" | "title" | "university" | "strengthScore" | "status";
 type SortDirection = "asc" | "desc";
 
 interface Notification {
@@ -160,7 +160,7 @@ export function ContactsTable() {
   const filtered = contacts.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.firmName.toLowerCase().includes(search.toLowerCase())
+      c.organization.toLowerCase().includes(search.toLowerCase())
   );
 
   const sorted = [...filtered].sort((a, b) => {
@@ -177,7 +177,7 @@ export function ContactsTable() {
 
   const columns: { field: SortField; label: string }[] = [
     { field: "name", label: "Name" },
-    { field: "firmName", label: "Firm" },
+    { field: "organization", label: "Firm" },
     { field: "title", label: "Title" },
     { field: "university", label: "University" },
     { field: "strengthScore", label: "Strength Score" },
@@ -304,7 +304,7 @@ export function ContactsTable() {
                     {contact.name}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-text-secondary">
-                    {contact.firmName}
+                    {contact.organization}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-text-secondary">
                     {contact.title}

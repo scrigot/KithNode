@@ -36,7 +36,7 @@ export interface RedactableContact {
 /**
  * Returns a redacted shallow copy. The fields that identify a real person
  * (name, email, linkedInUrl) get blurred, plus an `isRedacted: true` flag.
- * Other fields (firmName, title, score, tier, affiliations, education,
+ * Other fields (organization, title, score, tier, affiliations, education,
  * location) stay as-is — they're aggregate signal, not PII.
  */
 export function redactContact<T extends RedactableContact>(

@@ -63,7 +63,7 @@ export async function GET() {
       notes: string;
       added_at: string;
       affiliations: string[];
-      warmPaths: Array<{ intermediaryName: string; intermediaryRelation: string; firmName: string; title: string }>;
+      warmPaths: Array<{ intermediaryName: string; intermediaryRelation: string; organization: string; title: string }>;
       isRedacted?: boolean;
     }>> = {};
 
@@ -81,10 +81,10 @@ export async function GET() {
       const stage = (entry.stage || "researched").toLowerCase();
       if (!grouped[stage]) grouped[stage] = [];
 
-      let warmPaths = firmPathCache.get(contact.firmName || "");
+      let warmPaths = firmPathCache.get(contact.organization || "");
       if (warmPaths === undefined) {
-        warmPaths = await findWarmPaths(userId, contact.firmName || "");
-        firmPathCache.set(contact.firmName || "", warmPaths);
+        warmPaths = await findWarmPaths(userId, contact.organization || "");
+        firmPathCache.set(contact.organization || "", warmPaths);
       }
 
       // Redact PII when the underlying contact wasn't imported by the current user.
@@ -102,7 +102,7 @@ export async function GET() {
         email: "",
         linkedin_url: safeLinkedIn,
         education: contact.education || "",
-        company_name: contact.firmName || "",
+        company_name: contact.organization || "",
         company_location: contact.location || "",
         total_score: contact.warmthScore || 0,
         tier: contact.tier || "cold",

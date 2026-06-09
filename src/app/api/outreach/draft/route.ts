@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 CONTACT INFO:
 - Name: ${contact.name}
 - Title: ${contact.title || "Unknown"}
-- Company: ${contact.firmName || "Unknown"}
+- Company: ${contact.organization || "Unknown"}
 - Location: ${contact.location || "Unknown"}
 - Education: ${contact.education || "Unknown"}
 - Affiliations: ${affiliationNames.join(", ") || "None"}

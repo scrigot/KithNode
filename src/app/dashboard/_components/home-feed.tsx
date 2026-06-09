@@ -235,7 +235,7 @@ export function FeedRow({
 export interface OverdueLite {
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   stage: string;
   days: number;
   isRedacted?: boolean;
@@ -244,7 +244,7 @@ export interface OverdueLite {
 export interface UnratedLite {
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   score: number;
   tier: string;
 }
@@ -273,12 +273,12 @@ export function buildFeed(
     const tier = normalizeTier(rc?.score.tier);
     const score = rc?.score.total_score ?? 0;
     const dueLabel = `${o.days}D OVERDUE`;
-    const chain = deriveChain(rc?.warm_path ?? "", affiliations, o.firmName);
+    const chain = deriveChain(rc?.warm_path ?? "", affiliations, o.organization);
     items.push({
       id: o.contactId,
       name: o.contactName,
       title: rc?.title ?? "",
-      firm: o.firmName,
+      firm: o.organization,
       score: Math.round(score),
       tier,
       chain: chain.segments,
@@ -333,7 +333,7 @@ export function buildFeed(
       id: u.contactId,
       name: u.contactName,
       title: "",
-      firm: u.firmName,
+      firm: u.organization,
       score: Math.round(u.score),
       tier,
       // Unrated contacts have no derived warm path yet — prompt to rate rather

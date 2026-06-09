@@ -29,7 +29,7 @@ vi.mock("@/lib/supabase", () => {
             // importedByUserId matches the authed user so the row is "own" and
             // the route returns it un-redacted (PII redaction only applies to
             // shared-pool contacts the user didn't import).
-            { id: "1", name: "Jane Doe", title: "Analyst", warmthScore: 65, tier: "warm", linkedInUrl: "", education: "", location: "", affiliations: "", university: "", firmName: "GS", importedByUserId: "test@unc.edu" },
+            { id: "1", name: "Jane Doe", title: "Analyst", warmthScore: 65, tier: "warm", linkedInUrl: "", education: "", location: "", affiliations: "", university: "", organization: "GS", importedByUserId: "test@unc.edu" },
           ]);
         }
         if (callCount === 2) {

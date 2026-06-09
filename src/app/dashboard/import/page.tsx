@@ -18,7 +18,7 @@ const TIER_STYLES: Record<string, string> = {
 interface CsvContact {
   name: string;
   title: string;
-  firmName: string;
+  organization: string;
   email: string;
   education: string;
   location: string;
@@ -107,7 +107,7 @@ function parseLinkedInCSV(text: string): CsvContact[] {
     if (!name) continue;
 
     const email = emailIdx >= 0 ? parseCSVField(fields[emailIdx] || "") : "";
-    const firmName =
+    const organization =
       companyIdx >= 0 ? parseCSVField(fields[companyIdx] || "") : "";
     const title = positionIdx >= 0 ? parseCSVField(fields[positionIdx] || "") : "";
 
@@ -127,7 +127,7 @@ function parseLinkedInCSV(text: string): CsvContact[] {
     contacts.push({
       name,
       title,
-      firmName,
+      organization,
       email,
       education: "",
       location: "",
@@ -263,7 +263,7 @@ export default function ImportPage() {
   const csvFirmCounts: Array<[string, number]> = (() => {
     const m = new Map<string, number>();
     for (const c of csvContacts) {
-      const k = c.firmName || "(no company)";
+      const k = c.organization || "(no company)";
       m.set(k, (m.get(k) || 0) + 1);
     }
     return Array.from(m.entries())

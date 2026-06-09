@@ -14,7 +14,7 @@ function buildIntroEmailHtml(
   userName: string,
   intermediaryName: string,
   targetName: string,
-  firmName: string,
+  organization: string,
   message: string,
 ): string {
   const firstName = intermediaryName.trim().split(" ")[0] || "there";
@@ -44,7 +44,7 @@ function buildIntroEmailHtml(
                 ${userName} is asking for an intro
               </div>
               <div style="font-family: Geist, Arial, sans-serif; font-size: 14px; color: #94A3B8; margin-top: 8px;">
-                Hey ${firstName}, ${userName} would like you to introduce them to ${targetName} at ${firmName}.
+                Hey ${firstName}, ${userName} would like you to introduce them to ${targetName} at ${organization}.
               </div>
             </td>
           </tr>
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   // Look up target contact for the email subject
   const { data: target } = await supabase
     .from("AlumniContact")
-    .select("name, title, firmName, importedByUserId")
+    .select("name, title, organization, importedByUserId")
     .eq("id", targetContactId)
     .single();
 
@@ -187,12 +187,12 @@ export async function POST(request: NextRequest) {
         from: `KithNode <${FROM}>`,
         to: intermediaryEmail,
         replyTo: session.user.email,
-        subject: `KithNode: ${userName} wants an intro to ${target.name} at ${target.firmName}`,
+        subject: `KithNode: ${userName} wants an intro to ${target.name} at ${target.organization}`,
         html: buildIntroEmailHtml(
           userName,
           intermediaryName,
           target.name,
-          target.firmName,
+          target.organization,
           message,
         ),
       });
@@ -206,6 +206,6 @@ export async function POST(request: NextRequest) {
     success: true,
     emailSent,
     targetName: target.name,
-    firmName: target.firmName,
+    organization: target.organization,
   });
 }

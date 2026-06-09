@@ -66,7 +66,7 @@ export interface Professor {
   email: string;
   /** e.g. "Associate Professor of Computer Science" */
   title: string;
-  /** From DepartmentSeed.firmName. */
+  /** From DepartmentSeed.organization. */
   department: string;
   /** Raw bio text for Lane B classifier. */
   bio: string;
@@ -262,7 +262,7 @@ async function scrapeWpApi(
     const rawBio = post.content.rendered || post.excerpt.rendered || "";
     const bio = stripHtml(rawBio);
     const title = inferTitle(
-      seed.firmName,
+      seed.organization,
       designationMap,
       getTermIds(post, "designation")
     );
@@ -277,7 +277,7 @@ async function scrapeWpApi(
       name,
       email,
       title,
-      department: seed.firmName,
+      department: seed.organization,
       bio,
       profileUrl: post.link,
       researchAreas,
@@ -292,11 +292,11 @@ async function scrapeWpApi(
  * Falls back to "Faculty, <dept>" when no recognised slug maps.
  */
 function inferTitle(
-  firmName: string,
+  organization: string,
   designationMap: Map<number, string>,
   ids: number[]
 ): string {
-  if (ids.length === 0) return `Faculty, ${firmName}`;
+  if (ids.length === 0) return `Faculty, ${organization}`;
   const slugs = ids
     .map((id) => designationMap.get(id) ?? "")
     .filter((s) => s.length > 0);
@@ -320,10 +320,10 @@ function inferTitle(
   ];
   for (const r of ranked) {
     if (slugs.includes(r)) {
-      return slugToTitle(r) + `, ${firmName}`;
+      return slugToTitle(r) + `, ${organization}`;
     }
   }
-  return `Faculty, ${firmName}`;
+  return `Faculty, ${organization}`;
 }
 
 function slugToTitle(slug: string): string {
@@ -376,10 +376,10 @@ async function scrapeDdg(
     const html = await fetchText(url);
     if (!html) continue;
 
-    const prof = extractProfileFromHtml(html, url, seed.firmName);
+    const prof = extractProfileFromHtml(html, url, seed.organization);
     if (!prof || !prof.name) continue;
 
-    const key = `${prof.name.toLowerCase()}|${seed.firmName}`;
+    const key = `${prof.name.toLowerCase()}|${seed.organization}`;
     if (seen.has(key)) continue;
     seen.add(key);
 

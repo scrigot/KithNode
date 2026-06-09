@@ -29,7 +29,7 @@ const TIERS = ["HOT", "WARM", "MONITOR", "COLD"] as const;
 interface WarmPath {
   intermediaryName: string;
   intermediaryRelation: string;
-  firmName: string;
+  organization: string;
   title: string;
 }
 
@@ -37,7 +37,7 @@ interface Contact {
   id: string;
   name: string;
   title: string;
-  firmName: string;
+  organization: string;
   email: string;
   linkedInUrl: string;
   education: string;
@@ -156,8 +156,8 @@ function ContactCard({
         )}
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
           {contact.title}
-          {contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : ""}
-          <span className="text-foreground">{contact.firmName}</span>
+          {contact.title && contact.organization ? (isProfessor ? " · " : " @ ") : ""}
+          <span className="text-foreground">{contact.organization}</span>
         </p>
 
         {contact.warmPaths && contact.warmPaths.length > 0 && (
@@ -170,7 +170,7 @@ function ContactCard({
             title={contact.warmPaths
               .map(
                 (wp) =>
-                  `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.title} at ${wp.firmName}`,
+                  `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.title} at ${wp.organization}`,
               )
               .join(" · ")}
             className="mt-2 block w-full truncate border border-primary/20 bg-primary/5 px-2 py-1 text-left font-mono text-[10px] text-primary enabled:hover:bg-primary/10 disabled:cursor-default"
@@ -178,7 +178,7 @@ function ContactCard({
             <span className="text-muted-foreground">via </span>
             {contact.warmPaths[0].intermediaryName}
             <span className="text-muted-foreground"> -&gt; </span>
-            {contact.warmPaths[0].firmName}
+            {contact.warmPaths[0].organization}
             {contact.warmPaths.length > 1 && (
               <span className="text-muted-foreground">
                 {" "}
@@ -1096,7 +1096,7 @@ export default function DiscoverPage() {
             id: introTarget.contact.id,
             name: introTarget.contact.name,
             title: introTarget.contact.title,
-            firmName: introTarget.contact.firmName,
+            organization: introTarget.contact.organization,
           }}
           warmPath={introTarget.warmPath}
           userName={userName || "a KithNode user"}

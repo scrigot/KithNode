@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
   if (query) {
     builder = builder.or(
-      `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
+      `name.ilike.%${query}%,organization.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
     );
   }
   if (tier) {
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     if (query) {
       ownBuilder = ownBuilder.or(
-        `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
+        `name.ilike.%${query}%,organization.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
       );
     }
     if (tier) {
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
   // Enrich each contact with warm paths (user's own contacts at the same firm)
   const enriched = await Promise.all(
     filtered.map(async (c) => {
-      const warmPaths = await findWarmPaths(userId, c.firmName);
+      const warmPaths = await findWarmPaths(userId, c.organization);
       return { ...c, warmPaths };
     }),
   );

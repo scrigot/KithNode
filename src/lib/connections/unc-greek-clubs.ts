@@ -160,7 +160,7 @@ export function extractSeedFromState(
   return {
     name,
     title,
-    firmName: orgName,
+    organization: orgName,
     email: cleanEmail,
     sourceUrl,
     bio: `${group.role} of ${orgName} at UNC Chapel Hill.`,

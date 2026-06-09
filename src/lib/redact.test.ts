@@ -80,7 +80,7 @@ describe("redactContact", () => {
       name: "Jacob Goldstein",
       email: "jacob@goldman.com",
       linkedInUrl: "https://linkedin.com/in/jacob",
-      firmName: "Goldman Sachs",
+      organization: "Goldman Sachs",
       title: "VP",
       warmthScore: 85,
       tier: "hot",
@@ -92,7 +92,7 @@ describe("redactContact", () => {
     expect(r.email.includes("acob")).toBe(false);
     expect(r.linkedInUrl).toBe(`linkedin.com/in/${BLOCK.repeat(8)}`);
     // Aggregate-signal fields preserved
-    expect(r.firmName).toBe("Goldman Sachs");
+    expect(r.organization).toBe("Goldman Sachs");
     expect(r.title).toBe("VP");
     expect(r.warmthScore).toBe(85);
     expect(r.tier).toBe("hot");

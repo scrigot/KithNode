@@ -29,12 +29,12 @@ const ALLOWED_INDUSTRIES = [
 
 const ALLOWED_SENIORITY = ["Incoming", "Analyst", "Associate", "VP", "Senior"];
 
-function buildPrompt(c: { name: string; title: string; firmName: string }): string {
+function buildPrompt(c: { name: string; title: string; organization: string }): string {
   return `You are an enrichment engine for a finance-recruiting CRM. Given a contact's name, company, and current title, infer the most likely INDUSTRY, SENIORITY, probable UNIVERSITY (only if the name/company strongly suggests one, otherwise ""), and LOCATION (company HQ city if unknown).
 
 Contact:
 - Name: ${c.name}
-- Company: ${c.firmName}
+- Company: ${c.organization}
 - Title: ${c.title}
 
 Allowed INDUSTRY values (pick exactly one): ${ALLOWED_INDUSTRIES.map((s) => `"${s}"`).join(", ")}.
@@ -47,7 +47,7 @@ Return ONLY valid JSON, no prose, no markdown:
 async function enrichOne(contact: {
   name: string;
   title: string;
-  firmName: string;
+  organization: string;
 }): Promise<EnrichedFields | null> {
   try {
     const { text } = await generateText({
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       const fields = await enrichOne({
         name: c.name || "",
         title: c.title || "",
-        firmName: c.firmName || "",
+        organization: c.organization || "",
       });
 
       if (!fields) {
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
         name: c.name || "",
         education: c.education || fields.education,
         location: c.location || fields.location,
-        experience: c.firmName || "",
+        experience: c.organization || "",
         title: c.title || "",
         industry: fields.industry,
         seniorityLevel: fields.seniorityLevel,

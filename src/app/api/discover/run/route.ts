@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
             const record = {
               name: row.candidate.name,
               title: row.candidate.title,
-              firmName: row.candidate.company,
+              organization: row.candidate.company,
               email: row.email.email,
               linkedInUrl: row.candidate.linkedinUrl,
               university: "",
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
                 .from("AlumniContact")
                 .select("id")
                 .eq("name", record.name)
-                .eq("firmName", record.firmName)
+                .eq("organization", record.organization)
                 .eq("importedByUserId", userId)
                 .maybeSingle();
               existingId = data?.id;
