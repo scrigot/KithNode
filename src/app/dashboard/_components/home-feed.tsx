@@ -83,7 +83,11 @@ export function deriveWhyNow(
   bucket: DueBucket,
   dueLabel: string,
 ): string {
-  if (whyNow && whyNow.trim()) return whyNow.trim();
+  // /api/contacts maps `why_now` to the raw affiliations CSV, so guard against
+  // echoing a bare affiliation list as the headline "why now" reason.
+  const affJoin = affiliations.map((a) => a.trim()).filter(Boolean).join(", ");
+  const looksLikeAffList = !!affJoin && whyNow.trim() === affJoin;
+  if (whyNow && whyNow.trim() && !looksLikeAffList) return whyNow.trim();
   const top = affiliations.map((a) => a.trim()).filter(Boolean)[0];
   if (bucket === "overdue") {
     return top
@@ -299,7 +303,9 @@ export function buildFeed(
     const bucket: DueBucket = idx < TODAY_COUNT ? "today" : "upcoming";
     const affiliations = r.affiliations.map((a) => a.name);
     const chain = deriveChain(r.warm_path, affiliations, r.company.name);
-    const dueLabel = bucket === "today" ? "TODAY" : `${Math.min(idx, 9)}D`;
+    // Only OVERDUE rows carry a real days value; never fabricate a due date
+    // from the sort index — upcoming rows are simply "queued".
+    const dueLabel = bucket === "today" ? "TODAY" : "QUEUED";
     items.push({
       id: r.id,
       name: r.name,
@@ -323,7 +329,6 @@ export function buildFeed(
     if (used.has(u.contactId)) continue;
     used.add(u.contactId);
     const tier = normalizeTier(u.tier);
-    const chain = deriveChain("", [], u.firmName);
     items.push({
       id: u.contactId,
       name: u.contactName,
@@ -331,11 +336,13 @@ export function buildFeed(
       firm: u.firmName,
       score: Math.round(u.score),
       tier,
-      chain: chain.segments,
-      chainLead: chain.lead,
-      whyNow: deriveWhyNow("", [], "upcoming", ""),
+      // Unrated contacts have no derived warm path yet — prompt to rate rather
+      // than fabricate a chain/reason (authenticity over filling the field).
+      chain: ["Rate in Discover to map the warm path"],
+      chainLead: "",
+      whyNow: "High score, not yet rated — rate to surface the warm path",
       bucket: "upcoming",
-      dueLabel: "NEW",
+      dueLabel: "RATE",
       affiliations: [],
     });
   }
