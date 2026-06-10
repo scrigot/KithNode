@@ -69,7 +69,9 @@ export async function POST(request: NextRequest) {
   const prefs = await getUserPrefs(userEmail);
 
   const body = await request.json();
-  const { contactId } = body;
+  // Accept contactId (canonical) or connectionId/id from older callers — all
+  // hold the AlumniContact id; the param name just drifted across surfaces.
+  const contactId = body.contactId ?? body.connectionId ?? body.id;
 
   if (!contactId) {
     return NextResponse.json({ error: "contactId is required" }, { status: 400 });

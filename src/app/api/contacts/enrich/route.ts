@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 import { requireSubscription } from "@/lib/subscription";
+import { fetchProxycurlProfile } from "@/lib/enrich/proxycurl";
 
 const BATCH_LIMIT = 25;
 
@@ -120,8 +121,25 @@ export async function POST(req: NextRequest) {
 
     let enriched = 0;
     let failed = 0;
+    let proxycurlOk = 0;
+    let proxycurlFail = 0;
 
     for (const c of contacts) {
+      // ── Proxycurl first: real structured education by LinkedIn URL ──
+      // Only spend a lookup when the contact has a LinkedIn URL (cost guard) and
+      // the API key is configured. fetchProxycurlProfile no-ops to null when the
+      // key is unset, so this stays graceful with zero config.
+      const linkedInUrl: string = c.linkedInUrl || "";
+      let proxycurl: Awaited<ReturnType<typeof fetchProxycurlProfile>> = null;
+      if (linkedInUrl && process.env.PROXYCURL_API_KEY) {
+        proxycurl = await fetchProxycurlProfile(linkedInUrl);
+        if (proxycurl) {
+          proxycurlOk++;
+        } else {
+          proxycurlFail++;
+        }
+      }
+
       const fields = await enrichOne({
         name: c.name || "",
         title: c.title || "",
@@ -133,19 +151,30 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Real Proxycurl data wins over the LLM guess for education + grad year.
+      // Location only fills when the contact's is empty (don't clobber a value).
+      const education = proxycurl?.education || c.education || fields.education;
+      const graduationYear =
+        proxycurl && proxycurl.graduationYear > 0
+          ? proxycurl.graduationYear
+          : c.graduationYear || 0;
+      const location =
+        c.location || proxycurl?.location || fields.location;
+
       // Build meta with enriched fields layered on top of existing data
       // Don't overwrite non-empty fields. Enrichment fills gaps, not replaces.
       const meta = {
         name: c.name || "",
-        education: c.education || fields.education,
-        location: c.location || fields.location,
+        education,
+        location,
         experience: c.firmName || "",
         title: c.title || "",
         industry: fields.industry,
         seniorityLevel: fields.seniorityLevel,
       };
 
-      // Re-score with personalized prefs in the same loop
+      // Re-score with personalized prefs in the same loop. Populated education
+      // now lights up Same School / CS Top School affiliations.
       const affiliations = detectAffiliations(meta, prefs);
       const { score, tier } = computeWarmthScore(affiliations);
 
@@ -153,6 +182,7 @@ export async function POST(req: NextRequest) {
         .from("AlumniContact")
         .update({
           education: meta.education,
+          graduationYear,
           location: meta.location,
           industry: fields.industry,
           seniorityLevel: fields.seniorityLevel,
@@ -160,7 +190,7 @@ export async function POST(req: NextRequest) {
           tier,
           affiliations: affiliations.map((a) => a.name).join(","),
           enrichedAt: new Date().toISOString(),
-          enrichmentSource: "claude",
+          enrichmentSource: proxycurl ? "proxycurl+claude" : "claude",
         })
         .eq("id", c.id);
 
@@ -170,6 +200,12 @@ export async function POST(req: NextRequest) {
         enriched++;
       }
     }
+
+    console.log("Enrich batch: Proxycurl lookups", {
+      succeeded: proxycurlOk,
+      failed: proxycurlFail,
+      total: contacts.length,
+    });
 
     return NextResponse.json({ enriched, failed, total: contacts.length });
   } catch (error) {

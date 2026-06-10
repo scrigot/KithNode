@@ -8,9 +8,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!user.email) return false;
 
       // Alpha gate: @unc.edu emails + whitelisted testers
-      const ALLOWED_EMAILS = ["samrigot31@gmail.com"];
+      const ALLOWED_EMAILS = ["samrigot31@gmail.com", "samrigot@kithnode.ai"];
       if (
         !user.email.endsWith("@unc.edu") &&
+        !user.email.endsWith("@ad.unc.edu") &&
         !ALLOWED_EMAILS.includes(user.email)
       ) {
         return false;

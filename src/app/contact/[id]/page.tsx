@@ -259,18 +259,23 @@ export default function ContactDetailPage() {
                 Check Mutual Connections
               </a>
             </p>
-            {contact.linkedin_url && (
-              <p>
+            <p>
+              <span className="text-muted-foreground">LinkedIn: </span>
+              {contact.linkedin_url ? (
                 <a
                   href={contact.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent-blue hover:underline"
                 >
-                  LinkedIn Profile
+                  View Profile
                 </a>
-              </p>
-            )}
+              ) : (
+                <span className="text-muted-foreground/60">
+                  No LinkedIn on file
+                </span>
+              )}
+            </p>
             {contact.email && (
               <p>
                 <span className="text-muted-foreground">Email: </span>

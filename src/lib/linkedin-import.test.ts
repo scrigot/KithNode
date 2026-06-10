@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { isValidLinkedInUrl, scrapeLinkedInMeta } from "./linkedin-import";
+import {
+  isValidLinkedInUrl,
+  scrapeLinkedInMeta,
+  detectAffiliations,
+  type ContactMeta,
+} from "./linkedin-import";
+
+const baseMeta = (overrides: Partial<ContactMeta> = {}): ContactMeta => ({
+  name: "Test Person",
+  education: "",
+  location: "",
+  experience: "",
+  title: "",
+  ...overrides,
+});
 
 describe("isValidLinkedInUrl", () => {
   it("rejects SSRF payload with linkedin URL in query param", () => {
@@ -48,5 +62,42 @@ describe("scrapeLinkedInMeta", () => {
     expect(calledUrl).toBe("https://www.linkedin.com/in/jane-doe");
     expect((init as RequestInit).redirect).toBe("error");
     expect(meta.name).toBe("Jane Doe");
+  });
+});
+
+describe("detectAffiliations seniority: student-org vs firm officer", () => {
+  it("does NOT credit a club VP with professional seniority", () => {
+    const affs = detectAffiliations(baseMeta({ title: "VP of Finance Club" }));
+    expect(affs.some((a) => a.name === "VP")).toBe(false);
+    expect(affs.some((a) => a.boost > 0)).toBe(false);
+  });
+
+  it("does NOT credit a club president with professional seniority", () => {
+    const affs = detectAffiliations(
+      baseMeta({ title: "President, Investment Club" }),
+    );
+    expect(affs.some((a) => a.name === "VP")).toBe(false);
+    expect(affs.some((a) => a.boost > 0)).toBe(false);
+  });
+
+  it("does NOT credit a fraternity treasurer with seniority", () => {
+    const affs = detectAffiliations(
+      baseMeta({ title: "Treasurer of Sigma Chi Fraternity" }),
+    );
+    expect(affs.some((a) => a.boost > 0)).toBe(false);
+  });
+
+  it("still credits a firm VP with professional seniority", () => {
+    const affs = detectAffiliations(
+      baseMeta({ title: "Vice President", experience: "Goldman Sachs" }),
+    );
+    const vp = affs.find((a) => a.name === "VP");
+    expect(vp).toBeDefined();
+    expect(vp?.boost).toBe(7);
+  });
+
+  it("still credits a bare VP title (no club marker) with seniority", () => {
+    const affs = detectAffiliations(baseMeta({ title: "VP, Investment Banking" }));
+    expect(affs.some((a) => a.name === "VP" && a.boost === 7)).toBe(true);
   });
 });

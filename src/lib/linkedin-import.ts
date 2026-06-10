@@ -154,6 +154,22 @@ const FIRM_TIERS: { patterns: RegExp[]; label: string; boost: number }[] = [
 
 function detectSeniority(title: string): { level: string; boost: number } {
   const t = title.toLowerCase();
+  // Student-org / club officer guard: a "VP of Finance Club" or "President,
+  // Investment Society" is NOT professional seniority. Only strip the boost
+  // when a club/student-org marker is clearly paired with an officer word —
+  // "VP at Goldman Sachs" has no such marker and is left untouched. This must
+  // run before the generic VP/President/Director branch below.
+  const hasOfficerWord =
+    /\b(?:president|vice\s*president|vp|treasurer|secretary|chair(?:man|woman|person)?)\b/i.test(
+      t,
+    );
+  const hasStudentOrgMarker =
+    /\b(?:club|society|fraternity|sorority|student\s*government|student\s*council|chapter|association)\b/i.test(
+      t,
+    );
+  if (hasOfficerWord && hasStudentOrgMarker) {
+    return { level: "Student Org Officer", boost: 0 };
+  }
   // Network-multiplier roles: department heads / deans / chairs are
   // structural-hole nodes — they introduce dozens of students per year.
   if (/\bdean\s+of\b|\b(?:vice|associate)\s*dean\b/i.test(t)) return { level: "Dean", boost: 18 };
