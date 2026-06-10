@@ -18,7 +18,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  Building,
   Gauge,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
@@ -27,7 +26,6 @@ const NAV_GROUPS = [
   {
     label: "PAGES",
     items: [
-      { href: "/office", label: "Office", icon: Building, countKey: null },
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, countKey: null },
       { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, countKey: "warm_signals" },
       { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, countKey: "pipeline" },
