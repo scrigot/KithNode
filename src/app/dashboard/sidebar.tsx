@@ -9,6 +9,7 @@ import {
   Users,
   GitBranch,
   Compass,
+  Share2,
   Upload,
   Settings,
   CreditCard,
@@ -17,7 +18,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  Building,
   Gauge,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
@@ -26,11 +26,11 @@ const NAV_GROUPS = [
   {
     label: "PAGES",
     items: [
-      { href: "/office", label: "Office", icon: Building, countKey: null },
       { href: "/dashboard", label: "Overview", icon: LayoutDashboard, countKey: null },
       { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, countKey: "warm_signals" },
       { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, countKey: "pipeline" },
       { href: "/dashboard/discover", label: "Discover", icon: Compass, countKey: "discover" },
+      { href: "/dashboard/network", label: "Network", icon: Share2, countKey: "network" },
     ],
   },
   {
@@ -218,6 +218,7 @@ export function Sidebar({
           warm_signals: (tc.hot || 0) + (tc.warm || 0),
           pipeline: d.reminders_count || 0,
           discover: (d.top_unrated || []).length,
+          network: (tc.hot || 0) + (tc.warm || 0) + (tc.monitor || 0) + (tc.cold || 0),
         });
       })
       .catch(() => {});
