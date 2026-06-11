@@ -569,8 +569,8 @@ export default function ContactDetailPage() {
       {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
           rows, mutual/LinkedIn links, and the tags editor. ─── */}
       {tab === "profile" && (
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Affiliations */}
+      <div className="grid items-start grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* LEFT — Classification & signals */}
         <div className="border border-border bg-card p-4">
           <TypeToggle
             contactId={contact.id}
@@ -613,8 +613,15 @@ export default function ContactDetailPage() {
             </p>
           )}
 
-          {/* Contact info */}
           <Separator className="my-3" />
+          <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
+        </div>
+
+        {/* RIGHT — Details */}
+        <div className="border border-border bg-card p-4">
+          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            DETAILS
+          </h3>
           <div className="space-y-1 text-[10px]">
             <FieldEditor
               contactId={contact.id}
@@ -796,9 +803,6 @@ export default function ContactDetailPage() {
             )}
           </div>
         </div>
-
-        {/* Tags */}
-        <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
       </div>
       )}
     </div>
