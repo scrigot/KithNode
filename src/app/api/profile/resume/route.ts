@@ -9,6 +9,7 @@ import {
   resumeSchema,
   validateResumePdf,
   buildResumePrompt,
+  buildResumeResult,
 } from "@/lib/resume-extract";
 
 /**
@@ -74,7 +75,10 @@ export async function POST(request: NextRequest) {
       // cost telemetry is never load-bearing
     }
 
-    return NextResponse.json(object);
+    // Post-process: canonicalize rows and derive flat fields for consistency.
+    // Extraction is NEVER persisted here — the client prefills the form and
+    // the user reviews + saves via the preferences UI.
+    return NextResponse.json(buildResumeResult(object));
   } catch (error) {
     console.error("Resume extraction error:", error);
     return NextResponse.json(

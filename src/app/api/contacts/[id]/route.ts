@@ -6,6 +6,11 @@ import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { deduceHometown } from "@/lib/deduce-hometown";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 import { normalizeDegrees } from "@/lib/normalize-degrees";
+import {
+  parseEducations,
+  flatFromEducations,
+  educationsFromFlat,
+} from "@/lib/educations";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -31,6 +36,7 @@ const EDITABLE_FIELDS = [
   "pastFirms",
   "track",
   "role",
+  "educations",
 ] as const;
 
 // personType is a closed enum, not free text: '' = auto (text heuristics),
@@ -63,6 +69,9 @@ export function pickEditableFields(
 ): { fields: Record<string, string>; invalid: boolean } {
   const out: Record<string, string> = {};
   for (const key of EDITABLE_FIELDS) {
+    // educations is an array field — handled after the loop.
+    if (key === "educations") continue;
+
     const val = body[key];
     if (typeof val !== "string") continue;
     if (key === "personType") {
@@ -87,6 +96,17 @@ export function pickEditableFields(
     } else {
       out[key] = normalizeField(val);
     }
+  }
+
+  // educations: array of EducationEntry. Parsed + re-stringified for storage;
+  // flat major/degrees/concentration are derived so rescore sees fresh flats.
+  if (Array.isArray(body.educations)) {
+    const rows = parseEducations(JSON.stringify(body.educations));
+    out.educations = JSON.stringify(rows);
+    const flat = flatFromEducations(rows);
+    out.major = flat.major;
+    out.degrees = flat.degrees;
+    out.concentration = flat.concentration;
   }
 
   // Cross-field guard: a non-empty role must belong to its track. The effective
@@ -183,6 +203,16 @@ export async function GET(
   const prefs = await getUserPrefs(userId);
   const { affiliations: liveAffiliations } = rescoreContact(contact, prefs, tags);
 
+  // Synthesize structured rows from flat columns when the educations column is
+  // empty (old profiles render rows immediately without requiring a re-save).
+  const contactEducations = contact.educations
+    ? parseEducations(contact.educations as string)
+    : educationsFromFlat(
+        contact.major as string | null,
+        contact.degrees as string | null,
+        contact.concentration as string | null,
+      );
+
   return NextResponse.json({
     id: contact.id,
     name: contact.name,
@@ -202,6 +232,7 @@ export async function GET(
     degrees: contact.degrees || "",
     skills: contact.skills || "",
     past_firms: contact.pastFirms || "",
+    educations: contactEducations,
     person_type: contact.personType || "",
     track: contact.track || "",
     role: contact.role || "",

@@ -32,6 +32,8 @@ const PREFS: UserPrefs = {
   minor: "",
   concentration: "",
   degrees: "",
+  educations: [],
+  experiences: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };

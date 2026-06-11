@@ -3,7 +3,9 @@ import {
   validateResumePdf,
   buildResumePrompt,
   resumeSchema,
+  buildResumeResult,
   MAX_RESUME_BYTES,
+  type ResumeExtract,
 } from "./resume-extract";
 
 // Helper: base64 of an arbitrary byte array.
@@ -125,12 +127,16 @@ describe("resumeSchema", () => {
       concentration: "Finance",
       targetIndustries: ["Investment Banking"],
       pastFirms: ["Goldman Sachs", "Evercore"],
+      educations: [],
+      experiences: [],
     });
     expect(parsed.university).toBe("UNC Chapel Hill");
     expect(parsed.majors).toEqual(["Economics"]);
     expect(parsed.degrees).toEqual(["BS", "MBA"]);
     expect(parsed.concentration).toBe("Finance");
     expect(parsed.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
+    expect(parsed.educations).toEqual([]);
+    expect(parsed.experiences).toEqual([]);
   });
 
   it("rejects more than 3 degrees", () => {
@@ -147,6 +153,8 @@ describe("resumeSchema", () => {
       concentration: "",
       targetIndustries: [],
       pastFirms: [],
+      educations: [],
+      experiences: [],
     });
     expect(result.success).toBe(false);
   });
@@ -165,7 +173,167 @@ describe("resumeSchema", () => {
       concentration: "",
       targetIndustries: [],
       pastFirms: [],
+      educations: [],
+      experiences: [],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects more than 4 educations", () => {
+    const row = { major: "Economics", degree: "BS", concentration: "" };
+    const result = resumeSchema.safeParse({
+      university: "",
+      highSchool: "",
+      hometown: "",
+      greekOrg: "",
+      clubs: [],
+      skills: [],
+      majors: [],
+      minors: [],
+      degrees: [],
+      concentration: "",
+      targetIndustries: [],
+      pastFirms: [],
+      educations: [row, row, row, row, row],
+      experiences: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects more than 8 experiences", () => {
+    const row = { title: "Analyst", firm: "Goldman Sachs", dates: "Summer 2026" };
+    const result = resumeSchema.safeParse({
+      university: "",
+      highSchool: "",
+      hometown: "",
+      greekOrg: "",
+      clubs: [],
+      skills: [],
+      majors: [],
+      minors: [],
+      degrees: [],
+      concentration: "",
+      targetIndustries: [],
+      pastFirms: [],
+      educations: [],
+      experiences: [row, row, row, row, row, row, row, row, row],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// Minimal well-formed raw extract for buildResumeResult tests.
+const BASE_RAW: ResumeExtract = {
+  university: "UNC Chapel Hill",
+  highSchool: "",
+  hometown: "",
+  greekOrg: "",
+  clubs: [],
+  skills: [],
+  majors: [],
+  minors: [],
+  degrees: [],
+  concentration: "",
+  targetIndustries: [],
+  pastFirms: [],
+  educations: [],
+  experiences: [],
+};
+
+describe("buildResumeResult", () => {
+  it("paired education rows yield canonical degree and derived flat arrays", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      educations: [
+        { major: "Economics", degree: "BS", concentration: "Finance" },
+      ],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.educations).toHaveLength(1);
+    expect(result.educations[0].degree).toBe("BS");
+    expect(result.educations[0].major).toBe("Economics");
+    // Flat fields derived from rows.
+    expect(result.majors).toContain("Economics");
+    expect(result.degrees).toContain("BS");
+    expect(result.concentration).toBe("Finance");
+  });
+
+  it("invalid degree token inside an education row is dropped to empty string", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      educations: [
+        // "BADTOKEN" is not in ALL_DEGREES; parseEducations -> normalizeDegrees -> "".
+        { major: "Economics", degree: "BADTOKEN", concentration: "" },
+      ],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.educations[0].degree).toBe("");
+    // Row still survives because major is non-empty.
+    expect(result.educations[0].major).toBe("Economics");
+  });
+
+  it("experience rows derive pastFirms via firmsFromExperiences", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      // Legacy flat pastFirms should be overridden when rows are present.
+      pastFirms: ["Legacy Corp"],
+      experiences: [
+        { title: "Summer Analyst", firm: "Goldman Sachs", dates: "Summer 2026" },
+        { title: "Intern", firm: "Evercore", dates: "Summer 2025" },
+      ],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
+    expect(result.pastFirms).not.toContain("Legacy Corp");
+    expect(result.experiences).toHaveLength(2);
+  });
+
+  it("empty education rows leave legacy flat majors/degrees/concentration untouched", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      majors: ["Economics"],
+      degrees: ["BS"],
+      concentration: "Finance",
+      educations: [],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.majors).toEqual(["Economics"]);
+    expect(result.degrees).toEqual(["BS"]);
+    expect(result.concentration).toBe("Finance");
+    expect(result.educations).toEqual([]);
+  });
+
+  it("empty experience rows leave legacy flat pastFirms untouched", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      pastFirms: ["Goldman Sachs"],
+      experiences: [],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.pastFirms).toEqual(["Goldman Sachs"]);
+  });
+
+  it("all-empty rows with no content are filtered out by parseEducations", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      // A row with all empty strings: parseEducations filters it (no major/degree/concentration).
+      educations: [{ major: "", degree: "", concentration: "" }],
+    };
+    const result = buildResumeResult(raw);
+    // Filtered to empty, so legacy flat fields stand.
+    expect(result.educations).toHaveLength(0);
+  });
+
+  it("duplicate firms are deduped in pastFirms derived from experiences", () => {
+    const raw: ResumeExtract = {
+      ...BASE_RAW,
+      experiences: [
+        { title: "Analyst", firm: "Goldman Sachs", dates: "Summer 2026" },
+        { title: "Associate", firm: "Goldman Sachs", dates: "Summer 2025" },
+        { title: "Intern", firm: "Evercore", dates: "Summer 2024" },
+      ],
+    };
+    const result = buildResumeResult(raw);
+    expect(result.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
   });
 });

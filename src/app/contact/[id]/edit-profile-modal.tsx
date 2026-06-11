@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Plus } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 import { ChipField, stripCitySuffix } from "./field-editor";
 import {
   loadUniversities,
@@ -15,7 +16,8 @@ import {
   loadConcentrations,
   loadSkills,
 } from "@/lib/data/onboarding-options";
-import { DEGREE_OPTIONS } from "@/lib/data/preference-options";
+import { DEGREE_OPTIONS, FIRM_OPTIONS } from "@/lib/data/preference-options";
+import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
 import type { ContactDetail } from "@/lib/api";
 
 // LinkedIn-style "Edit profile" modal. A centered overlay over the contact
@@ -45,11 +47,9 @@ interface FormState {
   firmName: string;
   pastFirms: string[];
   education: string;
-  major: string[];
+  // Structured education rows (replaces flat major/degrees/concentration).
+  educations: EducationEntry[];
   minor: string[];
-  // Comma-joined degree tokens ("BS, MBA"); toggled via the chip rows.
-  degrees: string;
-  concentration: string;
   highSchool: string;
   location: string;
   hometown: string;
@@ -57,6 +57,22 @@ interface FormState {
   clubs: string[];
   skills: string[];
   passions: string;
+}
+
+// Tolerant parse of a JSON or comma-list column into EducationEntry[].
+function parseEducationRows(val: unknown): EducationEntry[] {
+  if (Array.isArray(val)) {
+    return val
+      .filter((e): e is Record<string, unknown> => e && typeof e === "object")
+      .map((e) => ({
+        major: String(e.major ?? "").trim(),
+        degree: String(e.degree ?? "").trim(),
+        concentration: String(e.concentration ?? "").trim(),
+      }))
+      .filter((e) => e.major || e.degree || e.concentration)
+      .slice(0, 4);
+  }
+  return [];
 }
 
 // Parse a ", "-joined column into a capped, de-duped chip array.
@@ -69,18 +85,14 @@ function parseChips(raw: string, cap: number): string[] {
 }
 
 function initialForm(contact: ContactDetail): FormState {
-  // degrees/concentration are new ", "-joined columns the contacts route now
-  // persists; read defensively so this compiles regardless of the api.ts type.
-  const academic = contact as { degrees?: string; concentration?: string };
+  const c = contact as unknown as Record<string, unknown>;
   return {
     title: contact.title || "",
     firmName: contact.company.name || "",
     pastFirms: parseChips(contact.past_firms || "", 5),
     education: contact.education || "",
-    major: parseChips(contact.major || "", 2),
+    educations: parseEducationRows(c.educations),
     minor: parseChips(contact.minor || "", 2),
-    degrees: academic.degrees || "",
-    concentration: academic.concentration || "",
     highSchool: contact.high_school || "",
     location: contact.linkedin_location || "",
     hometown: contact.hometown || "",
@@ -167,6 +179,108 @@ function ComboField({
   );
 }
 
+// ── Education Rows Editor (inline, for the modal) ─────────────────────────────
+function EducationRowsEditor({
+  rows,
+  onChange,
+}: {
+  rows: EducationEntry[];
+  onChange: (rows: EducationEntry[]) => void;
+}) {
+  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    loadConcentrations().then(setConcentrations);
+  }, []);
+
+  function updateRow(i: number, patch: Partial<EducationEntry>) {
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  function removeRow(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+
+  function addRow() {
+    if (rows.length >= 4) return;
+    onChange([...rows, { major: "", degree: "", concentration: "" }]);
+  }
+
+  function concPool(major: string): string[] {
+    const scoped = major ? (concentrations[major] ?? []) : [];
+    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
+    return Array.from(new Set(pool)).sort();
+  }
+
+  return (
+    <div>
+      <div className="space-y-1.5">
+        {rows.map((row, i) => {
+          const pool = concPool(row.major);
+          const loadConcPool = async () => pool;
+          return (
+            <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1.5">
+              <Combobox
+                value={row.major}
+                onSelect={(v) => updateRow(i, { major: v })}
+                loadOptions={loadMajors}
+                placeholder="Major (opt.)"
+                ariaLabel="Major"
+                inputClassName="h-9 bg-muted text-sm"
+              />
+              <select
+                value={row.degree}
+                onChange={(e) => updateRow(i, { degree: e.target.value })}
+                aria-label="Degree"
+                className="h-9 border border-input bg-muted px-1.5 text-xs text-foreground focus:border-accent-teal focus:outline-none"
+              >
+                <option value="">Degree</option>
+                <optgroup label="Undergrad">
+                  {DEGREE_OPTIONS.undergrad.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Grad">
+                  {DEGREE_OPTIONS.grad.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </optgroup>
+              </select>
+              <Combobox
+                key={`conc-${i}-${pool.join("|").slice(0, 40)}`}
+                value={row.concentration}
+                onSelect={(v) => updateRow(i, { concentration: v })}
+                loadOptions={loadConcPool}
+                placeholder="Concentration (opt.)"
+                ariaLabel="Concentration"
+                inputClassName="h-9 bg-muted text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="text-muted-foreground/60 hover:text-foreground transition-colors"
+                aria-label="Remove education row"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {rows.length < 4 && (
+        <button
+          type="button"
+          onClick={addRow}
+          className="mt-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Add education
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function EditProfileModal({
   contact,
   onSaved,
@@ -177,7 +291,6 @@ export function EditProfileModal({
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
   // Exit guard: with unsaved changes, every close path (Esc, backdrop, X,
   // CANCEL) routes through a confirm dialog — explicit Save or Discard only.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -218,46 +331,15 @@ export function EditProfileModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Load the major→concentration map once so the Concentration combobox can
-  // scope its pool to the contact's selected majors (fallback: union of all).
-  useEffect(() => {
-    loadConcentrations().then(setConcentrations);
-  }, []);
-
-  // Toggle a degree token in/out of the ", "-joined form value.
-  const degreeList = form.degrees
-    ? form.degrees.split(",").map((d) => d.trim()).filter(Boolean)
-    : [];
-  function toggleDegree(deg: string) {
-    const next = degreeList.includes(deg)
-      ? degreeList.filter((d) => d !== deg)
-      : [...degreeList, deg];
-    set("degrees", next.join(", "));
-  }
-
-  // Concentration pool: union of concentrations for every selected major; when
-  // no selected major has an entry, fall back to the union of ALL values.
-  const concentrationPool = useMemo(() => {
-    const scoped = form.major.flatMap((m) => concentrations[m] ?? []);
-    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
-    return Array.from(new Set(pool)).sort();
-  }, [form.major, concentrations]);
-  const loadConcentrationPool = useCallback(
-    async () => concentrationPool,
-    [concentrationPool],
-  );
-
   // Build the PATCH body: only the columns whose value differs from the opened
-  // snapshot. Chip arrays serialize to ", "-joined strings, matching how the
-  // route stores and the GET reads them.
-  function buildPatch(): Record<string, string> {
-    const patch: Record<string, string> = {};
+  // snapshot. educations and experiences are sent as arrays when changed.
+  function buildPatch(): Record<string, unknown> {
+    const patch: Record<string, unknown> = {};
+
     const single: (keyof FormState)[] = [
       "title",
       "firmName",
       "education",
-      "degrees",
-      "concentration",
       "highSchool",
       "location",
       "hometown",
@@ -268,9 +350,9 @@ export function EditProfileModal({
       const next = (form[key] as string).trim();
       if (next !== (initial[key] as string).trim()) patch[key] = next;
     }
+
     const chips: (keyof FormState)[] = [
       "pastFirms",
-      "major",
       "minor",
       "clubs",
       "skills",
@@ -279,6 +361,15 @@ export function EditProfileModal({
       const next = (form[key] as string[]).join(", ");
       if (next !== (initial[key] as string[]).join(", ")) patch[key] = next;
     }
+
+    // Education rows — diff as JSON-stringified for equality, send as array.
+    const eduNext = JSON.stringify(form.educations);
+    if (eduNext !== JSON.stringify(initial.educations)) {
+      patch.educations = form.educations;
+    }
+
+    // Experience rows — diff as JSON-stringified for equality, send as array.
+
     return patch;
   }
 
@@ -298,7 +389,7 @@ export function EditProfileModal({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Save failed (${res.status})`);
+        throw new Error((data as { error?: string }).error || `Save failed (${res.status})`);
       }
       await onSaved();
       onClose();
@@ -370,96 +461,35 @@ export function EditProfileModal({
           <section className="space-y-3">
             <SectionLabel>Education</SectionLabel>
             <ComboField
-              label="Education"
+              label="Education (university)"
               value={form.education}
               onSelect={(v) => set("education", v)}
               loadOptions={loadUniversities}
               placeholder="e.g. University of North Carolina"
               matchAcronyms
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <ChipField
-                label="Major"
-                values={form.major}
-                onChange={(v) => set("major", v)}
-                loadOptions={loadMajors}
-                placeholder="Add a major..."
-                cap={2}
-              />
-              <ChipField
-                label="Minor"
-                values={form.minor}
-                onChange={(v) => set("minor", v)}
-                loadOptions={loadMinors}
-                placeholder="Add a minor..."
-                cap={2}
-              />
-            </div>
+            {/* Education rows — replaces flat major/degrees/concentration */}
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Degrees
+                Education entries{" "}
+                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                  {form.educations.length}/4
+                </span>
               </label>
-              <div className="space-y-2">
-                <div>
-                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Undergrad</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEGREE_OPTIONS.undergrad.map((deg) => {
-                      const active = degreeList.includes(deg);
-                      return (
-                        <button
-                          key={deg}
-                          type="button"
-                          onClick={() => toggleDegree(deg)}
-                          className={`border px-2 py-1 text-[11px] font-bold transition-colors ${
-                            active
-                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {deg}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Grad</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEGREE_OPTIONS.grad.map((deg) => {
-                      const active = degreeList.includes(deg);
-                      return (
-                        <button
-                          key={deg}
-                          type="button"
-                          onClick={() => toggleDegree(deg)}
-                          className={`border px-2 py-1 text-[11px] font-bold transition-colors ${
-                            active
-                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {deg}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Concentration
-              </label>
-              <Combobox
-                key={`conc-${concentrationPool.join("|")}`}
-                value={form.concentration}
-                onSelect={(v) => set("concentration", v)}
-                loadOptions={loadConcentrationPool}
-                placeholder="e.g. Finance"
-                ariaLabel="Concentration"
-                inputClassName="h-9 bg-muted text-sm"
+              <EducationRowsEditor
+                rows={form.educations}
+                onChange={(rows) => set("educations", rows)}
               />
             </div>
+            {/* Minor stays as-is */}
+            <ChipField
+              label="Minor"
+              values={form.minor}
+              onChange={(v) => set("minor", v)}
+              loadOptions={loadMinors}
+              placeholder="Add a minor..."
+              cap={2}
+            />
             <ComboField
               label="High School"
               value={form.highSchool}

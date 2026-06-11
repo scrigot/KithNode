@@ -3,6 +3,13 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { normalizeDegrees } from "@/lib/normalize-degrees";
+import {
+  parseEducations,
+  parseExperiences,
+  flatFromEducations,
+  firmsFromExperiences,
+  educationsFromFlat,
+} from "@/lib/educations";
 
 export async function GET() {
   const session = await auth();
@@ -10,7 +17,21 @@ export async function GET() {
   if (!email) return NextResponse.json({}, { status: 401 });
 
   const prefs = await getUserPrefs(email);
-  return NextResponse.json(prefs);
+
+  // When no structured rows exist yet, synthesize from the flat columns so
+  // old profiles display rows immediately without requiring a re-save.
+  const educations =
+    prefs.educations.length > 0
+      ? prefs.educations
+      : educationsFromFlat(prefs.major, prefs.degrees, prefs.concentration);
+
+  // Synthesize experience rows from the flat pastFirms list when no rows exist.
+  const experiences =
+    prefs.experiences.length > 0
+      ? prefs.experiences
+      : prefs.pastFirms.map((firm) => ({ title: "", firm, dates: "" }));
+
+  return NextResponse.json({ ...prefs, educations, experiences });
 }
 
 export async function POST(request: NextRequest) {
@@ -60,38 +81,68 @@ export async function POST(request: NextRequest) {
       ? Math.min(99, Math.round(weeklyGoalRaw))
       : 3;
 
-  // major/minor/concentration are comma-joined strings (like the contact
-  // columns), trimmed and capped at 160 chars to bound the column.
-  const major = typeof body.major === "string" ? body.major.trim().slice(0, 160) : "";
-  const minor = typeof body.minor === "string" ? body.minor.trim().slice(0, 160) : "";
-  const concentration =
-    typeof body.concentration === "string" ? body.concentration.trim().slice(0, 160) : "";
+  // When educations array is present, derive major/degrees/concentration from
+  // it. Otherwise fall back to legacy flat handling (back-compat).
+  let major: string;
+  let concentration: string;
+  let degrees: string;
+  let educationsJson: string | undefined;
 
-  // degrees: comma-joined string filtered to the canonical closed set
-  // (ALL_DEGREES). Invalid tokens are silently dropped, like clubs/skills.
-  const degrees =
-    typeof body.degrees === "string" ? normalizeDegrees(body.degrees) : "";
+  if (Array.isArray(body.educations)) {
+    const parsedEdus = parseEducations(JSON.stringify(body.educations));
+    educationsJson = JSON.stringify(parsedEdus);
+    const flat = flatFromEducations(parsedEdus);
+    major = flat.major;
+    degrees = flat.degrees;
+    concentration = flat.concentration;
+  } else {
+    // Legacy flat columns: comma-joined strings, trimmed and capped at 160.
+    major = typeof body.major === "string" ? body.major.trim().slice(0, 160) : "";
+    concentration =
+      typeof body.concentration === "string" ? body.concentration.trim().slice(0, 160) : "";
+    // degrees: filtered to canonical closed set; invalid tokens silently dropped.
+    degrees =
+      typeof body.degrees === "string" ? normalizeDegrees(body.degrees) : "";
+  }
+
+  const minor = typeof body.minor === "string" ? body.minor.trim().slice(0, 160) : "";
+
+  // When experiences array is present, derive pastFirms from it.
+  let pastFirmsJson: string;
+  let experiencesJson: string | undefined;
+
+  if (Array.isArray(body.experiences)) {
+    const parsedExps = parseExperiences(JSON.stringify(body.experiences));
+    experiencesJson = JSON.stringify(parsedExps);
+    pastFirmsJson = JSON.stringify(firmsFromExperiences(parsedExps));
+  } else {
+    pastFirmsJson = JSON.stringify(rawPastFirms);
+  }
+
+  const patch: Record<string, unknown> = {
+    university: body.current_university || "",
+    highSchool: body.high_school || "",
+    hometown: body.hometown || "",
+    greekOrg: body.greek_life || "",
+    major,
+    minor,
+    concentration,
+    degrees,
+    targetIndustries: serializeList(body.target_industries),
+    targetFirms: serializeList(body.target_companies),
+    targetLocations: serializeList(body.target_locations),
+    clubs: JSON.stringify(rawClubs),
+    skills: JSON.stringify(rawSkills),
+    pastFirms: pastFirmsJson,
+    recruitingDate,
+    weeklyGoalTarget,
+  };
+  if (educationsJson !== undefined) patch.educations = educationsJson;
+  if (experiencesJson !== undefined) patch.experiences = experiencesJson;
 
   const { error } = await supabase
     .from("User")
-    .update({
-      university: body.current_university || "",
-      highSchool: body.high_school || "",
-      hometown: body.hometown || "",
-      greekOrg: body.greek_life || "",
-      major,
-      minor,
-      concentration,
-      degrees,
-      targetIndustries: serializeList(body.target_industries),
-      targetFirms: serializeList(body.target_companies),
-      targetLocations: serializeList(body.target_locations),
-      clubs: JSON.stringify(rawClubs),
-      skills: JSON.stringify(rawSkills),
-      pastFirms: JSON.stringify(rawPastFirms),
-      recruitingDate,
-      weeklyGoalTarget,
-    })
+    .update(patch)
     .eq("email", email);
 
   if (error) {

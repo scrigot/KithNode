@@ -113,6 +113,21 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: true });
     const manualTags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
+    // Structured experience lines: when the user has structured rows, render
+    // them as "<title> at <firm> (<dates>)" for richer prompt context. Falls
+    // back to the flat pastFirms list when no rows exist.
+    const experienceLines =
+      (prefs.experiences ?? []).length > 0
+        ? prefs.experiences
+            .filter((e) => e.title || e.firm)
+            .map((e) => {
+              const datePart = e.dates ? ` (${e.dates})` : "";
+              if (e.title && e.firm) return `${e.title} at ${e.firm}${datePart}`;
+              if (e.firm) return `${e.firm}${datePart}`;
+              return `${e.title}${datePart}`;
+            })
+        : [];
+
     // Shared-employer overlap: the user's OWN past employers against the
     // contact's current firm + their past firms, normalized + either-direction
     // containment (same rule as the Shared Employer matcher). The first match is
@@ -181,7 +196,7 @@ CONTACT INFO:
 SENDER CONTEXT:
 - ${senderFullName || "Me"}, a student at ${userSchool}
 - Interested in ${userIndustryFocus}
-${userGreek ? `- Member of ${userGreek}` : ""}
+${userGreek ? `- Member of ${userGreek}` : ""}${experienceLines.length > 0 ? `\n- Past experience: ${experienceLines.join("; ")}` : prefs.pastFirms.length > 0 ? `\n- Past employers: ${prefs.pastFirms.join(", ")}` : ""}
 - Genuine interest in learning from professionals
 
 TONE REQUIREMENTS:

@@ -404,6 +404,7 @@ describe("fetchPdlProfile", () => {
       skills: ["Financial Modeling", "Python", "Excel"],
       pastFirms: ["Goldman Sachs"],
       degrees: ["BS"],
+      educations: [{ major: "Economics", degree: "BS", concentration: "" }],
     });
   });
 
@@ -445,6 +446,82 @@ describe("fetchPdlProfile", () => {
     );
     const result = await fetchPdlProfile("https://linkedin.com/in/test");
     expect(result?.fullName).toBe("");
+  });
+});
+
+// ── educations mapping (per-school pairing / degree-only / redaction) ─────────
+
+describe("fetchPdlProfile educations", () => {
+  it("pairs BS + Computer Science into one EducationEntry", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: ["computer science"],
+            degrees: ["bachelor_of_science"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.educations).toEqual([
+      { major: "Computer Science", degree: "BS", concentration: "" },
+    ]);
+  });
+
+  it("emits a degree-only row when MBA and no majors", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "harvard", type: "post-secondary institution" },
+            end_date: "2030",
+            majors: [],
+            degrees: ["master_of_business_administration"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.educations).toEqual([
+      { major: "", degree: "MBA", concentration: "" },
+    ]);
+  });
+
+  it("returns [] when education degrees is boolean-redacted (free tier)", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: true as unknown as string[],
+            degrees: true as unknown as string[],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.educations).toEqual([]);
+  });
+
+  it("dedupes identical major+degree rows", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: ["economics", "economics"],
+            degrees: ["bachelor_of_science"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.educations).toHaveLength(1);
   });
 });
 

@@ -5,7 +5,6 @@ import {
   useRef,
   useEffect,
   useCallback,
-  useMemo,
   type DragEvent,
   type ChangeEvent,
 } from "react";
@@ -31,8 +30,10 @@ import {
   FIRM_OPTIONS,
   LOCATION_OPTIONS,
   DEGREE_OPTIONS,
-  ALL_DEGREES,
 } from "@/lib/data/preference-options";
+import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
+import { EducationRowsEditor } from "@/components/education-rows-editor";
+import { ExperienceRowsEditor } from "@/components/experience-rows-editor";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   parseLinkedInCSV,
@@ -205,13 +206,10 @@ export default function OnboardingPage() {
   const [hometown, setHometown] = useState("");
   const [greekLifeEnabled, setGreekLifeEnabled] = useState(false);
   const [greekOrg, setGreekOrg] = useState("");
-  const [majors, setMajors] = useState<string[]>([]);
-  const [majorInput, setMajorInput] = useState("");
+  // Education rows replace flat majors/degrees/concentration
+  const [educations, setEducations] = useState<EducationEntry[]>([]);
   const [minors, setMinors] = useState<string[]>([]);
   const [minorInput, setMinorInput] = useState("");
-  const [degrees, setDegrees] = useState<string[]>([]);
-  const [concentration, setConcentration] = useState("");
-  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
   const [clubs, setClubs] = useState<string[]>([]);
   const [clubInput, setClubInput] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
@@ -226,8 +224,8 @@ export default function OnboardingPage() {
   const [industries, setIndustries] = useState<string[]>([]);
   const [firms, setFirms] = useState<string[]>([]);
   const [customFirm, setCustomFirm] = useState("");
-  const [pastFirms, setPastFirms] = useState<string[]>([]);
-  const [pastFirmInput, setPastFirmInput] = useState("");
+  // Experience rows replace flat pastFirms
+  const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [recruitingDate, setRecruitingDate] = useState("");
   const [weeklyGoalTarget, setWeeklyGoalTarget] = useState(3);
@@ -270,24 +268,6 @@ export default function OnboardingPage() {
     };
   }, []);
 
-  // Load the major→concentration map once so the Concentration combobox can
-  // scope its pool to the selected majors (fallback: union of all).
-  useEffect(() => {
-    loadConcentrations().then(setConcentrations);
-  }, []);
-
-  // Concentration pool: union of concentrations for every selected major; when
-  // no selected major has an entry, fall back to the union of ALL values.
-  const concentrationPool = useMemo(() => {
-    const scoped = majors.flatMap((m) => concentrations[m] ?? []);
-    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
-    return Array.from(new Set(pool)).sort();
-  }, [majors, concentrations]);
-  const loadConcentrationPool = useCallback(
-    async () => concentrationPool,
-    [concentrationPool],
-  );
-
   // Hydrate step 1 + 2 from any saved preferences so a returning user resuming
   // onboarding doesn't lose fields they already entered.
   useEffect(() => {
@@ -305,20 +285,14 @@ export default function OnboardingPage() {
           setGreekLifeEnabled(true);
           setGreekOrg(data.greekOrg);
         }
-        // major/minor are comma-joined strings on the User row → chip arrays.
-        if (typeof data.major === "string" && data.major)
-          setMajors(
-            data.major.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
-          );
+        // Server synthesizes educations from flat fields when array is absent.
+        if (Array.isArray(data.educations) && data.educations.length > 0) {
+          setEducations(data.educations);
+        }
         if (typeof data.minor === "string" && data.minor)
           setMinors(
             data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
           );
-        if (typeof data.degrees === "string" && data.degrees)
-          setDegrees(
-            data.degrees.split(",").map((d: string) => d.trim()).filter(Boolean),
-          );
-        if (typeof data.concentration === "string") setConcentration(data.concentration);
         if (Array.isArray(data.clubs)) setClubs(data.clubs.slice(0, 3));
         if (Array.isArray(data.skills)) setSkills(data.skills.slice(0, 10));
         if (Array.isArray(data.targetIndustries))
@@ -326,7 +300,10 @@ export default function OnboardingPage() {
         // DB stores presets + customs flat; both render fine through the chip
         // group (presets toggle, customs append), so keep the full list.
         if (Array.isArray(data.targetFirms)) setFirms(data.targetFirms);
-        if (Array.isArray(data.pastFirms)) setPastFirms(data.pastFirms.slice(0, 8));
+        // Experience rows from server (synthesized from flat pastFirms when absent).
+        if (Array.isArray(data.experiences) && data.experiences.length > 0) {
+          setExperiences(data.experiences);
+        }
         if (Array.isArray(data.targetLocations))
           setLocations(data.targetLocations);
         if (data.recruitingDate)
@@ -343,13 +320,6 @@ export default function OnboardingPage() {
   }, []);
 
   // ── Step 1 handlers (profile) ────────────────────────────────────────────
-  const addMajor = (v: string) => {
-    const m = v.trim();
-    setMajors((p) => (m && !p.includes(m) && p.length < 2 ? [...p, m] : p));
-    setMajorInput("");
-  };
-  const removeMajor = (v: string) =>
-    setMajors((p) => p.filter((m) => m !== v));
   const addMinor = (v: string) => {
     const m = v.trim();
     setMinors((p) => (m && !p.includes(m) && p.length < 2 ? [...p, m] : p));
@@ -357,8 +327,6 @@ export default function OnboardingPage() {
   };
   const removeMinor = (v: string) =>
     setMinors((p) => p.filter((m) => m !== v));
-  const toggleDegree = (deg: string) =>
-    setDegrees((p) => (p.includes(deg) ? p.filter((d) => d !== deg) : [...p, deg]));
   const addClub = (v: string) => {
     const club = v.trim();
     setClubs((p) =>
@@ -380,9 +348,7 @@ export default function OnboardingPage() {
   // ── Resume autofill ──────────────────────────────────────────────────────
   // Parse a PDF client-side → base64 → POST. Prefill ONLY fields that are
   // currently empty so we never clobber what the user already typed. Tracks
-  // which fields were filled to drive a brief highlight. Uses functional state
-  // updates that re-check emptiness at apply time (avoids stale closures when
-  // multiple fields fill in the same tick).
+  // which fields were filled to drive a brief highlight.
   const handleResumeFile = async (file: File) => {
     setResumeError(null);
     if (file.type !== "application/pdf") {
@@ -443,13 +409,27 @@ export default function OnboardingPage() {
         setGreekOrg(data.greekOrg.trim());
         filled.add("greekOrg");
       }
-      fillList("majors", setMajors, data.majors, majors, 2);
+      // Map resume educations into rows (only when empty).
+      if (educations.length === 0 && Array.isArray(data.educations) && data.educations.length > 0) {
+        setEducations((data.educations as EducationEntry[]).slice(0, 4).map((e) => ({
+          major: String(e?.major ?? "").trim(),
+          degree: String(e?.degree ?? "").trim(),
+          concentration: String(e?.concentration ?? "").trim(),
+        })));
+        filled.add("educations");
+      }
       fillList("minors", setMinors, data.minors, minors, 2);
-      fillList("degrees", setDegrees, data?.degrees, degrees, ALL_DEGREES.length);
-      fillStr("concentration", setConcentration, data?.concentration, concentration);
       fillList("clubs", setClubs, data.clubs, clubs, 3);
       fillList("skills", setSkills, data.skills, skills, 10);
-      fillList("pastFirms", setPastFirms, data.pastFirms, pastFirms, 8);
+      // Map resume experiences into rows (only when empty).
+      if (experiences.length === 0 && Array.isArray(data.experiences) && data.experiences.length > 0) {
+        setExperiences((data.experiences as ExperienceEntry[]).slice(0, 8).map((e) => ({
+          title: String(e?.title ?? "").trim(),
+          firm: String(e?.firm ?? "").trim(),
+          dates: String(e?.dates ?? "").trim(),
+        })));
+        filled.add("experiences");
+      }
       fillList("industries", setIndustries, data.targetIndustries, industries, 7);
 
       setResumeFilled(filled);
@@ -481,15 +461,6 @@ export default function OnboardingPage() {
     setCustomFirm("");
   };
 
-  const addPastFirm = () => {
-    const f = pastFirmInput.trim();
-    if (!f || pastFirms.includes(f) || pastFirms.length >= 8) return;
-    setPastFirms((p) => [...p, f]);
-    setPastFirmInput("");
-  };
-  const removePastFirm = (v: string) =>
-    setPastFirms((p) => p.filter((x) => x !== v));
-
   // Step 1 only gates on university (the dashboard layout redirects to
   // onboarding while it's empty); everything else on this step is optional.
   const goToTargets = () => {
@@ -515,13 +486,11 @@ export default function OnboardingPage() {
           high_school: highSchool.trim(),
           hometown: hometown.trim(),
           greek_life: greekLifeEnabled ? greekOrg.trim() : "",
-          major: majors.join(", "),
           minor: minors.join(", "),
-          degrees: degrees.join(", "),
-          concentration: concentration || null,
+          educations,
+          experiences,
           clubs,
           skills,
-          past_firms: pastFirms,
           target_industries: industries,
           target_companies: firms,
           target_locations: locations,
@@ -843,39 +812,23 @@ export default function OnboardingPage() {
                     matchAcronyms
                   />
                 </div>
-                <div className={resumeFilled.has("majors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+
+                {/* Education rows editor — replaces majors/degrees/concentration */}
+                <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Major <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">{majors.length}/2</span>
+                    Education{" "}
+                    <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                      {educations.length}/4
+                    </span>
                   </label>
-                  {majors.length > 0 && (
-                    <div className="mb-1.5 flex flex-wrap gap-1.5">
-                      {majors.map((m) => (
-                        <span
-                          key={m}
-                          className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
-                        >
-                          {m}
-                          <button
-                            type="button"
-                            onClick={() => removeMajor(m)}
-                            className="text-accent-teal/60 hover:text-accent-teal"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {majors.length < 2 && (
-                    <Combobox
-                      value={majorInput}
-                      onSelect={addMajor}
-                      loadOptions={loadMajors}
-                      placeholder="Add a major..."
-                      ariaLabel="Major"
-                    />
-                  )}
+                  <EducationRowsEditor
+                    rows={educations}
+                    onChange={setEducations}
+                    resumeFilled={resumeFilled.has("educations")}
+                  />
                 </div>
+
+                {/* Minor stays exactly as-is */}
                 <div className={resumeFilled.has("minors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Minor <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">{minors.length}/2</span>
@@ -909,34 +862,7 @@ export default function OnboardingPage() {
                     />
                   )}
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Degrees
-                  </label>
-                  <div className="space-y-2">
-                    <div>
-                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Undergrad</p>
-                      <ChipGroup options={[...DEGREE_OPTIONS.undergrad]} selected={degrees} onToggle={toggleDegree} />
-                    </div>
-                    <div>
-                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Grad</p>
-                      <ChipGroup options={[...DEGREE_OPTIONS.grad]} selected={degrees} onToggle={toggleDegree} />
-                    </div>
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Concentration
-                  </label>
-                  <Combobox
-                    key={`conc-${concentrationPool.join("|")}`}
-                    value={concentration}
-                    onSelect={setConcentration}
-                    loadOptions={loadConcentrationPool}
-                    placeholder="e.g. Finance"
-                    ariaLabel="Concentration"
-                  />
-                </div>
+
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     High School
@@ -1164,47 +1090,21 @@ export default function OnboardingPage() {
               </div>
             </section>
 
+            {/* Experience rows editor — replaces Past Employers chips */}
             <section
-              className={`border bg-bg-card p-5 ${resumeFilled.has("pastFirms") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
+              className={`border bg-bg-card p-5 ${resumeFilled.has("experiences") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
             >
               <div className="mb-3 flex items-center gap-2">
                 <Building2 size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Past Employers
+                  Experience (up to 8)
                 </h2>
               </div>
-              {pastFirms.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {pastFirms.map((firm) => (
-                    <span
-                      key={firm}
-                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
-                    >
-                      {firm}
-                      <button
-                        onClick={() => removePastFirm(firm)}
-                        className="text-accent-teal/60 hover:text-accent-teal"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {pastFirms.length < 8 && (
-                <Input
-                  placeholder="Add a past employer..."
-                  value={pastFirmInput}
-                  onChange={(e) => setPastFirmInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addPastFirm();
-                    }
-                  }}
-                  className="bg-muted text-sm"
-                />
-              )}
+              <ExperienceRowsEditor
+                rows={experiences}
+                onChange={setExperiences}
+                resumeFilled={resumeFilled.has("experiences")}
+              />
             </section>
 
             <section className="border border-white/[0.06] bg-bg-card p-5">

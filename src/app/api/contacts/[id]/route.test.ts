@@ -164,4 +164,52 @@ describe("pickEditableFields", () => {
     expect(invalid).toBe(false);
     expect(fields.degrees).toBe("");
   });
+
+  it("accepts educations array, stores JSON-stringified rows, and derives flat columns", () => {
+    const { fields, invalid } = pickEditableFields({
+      educations: [
+        { major: "Computer Science", degree: "BS", concentration: "AI" },
+        { major: "", degree: "MBA", concentration: "" },
+      ],
+    });
+    expect(invalid).toBe(false);
+    // educations stored as JSON string
+    const rows = JSON.parse(fields.educations);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].major).toBe("Computer Science");
+    // flat fields derived
+    expect(fields.major).toBe("Computer Science");
+    expect(fields.degrees).toBe("BS, MBA");
+    expect(fields.concentration).toBe("AI");
+  });
+
+  it("drops all-empty educations rows and still sets flat fields", () => {
+    const { fields, invalid } = pickEditableFields({
+      educations: [
+        { major: "", degree: "", concentration: "" },
+        { major: "Economics", degree: "BA", concentration: "" },
+      ],
+    });
+    expect(invalid).toBe(false);
+    const rows = JSON.parse(fields.educations);
+    expect(rows).toHaveLength(1);
+    expect(fields.major).toBe("Economics");
+  });
+
+  it("sets flat fields to empty strings when educations array is empty", () => {
+    const { fields, invalid } = pickEditableFields({ educations: [] });
+    expect(invalid).toBe(false);
+    expect(JSON.parse(fields.educations)).toHaveLength(0);
+    expect(fields.major).toBe("");
+    expect(fields.degrees).toBe("");
+    expect(fields.concentration).toBe("");
+  });
+
+  it("ignores educations when the value is not an array (string body ignored)", () => {
+    const { fields } = pickEditableFields({
+      education: "UNC",
+      // educations as a string is invalid; only arrays are processed
+    });
+    expect(fields).not.toHaveProperty("educations");
+  });
 });

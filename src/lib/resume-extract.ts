@@ -14,6 +14,14 @@ import minors from "@/lib/data/unc-minors.json";
 import concentrations from "@/lib/data/unc-concentrations.json";
 import skills from "@/lib/data/us-skills.json";
 import { INDUSTRY_OPTIONS, ALL_DEGREES } from "@/lib/data/preference-options";
+import {
+  parseEducations,
+  parseExperiences,
+  flatFromEducations,
+  firmsFromExperiences,
+  type EducationEntry,
+  type ExperienceEntry,
+} from "@/lib/educations";
 
 // Flattened, deduped list of every named concentration across all majors —
 // the closed pool the resume extractor maps a stated concentration against.
@@ -38,6 +46,17 @@ export const resumeSchema = z.object({
   concentration: z.string(),
   targetIndustries: z.array(z.string()).max(4),
   pastFirms: z.array(z.string()).max(5),
+  // Structured rows — added after flat fields for back-compat.
+  educations: z
+    .array(
+      z.object({ major: z.string(), degree: z.string(), concentration: z.string() }),
+    )
+    .max(4),
+  experiences: z
+    .array(
+      z.object({ title: z.string(), firm: z.string(), dates: z.string() }),
+    )
+    .max(8),
 });
 
 export type ResumeExtract = z.infer<typeof resumeSchema>;
@@ -107,6 +126,8 @@ Return:
 - concentration: the candidate's formal concentration/area of emphasis within the major if stated, mapped to the CONCENTRATIONS list when confident; otherwise "".
 - targetIndustries: up to 4 industries the candidate targets/works in, chosen from the INDUSTRIES list.
 - pastFirms: up to 5 employers from the candidate's work experience section (company names only).
+- educations: up to 4 education entries, each as { major, degree, concentration }. Pair each degree with its corresponding major; map degree from the DEGREES list (${ALL_DEGREES.join(", ")}), map major against the MAJORS list, map concentration against the CONCENTRATIONS list. Unknown tokens use "" not a guess.
+- experiences: up to 8 work experience entries, each as { title, firm, dates }. dates is short free text like "Summer 2026" or "Jan 2025 - May 2026".
 
 INDUSTRIES: ${INDUSTRY_OPTIONS.join(", ")}
 
@@ -123,4 +144,45 @@ CONCENTRATIONS: ${CONCENTRATION_NAMES.join(", ")}
 SKILLS: ${(skills as string[]).join(", ")}
 
 Return the result as JSON matching the schema exactly.`;
+}
+
+/**
+ * Post-process the raw model output: canonicalize structured rows and, when
+ * rows are non-empty, derive the flat fields from them so the two
+ * representations stay consistent.
+ */
+export function buildResumeResult(raw: ResumeExtract): ResumeExtract {
+  const educations: EducationEntry[] = parseEducations(
+    JSON.stringify(raw.educations),
+  );
+  const experiences: ExperienceEntry[] = parseExperiences(
+    JSON.stringify(raw.experiences),
+  );
+
+  let majorsArr = raw.majors;
+  let degreesArr = raw.degrees;
+  let concentration = raw.concentration;
+  let pastFirms = raw.pastFirms;
+
+  if (educations.length > 0) {
+    const flat = flatFromEducations(educations);
+    // flatFromEducations returns joined strings; split back to arrays.
+    majorsArr = flat.major ? flat.major.split(", ") : [];
+    degreesArr = flat.degrees ? flat.degrees.split(", ") : [];
+    concentration = flat.concentration;
+  }
+
+  if (experiences.length > 0) {
+    pastFirms = firmsFromExperiences(experiences).slice(0, 5);
+  }
+
+  return {
+    ...raw,
+    majors: majorsArr,
+    degrees: degreesArr,
+    concentration,
+    pastFirms,
+    educations,
+    experiences,
+  };
 }

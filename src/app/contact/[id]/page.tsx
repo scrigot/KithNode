@@ -363,9 +363,13 @@ export default function ContactDetailPage() {
     );
   }
 
-  // degrees/concentration are new ", "-joined columns the contacts route now
-  // returns; read defensively so this compiles regardless of the api.ts type.
-  const academic = contact as { degrees?: string; concentration?: string };
+  // Read structured education rows + flat fallback fields defensively so this
+  // compiles regardless of api.ts version.
+  const contactExt = contact as {
+    degrees?: string;
+    concentration?: string;
+    educations?: { major: string; degree: string; concentration: string }[];
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -662,14 +666,33 @@ export default function ContactDetailPage() {
               <DetailRow label="Teaches at" value={contact.university} />
             )}
             <DetailRow label="Education" value={contact.education} />
-            <DetailRow label="Major" value={contact.major} />
+            {/* Render structured education rows when present; fall back to flat fields. */}
+            {contactExt.educations && contactExt.educations.length > 0 ? (
+              <div className="space-y-0.5">
+                <dt className="text-muted-foreground">Degrees / Programs</dt>
+                {contactExt.educations.map((edu, i) => {
+                  const parts = [edu.degree, edu.major, edu.concentration].filter(Boolean);
+                  if (!parts.length) return null;
+                  return (
+                    <dd key={i} className="text-right text-foreground">
+                      {parts.join(" · ")}
+                    </dd>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                <DetailRow label="Major" value={contact.major} />
+                {contactExt.degrees?.trim() && (
+                  <DetailRow label="Degrees" value={contactExt.degrees} />
+                )}
+                {contactExt.concentration?.trim() && (
+                  <DetailRow label="Concentration" value={contactExt.concentration} />
+                )}
+              </>
+            )}
+            {/* Minor is not part of education rows — always render it. */}
             <DetailRow label="Minor" value={contact.minor} />
-            {academic.degrees?.trim() && (
-              <DetailRow label="Degrees" value={academic.degrees} />
-            )}
-            {academic.concentration?.trim() && (
-              <DetailRow label="Concentration" value={academic.concentration} />
-            )}
             <DetailRow label="Skills" value={contact.skills} />
             <DetailRow label="Past employers" value={contact.past_firms} />
             <DetailRow label="Location (current)" value={contact.linkedin_location} />

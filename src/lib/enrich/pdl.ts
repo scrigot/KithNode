@@ -12,6 +12,8 @@
 // error, malformed body, no education) returns null so the caller can fall
 // back to LLM-only behavior with no regression.
 
+import { type EducationEntry, MAX_EDUCATIONS } from "@/lib/educations";
+
 const PDL_ENDPOINT = "https://api.peopledatalabs.com/v5/person/enrich";
 
 // US-state name → 2-letter code, for building "City, ST" from locality + region.
@@ -98,6 +100,10 @@ export interface PdlResult {
   // "bachelors"/"masters"/"doctorates" map to "" (dropped). Feeds the contact's
   // degrees column only-when-empty. Free-tier redaction is guarded.
   degrees: string[];
+  // Per-school education rows: one EducationEntry per major (or one degree-only
+  // row when a school has a mapped degree but no majors). Deduped, capped at
+  // MAX_EDUCATIONS. Feeds the contact's educations column only-when-empty.
+  educations: EducationEntry[];
 }
 
 // High school / pre-college markers. PDL uses school.type = "post-secondary institution"
@@ -253,6 +259,57 @@ function buildDegrees(entries: PdlEducationEntry[]): string[] {
   return out;
 }
 
+// Per-school education pairing: one EducationEntry per major (degree mapped via
+// PDL_DEGREE_MAP); when a school has a mapped degree but no majors, one
+// degree-only row. Free-tier redaction on degrees/majors/minors is guarded with
+// Array.isArray (same pattern as buildDegrees). Deduped by major+degree key,
+// capped at MAX_EDUCATIONS.
+function buildEducations(entries: PdlEducationEntry[]): EducationEntry[] {
+  const out: EducationEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of entries) {
+    // Map first valid degree token for this school entry.
+    let mappedDegree = "";
+    if (Array.isArray(entry.degrees)) {
+      for (const raw of entry.degrees) {
+        if (typeof raw !== "string") continue;
+        const key = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+        const canonical = PDL_DEGREE_MAP[key];
+        if (canonical !== undefined && canonical !== "") {
+          mappedDegree = canonical;
+          break;
+        }
+      }
+    }
+
+    const majors: string[] = Array.isArray(entry.majors)
+      ? entry.majors.filter((m): m is string => typeof m === "string" && m.trim().length > 0).map((m) => titleCase(m.trim()))
+      : [];
+
+    if (majors.length > 0) {
+      for (const major of majors) {
+        const row: EducationEntry = { major, degree: mappedDegree, concentration: "" };
+        const key = `${row.major.toLowerCase()}|${row.degree}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(row);
+        if (out.length >= MAX_EDUCATIONS) return out;
+      }
+    } else if (mappedDegree) {
+      const row: EducationEntry = { major: "", degree: mappedDegree, concentration: "" };
+      const key = `|${row.degree}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(row);
+        if (out.length >= MAX_EDUCATIONS) return out;
+      }
+    }
+  }
+
+  return out;
+}
+
 function buildLocation(data: PdlPersonData): string {
   const city = asString(data.location_locality);
   if (!city) return "";
@@ -340,6 +397,7 @@ export async function fetchPdlProfile(
       skills: buildSkills(personData),
       pastFirms: buildPastFirms(personData),
       degrees: buildDegrees(entries),
+      educations: buildEducations(entries),
     };
   } catch (err) {
     console.error("fetchPdlProfile: request failed", {

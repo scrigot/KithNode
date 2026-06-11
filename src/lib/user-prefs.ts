@@ -1,4 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import {
+  type EducationEntry,
+  type ExperienceEntry,
+  parseEducations,
+  parseExperiences,
+} from "@/lib/educations";
 
 /**
  * Per-user scoring preferences. Drives the personalized warmth score in
@@ -26,9 +32,16 @@ export interface UserPrefs {
   /** The user's own past employers. Drives the Shared Employer matcher. Stored
    * JSON-stringified on the User.pastFirms column (like clubs/skills). */
   pastFirms: string[];
+  /** Structured education rows. UI truth; flat major/degrees/concentration are
+   * derived from these on every save. */
+  educations: EducationEntry[];
+  /** Structured experience rows. UI truth; pastFirms is derived from these. */
+  experiences: ExperienceEntry[];
   recruitingDate: string | null;
   weeklyGoalTarget: number;
 }
+
+export type { EducationEntry, ExperienceEntry };
 
 const EMPTY_PREFS: UserPrefs = {
   university: "",
@@ -45,6 +58,8 @@ const EMPTY_PREFS: UserPrefs = {
   clubs: [],
   skills: [],
   pastFirms: [],
+  educations: [],
+  experiences: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
@@ -76,7 +91,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -98,6 +113,8 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     clubs: parseList(data.clubs),
     skills: parseList(data.skills),
     pastFirms: parseList(data.pastFirms),
+    educations: parseEducations(data.educations),
+    experiences: parseExperiences(data.experiences),
     recruitingDate: data.recruitingDate ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
   };
