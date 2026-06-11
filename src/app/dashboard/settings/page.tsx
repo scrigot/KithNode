@@ -5,7 +5,13 @@ import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { searchCities } from "@/lib/us-cities";
+import {
+  loadUniversities,
+  loadCities,
+  loadHighSchools,
+} from "@/lib/data/onboarding-options";
 import {
   GraduationCap,
   MapPin,
@@ -417,22 +423,29 @@ function EditPanel({
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 University
               </label>
-              <Input
-                placeholder="University of North Carolina at Chapel Hill"
+              <Combobox
                 value={local.university}
-                onChange={(e) => setLocal({ ...local, university: e.target.value })}
-                className="bg-muted text-sm"
+                onSelect={(v) => setLocal({ ...local, university: v })}
+                loadOptions={loadUniversities}
+                placeholder="University of North Carolina at Chapel Hill"
+                ariaLabel="University"
+                matchAcronyms
               />
             </div>
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 High School
               </label>
-              <Input
-                placeholder="East Chapel Hill High School"
+              <Combobox
                 value={local.highSchool}
-                onChange={(e) => setLocal({ ...local, highSchool: e.target.value })}
-                className="bg-muted text-sm"
+                onSelect={(v) => {
+                  // Display label is "Name — City, ST"; store only the school name.
+                  const name = v.includes(" — ") ? v.split(" — ")[0] : v;
+                  setLocal({ ...local, highSchool: name });
+                }}
+                loadOptions={loadHighSchools}
+                placeholder="East Chapel Hill High School"
+                ariaLabel="High School"
               />
             </div>
             <div>
@@ -489,11 +502,12 @@ function EditPanel({
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Hometown
               </label>
-              <CityAutocomplete
-                placeholder="Charlotte, NC"
+              <Combobox
                 value={local.hometown}
-                onChange={(v) => setLocal({ ...local, hometown: v })}
-                className="bg-muted text-sm"
+                onSelect={(v) => setLocal({ ...local, hometown: v })}
+                loadOptions={loadCities}
+                placeholder="Charlotte, NC"
+                ariaLabel="Hometown"
               />
             </div>
             <div>

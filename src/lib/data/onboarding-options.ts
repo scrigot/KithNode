@@ -6,6 +6,7 @@
 
 let universitiesPromise: Promise<string[]> | null = null;
 let citiesPromise: Promise<string[]> | null = null;
+let highSchoolsPromise: Promise<string[]> | null = null;
 
 export function loadUniversities(): Promise<string[]> {
   if (!universitiesPromise) {
@@ -25,4 +26,15 @@ export function loadCities(): Promise<string[]> {
     );
   }
   return citiesPromise;
+}
+
+export function loadHighSchools(): Promise<string[]> {
+  if (!highSchoolsPromise) {
+    highSchoolsPromise = import("./us-high-schools.json").then((m) =>
+      (m.default as { n: string; c: string; s: string }[]).map(
+        (hs) => `${hs.n} — ${hs.c}, ${hs.s}`,
+      ),
+    );
+  }
+  return highSchoolsPromise;
 }
