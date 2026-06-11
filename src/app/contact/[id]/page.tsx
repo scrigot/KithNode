@@ -246,7 +246,7 @@ export default function ContactDetailPage() {
           >
             &lt; {backLabel}
           </Link>
-          <div className="mt-1 [&_button]:text-xl [&_button]:font-bold [&_input]:text-xl [&_input]:font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
+          <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
             <FieldEditor
               contactId={contact.id}
               field="name"
