@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
         .slice(0, 3)
     : [];
 
+  const rawSkills = Array.isArray(body.skills)
+    ? body.skills
+        .map((s: unknown) => String(s).trim().slice(0, 40))
+        .filter(Boolean)
+        .slice(0, 10)
+    : [];
+
   const recruitingDate =
     typeof body.recruiting_date === "string" &&
     !Number.isNaN(Date.parse(body.recruiting_date))
@@ -54,6 +61,7 @@ export async function POST(request: NextRequest) {
       targetFirms: serializeList(body.target_companies),
       targetLocations: serializeList(body.target_locations),
       clubs: JSON.stringify(rawClubs),
+      skills: JSON.stringify(rawSkills),
       recruitingDate,
       weeklyGoalTarget,
     })

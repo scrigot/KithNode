@@ -36,6 +36,11 @@ export interface ContactMeta extends LinkedInMeta {
   clubs?: string;
   passions?: string;
   greekOrg?: string;
+  /** PDL-enriched or manually edited. major/minor are single values; skills is
+   * a comma-joined list. They feed ONLY the Skill Match matcher below. */
+  major?: string;
+  minor?: string;
+  skills?: string;
   /**
    * Manual identity override set by the user. '' = auto (text heuristics
    * decide). 'student' | 'alum' | 'professor' force WHO this contact is and
@@ -480,6 +485,26 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       const clubBlob = norm(`${meta.clubs ?? ""} ${tagsText}`);
       if (containsAny(clubBlob, prefs.clubs)) {
         affiliations.push({ name: "Same Club", boost: 8 });
+      }
+    }
+
+    // Skill Match: the contact's skills/major/minor + tags overlapping EITHER the
+    // user's skills OR their target industries (a major like "Computer Science"
+    // or a skill like "Machine Learning" can map to an industry interest). Built
+    // ONLY from skills + tags + major + minor — never schoolBlob or the K-12
+    // detector. Fires at most once.
+    // prefs.skills is nullish-guarded: a prefs object built before this field
+    // existed must not crash the matcher (containsAny treats [] as no-match).
+    const prefSkills = prefs.skills ?? [];
+    if (prefSkills.length || prefs.targetIndustries.length) {
+      const skillBlob = norm(
+        `${meta.skills ?? ""} ${tagsText} ${meta.major ?? ""} ${meta.minor ?? ""}`,
+      );
+      if (
+        containsAny(skillBlob, prefSkills) ||
+        containsAny(skillBlob, prefs.targetIndustries)
+      ) {
+        affiliations.push({ name: "Skill Match", boost: 8 });
       }
     }
   }

@@ -379,6 +379,32 @@ export default function ContactDetailPage() {
             />
             <FieldEditor
               contactId={contact.id}
+              field="major"
+              label="Major"
+              initialValue={contact.major || ""}
+              placeholder="Add major"
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="minor"
+              label="Minor"
+              initialValue={contact.minor || ""}
+              placeholder="Add minor"
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="skills"
+              label="Skills"
+              initialValue={contact.skills || ""}
+              placeholder="Add skills"
+              mode="multi-chip"
+              maxChips={12}
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
               field="location"
               label="Location"
               initialValue={contact.linkedin_location || ""}

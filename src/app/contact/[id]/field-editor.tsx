@@ -16,7 +16,10 @@ interface FieldEditorProps {
     | "greekOrg"
     | "title"
     | "firmName"
-    | "university";
+    | "university"
+    | "major"
+    | "minor"
+    | "skills";
   label: string;
   initialValue: string;
   placeholder?: string;
@@ -29,13 +32,16 @@ interface FieldEditorProps {
    *   Combobox, capped at 5; saved back as a ", "-joined string.
    */
   mode?: "plain" | "options" | "multi-chip";
-  /** Required for "options"/"multi-chip" mode — resolves the typeahead dataset. */
+  /** Required for "options" mode — resolves the typeahead dataset. Optional for
+   * "multi-chip": when omitted, chips are added via a free-text input. */
   loadOptions?: () => Promise<string[]>;
   /** Strip a " — City, ST" display suffix before saving (high-school dataset). */
   stripCitySuffix?: boolean;
+  /** Max chips in "multi-chip" mode. Defaults to 5 (clubs); skills passes 12. */
+  maxChips?: number;
 }
 
-const MAX_CHIPS = 5;
+const DEFAULT_MAX_CHIPS = 5;
 
 // Trim + collapse inner whitespace + cap, mirroring the route's normalizeField.
 function clean(raw: string): string {
@@ -67,6 +73,7 @@ export function FieldEditor({
   mode = "plain",
   loadOptions,
   stripCitySuffix,
+  maxChips,
 }: FieldEditorProps) {
   if (mode === "multi-chip") {
     return (
@@ -78,6 +85,7 @@ export function FieldEditor({
         placeholder={placeholder}
         onSaved={onSaved}
         loadOptions={loadOptions}
+        maxChips={maxChips}
       />
     );
   }
@@ -216,12 +224,12 @@ function SingleValueEditor({
 
 // ── Multi-chip (clubs) ──────────────────────────────────────────────────────────
 
-function parseChips(raw: string): string[] {
+function parseChips(raw: string, max: number): string[] {
   return raw
     .split(",")
     .map((c) => c.trim())
     .filter(Boolean)
-    .slice(0, MAX_CHIPS);
+    .slice(0, max);
 }
 
 function MultiChipEditor({
@@ -232,11 +240,18 @@ function MultiChipEditor({
   placeholder,
   onSaved,
   loadOptions,
+  maxChips = DEFAULT_MAX_CHIPS,
 }: Required<Pick<FieldEditorProps, "contactId" | "field" | "label" | "initialValue">> &
-  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "onSaved">) {
-  const [chips, setChips] = useState<string[]>(() => parseChips(initialValue));
+  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "onSaved" | "maxChips">) {
+  const [chips, setChips] = useState<string[]>(() => parseChips(initialValue, maxChips));
   const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (adding && !loadOptions) inputRef.current?.focus();
+  }, [adding, loadOptions]);
 
   async function persist(next: string[]) {
     setSaving(true);
@@ -254,7 +269,8 @@ function MultiChipEditor({
 
   function addChip(raw: string) {
     const chip = clean(raw);
-    if (!chip || chips.includes(chip) || chips.length >= MAX_CHIPS) {
+    setDraft("");
+    if (!chip || chips.includes(chip) || chips.length >= maxChips) {
       setAdding(false);
       return;
     }
@@ -296,8 +312,33 @@ function MultiChipEditor({
           className="inline-block w-40"
           inputClassName="h-5 px-1.5 text-[10px] bg-background border-border focus:border-accent-blue"
         />
+      ) : adding ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          maxLength={160}
+          disabled={saving}
+          placeholder={placeholder}
+          className="h-5 w-40 border border-border bg-background px-1.5 text-[10px] text-foreground placeholder:text-muted-foreground/50 focus:border-accent-blue focus:outline-none"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            setDraft("");
+            setAdding(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addChip(draft);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setDraft("");
+              setAdding(false);
+            }
+          }}
+        />
       ) : (
-        chips.length < MAX_CHIPS && (
+        chips.length < maxChips && (
           <button
             type="button"
             onClick={() => setAdding(true)}

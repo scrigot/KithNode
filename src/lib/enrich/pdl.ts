@@ -39,17 +39,22 @@ interface PdlEducationEntry {
   } | null;
   start_date?: string | null;
   end_date?: string | null;
+  // PDL carries majors/minors as string arrays on each education entry.
+  majors?: string[] | null;
+  minors?: string[] | null;
 }
 
 // Free-tier responses redact some fields to boolean true ("present but
 // hidden") instead of the string value, so location fields must be
-// runtime-checked as strings before use.
+// runtime-checked as strings before use. skills is the same: the free tier
+// may redact the whole array to boolean true, so Array.isArray-guard before use.
 interface PdlPersonData {
   full_name?: string | null;
   education?: PdlEducationEntry[] | null;
   location_locality?: string | boolean | null;
   location_region?: string | boolean | null;
   location_name?: string | boolean | null;
+  skills?: string[] | boolean | null;
 }
 
 interface PdlResponse {
@@ -63,6 +68,9 @@ export interface PdlResult {
   graduationYear: number;
   location: string;
   fullName: string;
+  major: string;
+  minor: string;
+  skills: string[];
 }
 
 // High school / pre-college markers. PDL uses school.type = "post-secondary institution"
@@ -71,6 +79,13 @@ const PRE_COLLEGE = /\b(high\s*school|preparatory|prep\s*school|country\s*day|ch
 
 function schoolNameOf(entry: PdlEducationEntry): string {
   return String(entry.school?.name || "").trim();
+}
+
+// First named major/minor off an education entry, title-cased. "" when absent.
+function firstFieldOf(arr: string[] | null | undefined): string {
+  if (!Array.isArray(arr)) return "";
+  const first = arr.find((v) => typeof v === "string" && v.trim().length > 0);
+  return first ? titleCase(first.trim()) : "";
 }
 
 function isPreCollege(entry: PdlEducationEntry): boolean {
@@ -114,6 +129,17 @@ function titleCase(str: string): string {
 
 function asString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+// Profile-level skills → first 12, title-cased. Free tier may redact the whole
+// array to boolean true, so Array.isArray-guard (same pattern as location). []
+// when absent or redacted.
+function buildSkills(data: PdlPersonData): string[] {
+  if (!Array.isArray(data.skills)) return [];
+  return data.skills
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .slice(0, 12)
+    .map((s) => titleCase(s.trim()));
 }
 
 function buildLocation(data: PdlPersonData): string {
@@ -195,6 +221,9 @@ export async function fetchPdlProfile(
       graduationYear: parseEndYear(best),
       location: buildLocation(personData),
       fullName,
+      major: firstFieldOf(best.majors),
+      minor: firstFieldOf(best.minors),
+      skills: buildSkills(personData),
     };
   } catch (err) {
     console.error("fetchPdlProfile: request failed", {

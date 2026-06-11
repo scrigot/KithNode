@@ -14,6 +14,7 @@ function makePdlResponse(
     location_locality?: string | null;
     location_region?: string | null;
     location_name?: string | null;
+    skills?: unknown;
   } = {},
 ) {
   return {
@@ -25,6 +26,7 @@ function makePdlResponse(
       location_locality: opts.location_locality ?? null,
       location_region: opts.location_region ?? null,
       location_name: opts.location_name ?? null,
+      skills: opts.skills ?? null,
     },
   };
 }
@@ -327,10 +329,16 @@ describe("fetchPdlProfile", () => {
       makePdlResponse({
         full_name: "aryan aladar",
         education: [
-          { school: { name: "university of north carolina", type: "post-secondary institution" }, end_date: "2027" },
+          {
+            school: { name: "university of north carolina", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: ["economics"],
+            minors: ["computer science"],
+          },
         ],
         location_locality: "chapel hill",
         location_region: "north carolina",
+        skills: ["financial modeling", "python", "excel"],
       }),
     );
     const result = await fetchPdlProfile("https://linkedin.com/in/samtest");
@@ -339,6 +347,9 @@ describe("fetchPdlProfile", () => {
       graduationYear: 2027,
       location: "Chapel Hill, NC",
       fullName: "Aryan Aladar",
+      major: "Economics",
+      minor: "Computer Science",
+      skills: ["Financial Modeling", "Python", "Excel"],
     });
   });
 
@@ -407,5 +418,81 @@ describe("shouldAdoptPdlName", () => {
 
   it("does NOT adopt when both names are empty", () => {
     expect(shouldAdoptPdlName("", "")).toBe(false);
+  });
+});
+
+// ── major / minor / skills mapping ────────────────────────────────────────────
+
+describe("fetchPdlProfile major/minor/skills", () => {
+  it("maps majors[0]/minors[0] off the picked education entry, title-cased", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: ["economics", "statistics"],
+            minors: ["computer science"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.major).toBe("Economics");
+    expect(result?.minor).toBe("Computer Science");
+  });
+
+  it("returns empty string major when majors is absent", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.major).toBe("");
+    expect(result?.minor).toBe("");
+  });
+
+  it("takes the first 12 profile skills, title-cased", async () => {
+    const fifteen = Array.from({ length: 15 }, (_, i) => `skill ${i + 1}`);
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        skills: fifteen,
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.skills).toHaveLength(12);
+    expect(result?.skills[0]).toBe("Skill 1");
+    expect(result?.skills[11]).toBe("Skill 12");
+  });
+
+  it("returns [] skills when the free tier redacts to boolean true", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        skills: true,
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.skills).toEqual([]);
+  });
+
+  it("returns [] skills when skills is absent", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.skills).toEqual([]);
   });
 });

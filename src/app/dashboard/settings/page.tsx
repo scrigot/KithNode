@@ -97,6 +97,7 @@ interface Preferences {
   greekLifeEnabled: boolean;
   greekOrganization: string;
   clubs: string[];
+  skills: string[];
   hometown: string;
   targetLocations: string[];
   customLocations: string[];
@@ -116,6 +117,7 @@ function getDefaults(): Preferences {
     greekLifeEnabled: false,
     greekOrganization: "",
     clubs: [],
+    skills: [],
     hometown: "",
     targetLocations: [],
     customLocations: [],
@@ -178,6 +180,7 @@ async function syncToAPI(prefs: Preferences) {
             : null,
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
         clubs: prefs.clubs,
+        skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
       }),
@@ -299,6 +302,7 @@ function EditPanel({
   const [customFirmInput, setCustomFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
   const [clubInput, setClubInput] = useState("");
+  const [skillInput, setSkillInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -338,6 +342,13 @@ function EditPanel({
     if (!loc || local.customLocations.includes(loc) || local.targetLocations.includes(loc) || LOCATION_OPTIONS.includes(loc)) return;
     setLocal((p) => ({ ...p, customLocations: [...p.customLocations, loc] }));
     setCustomLocationInput("");
+  };
+
+  const addSkill = () => {
+    const skill = skillInput.trim();
+    if (!skill || local.skills.includes(skill) || local.skills.length >= 10) return;
+    setLocal((p) => ({ ...p, skills: [...p.skills, skill] }));
+    setSkillInput("");
   };
 
   const handleSave = async () => {
@@ -534,6 +545,46 @@ function EditPanel({
               )}
               {local.clubs.length > 0 && (
                 <p className="mt-1 text-[10px] text-text-muted">{local.clubs.length}/3 selected</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Skills (up to 10)
+              </label>
+              {local.skills.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {local.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    >
+                      {skill}
+                      <button
+                        onClick={() => setLocal((p) => ({ ...p, skills: p.skills.filter((s) => s !== skill) }))}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {local.skills.length < 10 && (
+                <Input
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addSkill();
+                    }
+                  }}
+                  placeholder="Add a skill, then press Enter..."
+                  aria-label="Skills"
+                />
+              )}
+              {local.skills.length > 0 && (
+                <p className="mt-1 text-[10px] text-text-muted">{local.skills.length}/10 selected</p>
               )}
             </div>
           </div>
@@ -1120,6 +1171,7 @@ export default function SettingsPage() {
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",
               clubs: Array.isArray(data.clubs) ? data.clubs : [],
+              skills: Array.isArray(data.skills) ? data.skills : [],
               hometown: data.hometown || "",
               // DB stores presets + customs as one flat list; split against the
               // preset option arrays or custom entries render nowhere (and the

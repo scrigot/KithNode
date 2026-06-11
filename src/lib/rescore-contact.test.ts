@@ -17,6 +17,7 @@ const prefs = (overrides: Partial<UserPrefs> = {}): UserPrefs => ({
   targetFirms: [],
   targetLocations: [],
   clubs: [],
+  skills: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
   ...overrides,
@@ -85,5 +86,45 @@ describe("rescoreContact", () => {
       [],
     );
     expect(noOrg.affiliations.some((a) => a.name === "Same Greek Org")).toBe(false);
+  });
+
+  it("threads the skills column into Skill Match", () => {
+    // Skill Match fires ONLY via the contact's skills column (no tags, no
+    // major/minor) overlapping prefs.skills — proves the column reaches
+    // detectAffiliations through the rescore meta.
+    const contact = {
+      name: "Riya P",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      skills: "Financial Modeling, Python, Excel",
+    };
+    const withSkill = rescoreContact(contact, prefs({ skills: ["Python"] }), []);
+    expect(withSkill.affiliations.some((a) => a.name === "Skill Match")).toBe(true);
+
+    const noSkill = rescoreContact(
+      { ...contact, skills: "" },
+      prefs({ skills: ["Python"] }),
+      [],
+    );
+    expect(noSkill.affiliations.some((a) => a.name === "Skill Match")).toBe(false);
+  });
+
+  it("threads the major column into Skill Match via target industries", () => {
+    const contact = {
+      name: "Theo K",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      major: "Computer Science",
+    };
+    const result = rescoreContact(
+      contact,
+      prefs({ targetIndustries: ["Computer Science"] }),
+      [],
+    );
+    expect(result.affiliations.some((a) => a.name === "Skill Match")).toBe(true);
   });
 });

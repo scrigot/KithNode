@@ -76,6 +76,7 @@ describe("detectAffiliations: manual tags", () => {
       targetFirms: [],
       targetLocations: [],
       clubs: [],
+      skills: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -93,6 +94,7 @@ describe("detectAffiliations: manual tags", () => {
       targetFirms: [],
       targetLocations: [],
       clubs: [],
+      skills: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -124,6 +126,7 @@ describe("detectAffiliations: manual tags", () => {
       targetFirms: [],
       targetLocations: [],
       clubs: [],
+      skills: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -143,6 +146,7 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     targetFirms: [],
     targetLocations: [],
     clubs: [],
+    skills: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -209,6 +213,7 @@ describe("detectAffiliations: Same Club", () => {
     targetFirms: [],
     targetLocations: [],
     clubs,
+    skills: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -252,6 +257,88 @@ describe("detectAffiliations: Same Club", () => {
   });
 });
 
+describe("detectAffiliations: Skill Match", () => {
+  const skillPrefs = (
+    overrides: { skills?: string[]; targetIndustries?: string[] } = {},
+  ) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: overrides.targetIndustries ?? [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: overrides.skills ?? [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires when contact.skills overlaps prefs.skills", () => {
+    const affs = detectAffiliations(
+      baseMeta({ skills: "Financial Modeling, Python, Excel" }),
+      skillPrefs({ skills: ["Python"] }),
+    );
+    expect(affs.some((a) => a.name === "Skill Match" && a.boost === 8)).toBe(true);
+  });
+
+  it("fires when a tag overlaps prefs.targetIndustries", () => {
+    const affs = detectAffiliations(
+      baseMeta({ tags: ["Investment Banking"] }),
+      skillPrefs({ targetIndustries: ["Investment Banking"] }),
+    );
+    expect(affs.some((a) => a.name === "Skill Match" && a.boost === 8)).toBe(true);
+  });
+
+  it("fires when major overlaps prefs.targetIndustries", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Computer Science" }),
+      skillPrefs({ targetIndustries: ["Computer Science"] }),
+    );
+    expect(affs.some((a) => a.name === "Skill Match")).toBe(true);
+  });
+
+  it("does NOT fire when both prefs.skills and prefs.targetIndustries are empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ skills: "Python", major: "Economics" }),
+      skillPrefs(),
+    );
+    expect(affs.some((a) => a.name === "Skill Match")).toBe(false);
+  });
+
+  it("does NOT fire when nothing overlaps", () => {
+    const affs = detectAffiliations(
+      baseMeta({ skills: "Woodworking", major: "History" }),
+      skillPrefs({ skills: ["Python"], targetIndustries: ["Consulting"] }),
+    );
+    expect(affs.some((a) => a.name === "Skill Match")).toBe(false);
+  });
+
+  it("fires at most once even when skills AND industries both overlap", () => {
+    const affs = detectAffiliations(
+      baseMeta({ skills: "Python", major: "Consulting" }),
+      skillPrefs({ skills: ["Python"], targetIndustries: ["Consulting"] }),
+    );
+    expect(affs.filter((a) => a.name === "Skill Match")).toHaveLength(1);
+  });
+
+  it("skill text does NOT produce Pre-College", () => {
+    // A skill literally containing "high school" must not light up the K-12
+    // detector — Skill Match builds only from skills/tags/major/minor.
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        skills: "high school tutoring, python",
+        title: "Analyst",
+        experience: "Goldman Sachs",
+      }),
+      skillPrefs({ skills: ["Python"] }),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+    expect(affs.some((a) => a.name === "Skill Match")).toBe(true);
+  });
+});
+
 describe("detectAffiliations: contact greekOrg field", () => {
   const prefsWith = (overrides: Record<string, unknown> = {}) => ({
     university: "",
@@ -262,6 +349,7 @@ describe("detectAffiliations: contact greekOrg field", () => {
     targetFirms: [],
     targetLocations: [],
     clubs: [],
+    skills: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -342,6 +430,7 @@ describe("detectAffiliations: manual personType override", () => {
     targetFirms: [],
     targetLocations: [],
     clubs: [],
+    skills: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,

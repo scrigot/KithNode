@@ -164,6 +164,13 @@ export async function POST(req: NextRequest) {
       const location =
         c.location || pdl?.location || fields.location;
 
+      // PDL major/minor/skills fill ONLY when the contact's column is empty, so
+      // a manual edit is never clobbered. skills is stored comma-joined.
+      const major = c.major || pdl?.major || "";
+      const minor = c.minor || pdl?.minor || "";
+      const skills =
+        c.skills || (pdl?.skills?.length ? pdl.skills.join(", ") : "");
+
       // Adopt PDL full name when the current name is a single token (slug-derived).
       // Multi-word names (CSV imports) are considered accurate and never overwritten.
       // Empty current name is also treated as unset (single-token path).
@@ -182,7 +189,7 @@ export async function POST(req: NextRequest) {
       // highSchool/clubs/passions ride along from the existing columns.
       const tags = await loadContactTags(userId, c.id);
       const { affiliations, score, tier } = rescoreContact(
-        { ...c, name, education, location, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
+        { ...c, name, education, location, major, minor, skills, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
         prefs,
         tags,
       );
@@ -194,6 +201,9 @@ export async function POST(req: NextRequest) {
           education,
           graduationYear,
           location,
+          major,
+          minor,
+          skills,
           industry: fields.industry,
           seniorityLevel: fields.seniorityLevel,
           warmthScore: score,
