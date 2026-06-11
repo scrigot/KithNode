@@ -10,6 +10,11 @@ import {
   firmsFromExperiences,
   educationsFromFlat,
 } from "@/lib/educations";
+import {
+  parseClubMemberships,
+  clubsFlatFromMemberships,
+  membershipsFromFlat,
+} from "@/lib/club-memberships";
 
 export async function GET() {
   const session = await auth();
@@ -31,7 +36,13 @@ export async function GET() {
       ? prefs.experiences
       : prefs.pastFirms.map((firm) => ({ title: "", firm, dates: "" }));
 
-  return NextResponse.json({ ...prefs, educations, experiences });
+  // Synthesize club membership rows from the flat clubs list when no rows exist.
+  const clubMemberships =
+    prefs.clubMemberships.length > 0
+      ? prefs.clubMemberships
+      : membershipsFromFlat(prefs.clubs.join(", "));
+
+  return NextResponse.json({ ...prefs, educations, experiences, clubMemberships });
 }
 
 export async function POST(request: NextRequest) {
@@ -119,6 +130,17 @@ export async function POST(request: NextRequest) {
     pastFirmsJson = JSON.stringify(rawPastFirms);
   }
 
+  // When clubMemberships array is present, derive flat clubs from it.
+  // Absent → legacy flat clubs handling stays (rawClubs).
+  let clubsJson: string = JSON.stringify(rawClubs);
+  let clubMembershipsJson: string | undefined;
+
+  if (Array.isArray(body.clubMemberships)) {
+    const parsedMemberships = parseClubMemberships(JSON.stringify(body.clubMemberships));
+    clubMembershipsJson = JSON.stringify(parsedMemberships);
+    clubsJson = JSON.stringify(clubsFlatFromMemberships(parsedMemberships).split(", ").filter(Boolean));
+  }
+
   const patch: Record<string, unknown> = {
     university: body.current_university || "",
     highSchool: body.high_school || "",
@@ -131,7 +153,7 @@ export async function POST(request: NextRequest) {
     targetIndustries: serializeList(body.target_industries),
     targetFirms: serializeList(body.target_companies),
     targetLocations: serializeList(body.target_locations),
-    clubs: JSON.stringify(rawClubs),
+    clubs: clubsJson,
     skills: JSON.stringify(rawSkills),
     pastFirms: pastFirmsJson,
     recruitingDate,
@@ -139,6 +161,7 @@ export async function POST(request: NextRequest) {
   };
   if (educationsJson !== undefined) patch.educations = educationsJson;
   if (experiencesJson !== undefined) patch.experiences = experiencesJson;
+  if (clubMembershipsJson !== undefined) patch.clubMemberships = clubMembershipsJson;
 
   const { error } = await supabase
     .from("User")

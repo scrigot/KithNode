@@ -8,9 +8,23 @@ import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks
 import { normalizeDegrees } from "@/lib/normalize-degrees";
 import {
   parseEducations,
+  parseExperiences,
   flatFromEducations,
+  firmsFromExperiences,
   educationsFromFlat,
 } from "@/lib/educations";
+import {
+  parseClubMemberships,
+  clubsFlatFromMemberships,
+  membershipsFromFlat,
+} from "@/lib/club-memberships";
+import {
+  engagementScore,
+  signalScore,
+  combinedTotal,
+  tierFromTotal,
+  SPEAK_FREQUENCIES,
+} from "@/lib/relationship-score";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -37,6 +51,12 @@ const EDITABLE_FIELDS = [
   "track",
   "role",
   "educations",
+  "clubMemberships",
+  "experiences",
+  "graduationYear",
+  "isFriend",
+  "speakFrequency",
+  "lastSpokenAt",
 ] as const;
 
 // personType is a closed enum, not free text: '' = auto (text heuristics),
@@ -66,11 +86,19 @@ export function normalizeField(raw: string): string {
 // supplied so the route still answers 400. Pure — unit-tested without next-auth.
 export function pickEditableFields(
   body: Record<string, unknown>,
-): { fields: Record<string, string>; invalid: boolean } {
-  const out: Record<string, string> = {};
+): { fields: Record<string, string | number | boolean | null>; invalid: boolean } {
+  const out: Record<string, string | number | boolean | null> = {};
   for (const key of EDITABLE_FIELDS) {
-    // educations is an array field — handled after the loop.
-    if (key === "educations") continue;
+    // Array and typed fields handled after the loop.
+    if (
+      key === "educations" ||
+      key === "clubMemberships" ||
+      key === "experiences" ||
+      key === "graduationYear" ||
+      key === "isFriend" ||
+      key === "speakFrequency" ||
+      key === "lastSpokenAt"
+    ) continue;
 
     const val = body[key];
     if (typeof val !== "string") continue;
@@ -109,12 +137,67 @@ export function pickEditableFields(
     out.concentration = flat.concentration;
   }
 
+  // clubMemberships: array of ClubEntry. Flat clubs derived for matcher.
+  if (Array.isArray(body.clubMemberships)) {
+    const parsed = parseClubMemberships(JSON.stringify(body.clubMemberships));
+    out.clubMemberships = JSON.stringify(parsed);
+    out.clubs = clubsFlatFromMemberships(parsed);
+  }
+
+  // experiences: array of ExperienceEntry. Flat pastFirms derived for matcher.
+  if (Array.isArray(body.experiences)) {
+    const parsed = parseExperiences(JSON.stringify(body.experiences));
+    out.experiences = JSON.stringify(parsed);
+    out.pastFirms = firmsFromExperiences(parsed).join(", ");
+  }
+
+  // graduationYear: int 1950..2100; numeric string accepted.
+  if ("graduationYear" in body) {
+    const raw = Number(body.graduationYear);
+    if (Number.isInteger(raw) && raw >= 1950 && raw <= 2100) {
+      out.graduationYear = raw;
+    }
+  }
+
+  // isFriend: boolean only.
+  if (typeof body.isFriend === "boolean") {
+    out.isFriend = body.isFriend;
+  }
+
+  // speakFrequency: "" to clear, or a value in SPEAK_FREQUENCIES.
+  if ("speakFrequency" in body) {
+    const val = body.speakFrequency;
+    if (val === "") {
+      out.speakFrequency = "";
+    } else if (
+      typeof val === "string" &&
+      (SPEAK_FREQUENCIES as readonly string[]).includes(val)
+    ) {
+      out.speakFrequency = val;
+    } else {
+      return { fields: {}, invalid: true };
+    }
+  }
+
+  // lastSpokenAt: "" / null clears it; ISO date string stored as-is.
+  if ("lastSpokenAt" in body) {
+    const val = body.lastSpokenAt;
+    if (val === "" || val === null) {
+      out.lastSpokenAt = null;
+    } else if (typeof val === "string" && !Number.isNaN(Date.parse(val))) {
+      out.lastSpokenAt = val;
+    } else {
+      return { fields: {}, invalid: true };
+    }
+  }
+
   // Cross-field guard: a non-empty role must belong to its track. The effective
   // track is the one being set in this patch if present, else the role's own
   // owning track (the role-only edit case). A mismatch is invalid.
   if (out.role) {
-    const effectiveTrack = "track" in out ? out.track : roleToTrack(out.role);
-    if (roleToTrack(out.role) !== effectiveTrack) {
+    const role = out.role as string;
+    const effectiveTrack = "track" in out ? (out.track as string) : roleToTrack(role);
+    if (roleToTrack(role) !== effectiveTrack) {
       return { fields: {}, invalid: true };
     }
   }
@@ -213,6 +296,35 @@ export async function GET(
         contact.concentration as string | null,
       );
 
+  // Synthesize club membership rows from flat clubs when column is empty.
+  const contactClubMemberships = contact.clubMemberships
+    ? parseClubMemberships(contact.clubMemberships as string)
+    : membershipsFromFlat(contact.clubs as string | null);
+
+  // Synthesize experience rows from flat pastFirms when column is empty.
+  const contactExperiences = contact.experiences
+    ? parseExperiences(contact.experiences as string)
+    : (contact.pastFirms as string | null)
+        ?.split(",")
+        .map((f: string) => f.trim())
+        .filter(Boolean)
+        .map((firm: string) => ({ title: "", firm, dates: "" })) ?? [];
+
+  // Live score breakdown: fit from rescored warmth; signal + engagement from
+  // relationship fields; combined total + tier.
+  const fit = (contact.warmthScore as number) || 0;
+  const signal = signalScore({
+    isFriend: contact.isFriend as boolean | undefined,
+    affiliationNames: liveAffiliations.map((a) => a.name),
+  });
+  const engagement = engagementScore({
+    lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
+    speakFrequency: contact.speakFrequency as string | null | undefined,
+    now: Date.now(),
+  });
+  const total = combinedTotal(fit, signal, engagement);
+  const tier = tierFromTotal(total);
+
   return NextResponse.json({
     id: contact.id,
     name: contact.name,
@@ -233,6 +345,14 @@ export async function GET(
     skills: contact.skills || "",
     past_firms: contact.pastFirms || "",
     educations: contactEducations,
+    // camelCase to match the edit modal + detail page readers (which read
+    // these via a Record cast, so a snake_case key would silently load blank).
+    clubMemberships: contactClubMemberships,
+    experiences: contactExperiences,
+    graduationYear: (contact.graduationYear as number | null) ?? null,
+    isFriend: !!(contact.isFriend as boolean | null),
+    speakFrequency: (contact.speakFrequency as string | null) || "",
+    lastSpokenAt: (contact.lastSpokenAt as string | null) || "",
     person_type: contact.personType || "",
     track: contact.track || "",
     role: contact.role || "",
@@ -245,11 +365,11 @@ export async function GET(
       industry_tags: [],
     },
     score: {
-      fit_score: contact.warmthScore,
-      signal_score: 0,
-      engagement_score: 0,
-      total_score: contact.warmthScore,
-      tier: contact.tier,
+      fit_score: fit,
+      signal_score: signal,
+      engagement_score: engagement,
+      total_score: total,
+      tier,
     },
     affiliations: liveAffiliations.map((a, i) => ({
       id: i,
@@ -379,7 +499,7 @@ export async function PATCH(
     updates.hometown === undefined &&
     !(contact.hometown as string)
   ) {
-    const deduced = await deduceHometown(updates.highSchool);
+    const deduced = await deduceHometown(updates.highSchool as string);
     if (deduced) updates.hometown = deduced;
   }
 

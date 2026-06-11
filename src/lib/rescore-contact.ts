@@ -13,6 +13,11 @@ import {
   computeWarmthScore,
   type ContactMeta,
 } from "@/lib/linkedin-import";
+import {
+  parseClubMemberships,
+  rolesFromMemberships,
+  membershipsFromFlat,
+} from "@/lib/club-memberships";
 
 interface RescoreResult {
   affiliations: { name: string; boost: number }[];
@@ -75,6 +80,11 @@ export function rescoreContact(
     role: (contact.role as string) || "",
     tags,
   };
+
+  const memberships = parseClubMemberships((contact.clubMemberships as string) || "");
+  meta.clubRoles = rolesFromMemberships(
+    memberships.length ? memberships : membershipsFromFlat((contact.clubs as string) || ""),
+  );
 
   const affiliations = detectAffiliations(meta, prefs);
   const { score, tier } = computeWarmthScore(affiliations);

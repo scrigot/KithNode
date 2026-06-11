@@ -5,6 +5,7 @@ import {
   parseEducations,
   parseExperiences,
 } from "@/lib/educations";
+import { type ClubEntry, parseClubMemberships } from "@/lib/club-memberships";
 
 /**
  * Per-user scoring preferences. Drives the personalized warmth score in
@@ -37,11 +38,13 @@ export interface UserPrefs {
   educations: EducationEntry[];
   /** Structured experience rows. UI truth; pastFirms is derived from these. */
   experiences: ExperienceEntry[];
+  /** Structured club/role rows. UI truth; flat clubs is derived from these. */
+  clubMemberships: ClubEntry[];
   recruitingDate: string | null;
   weeklyGoalTarget: number;
 }
 
-export type { EducationEntry, ExperienceEntry };
+export type { EducationEntry, ExperienceEntry, ClubEntry };
 
 const EMPTY_PREFS: UserPrefs = {
   university: "",
@@ -60,6 +63,7 @@ const EMPTY_PREFS: UserPrefs = {
   pastFirms: [],
   educations: [],
   experiences: [],
+  clubMemberships: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
@@ -91,7 +95,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -115,6 +119,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     pastFirms: parseList(data.pastFirms),
     educations: parseEducations(data.educations),
     experiences: parseExperiences(data.experiences),
+    clubMemberships: parseClubMemberships(data.clubMemberships),
     recruitingDate: data.recruitingDate ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
   };

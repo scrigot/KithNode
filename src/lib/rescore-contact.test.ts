@@ -25,6 +25,7 @@ const prefs = (overrides: Partial<UserPrefs> = {}): UserPrefs => ({
   degrees: "",
   educations: [],
   experiences: [],
+  clubMemberships: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
   ...overrides,
@@ -133,6 +134,38 @@ describe("rescoreContact", () => {
       [],
     );
     expect(result.affiliations.some((a) => a.name === "Skill Match")).toBe(true);
+  });
+
+  it("derives clubRoles from clubMemberships and fires Club Leadership", () => {
+    // clubMemberships is a JSON-stringified ClubEntry[]; clubRoles is derived
+    // from it via rolesFromMemberships, then fed to the Club Leadership matcher.
+    const contact = {
+      name: "Alex B",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      clubs: "",
+      clubMemberships: JSON.stringify([{ club: "Finance Club", role: "President" }]),
+    };
+    const result = rescoreContact(contact, prefs(), []);
+    expect(result.affiliations.some((a) => a.name === "Club Leadership")).toBe(true);
+  });
+
+  it("falls back to legacy clubs when clubMemberships is empty", () => {
+    // membershipsFromFlat parses "Role — Club" tokens; the derived role feeds
+    // Club Leadership even before the contact is re-saved with structured data.
+    const contact = {
+      name: "Jamie C",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      clubs: "President — Investment Banking Club",
+      clubMemberships: "",
+    };
+    const result = rescoreContact(contact, prefs(), []);
+    expect(result.affiliations.some((a) => a.name === "Club Leadership")).toBe(true);
   });
 
   it("threads the pastFirms column into Shared Employer", () => {

@@ -177,7 +177,7 @@ describe("pickEditableFields", () => {
     });
     expect(invalid).toBe(false);
     // educations stored as JSON string
-    const rows = JSON.parse(fields.educations);
+    const rows = JSON.parse(fields.educations as string);
     expect(rows).toHaveLength(2);
     expect(rows[0].major).toBe("Computer Science");
     // flat fields derived
@@ -194,7 +194,7 @@ describe("pickEditableFields", () => {
       ],
     });
     expect(invalid).toBe(false);
-    const rows = JSON.parse(fields.educations);
+    const rows = JSON.parse(fields.educations as string);
     expect(rows).toHaveLength(1);
     expect(fields.major).toBe("Economics");
   });
@@ -202,7 +202,7 @@ describe("pickEditableFields", () => {
   it("sets flat fields to empty strings when educations array is empty", () => {
     const { fields, invalid } = pickEditableFields({ educations: [] });
     expect(invalid).toBe(false);
-    expect(JSON.parse(fields.educations)).toHaveLength(0);
+    expect(JSON.parse(fields.educations as string)).toHaveLength(0);
     expect(fields.major).toBe("");
     expect(fields.degrees).toBe("");
     expect(fields.concentration).toBe("");

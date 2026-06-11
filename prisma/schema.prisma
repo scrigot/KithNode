@@ -29,6 +29,7 @@ model User {
   pastFirms          String       @default("")
   educations         String       @default("")
   experiences        String       @default("")
+  clubMemberships    String       @default("")
   recruitingDate     DateTime?
   weeklyGoalTarget   Int          @default(3)
   stripeCustomerId   String?      @default("")
@@ -73,6 +74,11 @@ model AlumniContact {
   track            String          @default("")
   role             String          @default("")
   educations       String          @default("")
+  experiences      String          @default("")
+  isFriend         Boolean         @default(false)
+  speakFrequency   String          @default("")
+  lastSpokenAt     DateTime?       @db.Timestamptz(6)
+  clubMemberships  String          @default("")
   createdAt        DateTime        @default(now()) @db.Timestamptz(6)
   enrichedAt       DateTime?
   enrichmentSource String          @default("")

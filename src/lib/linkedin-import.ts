@@ -39,6 +39,10 @@ export interface ContactMeta extends LinkedInMeta {
    * this is empty. Never feeds Target Location, which reads `location` only. */
   hometown?: string;
   clubs?: string;
+  /** Space-joined role titles derived from the structured clubMemberships column
+   * (rolesFromMemberships). Feeds ONLY the Club Leadership matcher — never
+   * title/company or any other matcher. */
+  clubRoles?: string;
   passions?: string;
   greekOrg?: string;
   /** PDL-enriched or manually edited. major/minor are single values; skills is
@@ -441,12 +445,14 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
   }
 
   // ── Universal Club Leadership boost ──
-  // Reads clubs + tags ONLY (same blob as Same Club matcher). Must NEVER read
-  // titleText/companyText/educationText/schoolBlob: a Goldman Sachs "Vice
-  // President" job title is a professional rank, not club leadership — reading
-  // those fields would cause false fires on every finance VP.
+  // Reads clubRoles + clubs + tags ONLY (never title/company/education): a
+  // Goldman Sachs "Vice President" job title is a professional rank, not club
+  // leadership — reading those fields causes false fires on every finance VP.
+  // clubRoles carries the structured-membership roles (rolesFromMemberships);
+  // meta.clubs covers legacy "Role — Club" strings that predate the structured
+  // column.
   {
-    const clubLeadBlob = norm(`${meta.clubs ?? ""} ${tagsText}`);
+    const clubLeadBlob = norm(`${meta.clubRoles ?? ""} ${meta.clubs ?? ""} ${tagsText}`);
     const CLUB_LEAD_RE =
       /\b(president|vice\s*president|vp|founder|co.?founder|cofounder|captain|chair(?:man|woman)?|treasurer|e.?board|eboard|exec(?:utive)?\s*board|director)\b/;
     if (CLUB_LEAD_RE.test(clubLeadBlob)) {
@@ -506,7 +512,7 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
     if (prefs.greekOrg) {
       const allText = `${educationText} ${locationText} ${companyText} ${titleText} ${tagsText} ${meta.greekOrg ?? ""}`;
       if (norm(allText).includes(norm(prefs.greekOrg))) {
-        affiliations.push({ name: "Same Greek Org", boost: 12 });
+        affiliations.push({ name: "Same Greek Org", boost: 30 });
       }
     }
 

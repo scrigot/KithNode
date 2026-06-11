@@ -69,6 +69,14 @@ export interface RankedContact {
     total_score: number;
     tier: string;
   };
+  /** Whether this contact is marked as a personal friend. */
+  is_friend: boolean;
+  /** How often the user speaks with this contact ("daily" | "weekly" | etc, or ""). */
+  speak_frequency: string;
+  /** ISO date string of the last conversation, or "" when unset. */
+  last_spoken_at: string;
+  /** Graduation year (e.g. 2026), or null when unknown. */
+  graduation_year: number | null;
   created_at: string;
 }
 

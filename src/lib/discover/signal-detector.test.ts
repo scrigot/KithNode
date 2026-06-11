@@ -34,6 +34,7 @@ const PREFS: UserPrefs = {
   degrees: "",
   educations: [],
   experiences: [],
+  clubMemberships: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
