@@ -44,13 +44,24 @@ export async function GET(request: NextRequest) {
     : "alumni";
   const allowedSources = sourcesForCategory(category);
 
-  // Get IDs user already rated
+  // Get contacts the user has already rated, with their ratings.
   const { data: rated } = await supabase
     .from("UserDiscover")
-    .select("contactId")
+    .select("contactId, rating")
     .eq("userId", userId);
-  const ratedIds = (rated || []).map((r) => r.contactId);
 
+  // later-rated contacts stay in the deck (they need a final rating); only
+  // skip + high_value count as "done" for all-rated / empty-state logic.
+  const finalRated = new Set<string>(
+    (rated || [])
+      .filter((r) => r.rating === "skip" || r.rating === "high_value")
+      .map((r) => r.contactId),
+  );
+  const laterIds = new Set<string>(
+    (rated || [])
+      .filter((r) => r.rating === "later")
+      .map((r) => r.contactId),
+  );
   // Build query: prefer other users' contacts (shared pool)
   let builder = supabase
     .from("AlumniContact")
@@ -120,8 +131,13 @@ export async function GET(request: NextRequest) {
   // fallback is gone — Discover is strictly the shared pool now. An exhausted
   // pool lands on the all-rated state (networkSize distinguishes no-network).
 
-  // Filter out already rated
-  const filtered = contacts.filter((c) => !ratedIds.includes(c.id));
+  // Exclude contacts the user has given a final rating (skip / high_value).
+  // later-rated contacts are kept but separated so they can be appended last.
+  const unrated = contacts.filter((c) => !finalRated.has(c.id) && !laterIds.has(c.id));
+  const deferred = contacts.filter((c) => laterIds.has(c.id));
+
+  // Stable ordering: unrated first, later-rated appended at the end.
+  const filtered = [...unrated, ...deferred];
 
   // Enrich each contact with warm paths (user's own contacts at the same firm).
   // Guard: a contact can never be their own warm-path intermediary. Drop any
@@ -136,7 +152,9 @@ export async function GET(request: NextRequest) {
           (!contactUrl ||
             normalizeLinkedInUrl(wp.intermediaryLinkedInUrl) !== contactUrl),
       );
-      return { ...c, warmPaths };
+      // later-rated contacts carry a deferred flag so the UI can signal that
+      // the user has already seen them once and deferred the decision.
+      return laterIds.has(c.id) ? { ...c, warmPaths, deferred: true } : { ...c, warmPaths };
     }),
   );
 

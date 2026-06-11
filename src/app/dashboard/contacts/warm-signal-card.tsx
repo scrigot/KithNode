@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedContact } from "@/lib/api";
+import { composeWhyNow } from "@/lib/why-now";
 
 type WarmSignalContact = RankedContact & { isRedacted?: boolean };
 
@@ -62,15 +64,53 @@ export function WarmSignalCard({
   onDraftOutreach,
   onAddToPipeline,
   pipelineAdded,
+  onDelete,
 }: {
   contact: WarmSignalContact;
   onDraftOutreach?: (id: string) => void;
   onAddToPipeline?: (id: string) => void;
   pipelineAdded?: boolean;
+  onDelete?: (id: string) => void;
 }) {
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
   const isRedacted = !!contact.isRedacted;
+
+  // Two-click delete: null = idle, "armed" = first click done (awaiting confirm).
+  const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset armed state on any outside click or after 3s.
+  useEffect(() => {
+    if (deleteState !== "armed") return;
+    resetTimerRef.current = setTimeout(() => setDeleteState("idle"), 3000);
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, [deleteState]);
+
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (deleteState === "idle") {
+      setDeleteState("armed");
+    } else {
+      // Second click — confirmed.
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      setDeleteState("idle");
+      onDelete?.(contact.id);
+    }
+  }
+
+  // Compose Why Now from real affiliations instead of the raw CSV string.
+  const whyNowText = contact.affiliations?.length
+    ? composeWhyNow({
+        affiliations: contact.affiliations.map((a) => a.name),
+        title: contact.title,
+        firm: contact.company.name,
+        tier: contact.score.tier,
+      })
+    : contact.why_now;
 
   const NameBlock = (
     <>
@@ -117,10 +157,10 @@ export function WarmSignalCard({
             </Link>
           )}
 
-          {/* WHY NOW */}
-          {contact.why_now && (
+          {/* WHY NOW — composed from real affiliations */}
+          {whyNowText && (
             <p className="mt-1 text-[10px] text-accent-blue">
-              {contact.why_now}
+              {whyNowText}
             </p>
           )}
 
@@ -262,6 +302,26 @@ export function WarmSignalCard({
                 >
                   DRAFT
                 </Button>
+              )}
+              {onDelete && (
+                deleteState === "armed" ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="h-6 border border-red-500/30 px-2 text-[10px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+                  >
+                    CONFIRM?
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="flex h-6 items-center px-1 text-muted-foreground/40 transition-colors hover:text-red-400"
+                    title="Delete contact"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )
               )}
             </>
           )}

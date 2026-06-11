@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Mock } from "vitest";
 
 // The route module imports auth (next-auth → next/server) at load. Mock it and
 // the other module-level deps so we can import the PURE helpers without ever
-// pulling next-auth's runtime. We assert only on pickEditableFields /
-// normalizeField — no route handler, no session.
+// pulling next-auth's runtime.
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: {} }));
 vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
@@ -11,8 +11,11 @@ vi.mock("@/lib/rescore-contact", () => ({
   rescoreContact: vi.fn(),
   loadContactTags: vi.fn(),
 }));
+vi.mock("@/lib/deduce-hometown", () => ({ deduceHometown: vi.fn() }));
 
-import { normalizeField, pickEditableFields } from "./route";
+import { normalizeField, pickEditableFields, DELETE } from "./route";
+import { auth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 describe("normalizeField", () => {
   it("trims and collapses inner whitespace", () => {
@@ -211,5 +214,210 @@ describe("pickEditableFields", () => {
       // educations as a string is invalid; only arrays are processed
     });
     expect(fields).not.toHaveProperty("educations");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/contacts/[id]
+// ---------------------------------------------------------------------------
+
+function makeDeleteRequest(id: string) {
+  return new Request(`http://localhost/api/contacts/${id}`, { method: "DELETE" });
+}
+
+function makeParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+// Build a chainable Supabase mock. Each call to .from() returns a builder
+// whose terminal methods (.single(), .maybeSingle(), .delete()) are stubs
+// that can be overridden per-test via the returned `calls` map.
+function buildSupabaseMock(
+  responses: Record<string, { data?: unknown; error?: unknown }>,
+) {
+  // Track delete calls for assertions
+  const deletedTables: string[] = [];
+
+  const makeBuilder = (table: string) => {
+    const builder: Record<string, unknown> = {};
+    const filter = () => builder;
+    builder.select = vi.fn().mockReturnValue(builder);
+    builder.delete = vi.fn().mockImplementation(() => {
+      deletedTables.push(table);
+      return builder;
+    });
+    builder.eq = vi.fn().mockReturnValue(builder);
+    builder.single = vi.fn().mockResolvedValue(responses[table] ?? { data: null, error: null });
+    builder.maybeSingle = vi.fn().mockResolvedValue(responses[`${table}_maybe`] ?? { data: null, error: null });
+    // Make delete chains awaitable
+    builder.then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve(responses[`${table}_delete`] ?? { data: null, error: null }).then(resolve);
+    return builder;
+  };
+
+  const mockSupabase = {
+    from: vi.fn().mockImplementation((table: string) => makeBuilder(table)),
+    _deletedTables: deletedTables,
+  };
+  return mockSupabase;
+}
+
+describe("DELETE /api/contacts/[id]", () => {
+  const USER = "sam@example.com";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 401 when unauthenticated", async () => {
+    (auth as Mock).mockResolvedValue(null);
+
+    const res = await DELETE(
+      makeDeleteRequest("contact-1") as import("next/server").NextRequest,
+      makeParams("contact-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when contact does not exist", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+
+    const mock = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: { message: "not found" } }),
+        delete: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (r: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(r),
+      }),
+    };
+    (supabase as unknown as Record<string, unknown>).from = mock.from;
+
+    const res = await DELETE(
+      makeDeleteRequest("missing-id") as import("next/server").NextRequest,
+      makeParams("missing-id"),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("hard-deletes owned contact: removes children then the contact row, returns deleted", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+
+    const deletedTables: string[] = [];
+
+    const makeBuilder = (table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn().mockReturnValue(b);
+      b.eq = vi.fn().mockReturnValue(b);
+      b.delete = vi.fn().mockImplementation(() => {
+        deletedTables.push(table);
+        return b;
+      });
+      // .single() on AlumniContact returns the owned contact
+      b.single = vi.fn().mockResolvedValue({
+        data: { id: "c1", importedByUserId: USER },
+        error: null,
+      });
+      b.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+      b.then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: null }).then(r);
+      return b;
+    };
+
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockImplementation((t: string) => makeBuilder(t));
+
+    const res = await DELETE(
+      makeDeleteRequest("c1") as import("next/server").NextRequest,
+      makeParams("c1"),
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ ok: true, removed: "deleted" });
+    // All four child tables and the contact itself must be deleted
+    expect(deletedTables).toContain("Connection");
+    expect(deletedTables).toContain("PipelineEntry");
+    expect(deletedTables).toContain("UserDiscover");
+    expect(deletedTables).toContain("AuditLog");
+    expect(deletedTables).toContain("AlumniContact");
+    // Children before contact
+    expect(deletedTables.indexOf("AlumniContact")).toBeGreaterThan(
+      deletedTables.indexOf("Connection"),
+    );
+  });
+
+  it("unlinks discovered contact: deletes only this user's rows, contact NOT deleted, returns unlinked", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+
+    const deletedTables: string[] = [];
+    const OTHER = "other@example.com";
+
+    const makeBuilder = (table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn().mockReturnValue(b);
+      b.eq = vi.fn().mockReturnValue(b);
+      b.delete = vi.fn().mockImplementation(() => {
+        deletedTables.push(table);
+        return b;
+      });
+      b.single = vi.fn().mockResolvedValue({
+        // Contact owned by someone else
+        data: { id: "c2", importedByUserId: OTHER },
+        error: null,
+      });
+      // UserDiscover row exists for this user
+      b.maybeSingle = vi.fn().mockResolvedValue({ data: { id: "ud1" }, error: null });
+      b.then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: null }).then(r);
+      return b;
+    };
+
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockImplementation((t: string) => makeBuilder(t));
+
+    const res = await DELETE(
+      makeDeleteRequest("c2") as import("next/server").NextRequest,
+      makeParams("c2"),
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ ok: true, removed: "unlinked" });
+    // Pool contact row must NOT be deleted
+    expect(deletedTables).not.toContain("AlumniContact");
+  });
+
+  it("returns 404 when the user has no relationship to a shared contact", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+
+    const OTHER = "other@example.com";
+
+    const makeBuilder = (table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn().mockReturnValue(b);
+      b.eq = vi.fn().mockReturnValue(b);
+      b.delete = vi.fn().mockReturnValue(b);
+      b.single = vi.fn().mockResolvedValue({
+        data: { id: "c3", importedByUserId: OTHER },
+        error: null,
+      });
+      // No UserDiscover or PipelineEntry rows
+      b.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+      b.then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: null }).then(r);
+      return b;
+    };
+
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockImplementation((t: string) => makeBuilder(t));
+
+    const res = await DELETE(
+      makeDeleteRequest("c3") as import("next/server").NextRequest,
+      makeParams("c3"),
+    );
+    expect(res.status).toBe(404);
   });
 });

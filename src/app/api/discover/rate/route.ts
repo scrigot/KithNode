@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
   const { contactId, rating } = await request.json();
 
-  if (!contactId || !["high_value", "skip"].includes(rating)) {
+  if (!contactId || !["high_value", "skip", "later"].includes(rating)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 

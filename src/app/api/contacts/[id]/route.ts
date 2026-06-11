@@ -264,6 +264,80 @@ export async function GET(
   });
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+  const { id: contactId } = await params;
+
+  const { data: contact, error: loadError } = await supabase
+    .from("AlumniContact")
+    .select("id, importedByUserId")
+    .eq("id", contactId)
+    .single();
+
+  if (loadError || !contact) {
+    return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  }
+
+  if (contact.importedByUserId === userId) {
+    // Hard delete: no FK cascades — delete children first, then the row.
+    await supabase.from("Connection").delete().eq("alumniId", contactId);
+    await supabase.from("PipelineEntry").delete().eq("contactId", contactId);
+    await supabase.from("UserDiscover").delete().eq("contactId", contactId);
+    await supabase.from("AuditLog").delete().eq("contactId", contactId);
+    const { error: deleteError } = await supabase
+      .from("AlumniContact")
+      .delete()
+      .eq("id", contactId);
+    if (deleteError) {
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, removed: "deleted" });
+  }
+
+  // Shared/discovered contact: check if this user has any relationship at all.
+  const [{ data: discoverRow }, { data: pipelineRow }] = await Promise.all([
+    supabase
+      .from("UserDiscover")
+      .select("id")
+      .eq("userId", userId)
+      .eq("contactId", contactId)
+      .maybeSingle(),
+    supabase
+      .from("PipelineEntry")
+      .select("id")
+      .eq("userId", userId)
+      .eq("contactId", contactId)
+      .maybeSingle(),
+  ]);
+
+  if (!discoverRow && !pipelineRow) {
+    return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  }
+
+  // Unlink: remove only this user's rows; the pool contact survives.
+  await Promise.all([
+    supabase
+      .from("UserDiscover")
+      .delete()
+      .eq("userId", userId)
+      .eq("contactId", contactId),
+    supabase
+      .from("PipelineEntry")
+      .delete()
+      .eq("userId", userId)
+      .eq("contactId", contactId),
+  ]);
+
+  return NextResponse.json({ ok: true, removed: "unlinked" });
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
+import { trackEvent } from "@/lib/posthog";
 import { Upload, Compass, Zap, Users } from "lucide-react";
 import type { RankedContact } from "@/lib/api";
 import { OutreachSheet } from "./contacts/outreach-sheet";
@@ -60,6 +61,7 @@ export default function DashboardPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
   const [outreachTarget, setOutreachTarget] = useState<{
     id: string;
     name: string;
@@ -120,6 +122,14 @@ export default function DashboardPage() {
   const openDraft = useCallback((item: FeedItem) => {
     setSelectedId(item.id);
     setOutreachTarget({ id: item.id, name: item.name, email: item.email });
+  }, []);
+
+  const addToPipeline = useCallback(async (item: FeedItem) => {
+    const res = await apiFetch(`/api/pipeline/${item.id}`, { method: "POST" });
+    if (res.ok) {
+      setPipelineAdded((prev) => new Set(prev).add(item.id));
+    }
+    trackEvent("pipeline_added", { contact_id: item.id, name: item.name });
   }, []);
 
   const grouped = useMemo(() => {
@@ -354,6 +364,8 @@ export default function DashboardPage() {
                         onSkip={() =>
                           setSkipped((s) => new Set(s).add(item.id))
                         }
+                        onAddToPipeline={() => addToPipeline(item)}
+                        pipelineAdded={pipelineAdded.has(item.id)}
                       />
                     ))}
                   </>
@@ -371,6 +383,8 @@ export default function DashboardPage() {
                         onSkip={() =>
                           setSkipped((s) => new Set(s).add(item.id))
                         }
+                        onAddToPipeline={() => addToPipeline(item)}
+                        pipelineAdded={pipelineAdded.has(item.id)}
                       />
                     ))}
                   </>
@@ -388,6 +402,8 @@ export default function DashboardPage() {
                         onSkip={() =>
                           setSkipped((s) => new Set(s).add(item.id))
                         }
+                        onAddToPipeline={() => addToPipeline(item)}
+                        pipelineAdded={pipelineAdded.has(item.id)}
                       />
                     ))}
                   </>

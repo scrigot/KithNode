@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -304,6 +304,7 @@ function BackLink({
 export default function ContactDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id as string;
   const fromImport = searchParams.get("from") === "import";
   const backHref = fromImport ? "/dashboard/import" : "/dashboard/contacts";
@@ -312,8 +313,34 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOutreach, setShowOutreach] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(
+    searchParams.get("edit") === "1",
+  );
   const [tab, setTab] = useState<"signals" | "profile">("signals");
+  // Two-click delete for the contact page header.
+  const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset the armed delete state after 3s or on outside interaction.
+  useEffect(() => {
+    if (deleteState !== "armed") return;
+    deleteTimerRef.current = setTimeout(() => setDeleteState("idle"), 3000);
+    return () => {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
+  }, [deleteState]);
+
+  async function handlePageDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    if (deleteState === "idle") {
+      setDeleteState("armed");
+    } else {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+      setDeleteState("idle");
+      await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+      router.push("/dashboard/contacts");
+    }
+  }
 
   // Refetch the contact after a field/type edit so the rescored affiliations +
   // score (computed server-side in the PATCH) replace the stale panel data.
@@ -376,7 +403,28 @@ export default function ContactDetailPage() {
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <BackLink backHref={backHref} backLabel={backLabel} />
+          <div className="flex items-center gap-3">
+            <BackLink backHref={backHref} backLabel={backLabel} />
+            {/* Two-click-confirm delete */}
+            {deleteState === "armed" ? (
+              <button
+                type="button"
+                onClick={handlePageDelete}
+                className="border border-red-500/30 px-2 py-0.5 text-[10px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+              >
+                CONFIRM?
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePageDelete}
+                className="flex items-center text-muted-foreground/40 transition-colors hover:text-red-400"
+                title="Delete contact"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
             <FieldEditor
               contactId={contact.id}

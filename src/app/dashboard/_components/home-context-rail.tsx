@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import {
   type FeedItem,
@@ -43,9 +44,18 @@ export function HomeContextRail({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <p className="truncate text-[13px] font-semibold text-foreground">
-              {item.name}
-            </p>
+            {item.isRedacted ? (
+              <p className="truncate text-[13px] font-semibold text-foreground">
+                {item.name}
+              </p>
+            ) : (
+              <Link
+                href={`/contact/${item.id}`}
+                className="truncate text-[13px] font-semibold text-foreground hover:underline"
+              >
+                {item.name}
+              </Link>
+            )}
             {item.linkedInUrl &&
               !item.isRedacted &&
               !item.linkedInUrl.includes("█") &&

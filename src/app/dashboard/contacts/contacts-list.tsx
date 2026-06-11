@@ -38,23 +38,69 @@ export function countByTrack(
   return counts;
 }
 
+const SORT_OPTIONS: SortOption[] = ["score", "name", "company", "new"];
+const SESSION_KEY = "warm-signals-state";
+
+interface SavedState {
+  activeTrack: CareerTrack | "";
+  activeRole: string;
+  activeTier: string;
+  sort: SortOption;
+  search: string;
+}
+
+function loadSavedState(): SavedState | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SavedState>;
+    // Type-guard activeTrack against ALL_TRACKS union (includes "")
+    const validTracks: Array<CareerTrack | ""> = ["", ...ALL_TRACKS];
+    const track: CareerTrack | "" = validTracks.includes(parsed.activeTrack as CareerTrack | "")
+      ? (parsed.activeTrack as CareerTrack | "")
+      : "";
+    // Type-guard sort against SortOption values
+    const sort: SortOption = SORT_OPTIONS.includes(parsed.sort as SortOption)
+      ? (parsed.sort as SortOption)
+      : "score";
+    return {
+      activeTrack: track,
+      activeRole: typeof parsed.activeRole === "string" ? parsed.activeRole : "",
+      activeTier: typeof parsed.activeTier === "string" ? parsed.activeTier : "all",
+      sort,
+      search: typeof parsed.search === "string" ? parsed.search : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function ContactsList() {
   const [contacts, setContacts] = useState<RankedContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [activeTier, setActiveTier] = useState("all");
+
+  // Lazy-initialize each filter from sessionStorage; fall back to defaults.
+  const saved = typeof window !== "undefined" ? loadSavedState() : null;
+  const [search, setSearch] = useState(saved?.search ?? "");
+  const [activeTier, setActiveTier] = useState(saved?.activeTier ?? "all");
   // Career-track tabs (ALL + the 5 tracks); a selected track reveals its role
   // sub-chips. "" = ALL. Filters the already-loaded contacts client-side.
-  const [activeTrack, setActiveTrack] = useState<CareerTrack | "">("");
-  const [activeRole, setActiveRole] = useState("");
-  const [sort, setSort] = useState<SortOption>("score");
+  const [activeTrack, setActiveTrack] = useState<CareerTrack | "">(saved?.activeTrack ?? "");
+  const [activeRole, setActiveRole] = useState(saved?.activeRole ?? "");
+  const [sort, setSort] = useState<SortOption>(saved?.sort ?? "score");
   const [outreachTarget, setOutreachTarget] = useState<{
     id: string;
     name: string;
     email?: string;
   } | null>(null);
   const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
+
+  // Persist filter/sort/search state to sessionStorage whenever it changes.
+  useEffect(() => {
+    const state: SavedState = { activeTrack, activeRole, activeTier, sort, search };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+  }, [activeTrack, activeRole, activeTier, sort, search]);
 
   useEffect(() => {
     apiFetch("/api/contacts?curated=true")
@@ -279,6 +325,13 @@ export function ContactsList() {
                 contact_id: id,
                 name: contact.name,
               });
+            }}
+            onDelete={async (id) => {
+              const res = await apiFetch(`/api/contacts/${id}`, { method: "DELETE" });
+              if (res.ok) {
+                setContacts((prev) => prev.filter((c) => c.id !== id));
+                trackEvent("contact_deleted", { contact_id: id });
+              }
             }}
           />
         ))}

@@ -21,7 +21,7 @@ interface RateResult {
 
 async function rateContact(
   contactId: string,
-  rating: "high_value" | "skip",
+  rating: "high_value" | "skip" | "later",
 ): Promise<RateResult> {
   try {
     const res = await apiFetch("/api/discover/rate", {
@@ -67,8 +67,8 @@ export default function DiscoverPage() {
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
   const [reviewed, setReviewed] = useState(0);
 
-  // Card exit transition: "" | "left" (skip) | "right" (high value).
-  const [exitDir, setExitDir] = useState<"" | "left" | "right">("");
+  // Card exit transition: "" | "left" (skip) | "right" (high value) | "down" (later).
+  const [exitDir, setExitDir] = useState<"" | "left" | "right" | "down">("");
 
   // Discover pipeline modal state: streamed NDJSON progress.
   const [discoverLoading, setDiscoverLoading] = useState(false);
@@ -174,7 +174,7 @@ export default function DiscoverPage() {
   }, [current]);
 
   /** Advance the cursor with a directional slide, then settle. */
-  const advance = useCallback((dir: "left" | "right") => {
+  const advance = useCallback((dir: "left" | "right" | "down") => {
     setExitDir(dir);
     setTimeout(() => {
       setIndex((i) => i + 1);
@@ -190,6 +190,18 @@ export default function DiscoverPage() {
     // Skip: fire-and-forget, advance immediately with a left slide.
     rateContact(current.id, "skip");
     advance("left");
+    setTimeout(() => {
+      ratingLockRef.current = false;
+    }, 220);
+  }, [current, advance]);
+
+  const handleLater = useCallback(() => {
+    if (ratingLockRef.current || !current) return;
+    ratingLockRef.current = true;
+    trackEvent("discover_rate", { contact_id: current.id, rating: "later" });
+    // Later: fire-and-forget, advance immediately with a down slide.
+    rateContact(current.id, "later");
+    advance("down");
     setTimeout(() => {
       ratingLockRef.current = false;
     }, 220);
@@ -255,8 +267,8 @@ export default function DiscoverPage() {
     [],
   );
 
-  // Keyboard: ArrowLeft = skip, ArrowRight = high value. Ignored while a request
-  // is in flight, a confirm card is showing, or any modal is open.
+  // Keyboard: ArrowLeft = skip, ArrowRight = high value, ArrowDown = later.
+  // Ignored while a request is in flight, a confirm card is showing, or any modal is open.
   useEffect(() => {
     const anyModalOpen =
       introTarget !== null || discoverLoading || seedLoading;
@@ -271,11 +283,14 @@ export default function DiscoverPage() {
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         handleHighValue();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        handleLater();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [current, confirmCard, introTarget, discoverLoading, seedLoading, handleSkip, handleHighValue]);
+  }, [current, confirmCard, introTarget, discoverLoading, seedLoading, handleSkip, handleHighValue, handleLater]);
 
   // Fetch user name for intro modal
   useEffect(() => {
@@ -778,6 +793,11 @@ export default function DiscoverPage() {
             </span>
             <span className="text-muted-foreground/40">·</span>
             <span className="flex items-center gap-1">
+              <Kbd>↓</Kbd>
+              <span className="text-muted-foreground">later</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
               <Kbd>→</Kbd>
               <span className="text-muted-foreground">high value</span>
             </span>
@@ -858,7 +878,9 @@ export default function DiscoverPage() {
                   ? "-translate-x-8 opacity-0"
                   : exitDir === "right"
                     ? "translate-x-8 opacity-0"
-                    : "translate-x-0 opacity-100"
+                    : exitDir === "down"
+                      ? "translate-y-8 opacity-0"
+                      : "translate-x-0 opacity-100"
               }`}
             >
               {confirmCard ? (
@@ -878,6 +900,7 @@ export default function DiscoverPage() {
                   phase="rate"
                   inFlight={false}
                   onSkip={handleSkip}
+                  onLater={handleLater}
                   onHighValue={handleHighValue}
                   onAskIntro={(wp) => handleAskIntro(current, wp)}
                 />

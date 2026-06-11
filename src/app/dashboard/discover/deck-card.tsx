@@ -46,6 +46,8 @@ export interface DeckContact {
   hometown?: string;
   degrees?: string;
   concentration?: string;
+  // Set by the deck payload for contacts resurfaced after a "later" rating.
+  deferred?: boolean;
 }
 
 /** One labelled value cell. Renders nothing when the value is empty so blank
@@ -97,6 +99,7 @@ export function DeckCard({
   pipelineState = "idle",
   inFlight = false,
   onSkip,
+  onLater,
   onHighValue,
   onAskIntro,
   onKeepBrowsing,
@@ -107,6 +110,7 @@ export function DeckCard({
   pipelineState?: "idle" | "pending" | "sent";
   inFlight?: boolean;
   onSkip?: () => void;
+  onLater?: () => void;
   onHighValue?: () => void;
   onAskIntro?: (warmPath: WarmPath) => void;
   onKeepBrowsing?: () => void;
@@ -181,6 +185,11 @@ export function DeckCard({
         {contact.isRedacted && (
           <span className="mt-1 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
             Blurred · High value to unlock
+          </span>
+        )}
+        {contact.deferred && (
+          <span className="mt-1 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
+            Later
           </span>
         )}
         {(contact.title || contact.firmName) && (
@@ -278,7 +287,7 @@ export function DeckCard({
 
       {/* ─── Bottom actions ─── */}
       {phase === "rate" ? (
-        <div className="grid grid-cols-2 gap-2 border-t border-white/[0.06] p-3">
+        <div className="grid grid-cols-3 gap-2 border-t border-white/[0.06] p-3">
           <button
             type="button"
             onClick={onSkip}
@@ -288,6 +297,15 @@ export function DeckCard({
           >
             <X className="h-4 w-4" />
             Skip
+          </button>
+          <button
+            type="button"
+            onClick={onLater}
+            disabled={inFlight}
+            className="flex items-center justify-center gap-1.5 border border-amber-500/30 bg-amber-500/10 py-3 text-[12px] font-bold uppercase tracking-wider text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+            aria-label={`Save ${contact.name} for later`}
+          >
+            Later
           </button>
           <button
             type="button"
@@ -301,17 +319,49 @@ export function DeckCard({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2 border-t border-white/[0.06] p-3">
-          <button
-            type="button"
-            onClick={onKeepBrowsing}
-            disabled={pipelineState === "pending"}
-            className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] disabled:opacity-50"
-          >
-            Keep browsing
-          </button>
-          {!contact.isRedacted && contact.linkedInUrl ? (
-            <div className="grid grid-cols-[1fr_auto] gap-2">
+        <div className="flex flex-col gap-2 border-t border-white/[0.06] p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onKeepBrowsing}
+              disabled={pipelineState === "pending"}
+              className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+            >
+              Keep browsing
+            </button>
+            {!contact.isRedacted && contact.linkedInUrl ? (
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <button
+                  type="button"
+                  onClick={onSendToPipeline}
+                  disabled={pipelineState !== "idle"}
+                  className={`flex items-center justify-center gap-1.5 py-3 text-[12px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
+                    pipelineState === "sent"
+                      ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                      : pipelineState === "pending"
+                        ? "bg-primary/60 text-white"
+                        : "bg-primary text-white hover:bg-primary/80"
+                  }`}
+                >
+                  <Send className="h-4 w-4" />
+                  {pipelineState === "sent"
+                    ? "In pipeline"
+                    : pipelineState === "pending"
+                      ? "..."
+                      : "Pipeline"}
+                </button>
+                <a
+                  href={contact.linkedInUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center border border-white/[0.12] px-3 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="View LinkedIn profile"
+                  title="View LinkedIn profile"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            ) : (
               <button
                 type="button"
                 onClick={onSendToPipeline}
@@ -329,40 +379,20 @@ export function DeckCard({
                   ? "In pipeline"
                   : pipelineState === "pending"
                     ? "..."
-                    : "Pipeline"}
+                    : "Send to pipeline"}
               </button>
-              <a
-                href={contact.linkedInUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center border border-white/[0.12] px-3 text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="View LinkedIn profile"
-                title="View LinkedIn profile"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onSendToPipeline}
-              disabled={pipelineState !== "idle"}
-              className={`flex items-center justify-center gap-1.5 py-3 text-[12px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
-                pipelineState === "sent"
-                  ? "border border-green-500/30 bg-green-500/10 text-green-400"
-                  : pipelineState === "pending"
-                    ? "bg-primary/60 text-white"
-                    : "bg-primary text-white hover:bg-primary/80"
-              }`}
-            >
-              <Send className="h-4 w-4" />
-              {pipelineState === "sent"
-                ? "In pipeline"
-                : pipelineState === "pending"
-                  ? "..."
-                  : "Send to pipeline"}
-            </button>
-          )}
+            )}
+          </div>
+          {/* Edit profile: opens /contact/:id?edit=1 in a new tab so deck position is preserved. */}
+          <a
+            href={`/contact/${contact.id}?edit=1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Edit profile
+          </a>
         </div>
       )}
     </div>
