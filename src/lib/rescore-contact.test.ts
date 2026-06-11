@@ -64,4 +64,26 @@ describe("rescoreContact", () => {
     expect(result.affiliations.some((a) => a.name === "Same High School")).toBe(true);
     expect(result.affiliations.some((a) => a.name === "Same Greek Org")).toBe(true);
   });
+
+  it("threads the greekOrg column into Same Greek Org", () => {
+    // greekOrg matches ONLY via the contact's greekOrg column (no tags, no
+    // clubs, no education) — proves the column reaches detectAffiliations.
+    const contact = {
+      name: "Casey M",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      greekOrg: "Chi Phi",
+    };
+    const withOrg = rescoreContact(contact, prefs({ greekOrg: "Chi Phi" }), []);
+    expect(withOrg.affiliations.some((a) => a.name === "Same Greek Org")).toBe(true);
+
+    const noOrg = rescoreContact(
+      { ...contact, greekOrg: "" },
+      prefs({ greekOrg: "Chi Phi" }),
+      [],
+    );
+    expect(noOrg.affiliations.some((a) => a.name === "Same Greek Org")).toBe(false);
+  });
 });

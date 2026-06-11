@@ -252,6 +252,49 @@ describe("detectAffiliations: Same Club", () => {
   });
 });
 
+describe("detectAffiliations: contact greekOrg field", () => {
+  const prefsWith = (overrides: Record<string, unknown> = {}) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+    ...overrides,
+  });
+
+  it("fires Same Greek Org exactly once when contact.greekOrg matches prefs.greekOrg", () => {
+    const affs = detectAffiliations(
+      baseMeta({ greekOrg: "Chi Phi" }),
+      prefsWith({ greekOrg: "Chi Phi" }),
+    );
+    expect(affs.filter((a) => a.name === "Same Greek Org")).toHaveLength(1);
+  });
+
+  it("contact.greekOrg does NOT leak into the Same School matcher or Pre-College", () => {
+    // greekOrg is the ONLY contact text and it is a university alias ("Sigma
+    // Chi" shares no token, so use "Phi Beta Kappa"→"phi beta" against a UNC
+    // alias would not match; instead prove a high-school-named org can't fire
+    // Pre-College and a school-aliasing org can't fire Same School). Here the
+    // contact has no education, so Same School must stay silent even though the
+    // user's university is set and greekOrg contains "Chapel" — which is a UNC
+    // alias token — confirming greekOrg never reaches schoolBlob.
+    const affs = detectAffiliations(
+      baseMeta({ greekOrg: "Chapel Hill High School Greek Council" }),
+      prefsWith({
+        university: "University of North Carolina at Chapel Hill",
+        greekOrg: "Chi Phi",
+      }),
+    );
+    expect(affs.some((a) => a.name === "Same School")).toBe(false);
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+  });
+});
+
 describe("detectAffiliations seniority: student-org vs firm officer", () => {
   it("does NOT credit a club VP with professional seniority", () => {
     const affs = detectAffiliations(baseMeta({ title: "VP of Finance Club" }));

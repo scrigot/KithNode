@@ -13,6 +13,7 @@ const EDITABLE_FIELDS = [
   "highSchool",
   "clubs",
   "passions",
+  "greekOrg",
 ] as const;
 
 const MAX_FIELD_LEN = 160;
@@ -123,6 +124,7 @@ export async function GET(
     education: contact.education,
     linkedin_location: contact.location,
     high_school: contact.highSchool,
+    greek_org: contact.greekOrg,
     clubs: contact.clubs,
     passions: contact.passions,
     company: {

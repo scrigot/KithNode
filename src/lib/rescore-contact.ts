@@ -61,6 +61,7 @@ export function rescoreContact(
     highSchool: (contact.highSchool as string) || "",
     clubs: (contact.clubs as string) || "",
     passions: (contact.passions as string) || "",
+    greekOrg: (contact.greekOrg as string) || "",
     tags,
   };
 

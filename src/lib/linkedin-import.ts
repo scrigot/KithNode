@@ -35,6 +35,7 @@ export interface ContactMeta extends LinkedInMeta {
   highSchool?: string;
   clubs?: string;
   passions?: string;
+  greekOrg?: string;
 }
 
 interface Affiliation {
@@ -384,9 +385,11 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       }
     }
 
-    // Same greek org
+    // Same greek org. The contact's own greekOrg field is folded into this
+    // matcher's text ONLY — it must never reach the K-12 detector, schoolBlob,
+    // or any other matcher (a Greek org name is not a school or a club).
     if (prefs.greekOrg) {
-      const allText = `${educationText} ${locationText} ${companyText} ${titleText} ${tagsText}`;
+      const allText = `${educationText} ${locationText} ${companyText} ${titleText} ${tagsText} ${meta.greekOrg ?? ""}`;
       if (norm(allText).includes(norm(prefs.greekOrg))) {
         affiliations.push({ name: "Same Greek Org", boost: 12 });
       }

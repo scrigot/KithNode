@@ -10,6 +10,13 @@ import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
 import { TagEditor } from "./tag-editor";
 import { FieldEditor } from "./field-editor";
+import {
+  loadUniversities,
+  loadCities,
+  loadHighSchools,
+  loadGreekOrgs,
+  loadClubs,
+} from "@/lib/data/onboarding-options";
 import { trackEvent } from "@/lib/posthog";
 import type { ContactDetail } from "@/lib/api";
 
@@ -251,6 +258,8 @@ export default function ContactDetailPage() {
               label="Education"
               initialValue={contact.education || ""}
               placeholder="Add education"
+              mode="options"
+              loadOptions={loadUniversities}
             />
             <FieldEditor
               contactId={contact.id}
@@ -258,6 +267,8 @@ export default function ContactDetailPage() {
               label="Location"
               initialValue={contact.linkedin_location || ""}
               placeholder="Add location"
+              mode="options"
+              loadOptions={loadCities}
             />
             <FieldEditor
               contactId={contact.id}
@@ -265,6 +276,18 @@ export default function ContactDetailPage() {
               label="High School"
               initialValue={contact.high_school || ""}
               placeholder="Add high school"
+              mode="options"
+              loadOptions={loadHighSchools}
+              stripCitySuffix
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="greekOrg"
+              label="Greek Life"
+              initialValue={contact.greek_org || ""}
+              placeholder="Add Greek org"
+              mode="options"
+              loadOptions={loadGreekOrgs}
             />
             <FieldEditor
               contactId={contact.id}
@@ -272,6 +295,8 @@ export default function ContactDetailPage() {
               label="Clubs"
               initialValue={contact.clubs || ""}
               placeholder="Add clubs"
+              mode="multi-chip"
+              loadOptions={loadClubs}
             />
             <FieldEditor
               contactId={contact.id}

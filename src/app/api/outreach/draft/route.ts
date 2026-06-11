@@ -136,7 +136,7 @@ CONTACT INFO:
 - Title: ${contact.title || "Unknown"}
 - Company: ${contact.firmName || "Unknown"}
 - Location: ${contact.location || "Unknown"}
-- Education: ${contact.education || "Unknown"}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
+- Education: ${contact.education || "Unknown"}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
 - Affiliations: ${affiliationNames.join(", ") || "None"}
 - Warm Connection Phrases: ${warmConnections || "professional connection"}${manualTags.length > 0 ? `\n- Manual tags (user-added context): ${manualTags.join(", ")}` : ""}
 
