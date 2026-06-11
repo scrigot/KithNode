@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { ContactsList } from "./contacts-list";
-import { RefreshCw, Sparkles, Users } from "lucide-react";
+import { RefreshCw, Sparkles, Square, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
 interface TierCounts {
@@ -17,6 +17,7 @@ interface TierCounts {
 export default function ContactsPage() {
   const [rescoring, setRescoring] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const stopEnrichRef = useRef(false);
   const [statusMsg, setStatusMsg] = useState<{
     kind: "success" | "error" | "upgrade";
     text: string;
@@ -70,15 +71,16 @@ export default function ContactsPage() {
   };
 
   const handleEnrich = async () => {
+    stopEnrichRef.current = false;
     setEnriching(true);
     setStatusMsg(null);
     let totalEnriched = 0;
     let totalFailed = 0;
-    let safetyCap = 0;
     try {
-      // Loop client-side until the server reports zero unenriched left,
-      // or the safety cap (40 batches × 25 = 1000 contacts) trips.
-      while (safetyCap < 40) {
+      // Loop until the server reports remaining === 0, the user stops, or an error occurs.
+      // Safety cap: 40 batches × 25 = 1000 contacts max.
+      for (let batch = 0; batch < 40; batch++) {
+        if (stopEnrichRef.current) break;
         const res = await apiFetch("/api/contacts/enrich", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -95,21 +97,19 @@ export default function ContactsPage() {
         const data = await res.json();
         totalEnriched += data.enriched || 0;
         totalFailed += data.failed || 0;
-        // Server returns total=0 when there's nothing left to enrich.
-        // Stop also if a batch returned no successes (avoid infinite loop on persistent failures).
-        if ((data.total || 0) === 0 || (data.enriched || 0) === 0) break;
-        // Progress update during the loop.
+        const remaining: number = data.remaining ?? 0;
+        // Nothing left or a batch produced no progress (persistent failures guard).
+        if (remaining === 0 || (data.enriched || 0) === 0) break;
         setStatusMsg({
           kind: "success",
-          text: `Enriching... ${totalEnriched} done so far`,
+          text: `Enriching... ${totalEnriched} done · ${remaining} left`,
         });
         setRefreshKey((k) => k + 1);
-        safetyCap += 1;
       }
-      const failedSuffix = totalFailed > 0 ? ` (${totalFailed} failed)` : "";
+      const failedSuffix = totalFailed > 0 ? `, ${totalFailed} failed` : "";
       setStatusMsg({
         kind: "success",
-        text: `Enriched ${totalEnriched} contacts${failedSuffix}`,
+        text: `Enriched ${totalEnriched}${failedSuffix}`,
       });
       setRefreshKey((k) => k + 1);
     } catch (err) {
@@ -118,6 +118,10 @@ export default function ContactsPage() {
     } finally {
       setEnriching(false);
     }
+  };
+
+  const handleStopEnrich = () => {
+    stopEnrichRef.current = true;
   };
 
   return (
@@ -134,15 +138,26 @@ export default function ContactsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleEnrich}
-            disabled={enriching || rescoring}
-            title="Use Claude to fill in missing industry, seniority, education, and location, then re-score"
-            className="inline-flex items-center gap-1.5 border border-white/[0.12] bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
-          >
-            <Sparkles size={10} className={enriching ? "animate-spin" : ""} />
-            {enriching ? "Enriching" : "Enrich All"}
-          </button>
+          {enriching ? (
+            <button
+              onClick={handleStopEnrich}
+              title="Stop enrichment"
+              className="inline-flex items-center gap-1.5 border border-white/[0.12] bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400 transition-colors hover:border-amber-400/40"
+            >
+              <Square size={10} />
+              Stop
+            </button>
+          ) : (
+            <button
+              onClick={handleEnrich}
+              disabled={rescoring}
+              title="Use Claude to fill in missing industry, seniority, education, and location, then re-score"
+              className="inline-flex items-center gap-1.5 border border-white/[0.12] bg-muted px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50"
+            >
+              <Sparkles size={10} />
+              Enrich All
+            </button>
+          )}
           <button
             onClick={handleRescore}
             disabled={rescoring || enriching}

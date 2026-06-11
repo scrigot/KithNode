@@ -108,7 +108,10 @@ export async function POST(req: NextRequest) {
     if (contactId) {
       query = query.eq("id", contactId);
     } else {
-      query = query.is("enrichedAt", null).limit(BATCH_LIMIT);
+      query = query
+        .is("enrichedAt", null)
+        .order("warmthScore", { ascending: false })
+        .limit(BATCH_LIMIT);
     }
 
     const { data: contacts, error } = await query;
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     if (!contacts || contacts.length === 0) {
-      return NextResponse.json({ enriched: 0, total: 0 });
+      return NextResponse.json({ enriched: 0, failed: 0, total: 0, remaining: 0 });
     }
 
     let enriched = 0;
@@ -204,7 +207,19 @@ export async function POST(req: NextRequest) {
       total: contacts.length,
     });
 
-    return NextResponse.json({ enriched, failed, total: contacts.length });
+    // Count still-unenriched contacts so the client can loop without polling.
+    const { count: remainingCount } = await supabase
+      .from("AlumniContact")
+      .select("id", { count: "exact", head: true })
+      .eq("importedByUserId", userId)
+      .is("enrichedAt", null);
+
+    return NextResponse.json({
+      enriched,
+      failed,
+      total: contacts.length,
+      remaining: remainingCount ?? 0,
+    });
   } catch (error) {
     console.error("Enrich route error:", error);
     return NextResponse.json({ error: "Enrichment failed" }, { status: 500 });
