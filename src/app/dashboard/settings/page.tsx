@@ -85,6 +85,7 @@ const STEP_ICONS = [GraduationCap, MapPin, Target, Building2, CheckCircle2];
 
 interface Preferences {
   university: string;
+  highSchool: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
   hometown: string;
@@ -102,6 +103,7 @@ const STORAGE_KEY = "kithnode_preferences";
 function getDefaults(): Preferences {
   return {
     university: "",
+    highSchool: "",
     greekLifeEnabled: false,
     greekOrganization: "",
     hometown: "",
@@ -153,6 +155,7 @@ async function syncToAPI(prefs: Preferences) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         current_university: prefs.university || null,
+        high_school: prefs.highSchool || null,
         hometown: prefs.hometown || null,
         target_locations:
           [...prefs.targetLocations, ...prefs.customLocations].length > 0
@@ -418,6 +421,17 @@ function EditPanel({
                 placeholder="University of North Carolina at Chapel Hill"
                 value={local.university}
                 onChange={(e) => setLocal({ ...local, university: e.target.value })}
+                className="bg-muted text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                High School
+              </label>
+              <Input
+                placeholder="East Chapel Hill High School"
+                value={local.highSchool}
+                onChange={(e) => setLocal({ ...local, highSchool: e.target.value })}
                 className="bg-muted text-sm"
               />
             </div>
@@ -1040,6 +1054,7 @@ export default function SettingsPage() {
           if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length || data.recruitingDate)) {
             const merged: Preferences = {
               university: data.university || "",
+              highSchool: data.highSchool || "",
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",
               hometown: data.hometown || "",

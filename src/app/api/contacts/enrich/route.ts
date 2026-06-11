@@ -4,7 +4,7 @@ import { gateway } from "@ai-sdk/gateway";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
-import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
+import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { requireSubscription } from "@/lib/subscription";
 import { fetchPdlProfile } from "@/lib/enrich/pdl";
 
@@ -161,29 +161,26 @@ export async function POST(req: NextRequest) {
       const location =
         c.location || pdl?.location || fields.location;
 
-      // Build meta with enriched fields layered on top of existing data
-      // Don't overwrite non-empty fields. Enrichment fills gaps, not replaces.
-      const meta = {
-        name: c.name || "",
-        education,
-        location,
-        experience: c.firmName || "",
-        title: c.title || "",
-        industry: fields.industry,
-        seniorityLevel: fields.seniorityLevel,
-      };
-
-      // Re-score with personalized prefs in the same loop. Populated education
-      // now lights up Same School / CS Top School affiliations.
-      const affiliations = detectAffiliations(meta, prefs);
-      const { score, tier } = computeWarmthScore(affiliations);
+      // Re-score with personalized prefs in the same loop, via the shared
+      // helper so enrich stays in lockstep with the tags route. Load this
+      // contact's manual tags first — omitting them is exactly the bug that
+      // used to wipe tag-driven affiliations on enrich. Layer the freshly
+      // enriched education/location/industry/seniority on top of the row so
+      // populated education lights up Same School / CS Top School, while
+      // highSchool/clubs/passions ride along from the existing columns.
+      const tags = await loadContactTags(userId, c.id);
+      const { affiliations, score, tier } = rescoreContact(
+        { ...c, education, location, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
+        prefs,
+        tags,
+      );
 
       const { error: updateError } = await supabase
         .from("AlumniContact")
         .update({
-          education: meta.education,
+          education,
           graduationYear,
-          location: meta.location,
+          location,
           industry: fields.industry,
           seniorityLevel: fields.seniorityLevel,
           warmthScore: score,

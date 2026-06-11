@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
-import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
+import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 
 const MAX_TAGS = 10;
 const MAX_TAG_LEN = 40;
@@ -45,29 +45,12 @@ async function recomputeScoring(
   contact: Record<string, unknown>,
   contactId: string,
 ): Promise<void> {
-  const { data: tagsRows } = await supabase
-    .from("contact_tags")
-    .select("tag")
-    .eq("user_id", userEmail)
-    .eq("contact_id", contactId);
+  const [tags, prefs] = await Promise.all([
+    loadContactTags(userEmail, contactId),
+    getUserPrefs(userEmail),
+  ]);
 
-  const tags = (tagsRows ?? []).map((r: { tag: string }) => r.tag);
-
-  const prefs = await getUserPrefs(userEmail);
-
-  const meta = {
-    name: (contact.name as string) || "",
-    education: (contact.education as string) || "",
-    location: (contact.location as string) || "",
-    experience: (contact.firmName as string) || "",
-    title: (contact.title as string) || "",
-    industry: (contact.industry as string) || "",
-    seniorityLevel: (contact.seniorityLevel as string) || "",
-    tags,
-  };
-
-  const affiliations = detectAffiliations(meta, prefs);
-  const { score, tier } = computeWarmthScore(affiliations);
+  const { affiliations, score, tier } = rescoreContact(contact, prefs, tags);
 
   await supabase
     .from("AlumniContact")

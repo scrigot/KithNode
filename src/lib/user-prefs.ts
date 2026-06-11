@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
  */
 export interface UserPrefs {
   university: string;
+  highSchool: string;
   hometown: string;
   greekOrg: string;
   targetIndustries: string[];
@@ -18,6 +19,7 @@ export interface UserPrefs {
 
 const EMPTY_PREFS: UserPrefs = {
   university: "",
+  highSchool: "",
   hometown: "",
   greekOrg: "",
   targetIndustries: [],
@@ -54,7 +56,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, hometown, greekOrg, targetIndustries, targetFirms, targetLocations, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, targetIndustries, targetFirms, targetLocations, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -63,6 +65,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
 
   return {
     university: data.university || "",
+    highSchool: data.highSchool || "",
     hometown: data.hometown || "",
     greekOrg: data.greekOrg || "",
     targetIndustries: parseList(data.targetIndustries),

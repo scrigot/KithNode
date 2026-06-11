@@ -71,6 +71,9 @@ export interface ContactDetail extends RankedContact {
   email_confidence: string;
   education: string;
   linkedin_location: string;
+  high_school: string;
+  clubs: string;
+  passions: string;
   source: string;
   tags?: string[];
   affiliations: { id: number; name: string; boost: number }[];

@@ -13,6 +13,7 @@ model User {
   name               String
   image              String       @default("")
   university         String       @default("")
+  highSchool         String       @default("")
   targetIndustry     String       @default("")
   hometown           String       @default("")
   greekOrg           String       @default("")
@@ -40,6 +41,9 @@ model AlumniContact {
   graduationYear   Int
   education        String          @default("")
   location         String          @default("")
+  highSchool       String          @default("")
+  clubs            String          @default("")
+  passions         String          @default("")
   affiliations     String          @default("")
   warmthScore      Float           @default(0)
   tier             String          @default("cold")

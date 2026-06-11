@@ -19,6 +19,7 @@ import type { UserPrefs } from "@/lib/user-prefs";
 
 const PREFS: UserPrefs = {
   university: "UNC Chapel Hill",
+  highSchool: "",
   hometown: "Charlotte, NC",
   greekOrg: "Chi Phi",
   targetIndustries: ["Investment Banking"],

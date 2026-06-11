@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
     .from("User")
     .update({
       university: body.current_university || "",
+      highSchool: body.high_school || "",
       hometown: body.hometown || "",
       greekOrg: body.greek_life || "",
       targetIndustries: serializeList(body.target_industries),

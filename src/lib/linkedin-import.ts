@@ -32,6 +32,9 @@ export interface ContactMeta extends LinkedInMeta {
   industry?: string;
   seniorityLevel?: string;
   tags?: string[];
+  highSchool?: string;
+  clubs?: string;
+  passions?: string;
 }
 
 interface Affiliation {
@@ -289,10 +292,16 @@ function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
 export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affiliation[] {
   const affiliations: Affiliation[] = [];
 
-  // Tags feed the per-user relationship matchers (Same School, Same Greek Org)
-  // but never the K-12/pre-college detector or universal quality signals — a
-  // "high school friend" tag must not flag a college contact as Pre-College.
-  const tagsText = (meta.tags ?? []).join(" ");
+  // Tags + clubs + passions feed the per-user relationship matchers (Same
+  // School, Same Greek Org) but NEVER the K-12/pre-college detector or
+  // universal quality signals — a "high school friend" tag must not flag a
+  // college contact as Pre-College. highSchool is deliberately kept out of
+  // this blob: it drives only the dedicated Same High School matcher below
+  // (see per-user layer), so e.g. "Chapel Hill High School" can't false-fire
+  // Same School via the "chapel hill" alias.
+  const tagsText = [(meta.tags ?? []).join(" "), meta.clubs, meta.passions]
+    .filter(Boolean)
+    .join(" ");
   const companyText = (meta.experience || "").toLowerCase();
   const titleText = (meta.title || "").toLowerCase();
   const educationText = meta.education || "";
@@ -359,6 +368,19 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       const schoolBlob = norm(`${educationText} ${companyText} ${tagsText}`);
       if (aliases.some((a) => schoolBlob.includes(a))) {
         affiliations.push({ name: "Same School", boost: 15 });
+      }
+    }
+
+    // Same high school. Kept fully separate from Same School (above): a contact
+    // listing "Chapel Hill High School" must not light up the UNC alias, and a
+    // listed high school must never imply current-high-schooler. Matches when
+    // either normalized string contains the other (partial overlap, so
+    // "East Chapel Hill" matches "East Chapel Hill High School").
+    if (prefs.highSchool && meta.highSchool) {
+      const a = norm(prefs.highSchool);
+      const b = norm(meta.highSchool);
+      if (a && b && (a.includes(b) || b.includes(a))) {
+        affiliations.push({ name: "Same High School", boost: 10 });
       }
     }
 

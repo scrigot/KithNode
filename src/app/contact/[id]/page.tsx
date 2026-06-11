@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
 import { TagEditor } from "./tag-editor";
+import { FieldEditor } from "./field-editor";
 import { trackEvent } from "@/lib/posthog";
 import type { ContactDetail } from "@/lib/api";
 
@@ -244,12 +245,41 @@ export default function ContactDetailPage() {
           {/* Contact info */}
           <Separator className="my-3" />
           <div className="space-y-1 text-[10px]">
-            {contact.education && (
-              <p>
-                <span className="text-muted-foreground">Education: </span>
-                <span className="text-foreground">{contact.education}</span>
-              </p>
-            )}
+            <FieldEditor
+              contactId={contact.id}
+              field="education"
+              label="Education"
+              initialValue={contact.education || ""}
+              placeholder="Add education"
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="location"
+              label="Location"
+              initialValue={contact.linkedin_location || ""}
+              placeholder="Add location"
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="highSchool"
+              label="High School"
+              initialValue={contact.high_school || ""}
+              placeholder="Add high school"
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="clubs"
+              label="Clubs"
+              initialValue={contact.clubs || ""}
+              placeholder="Add clubs"
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="passions"
+              label="Passions"
+              initialValue={contact.passions || ""}
+              placeholder="Add passions"
+            />
             <p>
               <a
                 href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}

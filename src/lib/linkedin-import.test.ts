@@ -69,6 +69,7 @@ describe("detectAffiliations: manual tags", () => {
   it("Same Greek Org fires when greekOrg matches a manual tag", () => {
     const prefs = {
       university: "",
+      highSchool: "",
       hometown: "",
       greekOrg: "Chi Phi",
       targetIndustries: [],
@@ -84,6 +85,7 @@ describe("detectAffiliations: manual tags", () => {
   it("Same School fires when a tag matches a university alias", () => {
     const prefs = {
       university: "University of North Carolina at Chapel Hill",
+      highSchool: "",
       hometown: "",
       greekOrg: "",
       targetIndustries: [],
@@ -113,6 +115,7 @@ describe("detectAffiliations: manual tags", () => {
   it("no tags = unchanged behavior (regression)", () => {
     const prefs = {
       university: "Duke University",
+      highSchool: "",
       hometown: "",
       greekOrg: "Chi Phi",
       targetIndustries: [],
@@ -124,6 +127,71 @@ describe("detectAffiliations: manual tags", () => {
     const affsWithout = detectAffiliations(baseMeta({ education: "Yale University" }), prefs);
     const affsWith = detectAffiliations(baseMeta({ education: "Yale University", tags: [] }), prefs);
     expect(affsWithout).toEqual(affsWith);
+  });
+});
+
+describe("detectAffiliations: Same High School + editable fields", () => {
+  const prefsWith = (overrides: Record<string, unknown> = {}) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+    ...overrides,
+  });
+
+  it("Same High School fires on partial overlap (one string includes the other)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ highSchool: "East Chapel Hill High School" }),
+      prefsWith({ highSchool: "East Chapel Hill" }),
+    );
+    expect(affs.some((a) => a.name === "Same High School" && a.boost === 10)).toBe(true);
+  });
+
+  it("does NOT fire Same High School when neither string contains the other", () => {
+    const affs = detectAffiliations(
+      baseMeta({ highSchool: "Myers Park High School" }),
+      prefsWith({ highSchool: "East Chapel Hill High School" }),
+    );
+    expect(affs.some((a) => a.name === "Same High School")).toBe(false);
+  });
+
+  it("contact highSchool does NOT false-fire Same School via the UNC alias, and is not Pre-College", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        highSchool: "Chapel Hill High School",
+        experience: "Goldman Sachs",
+        title: "Analyst",
+      }),
+      prefsWith({ university: "University of North Carolina at Chapel Hill" }),
+    );
+    expect(affs.some((a) => a.name === "Same School")).toBe(false);
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+  });
+
+  it("clubs text fires Same Greek Org when greekOrg matches", () => {
+    const affs = detectAffiliations(
+      baseMeta({ clubs: "chi phi intramurals" }),
+      prefsWith({ greekOrg: "Chi Phi" }),
+    );
+    expect(affs.some((a) => a.name === "Same Greek Org")).toBe(true);
+  });
+
+  it("clubs/passions never feed the Pre-College detector", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        clubs: "high school robotics club",
+        passions: "middle school mentoring",
+        title: "Analyst",
+        experience: "Goldman Sachs",
+      }),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
   });
 });
 
