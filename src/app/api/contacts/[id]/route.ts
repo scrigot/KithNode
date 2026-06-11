@@ -139,6 +139,11 @@ export async function GET(
     .order("created_at", { ascending: true });
   const tags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
+  // Recompute affiliations live so each chip carries its REAL boost — the
+  // stored column is names-only and the UI used to fake a uniform +10.
+  const prefs = await getUserPrefs(userId);
+  const { affiliations: liveAffiliations } = rescoreContact(contact, prefs, tags);
+
   return NextResponse.json({
     id: contact.id,
     name: contact.name,
@@ -172,12 +177,11 @@ export async function GET(
       total_score: contact.warmthScore,
       tier: contact.tier,
     },
-    affiliations: contact.affiliations
-      ? contact.affiliations
-          .split(",")
-          .filter(Boolean)
-          .map((n: string) => ({ id: 0, name: n.trim(), boost: 10 }))
-      : [],
+    affiliations: liveAffiliations.map((a, i) => ({
+      id: i,
+      name: a.name,
+      boost: a.boost,
+    })),
     why_now: contact.affiliations || "",
     warm_path: contact.university || "",
     outreach_history: [],
