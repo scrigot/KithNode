@@ -33,6 +33,13 @@ export const FIRM_OPTIONS = [
   "Scale AI",
   "Replit",
   "NVIDIA",
+  "Meta",
+  "Google",
+  "Apple",
+  "Amazon",
+  "Microsoft",
+  "Tesla",
+  "SpaceX",
   // Finance / Consulting
   "Goldman Sachs",
   "JPMorgan",

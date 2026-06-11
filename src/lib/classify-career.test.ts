@@ -109,6 +109,101 @@ describe("classifyCareer — title precision (highest priority)", () => {
   });
 });
 
+describe("classifyCareer — new AI + CS/Tech roles (title precision)", () => {
+  it("Forward Deployed Engineer @ Anthropic -> AI / Applied AI (title beats firm)", () => {
+    expect(
+      classifyCareer({ title: "Forward Deployed Engineer", firmName: "Anthropic" }),
+    ).toEqual({ track: "AI", role: "Applied AI" });
+  });
+
+  it("solutions architect at an AI lab -> AI / Applied AI, not CS/Tech Solutions Engineering", () => {
+    expect(
+      classifyCareer({ title: "AI Solutions Architect", firmName: "OpenAI" }),
+    ).toEqual({ track: "AI", role: "Applied AI" });
+  });
+
+  it("ML Systems Engineer -> AI / ML Infrastructure", () => {
+    expect(classifyCareer({ title: "ML Systems Engineer" })).toEqual({
+      track: "AI",
+      role: "ML Infrastructure",
+    });
+    expect(classifyCareer({ title: "Inference Performance Engineer" })).toEqual({
+      track: "AI",
+      role: "ML Infrastructure",
+    });
+    expect(classifyCareer({ title: "GPU Kernel Engineer" })).toEqual({
+      track: "AI",
+      role: "ML Infrastructure",
+    });
+  });
+
+  it("alignment / safeguards / trust & safety -> AI / AI Safety", () => {
+    expect(classifyCareer({ title: "Alignment Research Scientist" })).toEqual({
+      track: "AI",
+      role: "AI Safety",
+    });
+    expect(classifyCareer({ title: "Safeguards Engineer" })).toEqual({
+      track: "AI",
+      role: "AI Safety",
+    });
+    expect(classifyCareer({ title: "Trust and Safety Lead" })).toEqual({
+      track: "AI",
+      role: "AI Safety",
+    });
+  });
+
+  it("SRE @ Meta -> CS/Tech / Infrastructure / DevOps (title beats firm)", () => {
+    expect(
+      classifyCareer({ title: "Site Reliability Engineer", firmName: "Meta" }),
+    ).toEqual({ track: "CS/Tech", role: "Infrastructure / DevOps" });
+    expect(classifyCareer({ title: "Senior DevOps Engineer" })).toEqual({
+      track: "CS/Tech",
+      role: "Infrastructure / DevOps",
+    });
+  });
+
+  it("Sales Engineer -> CS/Tech / Solutions Engineering", () => {
+    expect(classifyCareer({ title: "Sales Engineer" })).toEqual({
+      track: "CS/Tech",
+      role: "Solutions Engineering",
+    });
+  });
+
+  it("TPM @ Google -> CS/Tech / Technical Program Management (title beats firm)", () => {
+    expect(
+      classifyCareer({ title: "Technical Program Manager", firmName: "Google" }),
+    ).toEqual({ track: "CS/Tech", role: "Technical Program Management" });
+    expect(classifyCareer({ title: "Senior TPM" })).toEqual({
+      track: "CS/Tech",
+      role: "Technical Program Management",
+    });
+  });
+});
+
+describe("classifyCareer — big-tech firm fallback (only when title is silent)", () => {
+  it("untitled person @ SpaceX -> CS/Tech track, empty role", () => {
+    expect(classifyCareer({ title: "Member of Technical Staff", firmName: "SpaceX" })).toEqual({
+      track: "CS/Tech",
+      role: "",
+    });
+  });
+
+  it("vague title @ Google / Meta / Apple -> CS/Tech track, empty role", () => {
+    expect(classifyCareer({ title: "Analyst", firmName: "Google" })).toEqual({
+      track: "CS/Tech",
+      role: "",
+    });
+    expect(classifyCareer({ title: "Generalist", firmName: "Meta" })).toEqual({
+      track: "CS/Tech",
+      role: "",
+    });
+    expect(classifyCareer({ title: "Specialist", firmName: "Apple" })).toEqual({
+      track: "CS/Tech",
+      role: "",
+    });
+  });
+});
+
 describe("classifyCareer — firm tier fallback (only when title is silent)", () => {
   it("frontier AI lab -> AI track, empty role (title doesn't resolve role)", () => {
     expect(classifyCareer({ title: "Member of Technical Staff", firmName: "Anthropic" })).toEqual({

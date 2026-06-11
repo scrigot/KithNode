@@ -36,7 +36,13 @@ const TITLE_RULES: { re: RegExp; track: string; role: string }[] = [
   // SWE rule, and "Founder & CEO at X" must not fall through to finance/firm rules)
   { re: /\bfounding\s*engineer\b/i, track: "Startups", role: "Founding Engineer" },
   { re: /\b(?:co[\s-]*)?founder\b/i, track: "Startups", role: "Founder" },
-  // AI (most specific first — these must beat the generic SWE rule below)
+  // AI (most specific first — these must beat the generic SWE rule below).
+  // ML-infra + Applied AI sit ABOVE the CS/Tech "Solutions Engineering" rule on
+  // purpose: a "Solutions Architect" or "ML Systems" title at an AI lab must land
+  // in the AI track, never in CS/Tech Solutions Engineering. Order is load-bearing.
+  { re: /\bml\s*(?:systems?|infra(?:structure)?)\b|\binference\b|\b(?:gpu|tpu|kernel)\s*engineer\b|\bperformance\s*engineer\b/i, track: "AI", role: "ML Infrastructure" },
+  { re: /\balignment\b|\bsafeguards\b|\btrust\s*(?:&|and)\s*safety\b|\bai\s*safety\b/i, track: "AI", role: "AI Safety" },
+  { re: /\bforward[\s-]*deployed\b|\bsolutions?\s*architect\b|\bapplied\s*ai\b/i, track: "AI", role: "Applied AI" },
   { re: /\bml\s*engineer\b|\bmachine\s*learning\s*engineer\b/i, track: "AI", role: "ML Engineer" },
   { re: /\bai\s*engineer\b/i, track: "AI", role: "AI Engineer" },
   { re: /\b(?:ai|ml)\s*research(?:er)?\b/i, track: "AI", role: "AI Research" },
@@ -44,7 +50,13 @@ const TITLE_RULES: { re: RegExp; track: string; role: string }[] = [
   { re: /\bdata\s*scientist\b/i, track: "Data Science", role: "Data Science" },
   { re: /\bdata\s*engineer\b/i, track: "Data Science", role: "Data Engineering" },
   { re: /\bquant(?:itative)?\b/i, track: "Data Science", role: "Quant" },
-  // CS/Tech
+  // CS/Tech (specific roles first, before the generic SWE catch-all). TPM runs
+  // before generic SWE so "Technical Program Manager" beats nothing accidental;
+  // the Applied AI + ML-infra rules above already claimed "solutions architect" /
+  // "ml systems", so "solutions engineer" here only catches non-AI-lab GTM eng.
+  { re: /\btechnical\s*program\s*manager\b|\btpm\b/i, track: "CS/Tech", role: "Technical Program Management" },
+  { re: /\b(?:site\s*reliability|sre|devops|platform\s*engineer|infrastructure\s*engineer)\b/i, track: "CS/Tech", role: "Infrastructure / DevOps" },
+  { re: /\b(?:sales|solutions?)\s*engineer\b|\btechnical\s*specialist\b/i, track: "CS/Tech", role: "Solutions Engineering" },
   { re: /\bsoftware\s*(?:engineer|developer)\b|\bsoftware\s*dev\b|\bswe\b/i, track: "CS/Tech", role: "Software Engineering" },
   { re: /\bproduct\s*manager\b|\bproduct\s*management\b/i, track: "CS/Tech", role: "Product Management" },
   // Finance
@@ -58,6 +70,20 @@ const TITLE_RULES: { re: RegExp; track: string; role: string }[] = [
   { re: /\bconsultant\b|\bconsulting\b/i, track: "Consulting", role: "Management Consulting" },
 ];
 
+// Big-tech (MANGO + the rest) firm fallback. Defined locally because these firms
+// span SWE/infra/PM/data rather than a single role: a Google/Meta/Apple person
+// with no resolving title lands in CS/Tech with NO role, exactly like the AI-lab
+// tiers above. Kept distinct from BIG_TECH_AI (the warmth scorer's AI-lab tier).
+const BIG_TECH: RegExp[] = [
+  /\bmeta\b|\bfacebook\b/i,
+  /\bgoogle\b|\balphabet\b|\byoutube\b/i,
+  /\bapple\b/i,
+  /\bamazon\b|\baws\b/i,
+  /\bmicrosoft\b/i,
+  /\btesla\b/i,
+  /\bspace\s*x\b/i,
+];
+
 // Firm tier fallback — only consulted when no title rule fired. Reuses the
 // exported tier arrays. AI labs map to the AI track with NO role (a frontier lab
 // alone doesn't tell us engineer vs research vs product), so role stays "" unless
@@ -66,6 +92,7 @@ const FIRM_RULES: { tiers: RegExp[]; track: string; role: string }[] = [
   { tiers: FRONTIER_LAB, track: "AI", role: "" },
   { tiers: AI_UNICORN, track: "AI", role: "" },
   { tiers: BIG_TECH_AI, track: "AI", role: "" },
+  { tiers: BIG_TECH, track: "CS/Tech", role: "" },
   { tiers: MEGA_PE, track: "Finance", role: "Private Equity" },
   { tiers: BULGE_BRACKET, track: "Finance", role: "Investment Banking" },
   { tiers: ELITE_BOUTIQUE, track: "Finance", role: "Investment Banking" },

@@ -20,9 +20,9 @@ export const CAREER_TRACKS = {
     "Wealth Management",
   ],
   "Consulting": ["Management Consulting", "Strategy"],
-  "CS/Tech": ["Software Engineering", "Product Management", "Cybersecurity", "IT"],
+  "CS/Tech": ["Software Engineering", "Product Management", "Cybersecurity", "Infrastructure / DevOps", "Solutions Engineering", "Technical Program Management", "IT"],
   "Data Science": ["Data Science", "Data Engineering", "Quant", "Analytics"],
-  "AI": ["AI Engineer", "ML Engineer", "AI Research", "AI Product"],
+  "AI": ["AI Engineer", "ML Engineer", "AI Research", "AI Product", "Applied AI", "ML Infrastructure", "AI Safety"],
   "Startups": ["Founder", "Founding Engineer", "Early Stage", "AI-Native SaaS", "Growth Stage"],
 } as const;
 
