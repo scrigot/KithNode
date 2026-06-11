@@ -23,6 +23,7 @@ export const CAREER_TRACKS = {
   "CS/Tech": ["Software Engineering", "Product Management", "Cybersecurity", "IT"],
   "Data Science": ["Data Science", "Data Engineering", "Quant", "Analytics"],
   "AI": ["AI Engineer", "ML Engineer", "AI Research", "AI Product"],
+  "Startups": ["Founder", "Founding Engineer", "Early Stage", "AI-Native SaaS", "Growth Stage"],
 } as const;
 
 export type CareerTrack = keyof typeof CAREER_TRACKS;

@@ -85,7 +85,10 @@ export async function GET(request: NextRequest) {
   // themselves (cross-user duplicate identities). Without this, a user who
   // imported "Jacob Goldstein @ KKR" still sees another user's copy of the same
   // person as a blurred "import to unlock" card. Match on normalized LinkedIn
-  // URL (primary key) or normalized name + firm (fallback).
+  // URL (primary key), normalized name + firm, or — last resort — exact
+  // normalized full name. Name-only is deliberately aggressive: pool copies of
+  // someone you know often carry a DIFFERENT firm string (club-as-firm seed
+  // rows, job changes), and hiding a same-named stranger is the cheaper error.
   const { data: ownImports } = await supabase
     .from("AlumniContact")
     .select("linkedInUrl, name, firmName")
@@ -93,11 +96,14 @@ export async function GET(request: NextRequest) {
 
   const ownLinkedInUrls = new Set<string>();
   const ownNameFirms = new Set<string>();
+  const ownNames = new Set<string>();
   for (const own of ownImports || []) {
     const url = normalizeLinkedInUrl(own.linkedInUrl);
     if (url) ownLinkedInUrls.add(url);
     const nameFirm = normalizeNameFirm(own.name, own.firmName);
     if (nameFirm) ownNameFirms.add(nameFirm);
+    const name = (own.name || "").trim().toLowerCase();
+    if (name) ownNames.add(name);
   }
 
   contacts = contacts.filter((c) => {
@@ -105,36 +111,14 @@ export async function GET(request: NextRequest) {
     if (url && ownLinkedInUrls.has(url)) return false;
     const nameFirm = normalizeNameFirm(c.name, c.firmName);
     if (nameFirm && ownNameFirms.has(nameFirm)) return false;
+    const name = (c.name || "").trim().toLowerCase();
+    if (name && ownNames.has(name)) return false;
     return true;
   });
 
-  // Fallback: if no other-user contacts exist (single-user demo / no shared pool yet),
-  // show the user's own contacts so Discover is not empty
-  if (contacts.length === 0) {
-    let ownBuilder = supabase
-      .from("AlumniContact")
-      .select("*")
-      .eq("importedByUserId", userId);
-
-    if (query) {
-      ownBuilder = ownBuilder.or(
-        `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
-      );
-    }
-    if (tier) {
-      ownBuilder = ownBuilder.eq("tier", tier);
-    }
-    if (track) {
-      ownBuilder = ownBuilder.eq("track", track);
-    }
-    ownBuilder = ownBuilder.in("source", allowedSources);
-
-    const { data: ownData } = await ownBuilder
-      .order("warmthScore", { ascending: false })
-      .limit(100);
-
-    contacts = ownData || [];
-  }
+  // NOTE: the old "show the user's own contacts when the pool is empty"
+  // fallback is gone — Discover is strictly the shared pool now. An exhausted
+  // pool lands on the all-rated state (networkSize distinguishes no-network).
 
   // Filter out already rated
   const filtered = contacts.filter((c) => !ratedIds.includes(c.id));

@@ -32,6 +32,10 @@ const EMPTY: CareerClassification = { track: "", role: "" };
 // top (e.g. "ml engineer" before a bare "engineer" would, and "ai research"
 // before generic AI). Each entry maps a title regex to a taxonomy {track, role}.
 const TITLE_RULES: { re: RegExp; track: string; role: string }[] = [
+  // Startups (before everything — "Founding Engineer" must beat the generic
+  // SWE rule, and "Founder & CEO at X" must not fall through to finance/firm rules)
+  { re: /\bfounding\s*engineer\b/i, track: "Startups", role: "Founding Engineer" },
+  { re: /\b(?:co[\s-]*)?founder\b/i, track: "Startups", role: "Founder" },
   // AI (most specific first — these must beat the generic SWE rule below)
   { re: /\bml\s*engineer\b|\bmachine\s*learning\s*engineer\b/i, track: "AI", role: "ML Engineer" },
   { re: /\bai\s*engineer\b/i, track: "AI", role: "AI Engineer" },
