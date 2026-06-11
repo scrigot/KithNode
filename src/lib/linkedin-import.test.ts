@@ -77,6 +77,7 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      pastFirms: [],
       major: "",
       minor: "",
       recruitingDate: null,
@@ -97,6 +98,7 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      pastFirms: [],
       major: "",
       minor: "",
       recruitingDate: null,
@@ -131,6 +133,7 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      pastFirms: [],
       major: "",
       minor: "",
       recruitingDate: null,
@@ -153,6 +156,7 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    pastFirms: [],
     major: "",
     minor: "",
     recruitingDate: null,
@@ -222,6 +226,7 @@ describe("detectAffiliations: Same Club", () => {
     targetLocations: [],
     clubs,
     skills: [],
+    pastFirms: [],
     major: "",
     minor: "",
     recruitingDate: null,
@@ -280,6 +285,7 @@ describe("detectAffiliations: Skill Match", () => {
     targetLocations: [],
     clubs: [],
     skills: overrides.skills ?? [],
+    pastFirms: [],
     major: "",
     minor: "",
     recruitingDate: null,
@@ -366,6 +372,7 @@ describe("detectAffiliations: Same Major", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    pastFirms: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -470,6 +477,103 @@ describe("detectAffiliations: Same Major", () => {
   });
 });
 
+describe("detectAffiliations: Shared Employer", () => {
+  const firmPrefs = (pastFirms: string[] = []) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    major: "",
+    minor: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    pastFirms,
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires when a user past firm matches the contact's CURRENT firm (experience)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Goldman Sachs" }),
+      firmPrefs(["Goldman Sachs"]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer" && a.boost === 10)).toBe(true);
+  });
+
+  it("fires when a user past firm matches the contact's PAST firm (meta.pastFirms)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ pastFirms: "Evercore, Bain & Company" }),
+      firmPrefs(["Evercore"]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer" && a.boost === 10)).toBe(true);
+  });
+
+  it("fires on either-direction containment (user 'Goldman' ⊂ contact 'Goldman Sachs')", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Goldman Sachs" }),
+      firmPrefs(["Goldman"]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(true);
+  });
+
+  it("does NOT fire when prefs.pastFirms is empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Goldman Sachs", pastFirms: "Evercore" }),
+      firmPrefs([]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(false);
+  });
+
+  it("does NOT fire when prefs object is omitted entirely", () => {
+    const affs = detectAffiliations(baseMeta({ experience: "Goldman Sachs" }));
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(false);
+  });
+
+  it("does NOT fire when nothing overlaps", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Citadel", pastFirms: "Jane Street" }),
+      firmPrefs(["Goldman Sachs"]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(false);
+  });
+
+  it("fires at most once even when a user firm matches both current AND past", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Goldman Sachs", pastFirms: "Goldman Sachs Asset Management" }),
+      firmPrefs(["Goldman Sachs"]),
+    );
+    expect(affs.filter((a) => a.name === "Shared Employer")).toHaveLength(1);
+  });
+
+  it("ignores single-character user firms (no spurious containment)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ experience: "Goldman Sachs" }),
+      firmPrefs(["G"]),
+    );
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(false);
+  });
+
+  it("contact pastFirms does NOT leak into the Pre-College detector", () => {
+    // A contact whose pastFirms text contains "high school" must not light up
+    // the K-12 detector — Shared Employer builds only from pastFirms + the
+    // current-firm text, never the education-based Pre-College check.
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        experience: "Goldman Sachs",
+        title: "Analyst",
+        pastFirms: "High School Tutoring LLC",
+      }),
+      firmPrefs(["Goldman Sachs"]),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+    expect(affs.some((a) => a.name === "Shared Employer")).toBe(true);
+  });
+});
+
 describe("detectAffiliations: contact greekOrg field", () => {
   const prefsWith = (overrides: Record<string, unknown> = {}) => ({
     university: "",
@@ -481,6 +585,7 @@ describe("detectAffiliations: contact greekOrg field", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    pastFirms: [],
     major: "",
     minor: "",
     recruitingDate: null,
@@ -564,6 +669,7 @@ describe("detectAffiliations: manual personType override", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    pastFirms: [],
     major: "",
     minor: "",
     recruitingDate: null,

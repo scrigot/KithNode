@@ -79,6 +79,8 @@ export interface ContactDetail extends RankedContact {
   minor: string;
   // Comma-joined skills list (PDL-enriched or manually edited).
   skills: string;
+  // Comma-joined past-employers list (PDL-enriched or manually edited).
+  past_firms: string;
   // Manual identity override: '' = auto, 'alum' | 'student' | 'professor'.
   person_type: string;
   // Where a professor teaches (drives the "Teaches at" editor row).

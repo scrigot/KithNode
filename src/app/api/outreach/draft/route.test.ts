@@ -74,6 +74,7 @@ const DEFAULT_PREFS = {
   targetIndustries: ["Investment Banking"],
   targetFirms: ["Goldman Sachs"],
   targetLocations: ["New York, NY"],
+  pastFirms: [],
 };
 
 function makeRequest(body: unknown) {

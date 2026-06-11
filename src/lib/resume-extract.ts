@@ -26,6 +26,7 @@ export const resumeSchema = z.object({
   majors: z.array(z.string()).max(2),
   minors: z.array(z.string()).max(2),
   targetIndustries: z.array(z.string()).max(4),
+  pastFirms: z.array(z.string()).max(5),
 });
 
 export type ResumeExtract = z.infer<typeof resumeSchema>;
@@ -92,6 +93,7 @@ Return:
 - majors: up to 2 of the candidate's majors, mapped to the MAJORS list when confident.
 - minors: up to 2 of the candidate's minors, mapped to the MAJORS list when confident.
 - targetIndustries: up to 4 industries the candidate targets/works in, chosen from the INDUSTRIES list.
+- pastFirms: up to 5 employers from the candidate's work experience section (company names only).
 
 INDUSTRIES: ${INDUSTRY_OPTIONS.join(", ")}
 

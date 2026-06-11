@@ -217,6 +217,8 @@ export default function OnboardingPage() {
   const [industries, setIndustries] = useState<string[]>([]);
   const [firms, setFirms] = useState<string[]>([]);
   const [customFirm, setCustomFirm] = useState("");
+  const [pastFirms, setPastFirms] = useState<string[]>([]);
+  const [pastFirmInput, setPastFirmInput] = useState("");
   const [locations, setLocations] = useState<string[]>([]);
   const [recruitingDate, setRecruitingDate] = useState("");
   const [weeklyGoalTarget, setWeeklyGoalTarget] = useState(3);
@@ -292,6 +294,7 @@ export default function OnboardingPage() {
         // DB stores presets + customs flat; both render fine through the chip
         // group (presets toggle, customs append), so keep the full list.
         if (Array.isArray(data.targetFirms)) setFirms(data.targetFirms);
+        if (Array.isArray(data.pastFirms)) setPastFirms(data.pastFirms.slice(0, 8));
         if (Array.isArray(data.targetLocations))
           setLocations(data.targetLocations);
         if (data.recruitingDate)
@@ -410,6 +413,7 @@ export default function OnboardingPage() {
       fillList("minors", setMinors, data.minors, minors, 2);
       fillList("clubs", setClubs, data.clubs, clubs, 3);
       fillList("skills", setSkills, data.skills, skills, 10);
+      fillList("pastFirms", setPastFirms, data.pastFirms, pastFirms, 8);
       fillList("industries", setIndustries, data.targetIndustries, industries, 7);
 
       setResumeFilled(filled);
@@ -441,6 +445,15 @@ export default function OnboardingPage() {
     setCustomFirm("");
   };
 
+  const addPastFirm = () => {
+    const f = pastFirmInput.trim();
+    if (!f || pastFirms.includes(f) || pastFirms.length >= 8) return;
+    setPastFirms((p) => [...p, f]);
+    setPastFirmInput("");
+  };
+  const removePastFirm = (v: string) =>
+    setPastFirms((p) => p.filter((x) => x !== v));
+
   // Step 1 only gates on university (the dashboard layout redirects to
   // onboarding while it's empty); everything else on this step is optional.
   const goToTargets = () => {
@@ -470,6 +483,7 @@ export default function OnboardingPage() {
           minor: minors.join(", "),
           clubs,
           skills,
+          past_firms: pastFirms,
           target_industries: industries,
           target_companies: firms,
           target_locations: locations,
@@ -1090,6 +1104,49 @@ export default function OnboardingPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+            </section>
+
+            <section
+              className={`border bg-bg-card p-5 ${resumeFilled.has("pastFirms") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <Building2 size={14} className="text-accent-teal" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Past Employers
+                </h2>
+              </div>
+              {pastFirms.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pastFirms.map((firm) => (
+                    <span
+                      key={firm}
+                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    >
+                      {firm}
+                      <button
+                        onClick={() => removePastFirm(firm)}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {pastFirms.length < 8 && (
+                <Input
+                  placeholder="Add a past employer..."
+                  value={pastFirmInput}
+                  onChange={(e) => setPastFirmInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addPastFirm();
+                    }
+                  }}
+                  className="bg-muted text-sm"
+                />
+              )}
             </section>
 
             <section className="border border-white/[0.06] bg-bg-card p-5">

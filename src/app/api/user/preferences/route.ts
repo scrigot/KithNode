@@ -38,6 +38,15 @@ export async function POST(request: NextRequest) {
         .slice(0, 10)
     : [];
 
+  // Past employers: free-text firm names (no canonical pool). Trim, cap each at
+  // 80 chars, cap the list at 8. Stored JSON-stringified like clubs/skills.
+  const rawPastFirms = Array.isArray(body.past_firms)
+    ? body.past_firms
+        .map((f: unknown) => String(f).trim().slice(0, 80))
+        .filter(Boolean)
+        .slice(0, 8)
+    : [];
+
   const recruitingDate =
     typeof body.recruiting_date === "string" &&
     !Number.isNaN(Date.parse(body.recruiting_date))
@@ -69,6 +78,7 @@ export async function POST(request: NextRequest) {
       targetLocations: serializeList(body.target_locations),
       clubs: JSON.stringify(rawClubs),
       skills: JSON.stringify(rawSkills),
+      pastFirms: JSON.stringify(rawPastFirms),
       recruitingDate,
       weeklyGoalTarget,
     })

@@ -571,6 +571,16 @@ export default function ContactDetailPage() {
             />
             <FieldEditor
               contactId={contact.id}
+              field="pastFirms"
+              label="Past employers"
+              initialValue={contact.past_firms || ""}
+              placeholder="Add past employer"
+              mode="multi-chip"
+              maxChips={5}
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
               field="location"
               label="Location"
               initialValue={contact.linkedin_location || ""}

@@ -17,6 +17,9 @@ export interface UserPrefs {
   targetLocations: string[];
   clubs: string[];
   skills: string[];
+  /** The user's own past employers. Drives the Shared Employer matcher. Stored
+   * JSON-stringified on the User.pastFirms column (like clubs/skills). */
+  pastFirms: string[];
   recruitingDate: string | null;
   weeklyGoalTarget: number;
 }
@@ -33,6 +36,7 @@ const EMPTY_PREFS: UserPrefs = {
   targetLocations: [],
   clubs: [],
   skills: [],
+  pastFirms: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
@@ -64,7 +68,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, targetIndustries, targetFirms, targetLocations, clubs, skills, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, major, minor, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -83,6 +87,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     targetLocations: parseList(data.targetLocations),
     clubs: parseList(data.clubs),
     skills: parseList(data.skills),
+    pastFirms: parseList(data.pastFirms),
     recruitingDate: data.recruitingDate ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
   };

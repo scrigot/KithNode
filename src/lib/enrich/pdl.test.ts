@@ -10,6 +10,7 @@ function makePdlResponse(
     status?: number;
     likelihood?: number;
     education?: object[];
+    experience?: unknown;
     full_name?: string | null;
     location_locality?: string | null;
     location_region?: string | null;
@@ -23,6 +24,7 @@ function makePdlResponse(
     data: {
       full_name: opts.full_name ?? null,
       education: opts.education ?? [],
+      experience: opts.experience ?? null,
       location_locality: opts.location_locality ?? null,
       location_region: opts.location_region ?? null,
       location_name: opts.location_name ?? null,
@@ -339,6 +341,10 @@ describe("fetchPdlProfile", () => {
         location_locality: "chapel hill",
         location_region: "north carolina",
         skills: ["financial modeling", "python", "excel"],
+        experience: [
+          { company: { name: "goldman sachs" }, end_date: "2023" },
+          { company: { name: "morgan stanley" }, end_date: null },
+        ],
       }),
     );
     const result = await fetchPdlProfile("https://linkedin.com/in/samtest");
@@ -350,6 +356,7 @@ describe("fetchPdlProfile", () => {
       major: "Economics",
       minor: "Computer Science",
       skills: ["Financial Modeling", "Python", "Excel"],
+      pastFirms: ["Goldman Sachs"],
     });
   });
 
@@ -512,5 +519,104 @@ describe("fetchPdlProfile major/minor/skills", () => {
     );
     const result = await fetchPdlProfile("https://linkedin.com/in/test");
     expect(result?.skills).toEqual([]);
+  });
+});
+
+// ── pastFirms mapping (past-vs-current split / redaction / dedupe) ─────────────
+
+describe("fetchPdlProfile pastFirms", () => {
+  it("returns only PAST employers (end_date set), excluding the current role (end_date null)", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        experience: [
+          { company: { name: "morgan stanley" }, end_date: null }, // current → excluded
+          { company: { name: "goldman sachs" }, end_date: "2022" }, // past → included
+          { company: { name: "evercore" }, end_date: "2021-06" }, // past → included
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
+  });
+
+  it("returns [] pastFirms when the free tier redacts experience to boolean true", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        experience: true,
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toEqual([]);
+  });
+
+  it("returns [] pastFirms when experience is absent", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toEqual([]);
+  });
+
+  it("dedupes case-insensitively and title-cases, keeping first occurrence", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        experience: [
+          { company: { name: "goldman sachs" }, end_date: "2022" },
+          { company: { name: "GOLDMAN SACHS" }, end_date: "2020" }, // dupe → dropped
+          { company: { name: "bain & company" }, end_date: "2019" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toEqual(["Goldman Sachs", "Bain & Company"]);
+  });
+
+  it("caps pastFirms at the first 5 past employers", async () => {
+    const seven = Array.from({ length: 7 }, (_, i) => ({
+      company: { name: `firm ${i + 1}` },
+      end_date: "2020",
+    }));
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        experience: seven,
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toHaveLength(5);
+    expect(result?.pastFirms[0]).toBe("Firm 1");
+    expect(result?.pastFirms[4]).toBe("Firm 5");
+  });
+
+  it("skips experience entries with no company name", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        experience: [
+          { company: { name: "" }, end_date: "2022" },
+          { company: null, end_date: "2021" },
+          { company: { name: "citadel" }, end_date: "2020" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.pastFirms).toEqual(["Citadel"]);
   });
 });

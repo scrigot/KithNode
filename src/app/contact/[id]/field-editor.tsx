@@ -19,7 +19,8 @@ interface FieldEditorProps {
     | "university"
     | "major"
     | "minor"
-    | "skills";
+    | "skills"
+    | "pastFirms";
   label: string;
   initialValue: string;
   placeholder?: string;

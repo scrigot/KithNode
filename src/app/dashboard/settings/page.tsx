@@ -58,6 +58,7 @@ interface Preferences {
   targetIndustries: string[];
   targetFirms: string[];
   customFirms: string[];
+  pastFirms: string[];
   recruitingDate: string;
   weeklyGoalTarget: number;
 }
@@ -80,6 +81,7 @@ function getDefaults(): Preferences {
     targetIndustries: [],
     targetFirms: [],
     customFirms: [],
+    pastFirms: [],
     recruitingDate: "",
     weeklyGoalTarget: 3,
   };
@@ -139,6 +141,7 @@ async function syncToAPI(prefs: Preferences) {
         minor: prefs.minors.join(", "),
         clubs: prefs.clubs,
         skills: prefs.skills,
+        past_firms: prefs.pastFirms,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
       }),
@@ -258,6 +261,7 @@ function EditPanel({
 }) {
   const [local, setLocal] = useState<Preferences>(prefs);
   const [customFirmInput, setCustomFirmInput] = useState("");
+  const [pastFirmInput, setPastFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
   const [majorInput, setMajorInput] = useState("");
   const [minorInput, setMinorInput] = useState("");
@@ -290,6 +294,13 @@ function EditPanel({
     if (!firm || local.customFirms.includes(firm) || local.targetFirms.includes(firm) || FIRM_OPTIONS.includes(firm)) return;
     setLocal((p) => ({ ...p, customFirms: [...p.customFirms, firm] }));
     setCustomFirmInput("");
+  };
+
+  const addPastFirm = () => {
+    const firm = pastFirmInput.trim();
+    if (!firm || local.pastFirms.includes(firm) || local.pastFirms.length >= 8) return;
+    setLocal((p) => ({ ...p, pastFirms: [...p.pastFirms, firm] }));
+    setPastFirmInput("");
   };
 
   const toggleLocation = (loc: string) =>
@@ -389,6 +400,7 @@ function EditPanel({
         fillList("minors", data.minors, 2);
         fillList("clubs", data.clubs, 3);
         fillList("skills", data.skills, 10);
+        fillList("pastFirms", data.pastFirms, 8);
         fillList("targetIndustries", data.targetIndustries, 7);
         return next;
       });
@@ -911,6 +923,38 @@ function EditPanel({
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          <div className="mt-6">
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              Past employers (up to 8)
+            </label>
+            {local.pastFirms.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {local.pastFirms.map((firm) => (
+                  <span
+                    key={firm}
+                    className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                  >
+                    {firm}
+                    <button
+                      onClick={() => setLocal((p) => ({ ...p, pastFirms: p.pastFirms.filter((f) => f !== firm) }))}
+                      className="text-accent-teal/60 hover:text-accent-teal"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {local.pastFirms.length < 8 && (
+              <Input
+                value={pastFirmInput}
+                onChange={(e) => setPastFirmInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPastFirm(); } }}
+                placeholder="Add a past employer, then press Enter..."
+                aria-label="Past employers"
+              />
+            )}
+          </div>
         </section>
 
         {/* Save */}
@@ -1361,6 +1405,7 @@ export default function SettingsPage() {
               customFirms: Array.isArray(data.targetFirms)
                 ? data.targetFirms.filter((f: string) => !FIRM_OPTIONS.includes(f))
                 : [],
+              pastFirms: Array.isArray(data.pastFirms) ? data.pastFirms : [],
               recruitingDate: data.recruitingDate
                 ? String(data.recruitingDate).slice(0, 10)
                 : "",

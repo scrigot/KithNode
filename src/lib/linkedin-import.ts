@@ -41,6 +41,10 @@ export interface ContactMeta extends LinkedInMeta {
   major?: string;
   minor?: string;
   skills?: string;
+  /** The contact's PAST employers, comma-joined (PDL-enriched or manually
+   * edited). Feeds ONLY the Shared Employer matcher below — never the K-12
+   * detector or any other matcher. */
+  pastFirms?: string;
   /**
    * Manual identity override set by the user. '' = auto (text heuristics
    * decide). 'student' | 'alum' | 'professor' force WHO this contact is and
@@ -528,6 +532,31 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       );
       if (overlaps) {
         affiliations.push({ name: "Same Major", boost: 8 });
+      }
+    }
+
+    // Shared Employer: the user's OWN past employers (prefs.pastFirms)
+    // overlapping the contact's employers — both their PAST firms (meta.pastFirms,
+    // comma-joined) AND their CURRENT firm (companyText): you may have worked
+    // where they work now. Each user firm is matched against each contact firm by
+    // either-direction containment (so "Goldman" matches "Goldman Sachs"). Built
+    // ONLY from pastFirms + the current-firm text — never schoolBlob, the K-12
+    // detector, or any other matcher. Fires at most once. prefs.pastFirms is
+    // nullish-guarded so a UserPrefs built before this field existed never
+    // crashes the matcher.
+    const userPastFirms = (prefs.pastFirms ?? [])
+      .map((f) => norm(f))
+      .filter((f) => f.length > 1);
+    if (userPastFirms.length) {
+      const contactFirms = `${meta.pastFirms ?? ""},${companyText}`
+        .split(",")
+        .map((f) => norm(f))
+        .filter((f) => f.length > 1);
+      const overlaps = userPastFirms.some((u) =>
+        contactFirms.some((c) => u.includes(c) || c.includes(u)),
+      );
+      if (overlaps) {
+        affiliations.push({ name: "Shared Employer", boost: 10 });
       }
     }
   }

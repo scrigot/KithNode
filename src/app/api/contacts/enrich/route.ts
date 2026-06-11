@@ -170,6 +170,8 @@ export async function POST(req: NextRequest) {
       const minor = c.minor || pdl?.minor || "";
       const skills =
         c.skills || (pdl?.skills?.length ? pdl.skills.join(", ") : "");
+      const pastFirms =
+        c.pastFirms || (pdl?.pastFirms?.length ? pdl.pastFirms.join(", ") : "");
 
       // Adopt PDL full name when the current name is a single token (slug-derived).
       // Multi-word names (CSV imports) are considered accurate and never overwritten.
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
       // highSchool/clubs/passions ride along from the existing columns.
       const tags = await loadContactTags(userId, c.id);
       const { affiliations, score, tier } = rescoreContact(
-        { ...c, name, education, location, major, minor, skills, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
+        { ...c, name, education, location, major, minor, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
         prefs,
         tags,
       );
@@ -204,6 +206,7 @@ export async function POST(req: NextRequest) {
           major,
           minor,
           skills,
+          pastFirms,
           industry: fields.industry,
           seniorityLevel: fields.seniorityLevel,
           warmthScore: score,

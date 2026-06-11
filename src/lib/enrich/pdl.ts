@@ -44,6 +44,16 @@ interface PdlEducationEntry {
   minors?: string[] | null;
 }
 
+// PDL experience entry shape from /v5/person/enrich response. Each entry has a
+// company { name } and an end_date string ("2021" / "2021-06"); end_date is
+// null/absent for the contact's CURRENT role.
+interface PdlExperienceEntry {
+  company?: {
+    name?: string | null;
+  } | null;
+  end_date?: string | null;
+}
+
 // Free-tier responses redact some fields to boolean true ("present but
 // hidden") instead of the string value, so location fields must be
 // runtime-checked as strings before use. skills is the same: the free tier
@@ -51,6 +61,7 @@ interface PdlEducationEntry {
 interface PdlPersonData {
   full_name?: string | null;
   education?: PdlEducationEntry[] | null;
+  experience?: PdlExperienceEntry[] | boolean | null;
   location_locality?: string | boolean | null;
   location_region?: string | boolean | null;
   location_name?: string | boolean | null;
@@ -71,6 +82,10 @@ export interface PdlResult {
   major: string;
   minor: string;
   skills: string[];
+  // Past employer names: companies from experience entries EXCLUDING the
+  // current one (an entry with no end_date is current). Deduped, title-cased,
+  // first 5. Feeds the Shared Employer matcher.
+  pastFirms: string[];
 }
 
 // High school / pre-college markers. PDL uses school.type = "post-secondary institution"
@@ -145,6 +160,28 @@ function buildSkills(data: PdlPersonData): string[] {
     .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
     .slice(0, 12)
     .map((s) => titleCase(s.trim()));
+}
+
+// Past employer names from the experience array. An entry with an end_date is a
+// PAST role (included); an entry with no end_date is the CURRENT role
+// (excluded). Deduped case-insensitively, title-cased, first 5. Free tier may
+// redact the whole array to boolean true, so Array.isArray-guard (same pattern
+// as skills/location). [] when absent or redacted.
+function buildPastFirms(data: PdlPersonData): string[] {
+  if (!Array.isArray(data.experience)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of data.experience) {
+    if (!entry || entry.end_date == null) continue; // current role or malformed
+    const name = String(entry.company?.name || "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(titleCase(name));
+    if (out.length >= 5) break;
+  }
+  return out;
 }
 
 function buildLocation(data: PdlPersonData): string {
@@ -229,6 +266,7 @@ export async function fetchPdlProfile(
       major: firstFieldOf(best.majors),
       minor: firstFieldOf(best.minors),
       skills: buildSkills(personData),
+      pastFirms: buildPastFirms(personData),
     };
   } catch (err) {
     console.error("fetchPdlProfile: request failed", {

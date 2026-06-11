@@ -109,9 +109,11 @@ describe("resumeSchema", () => {
       majors: ["Economics"],
       minors: ["Computer Science"],
       targetIndustries: ["Investment Banking"],
+      pastFirms: ["Goldman Sachs", "Evercore"],
     });
     expect(parsed.university).toBe("UNC Chapel Hill");
     expect(parsed.majors).toEqual(["Economics"]);
+    expect(parsed.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
   });
 
   it("rejects more than 2 majors", () => {
@@ -125,6 +127,7 @@ describe("resumeSchema", () => {
       majors: ["A", "B", "C"],
       minors: [],
       targetIndustries: [],
+      pastFirms: [],
     });
     expect(result.success).toBe(false);
   });

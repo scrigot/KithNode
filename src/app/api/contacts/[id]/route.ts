@@ -22,6 +22,7 @@ const EDITABLE_FIELDS = [
   "major",
   "minor",
   "skills",
+  "pastFirms",
 ] as const;
 
 // personType is a closed enum, not free text: '' = auto (text heuristics),
@@ -151,6 +152,7 @@ export async function GET(
     major: contact.major || "",
     minor: contact.minor || "",
     skills: contact.skills || "",
+    past_firms: contact.pastFirms || "",
     person_type: contact.personType || "",
     university: contact.university || "",
     company: {

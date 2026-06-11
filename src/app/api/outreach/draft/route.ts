@@ -113,6 +113,29 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: true });
     const manualTags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
+    // Shared-employer overlap: the user's OWN past employers against the
+    // contact's current firm + their past firms, normalized + either-direction
+    // containment (same rule as the Shared Employer matcher). The first match is
+    // surfaced in CONTACT INFO so the email can name the shared employer.
+    const normFirm = (s: string): string =>
+      s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const contactPastFirms: string = contact.pastFirms || "";
+    const sharedEmployer = (() => {
+      const userFirms = prefs.pastFirms.map(normFirm).filter((f) => f.length > 1);
+      if (!userFirms.length) return "";
+      const contactFirms = [contact.firmName || "", contactPastFirms]
+        .join(",")
+        .split(",")
+        .map(normFirm)
+        .filter((f) => f.length > 1);
+      for (const u of prefs.pastFirms) {
+        const un = normFirm(u);
+        if (un.length <= 1) continue;
+        if (contactFirms.some((c) => un.includes(c) || c.includes(un))) return u;
+      }
+      return "";
+    })();
+
     const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
     const userSchool = prefs.university || "my school";
     const userIndustryFocus =
@@ -151,7 +174,7 @@ CONTACT INFO:
 - Title: ${contact.title || "Unknown"}
 - Company: ${contact.firmName || "Unknown"}
 - Location: ${contact.location || "Unknown"}
-- Education: ${contact.education || "Unknown"}${contact.major ? `\n- Major: ${contact.major}` : ""}${roleLine}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.skills ? `\n- Skills: ${contact.skills}` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
+- Education: ${contact.education || "Unknown"}${contact.major ? `\n- Major: ${contact.major}` : ""}${roleLine}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.skills ? `\n- Skills: ${contact.skills}` : ""}${contactPastFirms ? `\n- Past employers: ${contactPastFirms}` : ""}${sharedEmployer ? `\n- Shared employer: ${sharedEmployer} (the sender also worked there)` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
 - Affiliations: ${affiliationNames.join(", ") || "None"}
 - Warm Connection Phrases: ${warmConnections || "professional connection"}${manualTags.length > 0 ? `\n- Manual tags (user-added context): ${manualTags.join(", ")}` : ""}
 

@@ -18,6 +18,7 @@ const prefs = (overrides: Partial<UserPrefs> = {}): UserPrefs => ({
   targetLocations: [],
   clubs: [],
   skills: [],
+  pastFirms: [],
   major: "",
   minor: "",
   recruitingDate: null,
@@ -128,5 +129,28 @@ describe("rescoreContact", () => {
       [],
     );
     expect(result.affiliations.some((a) => a.name === "Skill Match")).toBe(true);
+  });
+
+  it("threads the pastFirms column into Shared Employer", () => {
+    // Shared Employer fires ONLY via the contact's pastFirms column overlapping
+    // prefs.pastFirms — proves the column reaches detectAffiliations through the
+    // rescore meta (firmName is empty so the current-firm path can't fire it).
+    const contact = {
+      name: "Dana W",
+      education: "",
+      location: "",
+      firmName: "",
+      title: "",
+      pastFirms: "Goldman Sachs, Evercore",
+    };
+    const withFirm = rescoreContact(contact, prefs({ pastFirms: ["Goldman Sachs"] }), []);
+    expect(withFirm.affiliations.some((a) => a.name === "Shared Employer")).toBe(true);
+
+    const noFirm = rescoreContact(
+      { ...contact, pastFirms: "" },
+      prefs({ pastFirms: ["Goldman Sachs"] }),
+      [],
+    );
+    expect(noFirm.affiliations.some((a) => a.name === "Shared Employer")).toBe(false);
   });
 });

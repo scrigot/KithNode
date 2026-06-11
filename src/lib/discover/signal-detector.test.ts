@@ -27,6 +27,7 @@ const PREFS: UserPrefs = {
   targetLocations: ["New York, NY"],
   clubs: [],
   skills: [],
+  pastFirms: [],
   major: "",
   minor: "",
   recruitingDate: null,
