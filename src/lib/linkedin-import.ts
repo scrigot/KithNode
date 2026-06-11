@@ -418,13 +418,19 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
     }
   }
 
-  // ── CS-strong school (universal, independent of user's school) ──
-  if (educationText && CS_TOP_SCHOOL.some((p) => p.test(educationText))) {
-    affiliations.push({ name: "CS Top School", boost: 5 });
-  }
-
   // ── Per-user match layer ──
   if (prefs) {
+    // CS-strong school: only meaningful when the user targets AI/ML/tech —
+    // "their school is elite in your target field" is signal; bare prestige is
+    // not warmth for a finance-focused user (Sam's call, 2026-06-12).
+    if (
+      prefs.targetIndustries.some((i) => /\bai\b|\bml\b|machine\s*learning|tech/i.test(i)) &&
+      educationText &&
+      CS_TOP_SCHOOL.some((p) => p.test(educationText))
+    ) {
+      affiliations.push({ name: "CS Top School", boost: 5 });
+    }
+
     // Target firm, biggest single boost since it's the user's actual recruiting target
     if (prefs.targetFirms.length && containsAny(companyText, prefs.targetFirms)) {
       affiliations.push({ name: "Target Firm", boost: 25 });

@@ -673,6 +673,46 @@ describe("detectAffiliations: contact greekOrg field", () => {
   });
 });
 
+describe("detectAffiliations: CS Top School gated on AI/tech targeting", () => {
+  const prefsTargeting = (targetIndustries: string[]) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries,
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    major: "",
+    minor: "",
+    pastFirms: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires for an AI/ML-targeting user when education is a CS-elite school", () => {
+    const affs = detectAffiliations(
+      baseMeta({ education: "Carnegie Mellon University" }),
+      prefsTargeting(["AI/ML"]),
+    );
+    expect(affs.some((a) => a.name === "CS Top School")).toBe(true);
+  });
+
+  it("does NOT fire for a finance-targeting user (prestige is not warmth)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ education: "Carnegie Mellon University" }),
+      prefsTargeting(["Investment Banking", "Private Equity"]),
+    );
+    expect(affs.some((a) => a.name === "CS Top School")).toBe(false);
+  });
+
+  it("does NOT fire without prefs at all", () => {
+    const affs = detectAffiliations(baseMeta({ education: "Stanford University" }));
+    expect(affs.some((a) => a.name === "CS Top School")).toBe(false);
+  });
+});
+
 describe("detectAffiliations seniority: student-org vs firm officer", () => {
   it("does NOT credit a club VP with professional seniority", () => {
     const affs = detectAffiliations(baseMeta({ title: "VP of Finance Club" }));
