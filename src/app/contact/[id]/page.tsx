@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,6 +172,38 @@ function TypeToggle({
   );
 }
 
+function BackLink({
+  backHref,
+  backLabel,
+}: {
+  backHref: string;
+  backLabel: string;
+}) {
+  const router = useRouter();
+  // Use history traversal when the user arrived from within the app — the
+  // browser/App Router will restore scroll position natively. Fall back to a
+  // hard link for direct/deep links (no history entry to go back to).
+  const canGoBack =
+    typeof window !== "undefined" && window.history.length > 1;
+
+  if (canGoBack) {
+    return (
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="text-[10px] text-muted-foreground hover:text-primary"
+      >
+        &lt; {backLabel}
+      </button>
+    );
+  }
+  return (
+    <Link href={backHref} className="text-[10px] text-muted-foreground hover:text-primary">
+      &lt; {backLabel}
+    </Link>
+  );
+}
+
 export default function ContactDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -225,12 +257,7 @@ export default function ContactDetailPage() {
   if (error || !contact) {
     return (
       <div className="min-h-screen bg-background p-6">
-        <Link
-          href={backHref}
-          className="text-xs text-muted-foreground hover:text-primary"
-        >
-          &lt; {backLabel}
-        </Link>
+        <BackLink backHref={backHref} backLabel={backLabel} />
         <div className="mt-8 border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
           {error || "Contact not found"}
         </div>
@@ -243,12 +270,7 @@ export default function ContactDetailPage() {
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <Link
-            href={backHref}
-            className="text-[10px] text-muted-foreground hover:text-primary"
-          >
-            &lt; {backLabel}
-          </Link>
+          <BackLink backHref={backHref} backLabel={backLabel} />
           <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
             <FieldEditor
               contactId={contact.id}

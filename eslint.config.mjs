@@ -37,6 +37,7 @@ export default [
         window: "readonly",
         navigator: "readonly",
         localStorage: "readonly",
+        sessionStorage: "readonly",
         performance: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",

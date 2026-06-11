@@ -106,6 +106,12 @@ export function WarmSignalCard({
             <Link
               href={`/contact/${contact.id}`}
               className="block hover:text-primary"
+              onClick={() => {
+                sessionStorage.setItem(
+                  "warm-signals-scroll",
+                  String(window.scrollY),
+                );
+              }}
             >
               {NameBlock}
             </Link>

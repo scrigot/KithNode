@@ -35,6 +35,20 @@ export function ContactsList() {
         setContacts(data);
         setLoading(false);
         trackEvent("dashboard_loaded", { contact_count: data.length });
+
+        // Belt-and-suspenders scroll restore: if the user navigated back from a
+        // contact page (and router.back() scroll restore didn't fire), scroll
+        // window to where they were.
+        const saved = sessionStorage.getItem("warm-signals-scroll");
+        if (saved !== null) {
+          sessionStorage.removeItem("warm-signals-scroll");
+          const y = Number(saved);
+          if (Number.isFinite(y) && y > 0) {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: y, behavior: "instant" });
+            });
+          }
+        }
       })
       .catch((err) => {
         setError(err.message);
