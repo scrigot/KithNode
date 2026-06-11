@@ -15,6 +15,11 @@ import {
   loadClubs,
 } from "@/lib/data/onboarding-options";
 import {
+  INDUSTRY_OPTIONS,
+  FIRM_OPTIONS,
+  LOCATION_OPTIONS,
+} from "@/lib/data/preference-options";
+import {
   GraduationCap,
   MapPin,
   Target,
@@ -31,63 +36,6 @@ import {
 import { trackEvent } from "@/lib/posthog";
 
 const TOTAL_STEPS = 5;
-
-const INDUSTRY_OPTIONS = [
-  "AI/ML",
-  "Investment Banking",
-  "Private Equity",
-  "Consulting",
-  "Venture Capital",
-  "Corporate Finance",
-  "Asset Management",
-];
-
-const FIRM_OPTIONS = [
-  // AI / ML
-  "Anthropic",
-  "OpenAI",
-  "Google DeepMind",
-  "Mistral AI",
-  "Cohere",
-  "xAI",
-  "Perplexity",
-  "Hugging Face",
-  "Cursor",
-  "Vercel",
-  "Databricks",
-  "Scale AI",
-  "Replit",
-  "NVIDIA",
-  // Finance / Consulting
-  "Goldman Sachs",
-  "JPMorgan",
-  "Morgan Stanley",
-  "Bank of America",
-  "Evercore",
-  "Lazard",
-  "Centerview",
-  "Moelis",
-  "PJT Partners",
-  "Blackstone",
-  "KKR",
-  "Carlyle",
-  "Apollo",
-  "McKinsey",
-  "BCG",
-  "Bain",
-  "Deloitte",
-];
-
-const LOCATION_OPTIONS = [
-  "New York",
-  "San Francisco",
-  "Chicago",
-  "Charlotte",
-  "Boston",
-  "Houston",
-  "Dallas",
-  "London",
-];
 
 const STEP_ICONS = [GraduationCap, MapPin, Target, Building2, CheckCircle2];
 

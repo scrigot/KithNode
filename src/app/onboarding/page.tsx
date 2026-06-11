@@ -3,6 +3,7 @@
 import {
   useState,
   useRef,
+  useEffect,
   useCallback,
   type DragEvent,
   type ChangeEvent,
@@ -17,7 +18,15 @@ import { trackEvent } from "@/lib/posthog";
 import {
   loadUniversities,
   loadCities,
+  loadHighSchools,
+  loadGreekOrgs,
+  loadClubs,
 } from "@/lib/data/onboarding-options";
+import {
+  INDUSTRY_OPTIONS,
+  FIRM_OPTIONS,
+  LOCATION_OPTIONS,
+} from "@/lib/data/preference-options";
 import {
   parseLinkedInCSV,
   type CsvContact,
@@ -34,38 +43,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  CalendarDays,
 } from "lucide-react";
 
 // Contacts are POSTed to /api/import/linkedin in batches so the client can
 // render a determinate progress bar instead of one long opaque request.
 const IMPORT_BATCH_SIZE = 50;
-
-const INDUSTRY_OPTIONS = [
-  "AI/ML",
-  "Investment Banking",
-  "Private Equity",
-  "Consulting",
-  "Venture Capital",
-  "Corporate Finance",
-  "Asset Management",
-];
-
-const FIRM_OPTIONS = [
-  "Anthropic",
-  "OpenAI",
-  "Google DeepMind",
-  "NVIDIA",
-  "Vercel",
-  "Goldman Sachs",
-  "JPMorgan",
-  "Morgan Stanley",
-  "Evercore",
-  "Blackstone",
-  "KKR",
-  "McKinsey",
-  "BCG",
-  "Bain",
-];
 
 const SAMPLE_CONTACTS: CsvContact[] = [
   {
@@ -131,7 +114,7 @@ const TIER_STYLES: Record<string, string> = {
 };
 
 // ─── Step indicator ────────────────────────────────────────────────────────
-const STEPS = ["Profile", "Contacts", "Pipeline"];
+const STEPS = ["Profile", "Targets", "Contacts", "Pipeline"];
 
 function StepIndicator({ step }: { step: number }) {
   return (
@@ -207,18 +190,28 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
 
-  // Step 1 — profile
+  // Step 1 — profile (who are you?)
   const [university, setUniversity] = useState("");
+  const [highSchool, setHighSchool] = useState("");
   const [hometown, setHometown] = useState("");
+  const [greekLifeEnabled, setGreekLifeEnabled] = useState(false);
   const [greekOrg, setGreekOrg] = useState("");
+  const [clubs, setClubs] = useState<string[]>([]);
+  const [clubInput, setClubInput] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState("");
+
+  // Step 2 — targets (what are you hunting?)
   const [industries, setIndustries] = useState<string[]>([]);
   const [firms, setFirms] = useState<string[]>([]);
   const [customFirm, setCustomFirm] = useState("");
   const [locations, setLocations] = useState<string[]>([]);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [recruitingDate, setRecruitingDate] = useState("");
+  const [weeklyGoalTarget, setWeeklyGoalTarget] = useState(3);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
 
-  // Step 2 — contacts
+  // Step 3 — contacts
   const [csvContacts, setCsvContacts] = useState<CsvContact[]>([]);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -232,18 +225,87 @@ export default function OnboardingPage() {
   // Determinate import progress (chunked POSTs) across all import sources.
   const [importDone, setImportDone] = useState(0);
   const [importTotal, setImportTotal] = useState(0);
-  const [enrichProgress, setEnrichProgress] = useState(0);
+  const [enrichDone, setEnrichDone] = useState(0);
+  const [enrichRemaining, setEnrichRemaining] = useState(0);
   const [enriching, setEnriching] = useState(false);
   const [manualImported, setManualImported] = useState(false);
   const [contactsError, setContactsError] = useState<string | null>(null);
+  // Aborts the background enrich loop when the wizard unmounts so we never
+  // keep POSTing after navigation.
+  const enrichAbortRef = useRef(false);
 
-  // Step 3 — pick
+  // Step 4 — pick
   const [ranked, setRanked] = useState<RankedLite[]>([]);
   const [loadingRanked, setLoadingRanked] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [finishing, setFinishing] = useState(false);
 
-  // ── Step 1 handlers ──────────────────────────────────────────────────────
+  // Abort the enrich loop if the wizard unmounts mid-flight.
+  useEffect(() => {
+    return () => {
+      enrichAbortRef.current = true;
+    };
+  }, []);
+
+  // Hydrate step 1 + 2 from any saved preferences so a returning user resuming
+  // onboarding doesn't lose fields they already entered.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/user/preferences");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data) return;
+        if (typeof data.university === "string") setUniversity(data.university);
+        if (typeof data.highSchool === "string") setHighSchool(data.highSchool);
+        if (typeof data.hometown === "string") setHometown(data.hometown);
+        if (typeof data.greekOrg === "string" && data.greekOrg) {
+          setGreekLifeEnabled(true);
+          setGreekOrg(data.greekOrg);
+        }
+        if (Array.isArray(data.clubs)) setClubs(data.clubs.slice(0, 3));
+        if (Array.isArray(data.skills)) setSkills(data.skills.slice(0, 10));
+        if (Array.isArray(data.targetIndustries))
+          setIndustries(data.targetIndustries);
+        // DB stores presets + customs flat; both render fine through the chip
+        // group (presets toggle, customs append), so keep the full list.
+        if (Array.isArray(data.targetFirms)) setFirms(data.targetFirms);
+        if (Array.isArray(data.targetLocations))
+          setLocations(data.targetLocations);
+        if (data.recruitingDate)
+          setRecruitingDate(String(data.recruitingDate).slice(0, 10));
+        if (typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0)
+          setWeeklyGoalTarget(data.weeklyGoalTarget);
+      } catch {
+        // Non-fatal: a fresh user simply starts with empty fields.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── Step 1 handlers (profile) ────────────────────────────────────────────
+  const addClub = (v: string) => {
+    const club = v.trim();
+    setClubs((p) =>
+      club && !p.includes(club) && p.length < 3 ? [...p, club] : p,
+    );
+    setClubInput("");
+  };
+  const removeClub = (v: string) => setClubs((p) => p.filter((c) => c !== v));
+  const addSkill = () => {
+    const skill = skillInput.trim();
+    setSkills((p) =>
+      skill && !p.includes(skill) && p.length < 10 ? [...p, skill] : p,
+    );
+    setSkillInput("");
+  };
+  const removeSkill = (v: string) =>
+    setSkills((p) => p.filter((s) => s !== v));
+
+  // ── Step 2 handlers (targets) ────────────────────────────────────────────
   const toggleIndustry = (v: string) =>
     setIndustries((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
   const toggleFirm = (v: string) =>
@@ -263,24 +325,38 @@ export default function OnboardingPage() {
     setCustomFirm("");
   };
 
-  const saveProfile = async () => {
+  // Step 1 only gates on university (the dashboard layout redirects to
+  // onboarding while it's empty); everything else on this step is optional.
+  const goToTargets = () => {
     if (!university.trim()) {
-      setProfileError("University is required.");
+      setPrefsError("University is required.");
       return;
     }
-    setSavingProfile(true);
-    setProfileError(null);
+    setPrefsError(null);
+    setStep(1);
+  };
+
+  // Step 2 → 3: persist the FULL step 1 + 2 payload before advancing. On
+  // failure, surface a retry and stay put rather than silently moving on.
+  const savePrefs = async () => {
+    setSavingPrefs(true);
+    setPrefsError(null);
     try {
       const res = await apiFetch("/api/user/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           current_university: university.trim(),
+          high_school: highSchool.trim(),
           hometown: hometown.trim(),
-          greek_life: greekOrg.trim(),
+          greek_life: greekLifeEnabled ? greekOrg.trim() : "",
+          clubs,
+          skills,
           target_industries: industries,
           target_companies: firms,
           target_locations: locations,
+          recruiting_date: recruitingDate || null,
+          weekly_goal_target: weeklyGoalTarget || 3,
         }),
       });
       if (!res.ok) throw new Error("save failed");
@@ -289,15 +365,15 @@ export default function OnboardingPage() {
         firms: firms.length,
         industries: industries.length,
       });
-      setStep(1);
+      setStep(2);
     } catch {
-      setProfileError("Could not save your profile. Try again.");
+      setPrefsError("Could not save your preferences. Try again.");
     } finally {
-      setSavingProfile(false);
+      setSavingPrefs(false);
     }
   };
 
-  // ── Step 2 handlers ──────────────────────────────────────────────────────
+  // ── Step 3 handlers (contacts) ───────────────────────────────────────────
   const handleCSVFile = (file: File) => {
     if (!file.name.endsWith(".csv")) {
       setContactsError("Only .csv files are accepted.");
@@ -354,30 +430,43 @@ export default function OnboardingPage() {
     setManualTitle("");
   };
 
-  // Loop the enrich endpoint until there's nothing left to enrich.
+  // Background enrich loop, mirroring the dashboard contacts "Enrich All"
+  // pattern: POST /api/contacts/enrich repeatedly until the server reports
+  // remaining === 0, a request fails, a 402 (Pro paywall) is hit, or the
+  // wizard unmounts. Never blocks navigation — the progress chip rides along
+  // in the header while the user moves through steps 3-4.
   const runEnrich = useCallback(async () => {
+    enrichAbortRef.current = false;
     setEnriching(true);
-    setEnrichProgress(0);
+    setEnrichDone(0);
+    setEnrichRemaining(0);
+    let totalEnriched = 0;
     try {
-      // Guard against an unexpected loop; 25/batch covers far more than a
-      // first-run import realistically needs.
-      for (let i = 0; i < 40; i++) {
+      // Safety cap: 40 batches × 25 = 1000 contacts max.
+      for (let batch = 0; batch < 40; batch++) {
+        if (enrichAbortRef.current) break;
         const res = await apiFetch("/api/contacts/enrich", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
+        // Enrich is a Pro feature; a 402 just ends the loop quietly here.
+        if (res.status === 402) break;
         if (!res.ok) break;
-        const data: { enriched?: number; total?: number } = await res.json();
+        const data: { enriched?: number; remaining?: number } =
+          await res.json();
         const enriched = data.enriched ?? 0;
-        const total = data.total ?? 0;
-        setEnrichProgress((p) => p + enriched);
-        if (total === 0 || enriched === 0) break;
+        const remaining = data.remaining ?? 0;
+        totalEnriched += enriched;
+        setEnrichDone(totalEnriched);
+        setEnrichRemaining(remaining);
+        // Nothing left, or a batch made no progress (persistent-failure guard).
+        if (remaining === 0 || enriched === 0) break;
       }
     } catch {
       // Non-fatal: enrichment improves scores but isn't required to continue.
     } finally {
-      setEnriching(false);
+      if (!enrichAbortRef.current) setEnriching(false);
     }
   }, []);
 
@@ -416,10 +505,13 @@ export default function OnboardingPage() {
           setManualContacts([]);
           setManualImported(true);
         }
-        await runEnrich();
+        // Auto-start enrichment in the background. Fire-and-forget so import is
+        // considered done immediately and the user can advance through the
+        // wizard while the enrich chip keeps progressing in the header.
+        setImporting(false);
+        void runEnrich();
       } catch {
         setContactsError("Import failed. Try again.");
-      } finally {
         setImporting(false);
       }
     },
@@ -427,7 +519,7 @@ export default function OnboardingPage() {
   );
 
   const handleEnterPipeline = async () => {
-    setStep(2);
+    setStep(3);
     setLoadingRanked(true);
     try {
       const res = await apiFetch("/api/contacts");
@@ -440,7 +532,7 @@ export default function OnboardingPage() {
     }
   };
 
-  // ── Step 3 handlers ──────────────────────────────────────────────────────
+  // ── Step 4 handlers (pick) ───────────────────────────────────────────────
   const togglePick = (id: string) => {
     setPicked((prev) => {
       const next = new Set(prev);
@@ -479,8 +571,18 @@ export default function OnboardingPage() {
               Set up KithNode
             </h1>
             <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-              Three steps to your warm-path network
+              Four steps to your warm-path network
             </p>
+            {/* Background enrich progress — rides along in the header across
+                steps 3-4 and never blocks navigation. */}
+            {enriching && (
+              <span className="mt-1.5 inline-flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 font-mono text-[10px] font-bold tabular-nums text-accent-teal">
+                <Sparkles className="h-3 w-3 animate-pulse" />
+                Enriching {enrichDone}
+                {enrichRemaining > 0 ? `/${enrichDone + enrichRemaining}` : ""}
+                ...
+              </span>
+            )}
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <button
@@ -495,16 +597,20 @@ export default function OnboardingPage() {
         </div>
         <div className="h-px bg-border" />
 
-        {/* ─── STEP 1: PROFILE ─────────────────────────────────────────── */}
+        {/* ─── STEP 1: PROFILE — WHO ARE YOU? ──────────────────────────── */}
         {step === 0 && (
           <div className="mt-4 space-y-3">
             <section className="border border-white/[0.06] bg-bg-card p-5">
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-1 flex items-center gap-2">
                 <GraduationCap size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Profile
+                  Who are you?
                 </h2>
               </div>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Every field lights up matches in your network. Skip what
+                doesn&apos;t apply.
+              </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -521,6 +627,22 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    High School
+                  </label>
+                  <Combobox
+                    value={highSchool}
+                    onSelect={(v) => {
+                      // Display label is "Name — City, ST"; store only the name.
+                      const name = v.includes(" — ") ? v.split(" — ")[0] : v;
+                      setHighSchool(name);
+                    }}
+                    loadOptions={loadHighSchools}
+                    placeholder="East Chapel Hill High School"
+                    ariaLabel="High School"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     Hometown
                   </label>
                   <Combobox
@@ -533,18 +655,158 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Greek Org
+                    In greek life?
                   </label>
-                  <Input
-                    placeholder="e.g. Chi Phi"
-                    value={greekOrg}
-                    onChange={(e) => setGreekOrg(e.target.value)}
-                    className="bg-muted text-sm"
-                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGreekLifeEnabled(true)}
+                      className={`border px-4 py-1.5 text-[11px] font-bold transition-colors ${
+                        greekLifeEnabled
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      YES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGreekLifeEnabled(false);
+                        setGreekOrg("");
+                      }}
+                      className={`border px-4 py-1.5 text-[11px] font-bold transition-colors ${
+                        !greekLifeEnabled
+                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      NO
+                    </button>
+                  </div>
                 </div>
+                {greekLifeEnabled && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Organization
+                    </label>
+                    <Combobox
+                      value={greekOrg}
+                      onSelect={setGreekOrg}
+                      loadOptions={loadGreekOrgs}
+                      placeholder="e.g. Chi Phi"
+                      ariaLabel="Greek Organization"
+                    />
+                  </div>
+                )}
               </div>
             </section>
 
+            <section className="border border-white/[0.06] bg-bg-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Users size={14} className="text-accent-teal" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Top Clubs
+                </h2>
+                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                  {clubs.length}/3
+                </span>
+              </div>
+              {clubs.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {clubs.map((club) => (
+                    <span
+                      key={club}
+                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                    >
+                      {club}
+                      <button
+                        type="button"
+                        onClick={() => removeClub(club)}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {clubs.length < 3 && (
+                <Combobox
+                  value={clubInput}
+                  onSelect={addClub}
+                  loadOptions={loadClubs}
+                  placeholder="Add a club..."
+                  ariaLabel="Top clubs"
+                />
+              )}
+            </section>
+
+            <section className="border border-white/[0.06] bg-bg-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Target size={14} className="text-accent-teal" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Skills
+                </h2>
+                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                  {skills.length}/10
+                </span>
+              </div>
+              {skills.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                    >
+                      {skill}
+                      <button
+                        type="button"
+                        onClick={() => removeSkill(skill)}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {skills.length < 10 && (
+                <Input
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addSkill();
+                    }
+                  }}
+                  placeholder="Add a skill, then press Enter..."
+                  aria-label="Skills"
+                  className="bg-muted text-sm"
+                />
+              )}
+            </section>
+
+            {prefsError && (
+              <p className="text-[11px] text-red-400">{prefsError}</p>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={goToTargets}
+                className="gap-1 bg-accent-teal text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/90"
+              >
+                Continue
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── STEP 2: TARGETS — WHAT ARE YOU HUNTING? ─────────────────── */}
+        {step === 1 && (
+          <div className="mt-4 space-y-3">
             <section className="border border-white/[0.06] bg-bg-card p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Target size={14} className="text-accent-teal" />
@@ -605,53 +867,95 @@ export default function OnboardingPage() {
                   Target Locations
                 </h2>
               </div>
-              <Combobox
-                value=""
-                onSelect={addLocation}
-                loadOptions={loadCities}
-                placeholder="Add a city..."
-                ariaLabel="Target locations"
+              <ChipGroup
+                options={[
+                  ...LOCATION_OPTIONS,
+                  ...locations.filter((l) => !LOCATION_OPTIONS.includes(l)),
+                ]}
+                selected={locations}
+                onToggle={(v) =>
+                  locations.includes(v) ? removeLocation(v) : addLocation(v)
+                }
               />
-              {locations.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {locations.map((loc) => (
-                    <span
-                      key={loc}
-                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
-                    >
-                      {loc}
-                      <button
-                        type="button"
-                        onClick={() => removeLocation(loc)}
-                        className="text-accent-teal/60 hover:text-accent-teal"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="mt-3">
+                <Combobox
+                  value=""
+                  onSelect={addLocation}
+                  loadOptions={loadCities}
+                  placeholder="Add a city..."
+                  ariaLabel="Target locations"
+                />
+              </div>
             </section>
 
-            {profileError && (
-              <p className="text-[11px] text-red-400">{profileError}</p>
+            <section className="border border-white/[0.06] bg-bg-card p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <CalendarDays size={14} className="text-accent-teal" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Recruiting Timeline
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Target recruiting date
+                  </label>
+                  <Input
+                    type="date"
+                    value={recruitingDate}
+                    onChange={(e) => setRecruitingDate(e.target.value)}
+                    aria-label="Target recruiting date"
+                    className="bg-muted text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Weekly coffee-chat goal
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={weeklyGoalTarget}
+                    onChange={(e) =>
+                      setWeeklyGoalTarget(Number(e.target.value))
+                    }
+                    aria-label="Weekly coffee-chat goal"
+                    className="bg-muted text-sm"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {prefsError && (
+              <p className="text-[11px] text-red-400">{prefsError}</p>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
               <Button
-                onClick={saveProfile}
-                disabled={savingProfile}
+                size="sm"
+                variant="ghost"
+                onClick={() => setStep(0)}
+                disabled={savingPrefs}
+                className="gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <Button
+                onClick={savePrefs}
+                disabled={savingPrefs}
                 className="gap-1 bg-accent-teal text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/90"
               >
-                {savingProfile ? "Saving..." : "Continue"}
+                {savingPrefs ? "Saving..." : "Continue"}
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* ─── STEP 2: CONTACTS ────────────────────────────────────────── */}
-        {step === 1 && (
+        {/* ─── STEP 3: CONTACTS ────────────────────────────────────────── */}
+        {step === 2 && (
           <div className="mt-4 space-y-3">
             {/* CSV upload */}
             <section className="border border-white/[0.06] bg-bg-card">
@@ -836,19 +1140,18 @@ export default function OnboardingPage() {
               </Button>
             </section>
 
-            {/* Progress — one panel covers both the import and enrich phases */}
-            {(importing || enriching || importedCount > 0) && (
+            {/* Import progress — determinate, per-batch. Enrichment shows in
+                the header chip and continues in the background. */}
+            {(importing || importedCount > 0) && (
               <div className="space-y-2 border border-accent-teal/30 bg-accent-teal/5 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-3.5 w-3.5 shrink-0 text-accent-teal" />
                   <p className="text-[11px] font-bold text-accent-teal">
                     {importing
                       ? `Imported ${importDone}/${importTotal}...`
-                      : enriching
-                        ? `Enriching ${enrichProgress}...`
-                        : manualImported
-                          ? `${importedCount} contacts imported and enriched. Queue cleared.`
-                          : `${importedCount} contacts imported and enriched.`}
+                      : manualImported
+                        ? `${importedCount} contacts imported. Enriching in the background. Queue cleared.`
+                        : `${importedCount} contacts imported. Enriching in the background.`}
                   </p>
                 </div>
                 <div className="h-1 w-full bg-white/[0.08]">
@@ -872,7 +1175,7 @@ export default function OnboardingPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setStep(0)}
+                onClick={() => setStep(1)}
                 className="gap-1 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -880,7 +1183,7 @@ export default function OnboardingPage() {
               </Button>
               <Button
                 onClick={handleEnterPipeline}
-                disabled={importing || enriching}
+                disabled={importing}
                 className="gap-1 bg-accent-teal text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/90"
               >
                 {importedCount > 0 ? "Pick contacts" : "Skip for now"}
@@ -890,8 +1193,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ─── STEP 3: PICK 5 ──────────────────────────────────────────── */}
-        {step === 2 && (
+        {/* ─── STEP 4: PICK 5 ──────────────────────────────────────────── */}
+        {step === 3 && (
           <div className="mt-4 space-y-3">
             <section className="border border-white/[0.06] bg-bg-card">
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
@@ -979,7 +1282,7 @@ export default function OnboardingPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
                 className="gap-1 text-[11px] text-muted-foreground hover:text-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
