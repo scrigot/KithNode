@@ -16,6 +16,7 @@ import {
   loadHighSchools,
   loadGreekOrgs,
   loadClubs,
+  loadMajors,
 } from "@/lib/data/onboarding-options";
 import { trackEvent } from "@/lib/posthog";
 import type { ContactDetail } from "@/lib/api";
@@ -181,6 +182,7 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOutreach, setShowOutreach] = useState(false);
+  const [tab, setTab] = useState<"signals" | "profile">("signals");
 
   // Refetch the contact after a field/type edit so the rescored affiliations +
   // score (computed server-side in the PATCH) replace the stale panel data.
@@ -295,11 +297,169 @@ export default function ContactDetailPage() {
 
       <Separator className="mb-4" />
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Score */}
-        <ScoreSection score={contact.score} />
+      {/* Tab bar — matches the discover page segment toggle. Active tab lives in
+          component state only; no URL change. */}
+      <div className="mb-4 flex overflow-hidden border border-white/[0.06]">
+        <button
+          type="button"
+          onClick={() => setTab("signals")}
+          aria-pressed={tab === "signals"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            tab === "signals"
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Score &amp; Signals
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("profile")}
+          aria-pressed={tab === "profile"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            tab === "profile"
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Profile
+        </button>
+      </div>
 
+      {/* ─── Tab: SCORE & SIGNALS ─── score breakdown (hugs its content),
+          signal timeline, outreach history stacked dense. ─── */}
+      {tab === "signals" && (
+        <div className="space-y-4">
+          {/* Score */}
+          <ScoreSection score={contact.score} />
+
+          {/* Signals */}
+          <div className="border border-border bg-card p-4">
+            <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              SIGNAL TIMELINE
+            </h3>
+            {contact.signals.length > 0 ? (
+              <div className="space-y-2">
+                {contact.signals.map((signal) => (
+                  <div
+                    key={signal.id}
+                    className="flex items-start gap-2 text-xs"
+                  >
+                    <span className="w-5 font-bold text-accent-amber">
+                      {SIGNAL_ICONS[signal.signal_type] || "**"}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-foreground">{signal.description}</p>
+                      <div className="flex gap-2 text-[10px] text-muted-foreground">
+                        <span>Strength: {signal.strength}/10</span>
+                        {signal.source_url && (
+                          <a
+                            href={signal.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent-blue hover:underline"
+                          >
+                            source
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No signals detected yet
+              </p>
+            )}
+          </div>
+
+          {/* Outreach History */}
+          <div className="border border-border bg-card p-4">
+            <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              OUTREACH HISTORY
+            </h3>
+            {contact.outreach_history.length > 0 ? (
+              <div className="space-y-3">
+                {contact.outreach_history.map((outreach) => {
+                  const isLocked = outreach.status === "replied";
+                  const isSent = outreach.status === "sent";
+                  return (
+                    <div
+                      key={outreach.id}
+                      className={`border p-2 text-xs ${isLocked ? "border-amber-500/30 bg-amber-500/5" : "border-border"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-foreground">
+                          {outreach.email_subject || "Untitled draft"}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            isLocked
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                              : isSent
+                                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
+                          }`}
+                        >
+                          {isLocked ? "LOCKED" : outreach.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {outreach.created_at}
+                      </p>
+                      {isSent && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-6 text-[10px] text-amber-400 hover:bg-amber-500/20"
+                          onClick={async () => {
+                            await fetch(
+                              `/api/contacts/${outreach.id}/status`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  status: "replied",
+                                }),
+                              },
+                            );
+                            trackEvent("autoguard_locked", {
+                              contact_id: contact.id,
+                              contact_name: contact.name,
+                            });
+                            // Reload to show AutoGuard state
+                            window.location.reload();
+                          }}
+                        >
+                          MARK AS RESPONDED
+                        </Button>
+                      )}
+                      {isLocked && (
+                        <p className="mt-1 text-[10px] text-amber-400">
+                          AutoGuard active — AI automation disabled
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No outreach history
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
+          rows, mutual/LinkedIn links, and the tags editor. ─── */}
+      {tab === "profile" && (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Affiliations */}
         <div className="border border-border bg-card p-4">
           <TypeToggle
@@ -383,6 +543,9 @@ export default function ContactDetailPage() {
               label="Major"
               initialValue={contact.major || ""}
               placeholder="Add major"
+              mode="multi-chip"
+              loadOptions={loadMajors}
+              maxChips={2}
               onSaved={loadContact}
             />
             <FieldEditor
@@ -391,6 +554,9 @@ export default function ContactDetailPage() {
               label="Minor"
               initialValue={contact.minor || ""}
               placeholder="Add minor"
+              mode="multi-chip"
+              loadOptions={loadMajors}
+              maxChips={2}
               onSaved={loadContact}
             />
             <FieldEditor
@@ -493,130 +659,10 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* Signals */}
-        <div className="border border-border bg-card p-4">
-          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            SIGNAL TIMELINE
-          </h3>
-          {contact.signals.length > 0 ? (
-            <div className="space-y-2">
-              {contact.signals.map((signal) => (
-                <div
-                  key={signal.id}
-                  className="flex items-start gap-2 text-xs"
-                >
-                  <span className="w-5 font-bold text-accent-amber">
-                    {SIGNAL_ICONS[signal.signal_type] || "**"}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-foreground">{signal.description}</p>
-                    <div className="flex gap-2 text-[10px] text-muted-foreground">
-                      <span>Strength: {signal.strength}/10</span>
-                      {signal.source_url && (
-                        <a
-                          href={signal.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent-blue hover:underline"
-                        >
-                          source
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No signals detected yet
-            </p>
-          )}
-        </div>
-
         {/* Tags */}
         <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
-
-        {/* Outreach History */}
-        <div className="border border-border bg-card p-4">
-          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            OUTREACH HISTORY
-          </h3>
-          {contact.outreach_history.length > 0 ? (
-            <div className="space-y-3">
-              {contact.outreach_history.map((outreach) => {
-                const isLocked = outreach.status === "replied";
-                const isSent = outreach.status === "sent";
-                return (
-                  <div
-                    key={outreach.id}
-                    className={`border p-2 text-xs ${isLocked ? "border-amber-500/30 bg-amber-500/5" : "border-border"}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-foreground">
-                        {outreach.email_subject || "Untitled draft"}
-                      </p>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] ${
-                          isLocked
-                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                            : isSent
-                              ? "bg-green-500/20 text-green-400 border-green-500/30"
-                              : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
-                        }`}
-                      >
-                        {isLocked ? "LOCKED" : outreach.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {outreach.created_at}
-                    </p>
-                    {isSent && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2 h-6 text-[10px] text-amber-400 hover:bg-amber-500/20"
-                        onClick={async () => {
-                          await fetch(
-                            `/api/contacts/${outreach.id}/status`,
-                            {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({
-                                status: "replied",
-                              }),
-                            },
-                          );
-                          trackEvent("autoguard_locked", {
-                            contact_id: contact.id,
-                            contact_name: contact.name,
-                          });
-                          // Reload to show AutoGuard state
-                          window.location.reload();
-                        }}
-                      >
-                        MARK AS RESPONDED
-                      </Button>
-                    )}
-                    {isLocked && (
-                      <p className="mt-1 text-[10px] text-amber-400">
-                        AutoGuard active — AI automation disabled
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No outreach history
-            </p>
-          )}
-        </div>
       </div>
+      )}
     </div>
   );
 }

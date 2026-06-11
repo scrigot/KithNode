@@ -81,11 +81,16 @@ function schoolNameOf(entry: PdlEducationEntry): string {
   return String(entry.school?.name || "").trim();
 }
 
-// First named major/minor off an education entry, title-cased. "" when absent.
+// First two named majors/minors off an education entry, title-cased and
+// comma-joined ("Business Administration, Political Science"). "" when absent.
+// Supports the double-major case the contact-page chip editor caps at 2.
 function firstFieldOf(arr: string[] | null | undefined): string {
   if (!Array.isArray(arr)) return "";
-  const first = arr.find((v) => typeof v === "string" && v.trim().length > 0);
-  return first ? titleCase(first.trim()) : "";
+  return arr
+    .filter((v) => typeof v === "string" && v.trim().length > 0)
+    .slice(0, 2)
+    .map((v) => titleCase(v.trim()))
+    .join(", ");
 }
 
 function isPreCollege(entry: PdlEducationEntry): boolean {

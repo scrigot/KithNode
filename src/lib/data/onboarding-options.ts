@@ -9,6 +9,7 @@ let citiesPromise: Promise<string[]> | null = null;
 let highSchoolsPromise: Promise<string[]> | null = null;
 let greekOrgsPromise: Promise<string[]> | null = null;
 let clubsPromise: Promise<string[]> | null = null;
+let majorsPromise: Promise<string[]> | null = null;
 
 export function loadUniversities(): Promise<string[]> {
   if (!universitiesPromise) {
@@ -57,4 +58,13 @@ export function loadClubs(): Promise<string[]> {
     );
   }
   return clubsPromise;
+}
+
+export function loadMajors(): Promise<string[]> {
+  if (!majorsPromise) {
+    majorsPromise = import("./us-majors.json").then(
+      (m) => m.default as string[],
+    );
+  }
+  return majorsPromise;
 }

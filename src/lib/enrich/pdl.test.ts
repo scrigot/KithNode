@@ -424,14 +424,32 @@ describe("shouldAdoptPdlName", () => {
 // ── major / minor / skills mapping ────────────────────────────────────────────
 
 describe("fetchPdlProfile major/minor/skills", () => {
-  it("maps majors[0]/minors[0] off the picked education entry, title-cased", async () => {
+  it("maps the first two majors/minors off the picked education entry, title-cased and comma-joined", async () => {
     mockFetch(
       makePdlResponse({
         education: [
           {
             school: { name: "unc", type: "post-secondary institution" },
             end_date: "2027",
-            majors: ["economics", "statistics"],
+            majors: ["business administration", "political science", "statistics"],
+            minors: ["computer science", "spanish"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.major).toBe("Business Administration, Political Science");
+    expect(result?.minor).toBe("Computer Science, Spanish");
+  });
+
+  it("maps a single major/minor without a trailing comma", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            majors: ["economics"],
             minors: ["computer science"],
           },
         ],
