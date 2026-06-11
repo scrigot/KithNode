@@ -50,6 +50,11 @@ export async function POST(request: NextRequest) {
       ? Math.min(99, Math.round(weeklyGoalRaw))
       : 3;
 
+  // major/minor are comma-joined strings (like the contact columns), trimmed
+  // and capped at 160 chars to bound the column.
+  const major = typeof body.major === "string" ? body.major.trim().slice(0, 160) : "";
+  const minor = typeof body.minor === "string" ? body.minor.trim().slice(0, 160) : "";
+
   const { error } = await supabase
     .from("User")
     .update({
@@ -57,6 +62,8 @@ export async function POST(request: NextRequest) {
       highSchool: body.high_school || "",
       hometown: body.hometown || "",
       greekOrg: body.greek_life || "",
+      major,
+      minor,
       targetIndustries: serializeList(body.target_industries),
       targetFirms: serializeList(body.target_companies),
       targetLocations: serializeList(body.target_locations),

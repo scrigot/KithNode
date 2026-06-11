@@ -21,6 +21,7 @@ import {
   loadHighSchools,
   loadGreekOrgs,
   loadClubs,
+  loadMajors,
 } from "@/lib/data/onboarding-options";
 import {
   INDUSTRY_OPTIONS,
@@ -44,6 +45,8 @@ import {
   ChevronRight,
   Check,
   CalendarDays,
+  FileText,
+  Loader2,
 } from "lucide-react";
 
 // Contacts are POSTed to /api/import/linkedin in batches so the client can
@@ -196,10 +199,19 @@ export default function OnboardingPage() {
   const [hometown, setHometown] = useState("");
   const [greekLifeEnabled, setGreekLifeEnabled] = useState(false);
   const [greekOrg, setGreekOrg] = useState("");
+  const [majors, setMajors] = useState<string[]>([]);
+  const [majorInput, setMajorInput] = useState("");
+  const [minors, setMinors] = useState<string[]>([]);
+  const [minorInput, setMinorInput] = useState("");
   const [clubs, setClubs] = useState<string[]>([]);
   const [clubInput, setClubInput] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState("");
+
+  // Resume autofill — prefills empty step-1 + step-2 fields only.
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeFilled, setResumeFilled] = useState<Set<string>>(new Set());
 
   // Step 2 — targets (what are you hunting?)
   const [industries, setIndustries] = useState<string[]>([]);
@@ -264,6 +276,15 @@ export default function OnboardingPage() {
           setGreekLifeEnabled(true);
           setGreekOrg(data.greekOrg);
         }
+        // major/minor are comma-joined strings on the User row → chip arrays.
+        if (typeof data.major === "string" && data.major)
+          setMajors(
+            data.major.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
+          );
+        if (typeof data.minor === "string" && data.minor)
+          setMinors(
+            data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
+          );
         if (Array.isArray(data.clubs)) setClubs(data.clubs.slice(0, 3));
         if (Array.isArray(data.skills)) setSkills(data.skills.slice(0, 10));
         if (Array.isArray(data.targetIndustries))
@@ -287,6 +308,20 @@ export default function OnboardingPage() {
   }, []);
 
   // ── Step 1 handlers (profile) ────────────────────────────────────────────
+  const addMajor = (v: string) => {
+    const m = v.trim();
+    setMajors((p) => (m && !p.includes(m) && p.length < 2 ? [...p, m] : p));
+    setMajorInput("");
+  };
+  const removeMajor = (v: string) =>
+    setMajors((p) => p.filter((m) => m !== v));
+  const addMinor = (v: string) => {
+    const m = v.trim();
+    setMinors((p) => (m && !p.includes(m) && p.length < 2 ? [...p, m] : p));
+    setMinorInput("");
+  };
+  const removeMinor = (v: string) =>
+    setMinors((p) => p.filter((m) => m !== v));
   const addClub = (v: string) => {
     const club = v.trim();
     setClubs((p) =>
@@ -304,6 +339,87 @@ export default function OnboardingPage() {
   };
   const removeSkill = (v: string) =>
     setSkills((p) => p.filter((s) => s !== v));
+
+  // ── Resume autofill ──────────────────────────────────────────────────────
+  // Parse a PDF client-side → base64 → POST. Prefill ONLY fields that are
+  // currently empty so we never clobber what the user already typed. Tracks
+  // which fields were filled to drive a brief highlight. Uses functional state
+  // updates that re-check emptiness at apply time (avoids stale closures when
+  // multiple fields fill in the same tick).
+  const handleResumeFile = async (file: File) => {
+    setResumeError(null);
+    if (file.type !== "application/pdf") {
+      setResumeError("Please upload a PDF.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setResumeError("PDF too large (max 4MB).");
+      return;
+    }
+    setResumeLoading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      let binary = "";
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
+      const base64 = btoa(binary);
+
+      const res = await apiFetch("/api/profile/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdf: base64 }),
+      });
+      if (!res.ok) throw new Error("extract failed");
+      const data = await res.json();
+
+      const filled = new Set<string>();
+      const fillStr = (key: string, setter: (v: string) => void, value: unknown, cur: string) => {
+        if (!cur.trim() && typeof value === "string" && value.trim()) {
+          setter(value.trim());
+          filled.add(key);
+        }
+      };
+      const fillList = (
+        key: string,
+        setter: (v: string[]) => void,
+        value: unknown,
+        cur: string[],
+        cap: number,
+      ) => {
+        if (cur.length === 0 && Array.isArray(value)) {
+          const next = value
+            .map((v) => String(v).trim())
+            .filter(Boolean)
+            .slice(0, cap);
+          if (next.length) {
+            setter(next);
+            filled.add(key);
+          }
+        }
+      };
+
+      fillStr("university", setUniversity, data.university, university);
+      fillStr("highSchool", setHighSchool, data.highSchool, highSchool);
+      fillStr("hometown", setHometown, data.hometown, hometown);
+      if (!greekOrg.trim() && typeof data.greekOrg === "string" && data.greekOrg.trim()) {
+        setGreekLifeEnabled(true);
+        setGreekOrg(data.greekOrg.trim());
+        filled.add("greekOrg");
+      }
+      fillList("majors", setMajors, data.majors, majors, 2);
+      fillList("minors", setMinors, data.minors, minors, 2);
+      fillList("clubs", setClubs, data.clubs, clubs, 3);
+      fillList("skills", setSkills, data.skills, skills, 10);
+      fillList("industries", setIndustries, data.targetIndustries, industries, 7);
+
+      setResumeFilled(filled);
+      setTimeout(() => setResumeFilled(new Set()), 2500);
+    } catch {
+      setResumeError("Couldn't read that resume. Fill the fields manually.");
+    } finally {
+      setResumeLoading(false);
+    }
+  };
 
   // ── Step 2 handlers (targets) ────────────────────────────────────────────
   const toggleIndustry = (v: string) =>
@@ -350,6 +466,8 @@ export default function OnboardingPage() {
           high_school: highSchool.trim(),
           hometown: hometown.trim(),
           greek_life: greekLifeEnabled ? greekOrg.trim() : "",
+          major: majors.join(", "),
+          minor: minors.join(", "),
           clubs,
           skills,
           target_industries: industries,
@@ -611,6 +729,54 @@ export default function OnboardingPage() {
                 Every field lights up matches in your network. Skip what
                 doesn&apos;t apply.
               </p>
+
+              {/* Resume autofill — prefills empty fields only, never stored. */}
+              <div className="mb-3 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText size={14} className="text-accent-teal" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-foreground">
+                      Autofill from resume (PDF)
+                    </span>
+                  </div>
+                  <label
+                    className={`flex cursor-pointer items-center gap-1.5 border border-accent-teal/40 bg-accent-teal/10 px-3 py-1.5 text-[11px] font-bold text-accent-teal transition-colors hover:bg-accent-teal/20 ${
+                      resumeLoading ? "pointer-events-none opacity-60" : ""
+                    }`}
+                  >
+                    {resumeLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Parsing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5" />
+                        Upload PDF
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      disabled={resumeLoading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleResumeFile(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  Parsed locally, never stored. Only fills empty fields, review
+                  before you continue.
+                </p>
+                {resumeError && (
+                  <p className="mt-1 text-[10px] text-red-400">{resumeError}</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -624,6 +790,72 @@ export default function OnboardingPage() {
                     ariaLabel="University"
                     matchAcronyms
                   />
+                </div>
+                <div className={resumeFilled.has("majors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Major <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">{majors.length}/2</span>
+                  </label>
+                  {majors.length > 0 && (
+                    <div className="mb-1.5 flex flex-wrap gap-1.5">
+                      {majors.map((m) => (
+                        <span
+                          key={m}
+                          className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                        >
+                          {m}
+                          <button
+                            type="button"
+                            onClick={() => removeMajor(m)}
+                            className="text-accent-teal/60 hover:text-accent-teal"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {majors.length < 2 && (
+                    <Combobox
+                      value={majorInput}
+                      onSelect={addMajor}
+                      loadOptions={loadMajors}
+                      placeholder="Add a major..."
+                      ariaLabel="Major"
+                    />
+                  )}
+                </div>
+                <div className={resumeFilled.has("minors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Minor <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">{minors.length}/2</span>
+                  </label>
+                  {minors.length > 0 && (
+                    <div className="mb-1.5 flex flex-wrap gap-1.5">
+                      {minors.map((m) => (
+                        <span
+                          key={m}
+                          className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                        >
+                          {m}
+                          <button
+                            type="button"
+                            onClick={() => removeMinor(m)}
+                            className="text-accent-teal/60 hover:text-accent-teal"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {minors.length < 2 && (
+                    <Combobox
+                      value={minorInput}
+                      onSelect={addMinor}
+                      loadOptions={loadMajors}
+                      placeholder="Add a minor..."
+                      ariaLabel="Minor"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

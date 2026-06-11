@@ -507,6 +507,29 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
         affiliations.push({ name: "Skill Match", boost: 8 });
       }
     }
+
+    // Same Major: the user's major/minor (comma-joined strings) overlapping the
+    // contact's major/minor ONLY — never schoolBlob, the K-12 detector, or any
+    // other matcher. Each user entry is matched against each contact entry by
+    // either-direction containment (so "Economics" matches "Business Economics").
+    // Fires at most once. major/minor are nullish-guarded so a UserPrefs built
+    // before these fields existed never crashes the matcher.
+    const userMajorList = `${prefs.major ?? ""},${prefs.minor ?? ""}`
+      .split(",")
+      .map((m) => norm(m))
+      .filter((m) => m.length > 1);
+    if (userMajorList.length) {
+      const contactMajorList = `${meta.major ?? ""},${meta.minor ?? ""}`
+        .split(",")
+        .map((m) => norm(m))
+        .filter((m) => m.length > 1);
+      const overlaps = userMajorList.some((u) =>
+        contactMajorList.some((c) => u.includes(c) || c.includes(u)),
+      );
+      if (overlaps) {
+        affiliations.push({ name: "Same Major", boost: 8 });
+      }
+    }
   }
 
   return affiliations;

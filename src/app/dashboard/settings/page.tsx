@@ -13,6 +13,7 @@ import {
   loadHighSchools,
   loadGreekOrgs,
   loadClubs,
+  loadMajors,
 } from "@/lib/data/onboarding-options";
 import {
   INDUSTRY_OPTIONS,
@@ -32,6 +33,9 @@ import {
   Pencil,
   RotateCcw,
   CalendarDays,
+  FileText,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { trackEvent } from "@/lib/posthog";
 
@@ -44,6 +48,8 @@ interface Preferences {
   highSchool: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
+  majors: string[];
+  minors: string[];
   clubs: string[];
   skills: string[];
   hometown: string;
@@ -64,6 +70,8 @@ function getDefaults(): Preferences {
     highSchool: "",
     greekLifeEnabled: false,
     greekOrganization: "",
+    majors: [],
+    minors: [],
     clubs: [],
     skills: [],
     hometown: "",
@@ -127,6 +135,8 @@ async function syncToAPI(prefs: Preferences) {
             ? [...prefs.targetFirms, ...prefs.customFirms]
             : null,
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+        major: prefs.majors.join(", "),
+        minor: prefs.minors.join(", "),
         clubs: prefs.clubs,
         skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
@@ -249,10 +259,15 @@ function EditPanel({
   const [local, setLocal] = useState<Preferences>(prefs);
   const [customFirmInput, setCustomFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
+  const [majorInput, setMajorInput] = useState("");
+  const [minorInput, setMinorInput] = useState("");
   const [clubInput, setClubInput] = useState("");
   const [skillInput, setSkillInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeFilled, setResumeFilled] = useState<Set<string>>(new Set());
 
   const toggleIndustry = (ind: string) =>
     setLocal((p) => ({
@@ -299,6 +314,94 @@ function EditPanel({
     setSkillInput("");
   };
 
+  const addMajor = (v: string) => {
+    const m = v.trim();
+    if (m && !local.majors.includes(m) && local.majors.length < 2) {
+      setLocal((p) => ({ ...p, majors: [...p.majors, m] }));
+    }
+    setMajorInput("");
+  };
+  const addMinor = (v: string) => {
+    const m = v.trim();
+    if (m && !local.minors.includes(m) && local.minors.length < 2) {
+      setLocal((p) => ({ ...p, minors: [...p.minors, m] }));
+    }
+    setMinorInput("");
+  };
+
+  // Resume autofill — parse PDF client-side → base64 → POST, then prefill the
+  // local form's EMPTY fields only (never clobber what's already set). User
+  // still hits Save to persist. Functional update re-checks emptiness at apply.
+  const handleResumeFile = async (file: File) => {
+    setResumeError(null);
+    if (file.type !== "application/pdf") {
+      setResumeError("Please upload a PDF.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setResumeError("PDF too large (max 4MB).");
+      return;
+    }
+    setResumeLoading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      let binary = "";
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
+      const base64 = btoa(binary);
+
+      const res = await fetch("/api/profile/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdf: base64 }),
+      });
+      if (!res.ok) throw new Error("extract failed");
+      const data = await res.json();
+
+      const filled = new Set<string>();
+      setLocal((p) => {
+        const next = { ...p };
+        const fillStr = (key: keyof Preferences, value: unknown) => {
+          if (!String(next[key]).trim() && typeof value === "string" && value.trim()) {
+            (next[key] as string) = value.trim();
+            filled.add(key);
+          }
+        };
+        const fillList = (key: keyof Preferences, value: unknown, cap: number) => {
+          if ((next[key] as string[]).length === 0 && Array.isArray(value)) {
+            const list = value.map((v) => String(v).trim()).filter(Boolean).slice(0, cap);
+            if (list.length) {
+              (next[key] as string[]) = list;
+              filled.add(key);
+            }
+          }
+        };
+
+        fillStr("university", data.university);
+        fillStr("highSchool", data.highSchool);
+        fillStr("hometown", data.hometown);
+        if (!next.greekOrganization.trim() && typeof data.greekOrg === "string" && data.greekOrg.trim()) {
+          next.greekLifeEnabled = true;
+          next.greekOrganization = data.greekOrg.trim();
+          filled.add("greekOrganization");
+        }
+        fillList("majors", data.majors, 2);
+        fillList("minors", data.minors, 2);
+        fillList("clubs", data.clubs, 3);
+        fillList("skills", data.skills, 10);
+        fillList("targetIndustries", data.targetIndustries, 7);
+        return next;
+      });
+
+      setResumeFilled(filled);
+      setTimeout(() => setResumeFilled(new Set()), 2500);
+    } catch {
+      setResumeError("Couldn't read that resume. Fill the fields manually.");
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     await onSave(local);
@@ -324,6 +427,52 @@ function EditPanel({
           <RotateCcw size={12} />
           Restart Setup
         </button>
+      </div>
+
+      {/* Resume autofill — prefills empty fields only, never stored. */}
+      <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-accent-teal" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white">
+              Autofill from resume (PDF)
+            </span>
+          </div>
+          <label
+            className={`flex cursor-pointer items-center gap-1.5 border border-accent-teal/40 bg-accent-teal/10 px-3 py-1.5 text-[11px] font-bold text-accent-teal transition-colors hover:bg-accent-teal/20 ${
+              resumeLoading ? "pointer-events-none opacity-60" : ""
+            }`}
+          >
+            {resumeLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Parsing...
+              </>
+            ) : (
+              <>
+                <Upload className="h-3.5 w-3.5" />
+                Upload PDF
+              </>
+            )}
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              disabled={resumeLoading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleResumeFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-[10px] text-text-muted">
+          Parsed locally, never stored. Only fills empty fields, then hit Save.
+        </p>
+        {resumeError && (
+          <p className="mt-1 text-[10px] text-red-400">{resumeError}</p>
+        )}
       </div>
 
       <div className="space-y-6">
@@ -396,6 +545,72 @@ function EditPanel({
                 ariaLabel="University"
                 matchAcronyms
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className={resumeFilled.has("majors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  Major <span className="font-mono text-[9px] tabular-nums text-text-muted/60">{local.majors.length}/2</span>
+                </label>
+                {local.majors.length > 0 && (
+                  <div className="mb-1.5 flex flex-wrap gap-1.5">
+                    {local.majors.map((m) => (
+                      <span
+                        key={m}
+                        className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                      >
+                        {m}
+                        <button
+                          onClick={() => setLocal((p) => ({ ...p, majors: p.majors.filter((x) => x !== m) }))}
+                          className="text-accent-teal/60 hover:text-accent-teal"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {local.majors.length < 2 && (
+                  <Combobox
+                    value={majorInput}
+                    onSelect={addMajor}
+                    loadOptions={loadMajors}
+                    placeholder="Add a major..."
+                    ariaLabel="Major"
+                  />
+                )}
+              </div>
+              <div className={resumeFilled.has("minors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+                <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  Minor <span className="font-mono text-[9px] tabular-nums text-text-muted/60">{local.minors.length}/2</span>
+                </label>
+                {local.minors.length > 0 && (
+                  <div className="mb-1.5 flex flex-wrap gap-1.5">
+                    {local.minors.map((m) => (
+                      <span
+                        key={m}
+                        className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                      >
+                        {m}
+                        <button
+                          onClick={() => setLocal((p) => ({ ...p, minors: p.minors.filter((x) => x !== m) }))}
+                          className="text-accent-teal/60 hover:text-accent-teal"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {local.minors.length < 2 && (
+                  <Combobox
+                    value={minorInput}
+                    onSelect={addMinor}
+                    loadOptions={loadMajors}
+                    placeholder="Add a minor..."
+                    ariaLabel="Minor"
+                  />
+                )}
+              </div>
             </div>
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
@@ -1118,6 +1333,15 @@ export default function SettingsPage() {
               highSchool: data.highSchool || "",
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",
+              // major/minor are comma-joined strings on the User row → chip arrays.
+              majors:
+                typeof data.major === "string" && data.major
+                  ? data.major.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2)
+                  : [],
+              minors:
+                typeof data.minor === "string" && data.minor
+                  ? data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2)
+                  : [],
               clubs: Array.isArray(data.clubs) ? data.clubs : [],
               skills: Array.isArray(data.skills) ? data.skills : [],
               hometown: data.hometown || "",

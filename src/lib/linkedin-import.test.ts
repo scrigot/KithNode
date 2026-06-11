@@ -77,6 +77,8 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      major: "",
+      minor: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -95,6 +97,8 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      major: "",
+      minor: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -127,6 +131,8 @@ describe("detectAffiliations: manual tags", () => {
       targetLocations: [],
       clubs: [],
       skills: [],
+      major: "",
+      minor: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -147,6 +153,8 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    major: "",
+    minor: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -214,6 +222,8 @@ describe("detectAffiliations: Same Club", () => {
     targetLocations: [],
     clubs,
     skills: [],
+    major: "",
+    minor: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -270,6 +280,8 @@ describe("detectAffiliations: Skill Match", () => {
     targetLocations: [],
     clubs: [],
     skills: overrides.skills ?? [],
+    major: "",
+    minor: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -339,6 +351,125 @@ describe("detectAffiliations: Skill Match", () => {
   });
 });
 
+describe("detectAffiliations: Same Major", () => {
+  const majorPrefs = (
+    overrides: { major?: string; minor?: string } = {},
+  ) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    major: overrides.major ?? "",
+    minor: overrides.minor ?? "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires when user major exactly matches contact major", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Economics" }),
+      majorPrefs({ major: "Economics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major" && a.boost === 8)).toBe(true);
+  });
+
+  it("fires when user major is contained in contact major (direction A)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Business Economics" }),
+      majorPrefs({ major: "Economics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(true);
+  });
+
+  it("fires when contact major is contained in user major (direction B)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Economics" }),
+      majorPrefs({ major: "Business Economics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(true);
+  });
+
+  it("fires on a minor↔minor overlap", () => {
+    const affs = detectAffiliations(
+      baseMeta({ minor: "Computer Science" }),
+      majorPrefs({ minor: "Computer Science" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(true);
+  });
+
+  it("fires when user minor overlaps contact major (cross major/minor)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Statistics" }),
+      majorPrefs({ minor: "Statistics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(true);
+  });
+
+  it("handles comma-joined lists on both sides", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "History, Statistics" }),
+      majorPrefs({ major: "Economics, Statistics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(true);
+  });
+
+  it("fires at most once even when multiple entries overlap", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Economics", minor: "Statistics" }),
+      majorPrefs({ major: "Economics", minor: "Statistics" }),
+    );
+    expect(affs.filter((a) => a.name === "Same Major")).toHaveLength(1);
+  });
+
+  it("does NOT fire when both prefs.major and prefs.minor are empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Economics", minor: "Statistics" }),
+      majorPrefs(),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(false);
+  });
+
+  it("does NOT fire when nothing overlaps", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "History" }),
+      majorPrefs({ major: "Economics", minor: "Statistics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(false);
+  });
+
+  it("ignores single-character entries (no spurious containment)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "X" }),
+      majorPrefs({ major: "Economics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(false);
+  });
+
+  it("builds the contact side from major/minor only — not skills/education", () => {
+    // A contact whose SKILLS or EDUCATION text contains the user's major must
+    // NOT fire Same Major; only the contact's own major/minor fields count.
+    const affs = detectAffiliations(
+      baseMeta({
+        skills: "Economics research, Python",
+        education: "Economics coursework, UNC",
+        major: "History",
+      }),
+      majorPrefs({ major: "Economics" }),
+    );
+    expect(affs.some((a) => a.name === "Same Major")).toBe(false);
+  });
+
+  it("does NOT fire Same Major when prefs object is omitted entirely", () => {
+    const affs = detectAffiliations(baseMeta({ major: "Economics" }));
+    expect(affs.some((a) => a.name === "Same Major")).toBe(false);
+  });
+});
+
 describe("detectAffiliations: contact greekOrg field", () => {
   const prefsWith = (overrides: Record<string, unknown> = {}) => ({
     university: "",
@@ -350,6 +481,8 @@ describe("detectAffiliations: contact greekOrg field", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    major: "",
+    minor: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -431,6 +564,8 @@ describe("detectAffiliations: manual personType override", () => {
     targetLocations: [],
     clubs: [],
     skills: [],
+    major: "",
+    minor: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
