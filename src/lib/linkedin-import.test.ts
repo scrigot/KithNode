@@ -75,6 +75,7 @@ describe("detectAffiliations: manual tags", () => {
       targetIndustries: [],
       targetFirms: [],
       targetLocations: [],
+      clubs: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -91,6 +92,7 @@ describe("detectAffiliations: manual tags", () => {
       targetIndustries: [],
       targetFirms: [],
       targetLocations: [],
+      clubs: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -121,6 +123,7 @@ describe("detectAffiliations: manual tags", () => {
       targetIndustries: [],
       targetFirms: [],
       targetLocations: [],
+      clubs: [],
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -139,6 +142,7 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     targetIndustries: [],
     targetFirms: [],
     targetLocations: [],
+    clubs: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -192,6 +196,59 @@ describe("detectAffiliations: Same High School + editable fields", () => {
       }),
     );
     expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+  });
+});
+
+describe("detectAffiliations: Same Club", () => {
+  const clubPrefs = (clubs: string[]) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs,
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires when contact.clubs contains one of prefs.clubs", () => {
+    const affs = detectAffiliations(
+      baseMeta({ clubs: "Investment Banking Club, Finance Society" }),
+      clubPrefs(["Investment Banking Club"]),
+    );
+    expect(affs.some((a) => a.name === "Same Club" && a.boost === 8)).toBe(true);
+  });
+
+  it("fires via a manual tag", () => {
+    const affs = detectAffiliations(
+      baseMeta({ tags: ["Fintech Club"] }),
+      clubPrefs(["Fintech Club"]),
+    );
+    expect(affs.some((a) => a.name === "Same Club" && a.boost === 8)).toBe(true);
+  });
+
+  it("does NOT fire when prefs.clubs is empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ clubs: "Investment Banking Club" }),
+      clubPrefs([]),
+    );
+    expect(affs.some((a) => a.name === "Same Club")).toBe(false);
+  });
+
+  it("club text does NOT produce Pre-College", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        clubs: "high school robotics club investment banking club",
+        title: "Analyst",
+        experience: "Goldman Sachs",
+      }),
+      clubPrefs(["Investment Banking Club"]),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+    expect(affs.some((a) => a.name === "Same Club")).toBe(true);
   });
 });
 

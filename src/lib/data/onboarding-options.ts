@@ -7,6 +7,8 @@
 let universitiesPromise: Promise<string[]> | null = null;
 let citiesPromise: Promise<string[]> | null = null;
 let highSchoolsPromise: Promise<string[]> | null = null;
+let greekOrgsPromise: Promise<string[]> | null = null;
+let clubsPromise: Promise<string[]> | null = null;
 
 export function loadUniversities(): Promise<string[]> {
   if (!universitiesPromise) {
@@ -37,4 +39,22 @@ export function loadHighSchools(): Promise<string[]> {
     );
   }
   return highSchoolsPromise;
+}
+
+export function loadGreekOrgs(): Promise<string[]> {
+  if (!greekOrgsPromise) {
+    greekOrgsPromise = import("./greek-orgs.json").then(
+      (m) => m.default as string[],
+    );
+  }
+  return greekOrgsPromise;
+}
+
+export function loadClubs(): Promise<string[]> {
+  if (!clubsPromise) {
+    clubsPromise = import("./college-clubs.json").then(
+      (m) => m.default as string[],
+    );
+  }
+  return clubsPromise;
 }

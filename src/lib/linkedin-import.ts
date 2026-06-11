@@ -410,6 +410,15 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
         affiliations.push({ name: "Hometown Match", boost: 8 });
       }
     }
+
+    // Same Club: match contact's clubs field + tags against prefs.clubs.
+    // Deliberately excludes education/experience/location to avoid false fires.
+    if (prefs.clubs.length) {
+      const clubBlob = norm(`${meta.clubs ?? ""} ${tagsText}`);
+      if (containsAny(clubBlob, prefs.clubs)) {
+        affiliations.push({ name: "Same Club", boost: 8 });
+      }
+    }
   }
 
   return affiliations;

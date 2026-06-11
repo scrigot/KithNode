@@ -13,6 +13,7 @@ export interface UserPrefs {
   targetIndustries: string[];
   targetFirms: string[];
   targetLocations: string[];
+  clubs: string[];
   recruitingDate: string | null;
   weeklyGoalTarget: number;
 }
@@ -25,6 +26,7 @@ const EMPTY_PREFS: UserPrefs = {
   targetIndustries: [],
   targetFirms: [],
   targetLocations: [],
+  clubs: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
@@ -56,7 +58,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, targetIndustries, targetFirms, targetLocations, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, targetIndustries, targetFirms, targetLocations, clubs, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -71,6 +73,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     targetIndustries: parseList(data.targetIndustries),
     targetFirms: parseList(data.targetFirms),
     targetLocations: parseList(data.targetLocations),
+    clubs: parseList(data.clubs),
     recruitingDate: data.recruitingDate ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
   };

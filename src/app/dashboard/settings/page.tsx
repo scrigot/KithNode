@@ -11,6 +11,8 @@ import {
   loadUniversities,
   loadCities,
   loadHighSchools,
+  loadGreekOrgs,
+  loadClubs,
 } from "@/lib/data/onboarding-options";
 import {
   GraduationCap,
@@ -94,6 +96,7 @@ interface Preferences {
   highSchool: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
+  clubs: string[];
   hometown: string;
   targetLocations: string[];
   customLocations: string[];
@@ -112,6 +115,7 @@ function getDefaults(): Preferences {
     highSchool: "",
     greekLifeEnabled: false,
     greekOrganization: "",
+    clubs: [],
     hometown: "",
     targetLocations: [],
     customLocations: [],
@@ -173,6 +177,7 @@ async function syncToAPI(prefs: Preferences) {
             ? [...prefs.targetFirms, ...prefs.customFirms]
             : null,
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+        clubs: prefs.clubs,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
       }),
@@ -293,6 +298,7 @@ function EditPanel({
   const [local, setLocal] = useState<Preferences>(prefs);
   const [customFirmInput, setCustomFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
+  const [clubInput, setClubInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -480,14 +486,56 @@ function EditPanel({
                 <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                   Organization
                 </label>
-                <Input
-                  placeholder="e.g. Chi Phi"
+                <Combobox
                   value={local.greekOrganization}
-                  onChange={(e) => setLocal({ ...local, greekOrganization: e.target.value })}
-                  className="bg-muted text-sm"
+                  onSelect={(v) => setLocal({ ...local, greekOrganization: v })}
+                  loadOptions={loadGreekOrgs}
+                  placeholder="e.g. Chi Phi"
+                  ariaLabel="Greek Organization"
                 />
               </div>
             )}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Top clubs (up to 3)
+              </label>
+              {local.clubs.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {local.clubs.map((club) => (
+                    <span
+                      key={club}
+                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    >
+                      {club}
+                      <button
+                        onClick={() => setLocal((p) => ({ ...p, clubs: p.clubs.filter((c) => c !== club) }))}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {local.clubs.length < 3 && (
+                <Combobox
+                  value={clubInput}
+                  onSelect={(v) => {
+                    const club = v.trim();
+                    if (club && !local.clubs.includes(club) && local.clubs.length < 3) {
+                      setLocal((p) => ({ ...p, clubs: [...p.clubs, club] }));
+                    }
+                    setClubInput("");
+                  }}
+                  loadOptions={loadClubs}
+                  placeholder="Add a club..."
+                  ariaLabel="Top clubs"
+                />
+              )}
+              {local.clubs.length > 0 && (
+                <p className="mt-1 text-[10px] text-text-muted">{local.clubs.length}/3 selected</p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -1071,6 +1119,7 @@ export default function SettingsPage() {
               highSchool: data.highSchool || "",
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",
+              clubs: Array.isArray(data.clubs) ? data.clubs : [],
               hometown: data.hometown || "",
               targetLocations: Array.isArray(data.targetLocations) ? data.targetLocations : [],
               customLocations: [],

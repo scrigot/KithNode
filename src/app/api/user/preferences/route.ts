@@ -24,6 +24,13 @@ export async function POST(request: NextRequest) {
     return "";
   };
 
+  const rawClubs = Array.isArray(body.clubs)
+    ? body.clubs
+        .map((c: unknown) => String(c).trim().slice(0, 60))
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
+
   const { error } = await supabase
     .from("User")
     .update({
@@ -34,6 +41,7 @@ export async function POST(request: NextRequest) {
       targetIndustries: serializeList(body.target_industries),
       targetFirms: serializeList(body.target_companies),
       targetLocations: serializeList(body.target_locations),
+      clubs: JSON.stringify(rawClubs),
     })
     .eq("email", email);
 

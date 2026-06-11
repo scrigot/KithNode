@@ -25,6 +25,7 @@ const PREFS: UserPrefs = {
   targetIndustries: ["Investment Banking"],
   targetFirms: ["Goldman Sachs"],
   targetLocations: ["New York, NY"],
+  clubs: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };
