@@ -10,6 +10,8 @@ let highSchoolsPromise: Promise<string[]> | null = null;
 let greekOrgsPromise: Promise<string[]> | null = null;
 let clubsPromise: Promise<string[]> | null = null;
 let majorsPromise: Promise<string[]> | null = null;
+let minorsPromise: Promise<string[]> | null = null;
+let concentrationsPromise: Promise<Record<string, string[]>> | null = null;
 let skillsPromise: Promise<string[]> | null = null;
 
 export function loadUniversities(): Promise<string[]> {
@@ -68,6 +70,26 @@ export function loadMajors(): Promise<string[]> {
     );
   }
   return majorsPromise;
+}
+
+export function loadMinors(): Promise<string[]> {
+  if (!minorsPromise) {
+    minorsPromise = import("./unc-minors.json").then(
+      (m) => m.default as string[],
+    );
+  }
+  return minorsPromise;
+}
+
+/** Concentrations / areas of emphasis / tracks, keyed by major name. Only
+ * majors with FORMAL catalog-defined concentrations have keys. */
+export function loadConcentrations(): Promise<Record<string, string[]>> {
+  if (!concentrationsPromise) {
+    concentrationsPromise = import("./unc-concentrations.json").then(
+      (m) => m.default as Record<string, string[]>,
+    );
+  }
+  return concentrationsPromise;
 }
 
 export function loadSkills(): Promise<string[]> {

@@ -17,6 +17,28 @@ import { ALL_ROLES } from "@/lib/data/career-tracks";
  */
 export const INDUSTRY_OPTIONS = ALL_ROLES;
 
+/**
+ * Degree designations conferred at UNC (scraped from catalog.unc.edu 2026-06;
+ * MBA/MAC/JD/MD confirmed via the professional schools — the Graduate School
+ * catalog excludes them). Grouped for the picker UI; GRAD_DEGREES doubles as
+ * the closed set behind the Same Program warmth matcher (undergrad degrees are
+ * deliberately excluded there so BS-BS overlap never fires it).
+ */
+export const DEGREE_OPTIONS = {
+  undergrad: ["BA", "BS", "BSBA", "BSPH", "BSN", "BFA", "BM", "BAEd"],
+  grad: [
+    "MBA", "MS", "MA", "PhD", "JD", "MD", "MPH", "MAC", "MPA", "MPP",
+    "MSW", "MEd", "MAT", "MFA", "MSN", "MSIS", "MSLS", "MPS", "MHA",
+    "MSPH", "DrPH", "EdD", "DNP", "PharmD", "DDS",
+  ],
+} as const;
+
+/** Flat list of every valid degree token (validation pool for prefs + contact PATCH). */
+export const ALL_DEGREES: string[] = [...DEGREE_OPTIONS.undergrad, ...DEGREE_OPTIONS.grad];
+
+/** Grad/professional degrees only — the Same Program matcher's token set. */
+export const GRAD_DEGREES: string[] = [...DEGREE_OPTIONS.grad];
+
 export const FIRM_OPTIONS = [
   // AI / ML
   "Anthropic",
