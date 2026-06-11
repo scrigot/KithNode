@@ -5,6 +5,7 @@ import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { deduceHometown } from "@/lib/deduce-hometown";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
+import { normalizeDegrees } from "@/lib/normalize-degrees";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -24,6 +25,8 @@ const EDITABLE_FIELDS = [
   "personType",
   "major",
   "minor",
+  "concentration",
+  "degrees",
   "skills",
   "pastFirms",
   "track",
@@ -77,6 +80,10 @@ export function pickEditableFields(
         return { fields: {}, invalid: true };
       }
       out[key] = val;
+    } else if (key === "degrees") {
+      // Closed-set validation (canonical casing, dedupe, junk dropped). Like
+      // clubs/skills it is forgiving — never a 400.
+      out[key] = normalizeDegrees(val);
     } else {
       out[key] = normalizeField(val);
     }
@@ -191,6 +198,8 @@ export async function GET(
     passions: contact.passions,
     major: contact.major || "",
     minor: contact.minor || "",
+    concentration: contact.concentration || "",
+    degrees: contact.degrees || "",
     skills: contact.skills || "",
     past_firms: contact.pastFirms || "",
     person_type: contact.personType || "",

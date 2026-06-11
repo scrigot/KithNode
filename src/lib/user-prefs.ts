@@ -12,6 +12,12 @@ export interface UserPrefs {
   greekOrg: string;
   major: string;
   minor: string;
+  /** Comma-joined area(s) of emphasis within the major (e.g. "Finance"). Feeds
+   * the Same Major matcher alongside major/minor. */
+  concentration: string;
+  /** Canonical degree designations, comma-joined (e.g. "BS, MBA"). Grad/pro
+   * degrees here drive the Same Program matcher. */
+  degrees: string;
   targetIndustries: string[];
   targetFirms: string[];
   targetLocations: string[];
@@ -31,6 +37,8 @@ const EMPTY_PREFS: UserPrefs = {
   greekOrg: "",
   major: "",
   minor: "",
+  concentration: "",
+  degrees: "",
   targetIndustries: [],
   targetFirms: [],
   targetLocations: [],
@@ -68,7 +76,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, recruitingDate, weeklyGoalTarget"
     )
     .eq("email", email)
     .single();
@@ -82,6 +90,8 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     greekOrg: data.greekOrg || "",
     major: data.major || "",
     minor: data.minor || "",
+    concentration: data.concentration || "",
+    degrees: data.degrees || "",
     targetIndustries: parseList(data.targetIndustries),
     targetFirms: parseList(data.targetFirms),
     targetLocations: parseList(data.targetLocations),

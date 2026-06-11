@@ -138,4 +138,30 @@ describe("pickEditableFields", () => {
     const { invalid } = pickEditableFields({ role: "Quant" });
     expect(invalid).toBe(false);
   });
+
+  it("keeps canonical degrees, rewrites casing, and drops junk tokens (no 400)", () => {
+    const { fields, invalid } = pickEditableFields({
+      degrees: "bs, mba, finance club, wizard",
+    });
+    expect(invalid).toBe(false);
+    expect(fields.degrees).toBe("BS, MBA");
+  });
+
+  it("normalizes concentration like other free text (cap 160, collapse whitespace)", () => {
+    const { fields } = pickEditableFields({
+      concentration: "  Finance   Concentration  ",
+    });
+    expect(fields.concentration).toBe("Finance Concentration");
+
+    const { fields: capped } = pickEditableFields({
+      concentration: "z".repeat(300),
+    });
+    expect(capped.concentration).toHaveLength(160);
+  });
+
+  it("drops a degrees field with no valid tokens to empty string (still no 400)", () => {
+    const { fields, invalid } = pickEditableFields({ degrees: "history, finance" });
+    expect(invalid).toBe(false);
+    expect(fields.degrees).toBe("");
+  });
 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
+import { normalizeDegrees } from "@/lib/normalize-degrees";
 
 export async function GET() {
   const session = await auth();
@@ -59,10 +60,17 @@ export async function POST(request: NextRequest) {
       ? Math.min(99, Math.round(weeklyGoalRaw))
       : 3;
 
-  // major/minor are comma-joined strings (like the contact columns), trimmed
-  // and capped at 160 chars to bound the column.
+  // major/minor/concentration are comma-joined strings (like the contact
+  // columns), trimmed and capped at 160 chars to bound the column.
   const major = typeof body.major === "string" ? body.major.trim().slice(0, 160) : "";
   const minor = typeof body.minor === "string" ? body.minor.trim().slice(0, 160) : "";
+  const concentration =
+    typeof body.concentration === "string" ? body.concentration.trim().slice(0, 160) : "";
+
+  // degrees: comma-joined string filtered to the canonical closed set
+  // (ALL_DEGREES). Invalid tokens are silently dropped, like clubs/skills.
+  const degrees =
+    typeof body.degrees === "string" ? normalizeDegrees(body.degrees) : "";
 
   const { error } = await supabase
     .from("User")
@@ -73,6 +81,8 @@ export async function POST(request: NextRequest) {
       greekOrg: body.greek_life || "",
       major,
       minor,
+      concentration,
+      degrees,
       targetIndustries: serializeList(body.target_industries),
       targetFirms: serializeList(body.target_companies),
       targetLocations: serializeList(body.target_locations),

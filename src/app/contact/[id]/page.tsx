@@ -363,6 +363,10 @@ export default function ContactDetailPage() {
     );
   }
 
+  // degrees/concentration are new ", "-joined columns the contacts route now
+  // returns; read defensively so this compiles regardless of the api.ts type.
+  const academic = contact as { degrees?: string; concentration?: string };
+
   return (
     <div className="min-h-screen bg-background p-6">
       {/* Header */}
@@ -660,6 +664,12 @@ export default function ContactDetailPage() {
             <DetailRow label="Education" value={contact.education} />
             <DetailRow label="Major" value={contact.major} />
             <DetailRow label="Minor" value={contact.minor} />
+            {academic.degrees?.trim() && (
+              <DetailRow label="Degrees" value={academic.degrees} />
+            )}
+            {academic.concentration?.trim() && (
+              <DetailRow label="Concentration" value={academic.concentration} />
+            )}
             <DetailRow label="Skills" value={contact.skills} />
             <DetailRow label="Past employers" value={contact.past_firms} />
             <DetailRow label="Location (current)" value={contact.linkedin_location} />

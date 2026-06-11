@@ -44,6 +44,8 @@ export interface DeckContact {
   role?: string;
   graduationYear?: string | number;
   hometown?: string;
+  degrees?: string;
+  concentration?: string;
 }
 
 /** One labelled value cell. Renders nothing when the value is empty so blank
@@ -210,6 +212,8 @@ export function DeckCard({
       <div className="grid flex-1 grid-cols-1 gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-2">
         <Field label="Education" value={contact.education} />
         <Field label="Graduation" value={contact.graduationYear} />
+        <Field label="Degrees" value={contact.degrees} />
+        <Field label="Concentration" value={contact.concentration} />
         <Field label="Location" value={contact.location} />
         <Field label="Hometown" value={contact.hometown} />
         <Field label="Source" value={sourceLabel} />

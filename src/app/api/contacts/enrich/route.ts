@@ -204,6 +204,11 @@ export async function POST(req: NextRequest) {
       // a manual edit is never clobbered. skills is stored comma-joined.
       const major = c.major || pdl?.major || "";
       const minor = c.minor || pdl?.minor || "";
+      // degrees fills only-when-empty from the PDL canonical tokens, joined
+      // comma-space like the contact column stores. concentration is NOT
+      // enriched (no reliable source) — manual + resume only.
+      const degrees =
+        c.degrees || (pdl?.degrees?.length ? pdl.degrees.join(", ") : "");
       const skills =
         c.skills || (pdl?.skills?.length ? pdl.skills.join(", ") : "");
       const pastFirms =
@@ -257,7 +262,7 @@ export async function POST(req: NextRequest) {
       // highSchool/clubs/passions ride along from the existing columns.
       const tags = await loadContactTags(userId, c.id);
       const { affiliations, score, tier } = rescoreContact(
-        { ...c, name, education, location, highSchool, hometown, major, minor, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel, track, role },
+        { ...c, name, education, location, highSchool, hometown, major, minor, degrees, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel, track, role },
         prefs,
         tags,
       );
@@ -273,6 +278,7 @@ export async function POST(req: NextRequest) {
           hometown,
           major,
           minor,
+          degrees,
           skills,
           pastFirms,
           track,

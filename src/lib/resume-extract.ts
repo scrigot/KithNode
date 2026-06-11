@@ -10,8 +10,16 @@ import { z } from "zod";
 import greekOrgs from "@/lib/data/greek-orgs.json";
 import clubs from "@/lib/data/college-clubs.json";
 import majors from "@/lib/data/us-majors.json";
+import minors from "@/lib/data/unc-minors.json";
+import concentrations from "@/lib/data/unc-concentrations.json";
 import skills from "@/lib/data/us-skills.json";
-import { INDUSTRY_OPTIONS } from "@/lib/data/preference-options";
+import { INDUSTRY_OPTIONS, ALL_DEGREES } from "@/lib/data/preference-options";
+
+// Flattened, deduped list of every named concentration across all majors —
+// the closed pool the resume extractor maps a stated concentration against.
+const CONCENTRATION_NAMES = [
+  ...new Set(Object.values(concentrations as Record<string, string[]>).flat()),
+];
 
 /** Hard cap on the decoded PDF size. Resumes are 1-2 pages; 4MB is generous. */
 export const MAX_RESUME_BYTES = 4 * 1024 * 1024;
@@ -26,6 +34,8 @@ export const resumeSchema = z.object({
   skills: z.array(z.string()).max(10),
   majors: z.array(z.string()).max(2),
   minors: z.array(z.string()).max(2),
+  degrees: z.array(z.string()).max(3),
+  concentration: z.string(),
   targetIndustries: z.array(z.string()).max(4),
   pastFirms: z.array(z.string()).max(5),
 });
@@ -92,7 +102,9 @@ Return:
 - clubs: up to 3 clubs/student orgs the candidate belongs to, mapped to the CLUBS list when confident.
 - skills: up to 10 of the candidate's skills, mapped to the SKILLS list when confident.
 - majors: up to 2 of the candidate's majors, mapped to the MAJORS list when confident.
-- minors: up to 2 of the candidate's minors, mapped to the MAJORS list when confident.
+- minors: up to 2 of the candidate's minors, mapped to the MINORS list when confident.
+- degrees: up to 3 degree designations the candidate holds or is pursuing, mapped to this exact list: ${ALL_DEGREES.join(", ")}.
+- concentration: the candidate's formal concentration/area of emphasis within the major if stated, mapped to the CONCENTRATIONS list when confident; otherwise "".
 - targetIndustries: up to 4 industries the candidate targets/works in, chosen from the INDUSTRIES list.
 - pastFirms: up to 5 employers from the candidate's work experience section (company names only).
 
@@ -103,6 +115,10 @@ GREEK ORGS: ${(greekOrgs as string[]).join(", ")}
 CLUBS: ${(clubs as string[]).join(", ")}
 
 MAJORS: ${(majors as string[]).join(", ")}
+
+MINORS: ${(minors as string[]).join(", ")}
+
+CONCENTRATIONS: ${CONCENTRATION_NAMES.join(", ")}
 
 SKILLS: ${(skills as string[]).join(", ")}
 

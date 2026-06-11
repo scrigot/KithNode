@@ -380,6 +380,7 @@ describe("fetchPdlProfile", () => {
             end_date: "2027",
             majors: ["economics"],
             minors: ["computer science"],
+            degrees: ["bachelor_of_science"],
           },
         ],
         location_locality: "chapel hill",
@@ -402,6 +403,7 @@ describe("fetchPdlProfile", () => {
       highSchool: "",
       skills: ["Financial Modeling", "Python", "Excel"],
       pastFirms: ["Goldman Sachs"],
+      degrees: ["BS"],
     });
   });
 
@@ -663,5 +665,118 @@ describe("fetchPdlProfile pastFirms", () => {
     );
     const result = await fetchPdlProfile("https://linkedin.com/in/test");
     expect(result?.pastFirms).toEqual(["Citadel"]);
+  });
+});
+
+// ── degrees mapping (canonical tokens / generic-drop / redaction / dedupe) ─────
+
+describe("fetchPdlProfile degrees", () => {
+  it("maps recognized PDL degree designations to canonical tokens", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            degrees: ["bachelor_of_science"],
+          },
+          {
+            school: { name: "harvard", type: "post-secondary institution" },
+            end_date: "2031",
+            degrees: ["master_of_business_administration"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toEqual(["BS", "MBA"]);
+  });
+
+  it("maps each known designation (BA/PhD/JD/MD/MS/MA)", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "grad", type: "post-secondary institution" },
+            end_date: "2027",
+            degrees: [
+              "bachelor_of_arts",
+              "doctor_of_philosophy",
+              "juris_doctor",
+              "doctor_of_medicine",
+            ],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toEqual(["BA", "PhD", "JD", "MD"]);
+  });
+
+  it("drops generic level-only designations (bachelors/masters/doctorates)", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            degrees: ["bachelors", "masters", "doctorates"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toEqual([]);
+  });
+
+  it("returns [] degrees when the free tier redacts the array to boolean true", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "unc", type: "post-secondary institution" },
+            end_date: "2027",
+            degrees: true as unknown as string[],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toEqual([]);
+  });
+
+  it("dedupes canonical tokens across entries and caps at 4", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          {
+            school: { name: "a", type: "post-secondary institution" },
+            end_date: "2020",
+            degrees: ["bachelor_of_science", "bachelor_of_science"],
+          },
+          {
+            school: { name: "b", type: "post-secondary institution" },
+            end_date: "2022",
+            degrees: ["master_of_science", "master_of_arts", "doctor_of_philosophy", "juris_doctor", "doctor_of_medicine"],
+          },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toHaveLength(4);
+    // First occurrence kept, dupe BS dropped; capped before MD.
+    expect(result?.degrees).toEqual(["BS", "MS", "MA", "PhD"]);
+  });
+
+  it("returns [] degrees when no education entry carries a degrees array", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.degrees).toEqual([]);
   });
 });

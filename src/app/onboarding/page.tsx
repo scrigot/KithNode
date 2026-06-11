@@ -5,6 +5,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type DragEvent,
   type ChangeEvent,
 } from "react";
@@ -22,11 +23,15 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadMinors,
+  loadConcentrations,
   loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
   FIRM_OPTIONS,
   LOCATION_OPTIONS,
+  DEGREE_OPTIONS,
+  ALL_DEGREES,
 } from "@/lib/data/preference-options";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
@@ -204,6 +209,9 @@ export default function OnboardingPage() {
   const [majorInput, setMajorInput] = useState("");
   const [minors, setMinors] = useState<string[]>([]);
   const [minorInput, setMinorInput] = useState("");
+  const [degrees, setDegrees] = useState<string[]>([]);
+  const [concentration, setConcentration] = useState("");
+  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
   const [clubs, setClubs] = useState<string[]>([]);
   const [clubInput, setClubInput] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
@@ -262,6 +270,24 @@ export default function OnboardingPage() {
     };
   }, []);
 
+  // Load the major→concentration map once so the Concentration combobox can
+  // scope its pool to the selected majors (fallback: union of all).
+  useEffect(() => {
+    loadConcentrations().then(setConcentrations);
+  }, []);
+
+  // Concentration pool: union of concentrations for every selected major; when
+  // no selected major has an entry, fall back to the union of ALL values.
+  const concentrationPool = useMemo(() => {
+    const scoped = majors.flatMap((m) => concentrations[m] ?? []);
+    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
+    return Array.from(new Set(pool)).sort();
+  }, [majors, concentrations]);
+  const loadConcentrationPool = useCallback(
+    async () => concentrationPool,
+    [concentrationPool],
+  );
+
   // Hydrate step 1 + 2 from any saved preferences so a returning user resuming
   // onboarding doesn't lose fields they already entered.
   useEffect(() => {
@@ -288,6 +314,11 @@ export default function OnboardingPage() {
           setMinors(
             data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
           );
+        if (typeof data.degrees === "string" && data.degrees)
+          setDegrees(
+            data.degrees.split(",").map((d: string) => d.trim()).filter(Boolean),
+          );
+        if (typeof data.concentration === "string") setConcentration(data.concentration);
         if (Array.isArray(data.clubs)) setClubs(data.clubs.slice(0, 3));
         if (Array.isArray(data.skills)) setSkills(data.skills.slice(0, 10));
         if (Array.isArray(data.targetIndustries))
@@ -326,6 +357,8 @@ export default function OnboardingPage() {
   };
   const removeMinor = (v: string) =>
     setMinors((p) => p.filter((m) => m !== v));
+  const toggleDegree = (deg: string) =>
+    setDegrees((p) => (p.includes(deg) ? p.filter((d) => d !== deg) : [...p, deg]));
   const addClub = (v: string) => {
     const club = v.trim();
     setClubs((p) =>
@@ -412,6 +445,8 @@ export default function OnboardingPage() {
       }
       fillList("majors", setMajors, data.majors, majors, 2);
       fillList("minors", setMinors, data.minors, minors, 2);
+      fillList("degrees", setDegrees, data?.degrees, degrees, ALL_DEGREES.length);
+      fillStr("concentration", setConcentration, data?.concentration, concentration);
       fillList("clubs", setClubs, data.clubs, clubs, 3);
       fillList("skills", setSkills, data.skills, skills, 10);
       fillList("pastFirms", setPastFirms, data.pastFirms, pastFirms, 8);
@@ -482,6 +517,8 @@ export default function OnboardingPage() {
           greek_life: greekLifeEnabled ? greekOrg.trim() : "",
           major: majors.join(", "),
           minor: minors.join(", "),
+          degrees: degrees.join(", "),
+          concentration: concentration || null,
           clubs,
           skills,
           past_firms: pastFirms,
@@ -866,11 +903,39 @@ export default function OnboardingPage() {
                     <Combobox
                       value={minorInput}
                       onSelect={addMinor}
-                      loadOptions={loadMajors}
+                      loadOptions={loadMinors}
                       placeholder="Add a minor..."
                       ariaLabel="Minor"
                     />
                   )}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Degrees
+                  </label>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Undergrad</p>
+                      <ChipGroup options={[...DEGREE_OPTIONS.undergrad]} selected={degrees} onToggle={toggleDegree} />
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Grad</p>
+                      <ChipGroup options={[...DEGREE_OPTIONS.grad]} selected={degrees} onToggle={toggleDegree} />
+                    </div>
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Concentration
+                  </label>
+                  <Combobox
+                    key={`conc-${concentrationPool.join("|")}`}
+                    value={concentration}
+                    onSelect={setConcentration}
+                    loadOptions={loadConcentrationPool}
+                    placeholder="e.g. Finance"
+                    ariaLabel="Concentration"
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { ChipField, stripCitySuffix } from "./field-editor";
@@ -11,8 +11,11 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadMinors,
+  loadConcentrations,
   loadSkills,
 } from "@/lib/data/onboarding-options";
+import { DEGREE_OPTIONS } from "@/lib/data/preference-options";
 import type { ContactDetail } from "@/lib/api";
 
 // LinkedIn-style "Edit profile" modal. A centered overlay over the contact
@@ -44,6 +47,9 @@ interface FormState {
   education: string;
   major: string[];
   minor: string[];
+  // Comma-joined degree tokens ("BS, MBA"); toggled via the chip rows.
+  degrees: string;
+  concentration: string;
   highSchool: string;
   location: string;
   hometown: string;
@@ -63,6 +69,9 @@ function parseChips(raw: string, cap: number): string[] {
 }
 
 function initialForm(contact: ContactDetail): FormState {
+  // degrees/concentration are new ", "-joined columns the contacts route now
+  // persists; read defensively so this compiles regardless of the api.ts type.
+  const academic = contact as { degrees?: string; concentration?: string };
   return {
     title: contact.title || "",
     firmName: contact.company.name || "",
@@ -70,6 +79,8 @@ function initialForm(contact: ContactDetail): FormState {
     education: contact.education || "",
     major: parseChips(contact.major || "", 2),
     minor: parseChips(contact.minor || "", 2),
+    degrees: academic.degrees || "",
+    concentration: academic.concentration || "",
     highSchool: contact.high_school || "",
     location: contact.linkedin_location || "",
     hometown: contact.hometown || "",
@@ -166,6 +177,7 @@ export function EditProfileModal({
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
   // Exit guard: with unsaved changes, every close path (Esc, backdrop, X,
   // CANCEL) routes through a confirm dialog — explicit Save or Discard only.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -206,6 +218,35 @@ export function EditProfileModal({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  // Load the major→concentration map once so the Concentration combobox can
+  // scope its pool to the contact's selected majors (fallback: union of all).
+  useEffect(() => {
+    loadConcentrations().then(setConcentrations);
+  }, []);
+
+  // Toggle a degree token in/out of the ", "-joined form value.
+  const degreeList = form.degrees
+    ? form.degrees.split(",").map((d) => d.trim()).filter(Boolean)
+    : [];
+  function toggleDegree(deg: string) {
+    const next = degreeList.includes(deg)
+      ? degreeList.filter((d) => d !== deg)
+      : [...degreeList, deg];
+    set("degrees", next.join(", "));
+  }
+
+  // Concentration pool: union of concentrations for every selected major; when
+  // no selected major has an entry, fall back to the union of ALL values.
+  const concentrationPool = useMemo(() => {
+    const scoped = form.major.flatMap((m) => concentrations[m] ?? []);
+    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
+    return Array.from(new Set(pool)).sort();
+  }, [form.major, concentrations]);
+  const loadConcentrationPool = useCallback(
+    async () => concentrationPool,
+    [concentrationPool],
+  );
+
   // Build the PATCH body: only the columns whose value differs from the opened
   // snapshot. Chip arrays serialize to ", "-joined strings, matching how the
   // route stores and the GET reads them.
@@ -215,6 +256,8 @@ export function EditProfileModal({
       "title",
       "firmName",
       "education",
+      "degrees",
+      "concentration",
       "highSchool",
       "location",
       "hometown",
@@ -347,9 +390,74 @@ export function EditProfileModal({
                 label="Minor"
                 values={form.minor}
                 onChange={(v) => set("minor", v)}
-                loadOptions={loadMajors}
+                loadOptions={loadMinors}
                 placeholder="Add a minor..."
                 cap={2}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Degrees
+              </label>
+              <div className="space-y-2">
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Undergrad</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEGREE_OPTIONS.undergrad.map((deg) => {
+                      const active = degreeList.includes(deg);
+                      return (
+                        <button
+                          key={deg}
+                          type="button"
+                          onClick={() => toggleDegree(deg)}
+                          className={`border px-2 py-1 text-[11px] font-bold transition-colors ${
+                            active
+                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {deg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Grad</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEGREE_OPTIONS.grad.map((deg) => {
+                      const active = degreeList.includes(deg);
+                      return (
+                        <button
+                          key={deg}
+                          type="button"
+                          onClick={() => toggleDegree(deg)}
+                          className={`border px-2 py-1 text-[11px] font-bold transition-colors ${
+                            active
+                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {deg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Concentration
+              </label>
+              <Combobox
+                key={`conc-${concentrationPool.join("|")}`}
+                value={form.concentration}
+                onSelect={(v) => set("concentration", v)}
+                loadOptions={loadConcentrationPool}
+                placeholder="e.g. Finance"
+                ariaLabel="Concentration"
+                inputClassName="h-9 bg-muted text-sm"
               />
             </div>
             <ComboField

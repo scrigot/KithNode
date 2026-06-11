@@ -65,6 +65,8 @@ export function rescoreContact(
     greekOrg: (contact.greekOrg as string) || "",
     major: (contact.major as string) || "",
     minor: (contact.minor as string) || "",
+    concentration: (contact.concentration as string) || "",
+    degrees: (contact.degrees as string) || "",
     skills: (contact.skills as string) || "",
     pastFirms: (contact.pastFirms as string) || "",
     personType: (contact.personType as string) || "",

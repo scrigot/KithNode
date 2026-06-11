@@ -30,6 +30,8 @@ const PREFS: UserPrefs = {
   pastFirms: [],
   major: "",
   minor: "",
+  concentration: "",
+  degrees: "",
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };

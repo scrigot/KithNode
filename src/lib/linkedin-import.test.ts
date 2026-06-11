@@ -80,6 +80,8 @@ describe("detectAffiliations: manual tags", () => {
       pastFirms: [],
       major: "",
       minor: "",
+      concentration: "",
+      degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -101,6 +103,8 @@ describe("detectAffiliations: manual tags", () => {
       pastFirms: [],
       major: "",
       minor: "",
+      concentration: "",
+      degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -136,6 +140,8 @@ describe("detectAffiliations: manual tags", () => {
       pastFirms: [],
       major: "",
       minor: "",
+      concentration: "",
+      degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
     };
@@ -159,6 +165,8 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -229,6 +237,8 @@ describe("detectAffiliations: Hometown Match vs Target Location", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -281,6 +291,8 @@ describe("detectAffiliations: Same Club", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -340,6 +352,8 @@ describe("detectAffiliations: Skill Match", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
   });
@@ -411,7 +425,7 @@ describe("detectAffiliations: Skill Match", () => {
 
 describe("detectAffiliations: Same Major", () => {
   const majorPrefs = (
-    overrides: { major?: string; minor?: string } = {},
+    overrides: { major?: string; minor?: string; concentration?: string } = {},
   ) => ({
     university: "",
     highSchool: "",
@@ -419,6 +433,8 @@ describe("detectAffiliations: Same Major", () => {
     greekOrg: "",
     major: overrides.major ?? "",
     minor: overrides.minor ?? "",
+    concentration: overrides.concentration ?? "",
+    degrees: "",
     targetIndustries: [],
     targetFirms: [],
     targetLocations: [],
@@ -527,6 +543,118 @@ describe("detectAffiliations: Same Major", () => {
     const affs = detectAffiliations(baseMeta({ major: "Economics" }));
     expect(affs.some((a) => a.name === "Same Major")).toBe(false);
   });
+
+  it("fires once when user concentration matches the contact's concentration", () => {
+    const affs = detectAffiliations(
+      baseMeta({ concentration: "Finance" }),
+      majorPrefs({ concentration: "Finance" }),
+    );
+    expect(affs.filter((a) => a.name === "Same Major")).toHaveLength(1);
+  });
+
+  it("fires once when user concentration matches the contact's MAJOR (cross-field)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ major: "Finance" }),
+      majorPrefs({ concentration: "Finance" }),
+    );
+    expect(affs.filter((a) => a.name === "Same Major")).toHaveLength(1);
+  });
+});
+
+describe("detectAffiliations: Same Program", () => {
+  const degreePrefs = (degrees: string) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    major: "",
+    minor: "",
+    concentration: "",
+    degrees,
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    pastFirms: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+  });
+
+  it("fires +6 when a grad degree (MBA) overlaps on both sides", () => {
+    const affs = detectAffiliations(
+      baseMeta({ degrees: "MBA" }),
+      degreePrefs("MBA"),
+    );
+    expect(affs.some((a) => a.name === "Same Program" && a.boost === 6)).toBe(true);
+  });
+
+  it("does NOT fire on a shared undergrad degree (BS-BS)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ degrees: "BS" }),
+      degreePrefs("BS"),
+    );
+    expect(affs.some((a) => a.name === "Same Program")).toBe(false);
+  });
+
+  it("does NOT fire when MBA is present on only one side", () => {
+    const userOnly = detectAffiliations(
+      baseMeta({ degrees: "BS" }),
+      degreePrefs("MBA"),
+    );
+    expect(userOnly.some((a) => a.name === "Same Program")).toBe(false);
+
+    const contactOnly = detectAffiliations(
+      baseMeta({ degrees: "MBA" }),
+      degreePrefs("BS"),
+    );
+    expect(contactOnly.some((a) => a.name === "Same Program")).toBe(false);
+  });
+
+  it("matches case-insensitively (mba vs MBA)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ degrees: "mba" }),
+      degreePrefs("MBA"),
+    );
+    expect(affs.some((a) => a.name === "Same Program")).toBe(true);
+  });
+
+  it("fires at most once even when multiple grad degrees overlap", () => {
+    const affs = detectAffiliations(
+      baseMeta({ degrees: "MBA, MS" }),
+      degreePrefs("MBA, MS"),
+    );
+    expect(affs.filter((a) => a.name === "Same Program")).toHaveLength(1);
+  });
+
+  it("does NOT fire when prefs.degrees is empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ degrees: "MBA" }),
+      degreePrefs(""),
+    );
+    expect(affs.some((a) => a.name === "Same Program")).toBe(false);
+  });
+
+  it("does NOT crash on an old prefs object lacking degrees (treated as no-match)", () => {
+    const legacyPrefs = {
+      university: "",
+      highSchool: "",
+      hometown: "",
+      greekOrg: "",
+      major: "",
+      minor: "",
+      targetIndustries: [],
+      targetFirms: [],
+      targetLocations: [],
+      clubs: [],
+      skills: [],
+      pastFirms: [],
+      recruitingDate: null,
+      weeklyGoalTarget: 3,
+    } as unknown as Parameters<typeof detectAffiliations>[1];
+    const affs = detectAffiliations(baseMeta({ degrees: "MBA" }), legacyPrefs);
+    expect(affs.some((a) => a.name === "Same Program")).toBe(false);
+  });
 });
 
 describe("detectAffiliations: Shared Employer", () => {
@@ -537,6 +665,8 @@ describe("detectAffiliations: Shared Employer", () => {
     greekOrg: "",
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     targetIndustries: [],
     targetFirms: [],
     targetLocations: [],
@@ -640,6 +770,8 @@ describe("detectAffiliations: contact greekOrg field", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -686,6 +818,8 @@ describe("detectAffiliations: CS Top School gated on AI/tech targeting", () => {
     skills: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     pastFirms: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
@@ -764,6 +898,8 @@ describe("detectAffiliations: manual personType override", () => {
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,
@@ -913,6 +1049,8 @@ describe("detectAffiliations: Target Industry fires on track/role (taxonomy)", (
     pastFirms: [],
     major: "",
     minor: "",
+    concentration: "",
+    degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
     ...overrides,

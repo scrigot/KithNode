@@ -76,17 +76,28 @@ describe("validateResumePdf", () => {
 describe("buildResumePrompt", () => {
   const prompt = buildResumePrompt();
 
-  it("embeds the canonical INDUSTRIES, GREEK ORGS, CLUBS, MAJORS, and SKILLS pools", () => {
+  it("embeds the canonical INDUSTRIES, GREEK ORGS, CLUBS, MAJORS, MINORS, CONCENTRATIONS, and SKILLS pools", () => {
     expect(prompt).toContain("INDUSTRIES:");
     expect(prompt).toContain("GREEK ORGS:");
     expect(prompt).toContain("CLUBS:");
     expect(prompt).toContain("MAJORS:");
+    expect(prompt).toContain("MINORS:");
+    expect(prompt).toContain("CONCENTRATIONS:");
     expect(prompt).toContain("SKILLS:");
     // Spot-check known canonical entries from each pool.
     expect(prompt).toContain("Investment Banking");
     expect(prompt).toContain("Chi Phi");
     expect(prompt).toContain("Accounting");
     expect(prompt).toContain("Bloomberg Terminal");
+  });
+
+  it("maps minors against MINORS (not MAJORS) and embeds the degree designations", () => {
+    expect(prompt).toMatch(/minors.*mapped to the MINORS list/);
+    // Degree designations are embedded inline for the degrees field.
+    expect(prompt).toContain("MBA");
+    expect(prompt).toContain("PhD");
+    // Finance is a known Business Administration concentration.
+    expect(prompt).toContain("Finance");
   });
 
   it("instructs the model to extract the candidate's own attributes only", () => {
@@ -110,12 +121,34 @@ describe("resumeSchema", () => {
       skills: ["Python", "Excel"],
       majors: ["Economics"],
       minors: ["Computer Science"],
+      degrees: ["BS", "MBA"],
+      concentration: "Finance",
       targetIndustries: ["Investment Banking"],
       pastFirms: ["Goldman Sachs", "Evercore"],
     });
     expect(parsed.university).toBe("UNC Chapel Hill");
     expect(parsed.majors).toEqual(["Economics"]);
+    expect(parsed.degrees).toEqual(["BS", "MBA"]);
+    expect(parsed.concentration).toBe("Finance");
     expect(parsed.pastFirms).toEqual(["Goldman Sachs", "Evercore"]);
+  });
+
+  it("rejects more than 3 degrees", () => {
+    const result = resumeSchema.safeParse({
+      university: "",
+      highSchool: "",
+      hometown: "",
+      greekOrg: "",
+      clubs: [],
+      skills: [],
+      majors: [],
+      minors: [],
+      degrees: ["BS", "MS", "MBA", "PhD"],
+      concentration: "",
+      targetIndustries: [],
+      pastFirms: [],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects more than 2 majors", () => {
@@ -128,6 +161,8 @@ describe("resumeSchema", () => {
       skills: [],
       majors: ["A", "B", "C"],
       minors: [],
+      degrees: [],
+      concentration: "",
       targetIndustries: [],
       pastFirms: [],
     });

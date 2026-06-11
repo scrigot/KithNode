@@ -21,6 +21,8 @@ const prefs = (overrides: Partial<UserPrefs> = {}): UserPrefs => ({
   pastFirms: [],
   major: "",
   minor: "",
+  concentration: "",
+  degrees: "",
   recruitingDate: null,
   weeklyGoalTarget: 3,
   ...overrides,

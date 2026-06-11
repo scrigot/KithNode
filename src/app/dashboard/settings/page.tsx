@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,14 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadMinors,
+  loadConcentrations,
   loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
   FIRM_OPTIONS,
   LOCATION_OPTIONS,
+  DEGREE_OPTIONS,
 } from "@/lib/data/preference-options";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
@@ -51,6 +54,8 @@ interface Preferences {
   greekOrganization: string;
   majors: string[];
   minors: string[];
+  degrees: string[];
+  concentration: string;
   clubs: string[];
   skills: string[];
   hometown: string;
@@ -74,6 +79,8 @@ function getDefaults(): Preferences {
     greekOrganization: "",
     majors: [],
     minors: [],
+    degrees: [],
+    concentration: "",
     clubs: [],
     skills: [],
     hometown: "",
@@ -140,6 +147,8 @@ async function syncToAPI(prefs: Preferences) {
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
         major: prefs.majors.join(", "),
         minor: prefs.minors.join(", "),
+        degrees: prefs.degrees.join(", "),
+        concentration: prefs.concentration || null,
         clubs: prefs.clubs,
         skills: prefs.skills,
         past_firms: prefs.pastFirms,
@@ -266,6 +275,7 @@ function EditPanel({
   const [customLocationInput, setCustomLocationInput] = useState("");
   const [majorInput, setMajorInput] = useState("");
   const [minorInput, setMinorInput] = useState("");
+  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
   const [clubInput, setClubInput] = useState("");
   const [skillKey, setSkillKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -340,6 +350,32 @@ function EditPanel({
     }
     setMinorInput("");
   };
+
+  // Load the major→concentration map once so the Concentration combobox can
+  // scope its pool to the user's selected majors (fallback: union of all).
+  useEffect(() => {
+    loadConcentrations().then(setConcentrations);
+  }, []);
+
+  const toggleDegree = (deg: string) =>
+    setLocal((p) => ({
+      ...p,
+      degrees: p.degrees.includes(deg)
+        ? p.degrees.filter((d) => d !== deg)
+        : [...p.degrees, deg],
+    }));
+
+  // Concentration pool: union of concentrations for every selected major; when
+  // no selected major has an entry, fall back to the union of ALL values.
+  const concentrationPool = useMemo(() => {
+    const scoped = local.majors.flatMap((m) => concentrations[m] ?? []);
+    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
+    return Array.from(new Set(pool)).sort();
+  }, [local.majors, concentrations]);
+  const loadConcentrationPool = useCallback(
+    async () => concentrationPool,
+    [concentrationPool],
+  );
 
   // Resume autofill — parse PDF client-side → base64 → POST, then prefill the
   // local form's EMPTY fields only (never clobber what's already set). User
@@ -618,12 +654,74 @@ function EditPanel({
                   <Combobox
                     value={minorInput}
                     onSelect={addMinor}
-                    loadOptions={loadMajors}
+                    loadOptions={loadMinors}
                     placeholder="Add a minor..."
                     ariaLabel="Minor"
                   />
                 )}
               </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Degrees
+              </label>
+              <div className="space-y-2">
+                <div>
+                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted/60">Undergrad</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEGREE_OPTIONS.undergrad.map((deg) => {
+                      const active = local.degrees.includes(deg);
+                      return (
+                        <button
+                          key={deg}
+                          onClick={() => toggleDegree(deg)}
+                          className={`border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            active
+                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                              : "border-white/[0.06] text-text-muted hover:text-white"
+                          }`}
+                        >
+                          {deg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted/60">Grad</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEGREE_OPTIONS.grad.map((deg) => {
+                      const active = local.degrees.includes(deg);
+                      return (
+                        <button
+                          key={deg}
+                          onClick={() => toggleDegree(deg)}
+                          className={`border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            active
+                              ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                              : "border-white/[0.06] text-text-muted hover:text-white"
+                          }`}
+                        >
+                          {deg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Concentration
+              </label>
+              <Combobox
+                key={`conc-${concentrationPool.join("|")}`}
+                value={local.concentration}
+                onSelect={(v) => setLocal({ ...local, concentration: v })}
+                loadOptions={loadConcentrationPool}
+                placeholder="e.g. Finance"
+                ariaLabel="Concentration"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
@@ -1358,6 +1456,11 @@ export default function SettingsPage() {
                 typeof data.minor === "string" && data.minor
                   ? data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2)
                   : [],
+              degrees:
+                typeof data.degrees === "string" && data.degrees
+                  ? data.degrees.split(",").map((d: string) => d.trim()).filter(Boolean)
+                  : [],
+              concentration: data.concentration || "",
               clubs: Array.isArray(data.clubs) ? data.clubs : [],
               skills: Array.isArray(data.skills) ? data.skills : [],
               hometown: data.hometown || "",

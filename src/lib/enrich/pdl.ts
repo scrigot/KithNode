@@ -42,6 +42,10 @@ interface PdlEducationEntry {
   // PDL carries majors/minors as string arrays on each education entry.
   majors?: string[] | null;
   minors?: string[] | null;
+  // PDL carries degree designations as a string array (e.g. ["bachelors",
+  // "bachelor_of_science"]). Free tier may redact the whole field to boolean
+  // true, so Array.isArray-guard before use.
+  degrees?: string[] | boolean | null;
 }
 
 // PDL experience entry shape from /v5/person/enrich response. Each entry has a
@@ -89,6 +93,11 @@ export interface PdlResult {
   // current one (an entry with no end_date is current). Deduped, title-cased,
   // first 5. Feeds the Shared Employer matcher.
   pastFirms: string[];
+  // Canonical degree tokens (e.g. ["BS", "MBA"]) mapped from PDL's degree
+  // designations across all education entries. Deduped, capped at 4. Generic
+  // "bachelors"/"masters"/"doctorates" map to "" (dropped). Feeds the contact's
+  // degrees column only-when-empty. Free-tier redaction is guarded.
+  degrees: string[];
 }
 
 // High school / pre-college markers. PDL uses school.type = "post-secondary institution"
@@ -204,6 +213,46 @@ function buildPastFirms(data: PdlPersonData): string[] {
   return out;
 }
 
+// PDL degree designation → canonical token. Generic level-only values
+// ("bachelors"/"masters"/"doctorates") map to "" and are dropped — they carry
+// no program signal. Keys are matched case-insensitively after normalizing
+// separators to single underscores.
+const PDL_DEGREE_MAP: Record<string, string> = {
+  bachelor_of_science: "BS",
+  bachelor_of_arts: "BA",
+  master_of_business_administration: "MBA",
+  doctor_of_philosophy: "PhD",
+  juris_doctor: "JD",
+  doctor_of_medicine: "MD",
+  master_of_science: "MS",
+  master_of_arts: "MA",
+  bachelors: "",
+  masters: "",
+  doctorates: "",
+};
+
+// Canonical degree tokens across ALL education entries. Each entry's degrees
+// array is Array.isArray-guarded (free tier may redact it to boolean true).
+// Recognized designations map to canonical tokens; unrecognized or generic
+// level-only values are dropped. Deduped, capped at 4.
+function buildDegrees(entries: PdlEducationEntry[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (!Array.isArray(entry.degrees)) continue;
+    for (const raw of entry.degrees) {
+      if (typeof raw !== "string") continue;
+      const key = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+      const canonical = PDL_DEGREE_MAP[key];
+      if (!canonical || seen.has(canonical)) continue;
+      seen.add(canonical);
+      out.push(canonical);
+      if (out.length >= 4) return out;
+    }
+  }
+  return out;
+}
+
 function buildLocation(data: PdlPersonData): string {
   const city = asString(data.location_locality);
   if (!city) return "";
@@ -290,6 +339,7 @@ export async function fetchPdlProfile(
       highSchool: preCollege ? schoolNameOf(preCollege) : "",
       skills: buildSkills(personData),
       pastFirms: buildPastFirms(personData),
+      degrees: buildDegrees(entries),
     };
   } catch (err) {
     console.error("fetchPdlProfile: request failed", {

@@ -4,6 +4,7 @@
 // contacts that match. Universal signals (firm tier, seniority) still apply.
 
 import type { UserPrefs } from "@/lib/user-prefs";
+import { GRAD_DEGREES } from "@/lib/data/preference-options";
 
 const LINKEDIN_URL_REGEX = /^https:\/\/(www\.)?linkedin\.com\/in\/([\w-]+)\/?$/;
 
@@ -44,6 +45,13 @@ export interface ContactMeta extends LinkedInMeta {
    * a comma-joined list. They feed ONLY the Skill Match matcher below. */
   major?: string;
   minor?: string;
+  /** Comma-joined area(s) of emphasis within the major (e.g. "Finance"). Feeds
+   * the Same Major matcher alongside major/minor — nothing else. */
+  concentration?: string;
+  /** Canonical degree designations, comma-joined (e.g. "BS, MBA"). Feeds ONLY
+   * the Same Program matcher below (grad/pro degrees only). Never reaches
+   * schoolBlob, the K-12 detector, or any other matcher. */
+  degrees?: string;
   skills?: string;
   /** The contact's PAST employers, comma-joined (PDL-enriched or manually
    * edited). Feeds ONLY the Shared Employer matcher below — never the K-12
@@ -325,8 +333,9 @@ function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
  *
  * Per-user layer (only when prefs supplied): target firm match (+25),
  * same school (+15), same greek org (+12), target industry (+10),
- * target location (+8), same hometown (+8). These let two different users
- * see two different scores for the same contact.
+ * target location (+8), same hometown (+8), same major (+8), same program
+ * (+6, grad degrees only). These let two different users see two different
+ * scores for the same contact.
  */
 export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affiliation[] {
   const affiliations: Affiliation[] = [];
@@ -553,18 +562,19 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       }
     }
 
-    // Same Major: the user's major/minor (comma-joined strings) overlapping the
-    // contact's major/minor ONLY — never schoolBlob, the K-12 detector, or any
-    // other matcher. Each user entry is matched against each contact entry by
-    // either-direction containment (so "Economics" matches "Business Economics").
-    // Fires at most once. major/minor are nullish-guarded so a UserPrefs built
-    // before these fields existed never crashes the matcher.
-    const userMajorList = `${prefs.major ?? ""},${prefs.minor ?? ""}`
+    // Same Major: the user's major/minor/concentration (comma-joined strings)
+    // overlapping the contact's major/minor/concentration ONLY — never
+    // schoolBlob, the K-12 detector, or any other matcher. Each user entry is
+    // matched against each contact entry by either-direction containment (so
+    // "Economics" matches "Business Economics"). Fires at most once. All fields
+    // are nullish-guarded so a UserPrefs built before they existed never crashes
+    // the matcher.
+    const userMajorList = `${prefs.major ?? ""},${prefs.minor ?? ""},${prefs.concentration ?? ""}`
       .split(",")
       .map((m) => norm(m))
       .filter((m) => m.length > 1);
     if (userMajorList.length) {
-      const contactMajorList = `${meta.major ?? ""},${meta.minor ?? ""}`
+      const contactMajorList = `${meta.major ?? ""},${meta.minor ?? ""},${meta.concentration ?? ""}`
         .split(",")
         .map((m) => norm(m))
         .filter((m) => m.length > 1);
@@ -573,6 +583,28 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       );
       if (overlaps) {
         affiliations.push({ name: "Same Major", boost: 8 });
+      }
+    }
+
+    // Same Program: the user's degrees overlapping the contact's degrees, but
+    // counting ONLY grad/professional degrees (GRAD_DEGREES) — a shared BS/BA
+    // is too common to be warmth, so undergrad tokens NEVER fire this. Both
+    // sides are comma-split, trimmed, and compared case-insensitively against
+    // the grad set. Built ONLY from the degrees fields — never schoolBlob, the
+    // K-12 detector, or any other matcher. Fires at most once. degrees is
+    // nullish-guarded so a UserPrefs built before this field existed never
+    // crashes the matcher.
+    const gradSet = new Set(GRAD_DEGREES.map((d) => d.toUpperCase()));
+    const splitGradDegrees = (s: string): string[] =>
+      s
+        .split(",")
+        .map((d) => d.trim().toUpperCase())
+        .filter((d) => gradSet.has(d));
+    const userDegrees = new Set(splitGradDegrees(prefs.degrees ?? ""));
+    if (userDegrees.size) {
+      const contactDegrees = splitGradDegrees(meta.degrees ?? "");
+      if (contactDegrees.some((d) => userDegrees.has(d))) {
+        affiliations.push({ name: "Same Program", boost: 6 });
       }
     }
 
