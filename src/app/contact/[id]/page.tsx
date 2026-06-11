@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,7 +172,11 @@ function TypeToggle({
 
 export default function ContactDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const fromImport = searchParams.get("from") === "import";
+  const backHref = fromImport ? "/dashboard/import" : "/dashboard/contacts";
+  const backLabel = fromImport ? "BACK TO IMPORT" : "BACK TO SIGNALS";
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -219,10 +223,10 @@ export default function ContactDetailPage() {
     return (
       <div className="min-h-screen bg-background p-6">
         <Link
-          href="/dashboard/contacts"
+          href={backHref}
           className="text-xs text-muted-foreground hover:text-primary"
         >
-          &lt; BACK TO SIGNALS
+          &lt; {backLabel}
         </Link>
         <div className="mt-8 border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
           {error || "Contact not found"}
@@ -237,10 +241,10 @@ export default function ContactDetailPage() {
       <div className="mb-4 flex items-start justify-between">
         <div>
           <Link
-            href="/dashboard/contacts"
+            href={backHref}
             className="text-[10px] text-muted-foreground hover:text-primary"
           >
-            &lt; BACK TO SIGNALS
+            &lt; {backLabel}
           </Link>
           <div className="mt-1 [&_button]:text-xl [&_button]:font-bold [&_input]:text-xl [&_input]:font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
             <FieldEditor

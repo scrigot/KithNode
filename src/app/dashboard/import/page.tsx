@@ -90,7 +90,7 @@ export default function ImportPage() {
         } catch {
           // Enrich failure is non-fatal — navigate anyway so user can edit manually.
         }
-        router.push(`/contact/${contactId}`);
+        router.push(`/contact/${contactId}?from=import`);
       }
     } catch {
       setError(
