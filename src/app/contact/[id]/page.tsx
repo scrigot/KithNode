@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,15 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
 import { TagEditor } from "./tag-editor";
 import { FieldEditor } from "./field-editor";
-import {
-  loadUniversities,
-  loadCities,
-  loadHighSchools,
-  loadGreekOrgs,
-  loadClubs,
-  loadMajors,
-  loadSkills,
-} from "@/lib/data/onboarding-options";
+import { EditProfileModal } from "./edit-profile-modal";
 import { trackEvent } from "@/lib/posthog";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 import type { ContactDetail } from "@/lib/api";
@@ -46,6 +39,23 @@ const SIGNAL_ICONS: Record<string, string> = {
   tech_stack: "<>",
   news: "!!",
 };
+
+// Read-only label/value row for the DETAILS card. Empty values render a muted
+// "Not set" (em-dash-free) so the user can see at a glance what's blank without
+// the row looking broken. Editing happens in the Edit Profile modal.
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  const display = value?.trim();
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd
+        className={`text-right ${display ? "text-foreground" : "text-muted-foreground/50"}`}
+      >
+        {display || "Not set"}
+      </dd>
+    </div>
+  );
+}
 
 function ScoreSection({ score }: { score: ContactDetail["score"] }) {
   if (!score) return null;
@@ -302,6 +312,7 @@ export default function ContactDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOutreach, setShowOutreach] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [tab, setTab] = useState<"signals" | "profile">("signals");
 
   // Refetch the contact after a field/type edit so the rescored affiliations +
@@ -404,6 +415,14 @@ export default function ContactDetailPage() {
         open={showOutreach}
         onClose={() => setShowOutreach(false)}
       />
+
+      {showEditProfile && (
+        <EditProfileModal
+          contact={contact}
+          onSaved={loadContact}
+          onClose={() => setShowEditProfile(false)}
+        />
+      )}
 
       <Separator className="mb-4" />
 
@@ -617,152 +636,41 @@ export default function ContactDetailPage() {
           <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
         </div>
 
-        {/* RIGHT — Details */}
+        {/* RIGHT — Details (read-only; edited via the Edit Profile modal) */}
         <div className="border border-border bg-card p-4">
-          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            DETAILS
-          </h3>
-          <div className="space-y-1 text-[10px]">
-            <FieldEditor
-              contactId={contact.id}
-              field="title"
-              label="Title"
-              initialValue={contact.title || ""}
-              placeholder="Add title"
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="firmName"
-              label="Company"
-              initialValue={contact.company.name || ""}
-              placeholder="Add company"
-              onSaved={loadContact}
-            />
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              DETAILS
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowEditProfile(true)}
+              className="inline-flex items-center gap-1.5 border border-white/[0.12] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <Pencil className="h-3 w-3" />
+              EDIT PROFILE
+            </button>
+          </div>
+          <dl className="space-y-1.5 text-xs">
+            <DetailRow label="Title" value={contact.title} />
+            <DetailRow label="Company" value={contact.company.name} />
             {contact.person_type === "professor" && (
-              <FieldEditor
-                contactId={contact.id}
-                field="university"
-                label="Teaches at"
-                initialValue={contact.university || ""}
-                placeholder="Add school"
-                mode="options"
-                loadOptions={loadUniversities}
-                onSaved={loadContact}
-              />
+              <DetailRow label="Teaches at" value={contact.university} />
             )}
-            <FieldEditor
-              contactId={contact.id}
-              field="education"
-              label="Education"
-              initialValue={contact.education || ""}
-              placeholder="Add education"
-              mode="options"
-              loadOptions={loadUniversities}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="major"
-              label="Major"
-              initialValue={contact.major || ""}
-              placeholder="Add major"
-              mode="multi-chip"
-              loadOptions={loadMajors}
-              maxChips={2}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="minor"
-              label="Minor"
-              initialValue={contact.minor || ""}
-              placeholder="Add minor"
-              mode="multi-chip"
-              loadOptions={loadMajors}
-              maxChips={2}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="skills"
-              label="Skills"
-              initialValue={contact.skills || ""}
-              placeholder="Add skills"
-              mode="multi-chip"
-              loadOptions={loadSkills}
-              maxChips={12}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="pastFirms"
-              label="Past employers"
-              initialValue={contact.past_firms || ""}
-              placeholder="Add past employer"
-              mode="multi-chip"
-              maxChips={5}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="location"
-              label="Location (current)"
-              initialValue={contact.linkedin_location || ""}
-              placeholder="Add location"
-              mode="options"
-              loadOptions={loadCities}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="hometown"
-              label="Hometown"
-              initialValue={contact.hometown || ""}
-              placeholder="Add hometown"
-              mode="options"
-              loadOptions={loadCities}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="highSchool"
-              label="High School"
-              initialValue={contact.high_school || ""}
-              placeholder="Add high school"
-              mode="options"
-              loadOptions={loadHighSchools}
-              stripCitySuffix
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="greekOrg"
-              label="Greek Life"
-              initialValue={contact.greek_org || ""}
-              placeholder="Add Greek org"
-              mode="options"
-              loadOptions={loadGreekOrgs}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="clubs"
-              label="Clubs"
-              initialValue={contact.clubs || ""}
-              placeholder="Add clubs"
-              mode="multi-chip"
-              loadOptions={loadClubs}
-              onSaved={loadContact}
-            />
-            <FieldEditor
-              contactId={contact.id}
-              field="passions"
-              label="Passions"
-              initialValue={contact.passions || ""}
-              placeholder="Add passions"
-              onSaved={loadContact}
-            />
+            <DetailRow label="Education" value={contact.education} />
+            <DetailRow label="Major" value={contact.major} />
+            <DetailRow label="Minor" value={contact.minor} />
+            <DetailRow label="Skills" value={contact.skills} />
+            <DetailRow label="Past employers" value={contact.past_firms} />
+            <DetailRow label="Location (current)" value={contact.linkedin_location} />
+            <DetailRow label="Hometown" value={contact.hometown} />
+            <DetailRow label="High School" value={contact.high_school} />
+            <DetailRow label="Greek Life" value={contact.greek_org} />
+            <DetailRow label="Clubs" value={contact.clubs} />
+            <DetailRow label="Passions" value={contact.passions} />
+          </dl>
+          <Separator className="my-3" />
+          <div className="space-y-1.5 text-xs">
             <p>
               <a
                 href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}

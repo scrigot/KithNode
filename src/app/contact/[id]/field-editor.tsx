@@ -1,70 +1,36 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 
 interface FieldEditorProps {
   contactId: string;
-  field:
-    | "name"
-    | "education"
-    | "location"
-    | "hometown"
-    | "highSchool"
-    | "clubs"
-    | "passions"
-    | "greekOrg"
-    | "title"
-    | "firmName"
-    | "university"
-    | "major"
-    | "minor"
-    | "skills"
-    | "pastFirms";
+  field: "name";
   label: string;
   initialValue: string;
   placeholder?: string;
   /** Fired after a successful PATCH so the page can refresh score/affiliations. */
   onSaved?: () => void;
-  /**
-   * "plain" (default): bare text input.
-   * "options": typeahead Combobox over `loadOptions`; free text still allowed.
-   * "multi-chip": removable chips parsed from a ", "-joined value; add via the
-   *   Combobox, capped at 5; saved back as a ", "-joined string.
-   */
-  mode?: "plain" | "options" | "multi-chip";
-  /** Required for "options" mode — resolves the typeahead dataset. Optional for
-   * "multi-chip": when omitted, chips are added via a free-text input. */
-  loadOptions?: () => Promise<string[]>;
-  /** Strip a " — City, ST" display suffix before saving (high-school dataset). */
-  stripCitySuffix?: boolean;
-  /** Max chips in "multi-chip" mode. Defaults to 5 (clubs); skills passes 12. */
-  maxChips?: number;
 }
-
-const DEFAULT_MAX_CHIPS = 5;
 
 // Trim + collapse inner whitespace + cap, mirroring the route's normalizeField.
 function clean(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").slice(0, 160);
 }
 
-// Drop the "Name — City, ST" suffix the high-school dataset appends, matching
-// the settings page so the stored value is just the school name.
-function stripSuffix(v: string): string {
+// Drop the "Name — City, ST" suffix the high-school dataset appends so the
+// stored value is just the school name. Shared with the edit-profile modal.
+export function stripCitySuffix(v: string): string {
   return v.includes(" — ") ? v.split(" — ")[0] : v;
 }
 
-// Inline click-to-edit for one editable contact field. Pencil shows on hover;
-// click swaps the value for an editor. Enter/select PATCHes /api/contacts/[id]
-// and shows the saved value immediately; Esc cancels. Mirrors tag-editor's
-// fetch shape and the page's dark dense styling.
+// Inline click-to-edit for the contact NAME in the page header. Pencil shows on
+// hover; click swaps the value for a text input. Enter PATCHes
+// /api/contacts/[id] and shows the saved value immediately; Esc/blur cancels.
 //
-// In "options" mode the editor is a typeahead Combobox so the saved value is
-// canonical (e.g. "Chi Phi", not "chi phi frat"), which is what the affiliation
-// matchers key on. In "multi-chip" mode the value is a ", "-joined list shown
-// as removable chips, added via the same Combobox.
+// Every OTHER contact field now lives in the Edit Profile modal — this inline
+// editor is intentionally limited to the single name field the header renders.
 export function FieldEditor({
   contactId,
   field,
@@ -72,54 +38,7 @@ export function FieldEditor({
   initialValue,
   placeholder,
   onSaved,
-  mode = "plain",
-  loadOptions,
-  stripCitySuffix,
-  maxChips,
 }: FieldEditorProps) {
-  if (mode === "multi-chip") {
-    return (
-      <MultiChipEditor
-        contactId={contactId}
-        field={field}
-        label={label}
-        initialValue={initialValue}
-        placeholder={placeholder}
-        onSaved={onSaved}
-        loadOptions={loadOptions}
-        maxChips={maxChips}
-      />
-    );
-  }
-  return (
-    <SingleValueEditor
-      contactId={contactId}
-      field={field}
-      label={label}
-      initialValue={initialValue}
-      placeholder={placeholder}
-      onSaved={onSaved}
-      mode={mode}
-      loadOptions={loadOptions}
-      stripCitySuffix={stripCitySuffix}
-    />
-  );
-}
-
-// ── Single value (plain input OR options Combobox) ──────────────────────────────
-
-function SingleValueEditor({
-  contactId,
-  field,
-  label,
-  initialValue,
-  placeholder,
-  onSaved,
-  mode,
-  loadOptions,
-  stripCitySuffix,
-}: Required<Pick<FieldEditorProps, "contactId" | "field" | "label" | "initialValue" | "mode">> &
-  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "stripCitySuffix" | "onSaved">) {
   const [value, setValue] = useState(initialValue);
   const [draft, setDraft] = useState(initialValue);
   const [editing, setEditing] = useState(false);
@@ -127,8 +46,8 @@ function SingleValueEditor({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (editing && mode === "plain") inputRef.current?.focus();
-  }, [editing, mode]);
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
 
   function startEdit() {
     setDraft(value);
@@ -141,7 +60,7 @@ function SingleValueEditor({
   }
 
   async function save(raw: string) {
-    const next = clean(stripCitySuffix ? stripSuffix(raw) : raw);
+    const next = clean(raw);
     if (next === value) {
       setEditing(false);
       return;
@@ -161,22 +80,6 @@ function SingleValueEditor({
   }
 
   if (editing) {
-    if (mode === "options" && loadOptions) {
-      return (
-        <p className="flex items-center gap-1.5">
-          {label && <span className="text-muted-foreground">{label}: </span>}
-          <Combobox
-            value={draft}
-            onSelect={(v) => save(v)}
-            loadOptions={loadOptions}
-            placeholder={placeholder}
-            ariaLabel={`Edit ${label}`}
-            className="flex-1"
-            inputClassName="h-5 px-1.5 text-[10px] bg-background border-border focus:border-accent-blue"
-          />
-        </p>
-      );
-    }
     return (
       <p className="flex items-center gap-1.5">
         {label && <span className="text-muted-foreground">{label}: </span>}
@@ -224,134 +127,105 @@ function SingleValueEditor({
   );
 }
 
-// ── Multi-chip (clubs) ──────────────────────────────────────────────────────────
+// ── ChipField — controlled multi-chip selector (used by the Edit Profile modal) ──
+//
+// Fully presentational: holds NO fetch state and never persists on its own. The
+// parent owns `values` and is notified via `onChange`, so chips added here can
+// never be lost by a blur or a tab switch — they live in the modal's local form
+// state until the user hits Save. Mirrors the onboarding chip UI: a label with a
+// "count/cap" badge, removable accent chips, and a Combobox (or free-text input
+// when no `loadOptions`) that hides once the cap is reached.
 
-function parseChips(raw: string, max: number): string[] {
-  return raw
-    .split(",")
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .slice(0, max);
-}
-
-function MultiChipEditor({
-  contactId,
-  field,
+export function ChipField({
   label,
-  initialValue,
-  placeholder,
-  onSaved,
+  values,
+  onChange,
   loadOptions,
-  maxChips = DEFAULT_MAX_CHIPS,
-}: Required<Pick<FieldEditorProps, "contactId" | "field" | "label" | "initialValue">> &
-  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "onSaved" | "maxChips">) {
-  const [chips, setChips] = useState<string[]>(() => parseChips(initialValue, maxChips));
-  const [adding, setAdding] = useState(false);
+  placeholder,
+  cap,
+}: {
+  label: string;
+  values: string[];
+  onChange: (next: string[]) => void;
+  /** Typeahead dataset; omit for a free-text chip input (e.g. past employers). */
+  loadOptions?: () => Promise<string[]>;
+  placeholder?: string;
+  cap: number;
+}) {
+  // Remount the Combobox after each add so its internal input clears, matching
+  // onboarding's addSkill behavior.
+  const [addKey, setAddKey] = useState(0);
   const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const freeRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (adding && !loadOptions) inputRef.current?.focus();
-  }, [adding, loadOptions]);
-
-  async function persist(next: string[]) {
-    setSaving(true);
-    const res = await fetch(`/api/contacts/${contactId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: next.join(", ") }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      setChips(next);
-      onSaved?.();
-    }
-  }
-
-  function addChip(raw: string) {
+  function add(raw: string) {
     const chip = clean(raw);
+    setAddKey((k) => k + 1);
     setDraft("");
-    if (!chip || chips.includes(chip) || chips.length >= maxChips) {
-      setAdding(false);
-      return;
-    }
-    void persist([...chips, chip]);
-    setAdding(false);
+    if (!chip || values.includes(chip) || values.length >= cap) return;
+    onChange([...values, chip]);
   }
 
-  function removeChip(chip: string) {
-    void persist(chips.filter((c) => c !== chip));
+  function remove(chip: string) {
+    onChange(values.filter((c) => c !== chip));
   }
 
   return (
-    <p className="group flex flex-wrap items-center gap-1">
-      {label && <span className="text-muted-foreground">{label}: </span>}
-      {chips.map((chip) => (
-        <span
-          key={chip}
-          className="inline-flex items-center gap-1 border border-border bg-background px-1 leading-none text-foreground"
-        >
-          {chip}
-          <button
-            type="button"
-            onClick={() => removeChip(chip)}
-            disabled={saving}
-            className="leading-none text-muted-foreground hover:text-accent-blue"
-            aria-label={`Remove ${chip}`}
-          >
-            x
-          </button>
+    <div>
+      <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+        <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+          {values.length}/{cap}
         </span>
-      ))}
-      {adding && loadOptions ? (
-        <Combobox
-          value=""
-          onSelect={addChip}
-          loadOptions={loadOptions}
-          placeholder={placeholder}
-          ariaLabel={`Add ${label}`}
-          className="inline-block w-40"
-          inputClassName="h-5 px-1.5 text-[10px] bg-background border-border focus:border-accent-blue"
-        />
-      ) : adding ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={draft}
-          maxLength={160}
-          disabled={saving}
-          placeholder={placeholder}
-          className="h-5 w-40 border border-border bg-background px-1.5 text-[10px] text-foreground placeholder:text-muted-foreground/50 focus:border-accent-blue focus:outline-none"
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => {
-            setDraft("");
-            setAdding(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addChip(draft);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              setDraft("");
-              setAdding(false);
-            }
-          }}
-        />
-      ) : (
-        chips.length < maxChips && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 text-left text-muted-foreground/50 hover:text-accent-blue"
-            aria-label={`Add ${label}`}
-          >
-            {chips.length === 0 ? placeholder ?? "Add" : "+"}
-            <Pencil className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-60" />
-          </button>
-        )
+      </label>
+      {values.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1.5">
+          {values.map((chip) => (
+            <span
+              key={chip}
+              className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[12px] font-bold text-accent-teal"
+            >
+              {chip}
+              <button
+                type="button"
+                onClick={() => remove(chip)}
+                className="text-accent-teal/60 hover:text-accent-teal"
+                aria-label={`Remove ${chip}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
       )}
-    </p>
+      {values.length < cap &&
+        (loadOptions ? (
+          <Combobox
+            key={addKey}
+            value=""
+            onSelect={add}
+            loadOptions={loadOptions}
+            placeholder={placeholder}
+            ariaLabel={`Add ${label}`}
+            inputClassName="h-9 bg-muted text-sm"
+          />
+        ) : (
+          <input
+            ref={freeRef}
+            type="text"
+            value={draft}
+            maxLength={160}
+            placeholder={placeholder}
+            className="h-9 w-full border border-input bg-muted px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent-teal focus:outline-none"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add(draft);
+              }
+            }}
+          />
+        ))}
+    </div>
   );
 }
