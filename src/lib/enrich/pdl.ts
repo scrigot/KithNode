@@ -41,11 +41,14 @@ interface PdlEducationEntry {
   end_date?: string | null;
 }
 
+// Free-tier responses redact some fields to boolean true ("present but
+// hidden") instead of the string value, so location fields must be
+// runtime-checked as strings before use.
 interface PdlPersonData {
   education?: PdlEducationEntry[] | null;
-  location_locality?: string | null;
-  location_region?: string | null;
-  location_name?: string | null;
+  location_locality?: string | boolean | null;
+  location_region?: string | boolean | null;
+  location_name?: string | boolean | null;
 }
 
 interface PdlResponse {
@@ -107,10 +110,14 @@ function titleCase(str: string): string {
   return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function asString(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
 function buildLocation(data: PdlPersonData): string {
-  const city = String(data.location_locality || "").trim();
+  const city = asString(data.location_locality);
   if (!city) return "";
-  const regionRaw = String(data.location_region || "").trim();
+  const regionRaw = asString(data.location_region);
   if (!regionRaw) return titleCase(city);
   const abbr =
     STATE_ABBR[regionRaw.toLowerCase()] ||

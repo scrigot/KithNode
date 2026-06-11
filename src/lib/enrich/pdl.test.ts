@@ -287,6 +287,23 @@ describe("fetchPdlProfile", () => {
     expect(result?.location).toBe("");
   });
 
+  it("returns empty location when free tier redacts fields to boolean true", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+        // PDL free tier sends boolean true ("present but hidden") instead of
+        // the string value. Must not become the literal text "True, true".
+        location_locality: true as unknown as string,
+        location_region: true as unknown as string,
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.location).toBe("");
+    expect(result?.education).toBe("unc");
+  });
+
   it("returns city only when region is absent", async () => {
     mockFetch(
       makePdlResponse({
