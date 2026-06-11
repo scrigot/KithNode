@@ -69,6 +69,7 @@ export interface RankedContact {
     total_score: number;
     tier: string;
   };
+  created_at: string;
 }
 
 export interface ContactDetail extends RankedContact {

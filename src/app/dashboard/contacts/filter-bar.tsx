@@ -12,7 +12,7 @@ const TIER_BUTTON_STYLES: Record<string, string> = {
   all: "data-[active=true]:bg-primary/20 data-[active=true]:text-primary data-[active=true]:border-primary/30",
 };
 
-export type SortOption = "score" | "name" | "company";
+export type SortOption = "score" | "name" | "company" | "new";
 
 export function FilterBar({
   search,
@@ -49,6 +49,7 @@ export function FilterBar({
           <option value="score">Score</option>
           <option value="name">Name</option>
           <option value="company">Company</option>
+          <option value="new">Newest</option>
         </select>
         <span className="whitespace-nowrap text-[10px] text-muted-foreground">
           {resultCount} results

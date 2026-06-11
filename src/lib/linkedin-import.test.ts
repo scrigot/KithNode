@@ -84,6 +84,8 @@ describe("detectAffiliations: manual tags", () => {
       degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
+      educations: [],
+      experiences: [],
     };
     const affs = detectAffiliations(baseMeta({ tags: ["chi phi"] }), prefs);
     expect(affs.some((a) => a.name === "Same Greek Org")).toBe(true);
@@ -107,6 +109,8 @@ describe("detectAffiliations: manual tags", () => {
       degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
+      educations: [],
+      experiences: [],
     };
     // "kenan flagler" is a registered alias for UNC
     const affs = detectAffiliations(baseMeta({ tags: ["Kenan Flagler"] }), prefs);
@@ -144,6 +148,8 @@ describe("detectAffiliations: manual tags", () => {
       degrees: "",
       recruitingDate: null,
       weeklyGoalTarget: 3,
+      educations: [],
+      experiences: [],
     };
     const affsWithout = detectAffiliations(baseMeta({ education: "Yale University" }), prefs);
     const affsWith = detectAffiliations(baseMeta({ education: "Yale University", tags: [] }), prefs);
@@ -169,6 +175,8 @@ describe("detectAffiliations: Same High School + editable fields", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
     ...overrides,
   });
 
@@ -241,6 +249,8 @@ describe("detectAffiliations: Hometown Match vs Target Location", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
     ...overrides,
   });
 
@@ -295,6 +305,8 @@ describe("detectAffiliations: Same Club", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires when contact.clubs contains one of prefs.clubs", () => {
@@ -356,6 +368,8 @@ describe("detectAffiliations: Skill Match", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires when contact.skills overlaps prefs.skills", () => {
@@ -443,6 +457,8 @@ describe("detectAffiliations: Same Major", () => {
     pastFirms: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires when user major exactly matches contact major", () => {
@@ -579,6 +595,8 @@ describe("detectAffiliations: Same Program", () => {
     pastFirms: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires +6 when a grad degree (MBA) overlaps on both sides", () => {
@@ -675,6 +693,8 @@ describe("detectAffiliations: Shared Employer", () => {
     pastFirms,
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires when a user past firm matches the contact's CURRENT firm (experience)", () => {
@@ -774,6 +794,8 @@ describe("detectAffiliations: contact greekOrg field", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
     ...overrides,
   });
 
@@ -823,6 +845,8 @@ describe("detectAffiliations: CS Top School gated on AI/tech targeting", () => {
     pastFirms: [],
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
   });
 
   it("fires for an AI/ML-targeting user when education is a CS-elite school", () => {
@@ -902,6 +926,8 @@ describe("detectAffiliations: manual personType override", () => {
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
     ...overrides,
   });
 
@@ -1035,6 +1061,42 @@ describe("detectAffiliations: manual personType override", () => {
   });
 });
 
+describe("detectAffiliations: Club Leadership (universal)", () => {
+  it("fires on clubs containing a president role", () => {
+    const affs = detectAffiliations(
+      baseMeta({ clubs: "President — Investment Banking Club" }),
+    );
+    expect(affs.some((a) => a.name === "Club Leadership" && a.boost === 6)).toBe(true);
+  });
+
+  it("fires when tags contain 'captain'", () => {
+    const affs = detectAffiliations(
+      baseMeta({ tags: ["captain", "soccer team"] }),
+    );
+    expect(affs.some((a) => a.name === "Club Leadership" && a.boost === 6)).toBe(true);
+  });
+
+  it("is SILENT when title='Vice President' + firmName='Goldman Sachs' with clubs empty", () => {
+    // Finance VP is a job rank, not club leadership. clubs + tags are both empty.
+    const affs = detectAffiliations(
+      baseMeta({ title: "Vice President", experience: "Goldman Sachs", clubs: "" }),
+    );
+    expect(affs.some((a) => a.name === "Club Leadership")).toBe(false);
+  });
+
+  it("is SILENT on an empty contact", () => {
+    const affs = detectAffiliations(baseMeta());
+    expect(affs.some((a) => a.name === "Club Leadership")).toBe(false);
+  });
+
+  it("fires at most once even when clubs and tags both match", () => {
+    const affs = detectAffiliations(
+      baseMeta({ clubs: "President — IB Club", tags: ["treasurer"] }),
+    );
+    expect(affs.filter((a) => a.name === "Club Leadership")).toHaveLength(1);
+  });
+});
+
 describe("detectAffiliations: Target Industry fires on track/role (taxonomy)", () => {
   const prefsWith = (overrides: Record<string, unknown> = {}) => ({
     university: "",
@@ -1053,6 +1115,8 @@ describe("detectAffiliations: Target Industry fires on track/role (taxonomy)", (
     degrees: "",
     recruitingDate: null,
     weeklyGoalTarget: 3,
+    educations: [],
+    experiences: [],
     ...overrides,
   });
 

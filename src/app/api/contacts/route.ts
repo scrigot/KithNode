@@ -92,6 +92,7 @@ export async function GET() {
           total_score: c.warmthScore || 0,
           tier: c.tier || "cold",
         },
+        created_at: c.createdAt || "",
         ...(unlocked ? {} : { isRedacted: true }),
       };
     });
@@ -101,3 +102,4 @@ export async function GET() {
     return NextResponse.json([]);
   }
 }
+

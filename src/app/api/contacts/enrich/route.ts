@@ -74,6 +74,8 @@ Allowed SENIORITY values (pick exactly one): ${ALLOWED_SENIORITY.map((s) => `"${
 Career taxonomy (TRACK -> allowed ROLES). Pick exactly one TRACK from the keys and one ROLE from THAT track's list. Use "" for either when you are not confident:
 ${TAXONOMY_BLOCK}
 
+When inferring CLUBS, write each entry as "Role — Club Name" when a leadership role is evident (e.g. "President — Investment Banking Club").
+
 Return ONLY valid JSON, no prose, no markdown:
 {"industry":"...","seniorityLevel":"...","education":"...","location":"...","track":"...","role":"..."}`;
 }
@@ -209,6 +211,9 @@ export async function POST(req: NextRequest) {
       // enriched (no reliable source) — manual + resume only.
       const degrees =
         c.degrees || (pdl?.degrees?.length ? pdl.degrees.join(", ") : "");
+      // educations fills only-when-empty from PDL per-school rows (JSON-stringified).
+      const educations =
+        c.educations || (pdl?.educations?.length ? JSON.stringify(pdl.educations) : "");
       const skills =
         c.skills || (pdl?.skills?.length ? pdl.skills.join(", ") : "");
       const pastFirms =
@@ -279,6 +284,7 @@ export async function POST(req: NextRequest) {
           major,
           minor,
           degrees,
+          educations,
           skills,
           pastFirms,
           track,

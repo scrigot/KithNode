@@ -119,6 +119,8 @@ export function ContactsList() {
         return a.name.localeCompare(b.name);
       case "company":
         return a.company.name.localeCompare(b.company.name);
+      case "new":
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       default:
         return 0;
     }

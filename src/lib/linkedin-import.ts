@@ -440,6 +440,20 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
     }
   }
 
+  // ── Universal Club Leadership boost ──
+  // Reads clubs + tags ONLY (same blob as Same Club matcher). Must NEVER read
+  // titleText/companyText/educationText/schoolBlob: a Goldman Sachs "Vice
+  // President" job title is a professional rank, not club leadership — reading
+  // those fields would cause false fires on every finance VP.
+  {
+    const clubLeadBlob = norm(`${meta.clubs ?? ""} ${tagsText}`);
+    const CLUB_LEAD_RE =
+      /\b(president|vice\s*president|vp|founder|co.?founder|cofounder|captain|chair(?:man|woman)?|treasurer|e.?board|eboard|exec(?:utive)?\s*board|director)\b/;
+    if (CLUB_LEAD_RE.test(clubLeadBlob)) {
+      affiliations.push({ name: "Club Leadership", boost: 6 });
+    }
+  }
+
   // ── Per-user match layer ──
   if (prefs) {
     // CS-strong school: only meaningful when the user targets AI/ML/tech —
