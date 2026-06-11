@@ -204,6 +204,50 @@ describe("fetchPdlProfile", () => {
     expect(result?.graduationYear).toBe(2021);
   });
 
+  // ── high-school extraction (alongside the collegiate education) ────────────
+
+  it("extracts education=college AND highSchool=HS when both are present", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "East Chapel Hill High School", type: "secondary school" }, end_date: "2019" },
+          { school: { name: "UNC Chapel Hill", type: "post-secondary institution" }, end_date: "2023" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.education).toBe("UNC Chapel Hill");
+    expect(result?.highSchool).toBe("East Chapel Hill High School");
+  });
+
+  it("picks the most recent pre-college entry for highSchool", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "Old Middle School", type: "middle school" }, end_date: "2015" },
+          { school: { name: "Jordan High School", type: "secondary school" }, end_date: "2019" },
+          { school: { name: "Duke University", type: "post-secondary institution" }, end_date: "2023" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.education).toBe("Duke University");
+    expect(result?.highSchool).toBe("Jordan High School");
+  });
+
+  it("returns highSchool='' when the profile is college-only", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "UNC Chapel Hill", type: "post-secondary institution" }, end_date: "2023" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.education).toBe("UNC Chapel Hill");
+    expect(result?.highSchool).toBe("");
+  });
+
   // ── most-recent end-year wins ─────────────────────────────────────────────
 
   it("picks the entry with the most recent end_date year among colleges", async () => {
@@ -355,6 +399,7 @@ describe("fetchPdlProfile", () => {
       fullName: "Aryan Aladar",
       major: "Economics",
       minor: "Computer Science",
+      highSchool: "",
       skills: ["Financial Modeling", "Python", "Excel"],
       pastFirms: ["Goldman Sachs"],
     });

@@ -33,6 +33,10 @@ export interface ContactMeta extends LinkedInMeta {
   seniorityLevel?: string;
   tags?: string[];
   highSchool?: string;
+  /** Manually-entered or high-school-deduced hometown ("City, ST"). Feeds the
+   * Hometown Match matcher FIRST; the matcher falls back to `location` only when
+   * this is empty. Never feeds Target Location, which reads `location` only. */
+  hometown?: string;
   clubs?: string;
   passions?: string;
   greekOrg?: string;
@@ -475,10 +479,17 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       affiliations.push({ name: "Target Location", boost: 8 });
     }
 
-    // Hometown match, split city/state and look for either token in contact's location
+    // Hometown match: split the user's hometown into city/state tokens and look
+    // for either in the contact's hometown FIRST. Only fall back to the
+    // contact's (current) location when the contact has no hometown on file —
+    // this preserves the prior behavior for hometown-less contacts while letting
+    // a real hometown win when present. Target Location (above) is unaffected: it
+    // keeps reading locationText only, so a contact's hometown never lights it.
     if (prefs.hometown) {
       const tokens = prefs.hometown.split(",").map((t) => norm(t)).filter((t) => t.length > 1);
-      if (tokens.some((t) => norm(locationText).includes(t))) {
+      const hometownText = norm(meta.hometown ?? "");
+      const haystack = hometownText || norm(locationText);
+      if (tokens.some((t) => haystack.includes(t))) {
         affiliations.push({ name: "Hometown Match", boost: 8 });
       }
     }

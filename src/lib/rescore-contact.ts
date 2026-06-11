@@ -59,6 +59,7 @@ export function rescoreContact(
     industry: (contact.industry as string) || "",
     seniorityLevel: (contact.seniorityLevel as string) || "",
     highSchool: (contact.highSchool as string) || "",
+    hometown: (contact.hometown as string) || "",
     clubs: (contact.clubs as string) || "",
     passions: (contact.passions as string) || "",
     greekOrg: (contact.greekOrg as string) || "",

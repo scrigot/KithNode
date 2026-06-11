@@ -14,6 +14,7 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
   INDUSTRY_OPTIONS,
@@ -266,7 +267,7 @@ function EditPanel({
   const [majorInput, setMajorInput] = useState("");
   const [minorInput, setMinorInput] = useState("");
   const [clubInput, setClubInput] = useState("");
-  const [skillInput, setSkillInput] = useState("");
+  const [skillKey, setSkillKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
@@ -318,11 +319,11 @@ function EditPanel({
     setCustomLocationInput("");
   };
 
-  const addSkill = () => {
-    const skill = skillInput.trim();
+  const addSkill = (raw: string) => {
+    const skill = raw.trim();
+    setSkillKey((k) => k + 1); // remount the Combobox to clear its input
     if (!skill || local.skills.includes(skill) || local.skills.length >= 10) return;
     setLocal((p) => ({ ...p, skills: [...p.skills, skill] }));
-    setSkillInput("");
   };
 
   const addMajor = (v: string) => {
@@ -745,17 +746,13 @@ function EditPanel({
                 </div>
               )}
               {local.skills.length < 10 && (
-                <Input
-                  value={skillInput}
-                  onChange={(e) => setSkillInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addSkill();
-                    }
-                  }}
+                <Combobox
+                  key={skillKey}
+                  value=""
+                  onSelect={addSkill}
+                  loadOptions={loadSkills}
                   placeholder="Add a skill, then press Enter..."
-                  aria-label="Skills"
+                  ariaLabel="Skills"
                 />
               )}
               {local.skills.length > 0 && (

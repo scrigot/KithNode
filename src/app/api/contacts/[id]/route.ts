@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
+import { deduceHometown } from "@/lib/deduce-hometown";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -11,6 +12,7 @@ const EDITABLE_FIELDS = [
   "name",
   "education",
   "location",
+  "hometown",
   "highSchool",
   "clubs",
   "passions",
@@ -145,6 +147,7 @@ export async function GET(
     linkedin_url: contact.linkedInUrl,
     education: contact.education,
     linkedin_location: contact.location,
+    hometown: contact.hometown || "",
     high_school: contact.highSchool,
     greek_org: contact.greekOrg,
     clubs: contact.clubs,
@@ -213,6 +216,19 @@ export async function PATCH(
       { error: "No valid fields to update" },
       { status: 400 },
     );
+  }
+
+  // Auto-deduce hometown from a newly-set highSchool, but ONLY when the user did
+  // not also set hometown in this PATCH (manual edits win) AND the contact's
+  // stored hometown is empty (never overwrite an existing value). A unique
+  // school name yields "City, ST"; ambiguous/unknown leaves it unset.
+  if (
+    updates.highSchool &&
+    updates.hometown === undefined &&
+    !(contact.hometown as string)
+  ) {
+    const deduced = await deduceHometown(updates.highSchool);
+    if (deduced) updates.hometown = deduced;
   }
 
   // Persist only the provided columns, then recompute affiliations/warmth from

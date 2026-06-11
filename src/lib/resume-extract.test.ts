@@ -76,15 +76,17 @@ describe("validateResumePdf", () => {
 describe("buildResumePrompt", () => {
   const prompt = buildResumePrompt();
 
-  it("embeds the canonical INDUSTRIES, GREEK ORGS, CLUBS, and MAJORS pools", () => {
+  it("embeds the canonical INDUSTRIES, GREEK ORGS, CLUBS, MAJORS, and SKILLS pools", () => {
     expect(prompt).toContain("INDUSTRIES:");
     expect(prompt).toContain("GREEK ORGS:");
     expect(prompt).toContain("CLUBS:");
     expect(prompt).toContain("MAJORS:");
+    expect(prompt).toContain("SKILLS:");
     // Spot-check known canonical entries from each pool.
     expect(prompt).toContain("Investment Banking");
     expect(prompt).toContain("Chi Phi");
     expect(prompt).toContain("Accounting");
+    expect(prompt).toContain("Bloomberg Terminal");
   });
 
   it("instructs the model to extract the candidate's own attributes only", () => {

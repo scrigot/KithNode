@@ -7,6 +7,7 @@ import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { requireSubscription } from "@/lib/subscription";
 import { fetchPdlProfile, shouldAdoptPdlName } from "@/lib/enrich/pdl";
+import { deduceHometown } from "@/lib/deduce-hometown";
 
 const BATCH_LIMIT = 25;
 
@@ -173,6 +174,14 @@ export async function POST(req: NextRequest) {
       const pastFirms =
         c.pastFirms || (pdl?.pastFirms?.length ? pdl.pastFirms.join(", ") : "");
 
+      // High school fills from PDL only when the column is empty (manual edits
+      // win). Hometown is then deduced from the high school, but ONLY when the
+      // contact's hometown is empty and a high school is now known — a unique
+      // school name yields "City, ST", ambiguous/unknown stays "".
+      const highSchool = c.highSchool || pdl?.highSchool || "";
+      const hometown =
+        c.hometown || (highSchool ? await deduceHometown(highSchool) : "");
+
       // Adopt PDL full name when the current name is a single token (slug-derived).
       // Multi-word names (CSV imports) are considered accurate and never overwritten.
       // Empty current name is also treated as unset (single-token path).
@@ -191,7 +200,7 @@ export async function POST(req: NextRequest) {
       // highSchool/clubs/passions ride along from the existing columns.
       const tags = await loadContactTags(userId, c.id);
       const { affiliations, score, tier } = rescoreContact(
-        { ...c, name, education, location, major, minor, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
+        { ...c, name, education, location, highSchool, hometown, major, minor, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
         prefs,
         tags,
       );
@@ -203,6 +212,8 @@ export async function POST(req: NextRequest) {
           education,
           graduationYear,
           location,
+          highSchool,
+          hometown,
           major,
           minor,
           skills,

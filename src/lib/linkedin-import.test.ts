@@ -215,6 +215,58 @@ describe("detectAffiliations: Same High School + editable fields", () => {
   });
 });
 
+describe("detectAffiliations: Hometown Match vs Target Location", () => {
+  const prefsWith = (overrides: Record<string, unknown> = {}) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    pastFirms: [],
+    major: "",
+    minor: "",
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+    ...overrides,
+  });
+
+  it("fires Hometown Match on the contact's hometown field", () => {
+    const affs = detectAffiliations(
+      baseMeta({ hometown: "Charlotte, NC", location: "New York, NY" }),
+      prefsWith({ hometown: "Charlotte, NC" }),
+    );
+    expect(affs.some((a) => a.name === "Hometown Match" && a.boost === 8)).toBe(true);
+  });
+
+  it("falls back to location for Hometown Match when contact hometown is empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ hometown: "", location: "Charlotte, NC" }),
+      prefsWith({ hometown: "Charlotte, NC" }),
+    );
+    expect(affs.some((a) => a.name === "Hometown Match")).toBe(true);
+  });
+
+  it("does NOT fall back to location when the contact hometown is present but differs", () => {
+    const affs = detectAffiliations(
+      baseMeta({ hometown: "Boston, MA", location: "Charlotte, NC" }),
+      prefsWith({ hometown: "Charlotte, NC" }),
+    );
+    expect(affs.some((a) => a.name === "Hometown Match")).toBe(false);
+  });
+
+  it("contact hometown does NOT light Target Location (that reads location only)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ hometown: "Charlotte, NC", location: "" }),
+      prefsWith({ targetLocations: ["Charlotte"] }),
+    );
+    expect(affs.some((a) => a.name === "Target Location")).toBe(false);
+  });
+});
+
 describe("detectAffiliations: Same Club", () => {
   const clubPrefs = (clubs: string[]) => ({
     university: "",

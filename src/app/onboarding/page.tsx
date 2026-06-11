@@ -22,6 +22,7 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
   INDUSTRY_OPTIONS,
@@ -206,7 +207,7 @@ export default function OnboardingPage() {
   const [clubs, setClubs] = useState<string[]>([]);
   const [clubInput, setClubInput] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
-  const [skillInput, setSkillInput] = useState("");
+  const [skillKey, setSkillKey] = useState(0);
 
   // Resume autofill — prefills empty step-1 + step-2 fields only.
   const [resumeLoading, setResumeLoading] = useState(false);
@@ -333,12 +334,12 @@ export default function OnboardingPage() {
     setClubInput("");
   };
   const removeClub = (v: string) => setClubs((p) => p.filter((c) => c !== v));
-  const addSkill = () => {
-    const skill = skillInput.trim();
+  const addSkill = (raw: string) => {
+    const skill = raw.trim();
+    setSkillKey((k) => k + 1); // remount the Combobox to clear its input
     setSkills((p) =>
       skill && !p.includes(skill) && p.length < 10 ? [...p, skill] : p,
     );
-    setSkillInput("");
   };
   const removeSkill = (v: string) =>
     setSkills((p) => p.filter((s) => s !== v));
@@ -1018,18 +1019,14 @@ export default function OnboardingPage() {
                 </div>
               )}
               {skills.length < 10 && (
-                <Input
-                  value={skillInput}
-                  onChange={(e) => setSkillInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addSkill();
-                    }
-                  }}
+                <Combobox
+                  key={skillKey}
+                  value=""
+                  onSelect={addSkill}
+                  loadOptions={loadSkills}
                   placeholder="Add a skill, then press Enter..."
-                  aria-label="Skills"
-                  className="bg-muted text-sm"
+                  ariaLabel="Skills"
+                  inputClassName="bg-muted text-sm"
                 />
               )}
             </section>

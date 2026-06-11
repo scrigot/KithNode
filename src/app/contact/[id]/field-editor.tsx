@@ -10,6 +10,7 @@ interface FieldEditorProps {
     | "name"
     | "education"
     | "location"
+    | "hometown"
     | "highSchool"
     | "clubs"
     | "passions"

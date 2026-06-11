@@ -81,6 +81,9 @@ export interface PdlResult {
   fullName: string;
   major: string;
   minor: string;
+  // Best pre-college school name (most recent pre-college end year). "" when the
+  // profile has no pre-college entry. Feeds the contact's highSchool column.
+  highSchool: string;
   skills: string[];
   // Past employer names: companies from experience entries EXCLUDING the
   // current one (an entry with no end_date is current). Deduped, title-cased,
@@ -139,6 +142,23 @@ function pickEducation(entries: PdlEducationEntry[]): PdlEducationEntry | null {
 
   // Most recent end year wins; unknown years (0) sort last.
   return pool.reduce((best, e) =>
+    parseEndYear(e) > parseEndYear(best) ? e : best,
+  );
+}
+
+/**
+ * Pick the best PRE-COLLEGE school: among named entries that isPreCollege flags,
+ * the one with the most recent end year (latest high school). Returns null when
+ * the profile has no pre-college entry. Independent of pickEducation, which
+ * prefers collegiate entries — a profile yields both a college education AND a
+ * high school when it lists each.
+ */
+function pickPreCollege(entries: PdlEducationEntry[]): PdlEducationEntry | null {
+  const named = entries.filter(
+    (e) => schoolNameOf(e).length > 0 && isPreCollege(e),
+  );
+  if (named.length === 0) return null;
+  return named.reduce((best, e) =>
     parseEndYear(e) > parseEndYear(best) ? e : best,
   );
 }
@@ -255,6 +275,8 @@ export async function fetchPdlProfile(
     const best = pickEducation(entries);
     if (!best) return null;
 
+    const preCollege = pickPreCollege(entries);
+
     const rawFullName = asString(personData.full_name);
     const fullName = rawFullName ? titleCase(rawFullName) : "";
 
@@ -265,6 +287,7 @@ export async function fetchPdlProfile(
       fullName,
       major: firstFieldOf(best.majors),
       minor: firstFieldOf(best.minors),
+      highSchool: preCollege ? schoolNameOf(preCollege) : "",
       skills: buildSkills(personData),
       pastFirms: buildPastFirms(personData),
     };

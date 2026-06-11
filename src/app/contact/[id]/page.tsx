@@ -17,6 +17,7 @@ import {
   loadGreekOrgs,
   loadClubs,
   loadMajors,
+  loadSkills,
 } from "@/lib/data/onboarding-options";
 import { trackEvent } from "@/lib/posthog";
 import type { ContactDetail } from "@/lib/api";
@@ -566,6 +567,7 @@ export default function ContactDetailPage() {
               initialValue={contact.skills || ""}
               placeholder="Add skills"
               mode="multi-chip"
+              loadOptions={loadSkills}
               maxChips={12}
               onSaved={loadContact}
             />
@@ -582,9 +584,19 @@ export default function ContactDetailPage() {
             <FieldEditor
               contactId={contact.id}
               field="location"
-              label="Location"
+              label="Location (current)"
               initialValue={contact.linkedin_location || ""}
               placeholder="Add location"
+              mode="options"
+              loadOptions={loadCities}
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="hometown"
+              label="Hometown"
+              initialValue={contact.hometown || ""}
+              placeholder="Add hometown"
               mode="options"
               loadOptions={loadCities}
               onSaved={loadContact}

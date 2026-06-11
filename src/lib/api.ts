@@ -71,6 +71,8 @@ export interface ContactDetail extends RankedContact {
   email_confidence: string;
   education: string;
   linkedin_location: string;
+  // Manually-entered or high-school-deduced hometown ("City, ST"). "" when unset.
+  hometown: string;
   high_school: string;
   greek_org: string;
   clubs: string;

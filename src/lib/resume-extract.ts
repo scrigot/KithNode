@@ -10,6 +10,7 @@ import { z } from "zod";
 import greekOrgs from "@/lib/data/greek-orgs.json";
 import clubs from "@/lib/data/college-clubs.json";
 import majors from "@/lib/data/us-majors.json";
+import skills from "@/lib/data/us-skills.json";
 import { INDUSTRY_OPTIONS } from "@/lib/data/preference-options";
 
 /** Hard cap on the decoded PDF size. Resumes are 1-2 pages; 4MB is generous. */
@@ -89,7 +90,7 @@ Return:
 - hometown: the candidate's hometown as "City, ST" if derivable.
 - greekOrg: the candidate's fraternity/sorority, mapped to the GREEK ORGS list when confident.
 - clubs: up to 3 clubs/student orgs the candidate belongs to, mapped to the CLUBS list when confident.
-- skills: up to 10 of the candidate's skills.
+- skills: up to 10 of the candidate's skills, mapped to the SKILLS list when confident.
 - majors: up to 2 of the candidate's majors, mapped to the MAJORS list when confident.
 - minors: up to 2 of the candidate's minors, mapped to the MAJORS list when confident.
 - targetIndustries: up to 4 industries the candidate targets/works in, chosen from the INDUSTRIES list.
@@ -102,6 +103,8 @@ GREEK ORGS: ${(greekOrgs as string[]).join(", ")}
 CLUBS: ${(clubs as string[]).join(", ")}
 
 MAJORS: ${(majors as string[]).join(", ")}
+
+SKILLS: ${(skills as string[]).join(", ")}
 
 Return the result as JSON matching the schema exactly.`;
 }
