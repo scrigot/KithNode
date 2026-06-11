@@ -10,13 +10,14 @@ describe("seedsForSchool", () => {
     expect(names).toContain("Bank of America");
     expect(names).toContain("McKinsey & Company");
     expect(names).toContain("Evercore");
-    expect(seeds.length).toBe(15);
+    expect(names).toContain("Accenture");
+    expect(seeds.length).toBe(16);
   });
 
   it("resolves alias 'unc-chapel-hill' to UNC seeds", () => {
     const seeds = seedsForSchool("unc-chapel-hill");
     expect(seeds.map((s) => s.name)).toContain("Goldman Sachs");
-    expect(seeds.length).toBe(15);
+    expect(seeds.length).toBe(16);
   });
 
   it("returns NC State recruiting firms for 'NC State'", () => {

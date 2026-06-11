@@ -168,7 +168,7 @@ export const FIRM_SEEDS: Record<IndustryKey, readonly FirmSeed[]> = {
   "Investment Banking": [...BULGE_BRACKET, ...ELITE_BOUTIQUE],
   "Private Equity": [...MEGA_PE],
   "Hedge Fund": [...HEDGE_FUNDS],
-  "Consulting": [...MBB],
+  "Consulting": [...MBB, ...BIG4],
   "Big 4": [...BIG4],
   "AI/ML": [...FRONTIER_LAB, ...AI_UNICORN, ...BIG_TECH_AI],
 };
@@ -222,6 +222,7 @@ const SCHOOL_SEEDS: Record<SchoolKey, readonly FirmSeed[]> = {
     s("EY", "ey.com"),
     s("PwC", "pwc.com"),
     s("KPMG", "kpmg.com"),
+    s("Accenture", "accenture.com"),
     s("McKinsey & Company", "mckinsey.com"),
     s("Boston Consulting Group", "bcg.com"),
     s("Bain & Company", "bain.com"),
