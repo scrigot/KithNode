@@ -53,20 +53,27 @@ interface Contact {
 type ViewMode = "browse" | "search";
 type SourceFilter = "alumni" | "professor" | "student";
 
+interface RateResult {
+  ok: boolean;
+  contact?: Contact | null;
+}
+
 async function rateContact(
   contactId: string,
   rating: "high_value" | "skip",
-): Promise<boolean> {
+): Promise<RateResult> {
   try {
     const res = await apiFetch("/api/discover/rate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contactId, rating }),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const data = await res.json();
+    return { ok: true, contact: data.contact ?? null };
   } catch (err) {
     Sentry.captureException(err);
-    return false;
+    return { ok: false };
   }
 }
 
@@ -349,6 +356,11 @@ export default function DiscoverPage() {
   const [allRated, setAllRated] = useState(false);
   const ratingLockRef = useRef(false);
 
+  // Cards waiting in the high-value confirmation state: contactId -> unlocked Contact.
+  const [confirmedCards, setConfirmedCards] = useState<Map<string, Contact>>(new Map());
+  // Pipeline send state per card: "idle" | "pending" | "sent"
+  const [pipelineSendState, setPipelineSendState] = useState<Map<string, "idle" | "pending" | "sent">>(new Map());
+
   const search = useCallback(
     async (q: string, tier: string, src: SourceFilter) => {
       setLoading(true);
@@ -416,25 +428,83 @@ export default function DiscoverPage() {
   }, [mode, fetchBrowseContacts, sourceFilter]);
 
   const handleRate = useCallback(
-    (contactId: string, rating: "high_value" | "skip") => {
+    async (contactId: string, rating: "high_value" | "skip") => {
       if (ratingLockRef.current) return;
       ratingLockRef.current = true;
 
-      rateContact(contactId, rating);
       trackEvent("discover_rate", { contact_id: contactId, rating });
 
-      setBrowseContacts((prev) => {
-        const next = prev.filter((c) => c.id !== contactId);
-        if (next.length === 0) setAllRated(true);
-        return next;
-      });
-
-      setTimeout(() => {
+      if (rating === "skip") {
+        // Skip: fire-and-forget, remove immediately.
+        rateContact(contactId, "skip");
+        setBrowseContacts((prev) => {
+          const next = prev.filter((c) => c.id !== contactId);
+          if (next.length === 0) setAllRated(true);
+          return next;
+        });
+        setTimeout(() => { ratingLockRef.current = false; }, 80);
+      } else {
+        // High value: await the rate call so we get the unlocked contact back.
+        // Keep the card in browseContacts but move it to confirmedCards.
+        const result = await rateContact(contactId, "high_value");
+        // Merge unlocked data into the existing card (fallback to existing if endpoint returned null).
+        setBrowseContacts((prev) => {
+          const existing = prev.find((c) => c.id === contactId);
+          if (!existing) {
+            ratingLockRef.current = false;
+            return prev;
+          }
+          const unlocked: Contact = result.contact
+            ? { ...existing, ...result.contact, isRedacted: false }
+            : { ...existing, isRedacted: false };
+          setConfirmedCards((m) => new Map(m).set(contactId, unlocked));
+          // Remove from the unrated list — it now lives in confirmedCards.
+          return prev.filter((c) => c.id !== contactId);
+        });
         ratingLockRef.current = false;
-      }, 80);
+      }
     },
     [],
   );
+
+  /** Advance a confirmed card out of the confirmation state (both "keep browsing" and post-pipeline). */
+  const handleConfirmAdvance = useCallback((contactId: string) => {
+    setConfirmedCards((prev) => {
+      const next = new Map(prev);
+      next.delete(contactId);
+      // If nothing unrated remains and this was the last confirmed card, mark all done.
+      setBrowseContacts((bc) => {
+        if (bc.length === 0 && next.size === 0) setAllRated(true);
+        return bc;
+      });
+      return next;
+    });
+    setPipelineSendState((prev) => {
+      const next = new Map(prev);
+      next.delete(contactId);
+      return next;
+    });
+  }, []);
+
+  /** Send a confirmed card to the pipeline, then advance. */
+  const handleSendToPipeline = useCallback(async (contactId: string) => {
+    setPipelineSendState((prev) => new Map(prev).set(contactId, "pending"));
+    try {
+      const res = await apiFetch(`/api/pipeline/${contactId}`, { method: "POST" });
+      if (res.ok) {
+        trackEvent("discover_add_pipeline", { contact_id: contactId, source: "confirm_state" });
+        setPipelineSendState((prev) => new Map(prev).set(contactId, "sent"));
+        // Brief "In pipeline" flash then advance.
+        setTimeout(() => handleConfirmAdvance(contactId), 900);
+      } else {
+        // Non-2xx that isn't the idempotent case — just advance silently.
+        handleConfirmAdvance(contactId);
+      }
+    } catch (err) {
+      Sentry.captureException(err);
+      handleConfirmAdvance(contactId);
+    }
+  }, [handleConfirmAdvance]);
 
   // Keyboard: act on the top (first) unrated contact.
   useEffect(() => {
@@ -941,9 +1011,15 @@ export default function DiscoverPage() {
           </button>
         </div>
 
-        {mode === "browse" && !loading && !allRated && browseContacts.length > 0 && (
+        {mode === "browse" && !loading && !allRated && (browseContacts.length > 0 || confirmedCards.size > 0) && (
           <div className="flex items-center gap-2 py-1 text-[10px] text-muted-foreground">
             <span className="tabular-nums">{browseContacts.length} unrated</span>
+            {confirmedCards.size > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="tabular-nums text-primary/70">{confirmedCards.size} to review</span>
+              </>
+            )}
             <span className="text-muted-foreground/40">·</span>
             <span className="flex items-center gap-1">
               <Kbd>1</Kbd>
@@ -989,14 +1065,88 @@ export default function DiscoverPage() {
             </div>
           )}
 
-          {!loading && !allRated && browseContacts.length > 0 && (
+          {!loading && !allRated && (browseContacts.length > 0 || confirmedCards.size > 0) && (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from(confirmedCards.entries()).map(([cid, contact]) => {
+                const sendState = pipelineSendState.get(cid) ?? "idle";
+                return (
+                  <div
+                    key={cid}
+                    className="flex flex-col border border-primary/40 bg-card shadow-sm shadow-primary/10"
+                  >
+                    {/* Card header — same layout as ContactCard */}
+                    <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] font-bold ${TIER_STYLES[(contact.tier || "cold").toLowerCase()] || TIER_STYLES.cold}`}
+                      >
+                        {(contact.tier || "COLD").toUpperCase()}
+                      </Badge>
+                      <span className={`text-xl font-bold tabular-nums ${SCORE_STYLES[(contact.tier || "cold").toLowerCase()] || "text-zinc-400"}`}>
+                        {Math.round(contact.warmthScore || 0)}
+                      </span>
+                    </div>
+
+                    {/* Identity reveal */}
+                    <div className="flex-1 px-4 py-3">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-primary/70">
+                        Added to your network
+                      </p>
+                      <h3 className="mt-1 flex items-center gap-1 truncate text-[13px] font-bold text-foreground">
+                        <a
+                          href={`/contact/${contact.id}`}
+                          className="truncate hover:underline hover:decoration-white/40"
+                        >
+                          {contact.name}
+                        </a>
+                      </h3>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {contact.title}
+                        {contact.title && contact.firmName ? (contact.source === "professor" ? " · " : " @ ") : ""}
+                        <span className="text-foreground">{contact.firmName}</span>
+                      </p>
+                      {(contact.education || contact.location) && (
+                        <div className="mt-2 space-y-0.5 text-[10px] text-muted-foreground">
+                          {contact.education && <p className="truncate">{contact.education}</p>}
+                          {contact.location && <p className="truncate">{contact.location}</p>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmAdvance(cid)}
+                        disabled={sendState === "pending"}
+                        className="flex flex-1 items-center justify-center border border-white/[0.12] py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+                      >
+                        Keep browsing
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSendToPipeline(cid)}
+                        disabled={sendState !== "idle"}
+                        className={`flex flex-1 items-center justify-center gap-1 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
+                          sendState === "sent"
+                            ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                            : sendState === "pending"
+                              ? "bg-primary/60 text-white"
+                              : "bg-primary text-white hover:bg-primary/80"
+                        }`}
+                      >
+                        {sendState === "sent" ? "In pipeline" : sendState === "pending" ? "..." : "Send to Pipeline"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
               {browseContacts.map((c, i) => (
                 <ContactCard
                   key={c.id}
                   contact={c}
                   variant="rate"
-                  focused={i === 0}
+                  focused={i === 0 && confirmedCards.size === 0}
                   onRate={(rating) => handleRate(c.id, rating)}
                   onAskIntro={handleAskIntro}
                 />
