@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 import { requireSubscription } from "@/lib/subscription";
-import { fetchProxycurlProfile } from "@/lib/enrich/proxycurl";
+import { fetchPdlProfile } from "@/lib/enrich/pdl";
 
 const BATCH_LIMIT = 25;
 
@@ -121,22 +121,22 @@ export async function POST(req: NextRequest) {
 
     let enriched = 0;
     let failed = 0;
-    let proxycurlOk = 0;
-    let proxycurlFail = 0;
+    let pdlOk = 0;
+    let pdlFail = 0;
 
     for (const c of contacts) {
-      // ── Proxycurl first: real structured education by LinkedIn URL ──
+      // ── PDL first: real structured education by LinkedIn URL ──
       // Only spend a lookup when the contact has a LinkedIn URL (cost guard) and
-      // the API key is configured. fetchProxycurlProfile no-ops to null when the
+      // the API key is configured. fetchPdlProfile no-ops to null when the
       // key is unset, so this stays graceful with zero config.
       const linkedInUrl: string = c.linkedInUrl || "";
-      let proxycurl: Awaited<ReturnType<typeof fetchProxycurlProfile>> = null;
-      if (linkedInUrl && process.env.PROXYCURL_API_KEY) {
-        proxycurl = await fetchProxycurlProfile(linkedInUrl);
-        if (proxycurl) {
-          proxycurlOk++;
+      let pdl: Awaited<ReturnType<typeof fetchPdlProfile>> = null;
+      if (linkedInUrl && process.env.PDL_API_KEY) {
+        pdl = await fetchPdlProfile(linkedInUrl);
+        if (pdl) {
+          pdlOk++;
         } else {
-          proxycurlFail++;
+          pdlFail++;
         }
       }
 
@@ -151,15 +151,15 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Real Proxycurl data wins over the LLM guess for education + grad year.
+      // Real PDL data wins over the LLM guess for education + grad year.
       // Location only fills when the contact's is empty (don't clobber a value).
-      const education = proxycurl?.education || c.education || fields.education;
+      const education = pdl?.education || c.education || fields.education;
       const graduationYear =
-        proxycurl && proxycurl.graduationYear > 0
-          ? proxycurl.graduationYear
+        pdl && pdl.graduationYear > 0
+          ? pdl.graduationYear
           : c.graduationYear || 0;
       const location =
-        c.location || proxycurl?.location || fields.location;
+        c.location || pdl?.location || fields.location;
 
       // Build meta with enriched fields layered on top of existing data
       // Don't overwrite non-empty fields. Enrichment fills gaps, not replaces.
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
           tier,
           affiliations: affiliations.map((a) => a.name).join(","),
           enrichedAt: new Date().toISOString(),
-          enrichmentSource: proxycurl ? "proxycurl+claude" : "claude",
+          enrichmentSource: pdl ? "pdl+claude" : "claude",
         })
         .eq("id", c.id);
 
@@ -201,9 +201,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log("Enrich batch: Proxycurl lookups", {
-      succeeded: proxycurlOk,
-      failed: proxycurlFail,
+    console.log("Enrich batch: PDL lookups", {
+      succeeded: pdlOk,
+      failed: pdlFail,
       total: contacts.length,
     });
 
