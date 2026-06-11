@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="panel.css">
+<title>KithNode Clipper</title>
+</head>
+<body>
+  <header>
+    <span class="mark">Kith<b>Node</b> clipper</span>
+  </header>
+
+  <main>
+    <button id="parse" class="btn primary">Read this profile</button>
+    <p id="hint" class="hint">Open a linkedin.com/in/ profile, then click above.</p>
+
+    <form id="form" hidden>
+      <label>Name <input name="name" autocomplete="off"></label>
+      <label>Title <input name="title" autocomplete="off"></label>
+      <label>Firm <input name="firmName" autocomplete="off"></label>
+      <label>Education <input name="education" autocomplete="off"></label>
+      <label>Location <input name="location" autocomplete="off"></label>
+      <label>Email <input name="email" type="email" autocomplete="off" placeholder="optional"></label>
+      <label>LinkedIn URL <input name="linkedInUrl" autocomplete="off"></label>
+
+      <div class="actions">
+        <button type="button" id="copyJson" class="btn">Copy JSON</button>
+        <button type="button" id="copyCsv" class="btn">Copy CSV row</button>
+        <button type="button" id="send" class="btn primary">Add to KithNode</button>
+      </div>
+      <p id="status" class="status"></p>
+    </form>
+
+    <details class="settings">
+      <summary>Settings</summary>
+      <label>KithNode URL
+        <input id="baseUrl" placeholder="https://kithnode.ai" autocomplete="off">
+      </label>
+      <p class="hint">Used by "Add to KithNode". You must be signed in to KithNode in this
+        browser. Leave blank to use only the copy buttons.</p>
+    </details>
+  </main>
+
+  <script src="panel.js"></script>
+</body>
+</html>
