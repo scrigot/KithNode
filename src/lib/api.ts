@@ -48,6 +48,10 @@ export interface RankedContact {
   linkedin_url: string;
   education: string;
   linkedin_location: string;
+  // Career-track taxonomy: track is one of CAREER_TRACKS keys, role one of its
+  // values. Both "" when unclassified. Drives the Warm Signals + Discover tabs.
+  track: string;
+  role: string;
   why_now: string;
   warm_path: string;
   affiliations: { name: string; boost: number }[];

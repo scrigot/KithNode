@@ -20,6 +20,7 @@ import {
   loadSkills,
 } from "@/lib/data/onboarding-options";
 import { trackEvent } from "@/lib/posthog";
+import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 import type { ContactDetail } from "@/lib/api";
 
 const TIER_STYLES: Record<string, string> = {
@@ -167,6 +168,92 @@ function TypeToggle({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// Track + role editor over the taxonomy. The track <select> gates the role
+// <select> options (roles shown belong to the chosen track); clearing the track
+// clears the role. Both persist via the same PATCH the rest of the page uses;
+// the route validates them as closed sets and rescores server-side. Changing the
+// track to one that doesn't own the current role auto-clears the role in the same
+// PATCH so the two never disagree.
+function TrackRoleEditor({
+  contactId,
+  track,
+  role,
+  onSaved,
+}: {
+  contactId: string;
+  track: string;
+  role: string;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  async function patch(body: { track: string; role: string }) {
+    setSaving(true);
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setSaving(false);
+    if (res.ok) onSaved();
+  }
+
+  function onTrackChange(nextTrack: string) {
+    if (nextTrack === track) return;
+    // Keep the role only if it still belongs to the new track; otherwise clear it.
+    const keepRole = nextTrack && roleToTrack(role) === nextTrack ? role : "";
+    void patch({ track: nextTrack, role: keepRole });
+  }
+
+  function onRoleChange(nextRole: string) {
+    if (nextRole === role) return;
+    // Setting a role implies its track (handles the role-without-track case).
+    void patch({ track: nextRole ? roleToTrack(nextRole) : track, role: nextRole });
+  }
+
+  const roleOptions = track && track in CAREER_TRACKS
+    ? CAREER_TRACKS[track as keyof typeof CAREER_TRACKS]
+    : [];
+
+  return (
+    <div className="mb-3">
+      <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        CAREER TRACK
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        <select
+          aria-label="Career track"
+          disabled={saving}
+          value={track}
+          onChange={(e) => onTrackChange(e.target.value)}
+          className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+        >
+          <option value="">Track —</option>
+          {ALL_TRACKS.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Career role"
+          disabled={saving || !track}
+          value={role}
+          onChange={(e) => onRoleChange(e.target.value)}
+          className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+        >
+          <option value="">Role —</option>
+          {roleOptions.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -488,6 +575,13 @@ export default function ContactDetailPage() {
           <TypeToggle
             contactId={contact.id}
             value={contact.person_type || ""}
+            onSaved={loadContact}
+          />
+
+          <TrackRoleEditor
+            contactId={contact.id}
+            track={contact.track || ""}
+            role={contact.role || ""}
             onSaved={loadContact}
           />
 

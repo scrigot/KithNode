@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { deduceHometown } from "@/lib/deduce-hometown";
+import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -25,12 +26,22 @@ const EDITABLE_FIELDS = [
   "minor",
   "skills",
   "pastFirms",
+  "track",
+  "role",
 ] as const;
 
 // personType is a closed enum, not free text: '' = auto (text heuristics),
 // 'alum' | 'student' | 'professor' = manual identity override. Anything else
 // is a 400.
 const VALID_PERSON_TYPES = ["", "alum", "student", "professor"] as const;
+
+// track/role are closed sets over the taxonomy, validated like personType. ""
+// clears the field. A role must belong to the track being set in the SAME patch
+// (or, if track isn't in the patch, to the role's own track) — a track/role
+// mismatch is a 400, never a silent persist.
+const VALID_TRACKS = ["", ...ALL_TRACKS] as const;
+const ALL_ROLE_VALUES = ALL_TRACKS.flatMap((t) => [...CAREER_TRACKS[t]]);
+const VALID_ROLES = ["", ...ALL_ROLE_VALUES] as const;
 
 const MAX_FIELD_LEN = 160;
 
@@ -56,10 +67,31 @@ export function pickEditableFields(
         return { fields: {}, invalid: true };
       }
       out[key] = val; // enum value, no whitespace normalization needed
+    } else if (key === "track") {
+      if (!VALID_TRACKS.includes(val as (typeof VALID_TRACKS)[number])) {
+        return { fields: {}, invalid: true };
+      }
+      out[key] = val;
+    } else if (key === "role") {
+      if (!VALID_ROLES.includes(val as (typeof VALID_ROLES)[number])) {
+        return { fields: {}, invalid: true };
+      }
+      out[key] = val;
     } else {
       out[key] = normalizeField(val);
     }
   }
+
+  // Cross-field guard: a non-empty role must belong to its track. The effective
+  // track is the one being set in this patch if present, else the role's own
+  // owning track (the role-only edit case). A mismatch is invalid.
+  if (out.role) {
+    const effectiveTrack = "track" in out ? out.track : roleToTrack(out.role);
+    if (roleToTrack(out.role) !== effectiveTrack) {
+      return { fields: {}, invalid: true };
+    }
+  }
+
   return { fields: out, invalid: false };
 }
 
@@ -162,6 +194,8 @@ export async function GET(
     skills: contact.skills || "",
     past_firms: contact.pastFirms || "",
     person_type: contact.personType || "",
+    track: contact.track || "",
+    role: contact.role || "",
     university: contact.university || "",
     company: {
       name: contact.firmName,
@@ -210,7 +244,7 @@ export async function PATCH(
 
   if (invalid) {
     return NextResponse.json(
-      { error: "Invalid personType" },
+      { error: "Invalid field value" },
       { status: 400 },
     );
   }

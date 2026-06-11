@@ -61,6 +61,15 @@ export interface ContactMeta extends LinkedInMeta {
    * where-they-studied, so it never feeds the education-based Same School match.
    */
   university?: string;
+  /**
+   * Career-track classification (taxonomy in src/lib/data/career-tracks.ts).
+   * track is a CAREER_TRACKS key, role one of its values. They feed ONLY the
+   * Target Industry matcher (folded into the contact-side industry text), so a
+   * prefs role like "AI Engineer" matches even when the legacy `industry` column
+   * is empty. Never reach the K-12 detector or any other matcher.
+   */
+  track?: string;
+  role?: string;
 }
 
 interface Affiliation {
@@ -157,19 +166,23 @@ export async function scrapeLinkedInMeta(url: string): Promise<LinkedInMeta> {
 // brushes a finance pattern.
 
 // AI / ML
-const FRONTIER_LAB = [/\banthropic\b/i, /\bopenai\b/i, /\bgoogle\s*deepmind\b|\bdeepmind\b/i, /\bmistral\s*ai\b/i, /\bcohere\b/i, /\bxai\b/i, /\binflection\s*ai\b/i, /\badept\s*ai\b/i, /\bcharacter\.?ai\b/i, /\bperplexity\b/i, /\bsafe\s*superintelligence\b|\bssi\s*inc\b/i];
-const AI_UNICORN = [/\bhugging\s*face\b/i, /\blangchain\b/i, /\banysphere\b|\bcursor\s*ai\b/i, /\breplicate\b/i, /\bvercel\b/i, /\bmodal\s*labs\b/i, /\btogether\s*ai\b/i, /\bdatabricks\b/i, /\bscale\s*ai\b/i, /\bharvey\s*ai\b/i, /\bweights\s*(?:&|and)?\s*biases\b/i, /\breplit\b/i, /\bnotion\s*labs\b/i, /\brunway\s*ml\b/i, /\bmidjourney\b/i, /\beleven\s*labs\b/i, /\bsuno\b/i];
-const BIG_TECH_AI = [/\bmeta\s*(?:ai|fair)\b|\bfacebook\s*ai\b/i, /\bapple\s*intelligence\b/i, /\bmicrosoft\s*research\b|\bmsr\b/i, /\bgoogle\s*brain\b/i, /\bnvidia\b/i, /\bsalesforce\s*research\b/i, /\bibm\s*research\b/i, /\bamazon\s*(?:agi|science)\b/i];
+// These tier arrays are EXPORTED so the heuristic career classifier
+// (src/lib/classify-career.ts) reuses the exact same firm lists instead of
+// duplicating them — one edit here updates both warmth scoring and track
+// classification.
+export const FRONTIER_LAB = [/\banthropic\b/i, /\bopenai\b/i, /\bgoogle\s*deepmind\b|\bdeepmind\b/i, /\bmistral\s*ai\b/i, /\bcohere\b/i, /\bxai\b/i, /\binflection\s*ai\b/i, /\badept\s*ai\b/i, /\bcharacter\.?ai\b/i, /\bperplexity\b/i, /\bsafe\s*superintelligence\b|\bssi\s*inc\b/i];
+export const AI_UNICORN = [/\bhugging\s*face\b/i, /\blangchain\b/i, /\banysphere\b|\bcursor\s*ai\b/i, /\breplicate\b/i, /\bvercel\b/i, /\bmodal\s*labs\b/i, /\btogether\s*ai\b/i, /\bdatabricks\b/i, /\bscale\s*ai\b/i, /\bharvey\s*ai\b/i, /\bweights\s*(?:&|and)?\s*biases\b/i, /\breplit\b/i, /\bnotion\s*labs\b/i, /\brunway\s*ml\b/i, /\bmidjourney\b/i, /\beleven\s*labs\b/i, /\bsuno\b/i];
+export const BIG_TECH_AI = [/\bmeta\s*(?:ai|fair)\b|\bfacebook\s*ai\b/i, /\bapple\s*intelligence\b/i, /\bmicrosoft\s*research\b|\bmsr\b/i, /\bgoogle\s*brain\b/i, /\bnvidia\b/i, /\bsalesforce\s*research\b/i, /\bibm\s*research\b/i, /\bamazon\s*(?:agi|science)\b/i];
 
 // Finance / Consulting
-const BULGE_BRACKET = [/goldman\s*sachs/i, /jpmorgan/i, /morgan\s*stanley/i, /bank of america/i, /citi(?:group|bank)?/i, /barclays/i, /deutsche\s*bank/i, /ubs\b/i, /credit\s*suisse/i, /hsbc/i, /wells\s*fargo/i];
-const ELITE_BOUTIQUE = [/evercore/i, /lazard/i, /centerview/i, /moelis/i, /perella/i, /pjt/i, /guggenheim/i, /greenhill/i, /rothschild/i, /qatalyst/i, /houlihan/i, /jefferies/i, /raymond\s*james/i, /william\s*blair/i, /piper\s*sandler/i, /robert\s*w\.?\s*baird/i];
-const MEGA_PE = [/blackstone/i, /kkr\b/i, /carlyle/i, /apollo\s*(?:global)?/i, /warburg/i, /tpg\b/i, /thoma\s*bravo/i, /vista\s*equity/i, /silver\s*lake/i, /bain\s*capital/i, /general\s*atlantic/i, /advent\s*international/i, /hellman/i, /leonard\s*green/i, /ares\s*management/i, /providence\s*equity/i, /welsh\s*carson/i];
-const HEDGE_FUNDS = [/citadel/i, /point72/i, /two\s*sigma/i, /bridgewater/i, /millennium/i, /de\s*shaw/i, /jane\s*street/i, /hudson\s*river/i, /jump\s*trading/i, /tower\s*research/i, /renaissance/i, /man\s*group/i, /aqr/i, /elliott/i, /baupost/i];
-const MBB = [/mckinsey/i, /boston\s*consulting|bcg\b/i, /\bbain\b(?!\s*capital)/i];
+export const BULGE_BRACKET = [/goldman\s*sachs/i, /jpmorgan/i, /morgan\s*stanley/i, /bank of america/i, /citi(?:group|bank)?/i, /barclays/i, /deutsche\s*bank/i, /ubs\b/i, /credit\s*suisse/i, /hsbc/i, /wells\s*fargo/i];
+export const ELITE_BOUTIQUE = [/evercore/i, /lazard/i, /centerview/i, /moelis/i, /perella/i, /pjt/i, /guggenheim/i, /greenhill/i, /rothschild/i, /qatalyst/i, /houlihan/i, /jefferies/i, /raymond\s*james/i, /william\s*blair/i, /piper\s*sandler/i, /robert\s*w\.?\s*baird/i];
+export const MEGA_PE = [/blackstone/i, /kkr\b/i, /carlyle/i, /apollo\s*(?:global)?/i, /warburg/i, /tpg\b/i, /thoma\s*bravo/i, /vista\s*equity/i, /silver\s*lake/i, /bain\s*capital/i, /general\s*atlantic/i, /advent\s*international/i, /hellman/i, /leonard\s*green/i, /ares\s*management/i, /providence\s*equity/i, /welsh\s*carson/i];
+export const HEDGE_FUNDS = [/citadel/i, /point72/i, /two\s*sigma/i, /bridgewater/i, /millennium/i, /de\s*shaw/i, /jane\s*street/i, /hudson\s*river/i, /jump\s*trading/i, /tower\s*research/i, /renaissance/i, /man\s*group/i, /aqr/i, /elliott/i, /baupost/i];
+export const MBB = [/mckinsey/i, /boston\s*consulting|bcg\b/i, /\bbain\b(?!\s*capital)/i];
 // Note: \bEY\b on BOTH sides — without leading boundary, /ey\b/ matches the
 // trailing "ey" of any word ending that way (e.g. "Bentley", "honey").
-const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|\bey\b/i, /kpmg/i];
+export const BIG4 = [/deloitte/i, /accenture/i, /pwc|pricewaterhouse/i, /ernst\s*&?\s*young|\bey\b/i, /kpmg/i];
 
 // CS-strong schools, applied as a separate affiliation chip when the contact's
 // education field matches. Independent of user's "Same School" boost.
@@ -474,9 +487,20 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       }
     }
 
-    // Target industry, prefer explicit enrichment field, fall back to firm tier inference
+    // Target industry. The contact-side text is now industry + track + role, so a
+    // prefs entry (which stores taxonomy ROLE names like "AI Engineer", plus any
+    // legacy industry strings) fires when it equals the legacy industry OR the
+    // classified role OR the classified track — letting role-based targeting work
+    // even when the legacy `industry` column is empty. Each comparison is exact
+    // (normalized) to avoid loose substring false-fires. Fires at most once.
     const contactIndustry = meta.industry || inferIndustryFromAffiliations(affiliations);
-    if (contactIndustry && prefs.targetIndustries.some((i) => norm(i) === norm(contactIndustry))) {
+    const contactTargets = [contactIndustry, meta.track, meta.role]
+      .map((v) => norm(v || ""))
+      .filter((v) => v.length > 0);
+    if (
+      contactTargets.length &&
+      prefs.targetIndustries.some((i) => contactTargets.includes(norm(i)))
+    ) {
       affiliations.push({ name: "Target Industry", boost: 10 });
     }
 

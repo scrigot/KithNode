@@ -94,4 +94,48 @@ describe("pickEditableFields", () => {
     expect(invalid).toBe(true);
     expect(fields).toEqual({});
   });
+
+  it("accepts a valid track + role pair from the taxonomy", () => {
+    const { fields, invalid } = pickEditableFields({
+      track: "AI",
+      role: "AI Engineer",
+    });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ track: "AI", role: "AI Engineer" });
+  });
+
+  it("accepts clearing track + role to empty strings", () => {
+    const { fields, invalid } = pickEditableFields({ track: "", role: "" });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ track: "", role: "" });
+  });
+
+  it("accepts a role alone and infers nothing extra (track stays absent)", () => {
+    const { fields, invalid } = pickEditableFields({ role: "Private Equity" });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ role: "Private Equity" });
+  });
+
+  it("flags an off-taxonomy track as invalid and drops all fields", () => {
+    const { fields, invalid } = pickEditableFields({ track: "Crypto", education: "UNC" });
+    expect(invalid).toBe(true);
+    expect(fields).toEqual({});
+  });
+
+  it("flags an off-taxonomy role as invalid", () => {
+    const { invalid } = pickEditableFields({ role: "Degen Trader" });
+    expect(invalid).toBe(true);
+  });
+
+  it("flags a track/role mismatch as invalid (role not in the set track)", () => {
+    // AI Engineer is an AI role, not a Finance role.
+    const { invalid } = pickEditableFields({ track: "Finance", role: "AI Engineer" });
+    expect(invalid).toBe(true);
+  });
+
+  it("flags a role-only edit whose owning track conflicts only when inconsistent", () => {
+    // role alone is always self-consistent (track inferred from the role).
+    const { invalid } = pickEditableFields({ role: "Quant" });
+    expect(invalid).toBe(false);
+  });
 });

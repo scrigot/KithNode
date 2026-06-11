@@ -8,8 +8,35 @@ import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
 import { Users } from "lucide-react";
 import type { RankedContact } from "@/lib/api";
+import { ALL_TRACKS, CAREER_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
 import Link from "next/link";
 import { Upload } from "lucide-react";
+
+// Pure tab-filter predicate (exported for unit testing). A contact matches when:
+// no track is selected (ALL), OR its track equals the active track AND — when a
+// role sub-chip is active — its role equals that role. Empty role filter means
+// "all roles in this track".
+export function matchesTrackRole(
+  c: Pick<RankedContact, "track" | "role">,
+  track: string,
+  role: string,
+): boolean {
+  if (!track) return true;
+  if (c.track !== track) return false;
+  if (role && c.role !== role) return false;
+  return true;
+}
+
+// Count loaded contacts per track for the tab labels. Pure; unit-tested.
+export function countByTrack(
+  contacts: Pick<RankedContact, "track">[],
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const c of contacts) {
+    if (c.track) counts[c.track] = (counts[c.track] || 0) + 1;
+  }
+  return counts;
+}
 
 export function ContactsList() {
   const [contacts, setContacts] = useState<RankedContact[]>([]);
@@ -17,6 +44,10 @@ export function ContactsList() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeTier, setActiveTier] = useState("all");
+  // Career-track tabs (ALL + the 5 tracks); a selected track reveals its role
+  // sub-chips. "" = ALL. Filters the already-loaded contacts client-side.
+  const [activeTrack, setActiveTrack] = useState<CareerTrack | "">("");
+  const [activeRole, setActiveRole] = useState("");
   const [sort, setSort] = useState<SortOption>("score");
   const [outreachTarget, setOutreachTarget] = useState<{
     id: string;
@@ -58,6 +89,7 @@ export function ContactsList() {
 
   // Filter
   const filtered = contacts.filter((c) => {
+    if (!matchesTrackRole(c, activeTrack, activeRole)) return false;
     if (activeTier !== "all" && c.score.tier !== activeTier) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -74,6 +106,9 @@ export function ContactsList() {
     }
     return true;
   });
+
+  // Per-track counts for the tab labels. Cheap: one pass over the loaded set.
+  const trackCounts = countByTrack(contacts);
 
   // Sort
   const sorted = [...filtered].sort((a, b) => {
@@ -147,6 +182,72 @@ export function ContactsList() {
           });
         }}
       />
+
+      {/* Career-track tabs — ALL + the 5 tracks. Selecting a track reveals its
+          role sub-chips. Matches the discover page segmented-tab styling. */}
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap gap-1">
+          <button
+            onClick={() => {
+              setActiveTrack("");
+              setActiveRole("");
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              activeTrack === ""
+                ? "bg-primary text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All
+            <span className="tabular-nums opacity-60">{contacts.length}</span>
+          </button>
+          {ALL_TRACKS.map((track) => (
+            <button
+              key={track}
+              onClick={() => {
+                setActiveTrack(track);
+                setActiveRole("");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                activeTrack === track
+                  ? "bg-primary text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {track}
+              <span className="tabular-nums opacity-60">{trackCounts[track] || 0}</span>
+            </button>
+          ))}
+        </div>
+
+        {activeTrack !== "" && (
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setActiveRole("")}
+              className={`border px-2 py-1 text-[10px] font-bold tracking-wider transition-colors ${
+                activeRole === ""
+                  ? "border-primary/30 bg-primary/20 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              ALL ROLES
+            </button>
+            {CAREER_TRACKS[activeTrack].map((role) => (
+              <button
+                key={role}
+                onClick={() => setActiveRole(role)}
+                className={`border px-2 py-1 text-[10px] font-bold tracking-wider transition-colors ${
+                  activeRole === role
+                    ? "border-primary/30 bg-primary/20 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <FilterBar
         search={search}

@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get("q") || "";
   const query = raw.replace(/[^\p{L}\p{N}\s.-]/gu, "").slice(0, 100);
   const tier = request.nextUrl.searchParams.get("tier") || "";
+  // Optional career-track filter. When non-empty, narrows the pool to that exact
+  // track via an equality match on the AlumniContact.track column.
+  const track = request.nextUrl.searchParams.get("track") || "";
   const rawSource = request.nextUrl.searchParams.get("source") || "alumni";
   const category: DiscoverCategory = ALL_CATEGORIES.includes(rawSource as DiscoverCategory)
     ? (rawSource as DiscoverCategory)
@@ -62,6 +65,9 @@ export async function GET(request: NextRequest) {
   }
   if (tier) {
     builder = builder.eq("tier", tier);
+  }
+  if (track) {
+    builder = builder.eq("track", track);
   }
   builder = builder.in("source", allowedSources);
 
@@ -117,6 +123,9 @@ export async function GET(request: NextRequest) {
     }
     if (tier) {
       ownBuilder = ownBuilder.eq("tier", tier);
+    }
+    if (track) {
+      ownBuilder = ownBuilder.eq("track", track);
     }
     ownBuilder = ownBuilder.in("source", allowedSources);
 

@@ -17,10 +17,10 @@ import {
   loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
-  INDUSTRY_OPTIONS,
   FIRM_OPTIONS,
   LOCATION_OPTIONS,
 } from "@/lib/data/preference-options";
+import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   GraduationCap,
   MapPin,
@@ -838,30 +838,14 @@ function EditPanel({
           </div>
         </section>
 
-        {/* Industries */}
+        {/* Target roles — track-grouped. Selected ROLE names persist into
+            targetIndustries (storage shape unchanged). */}
         <section className="border border-white/[0.06] bg-bg-card p-5">
           <div className="mb-4 flex items-center gap-2">
             <Target size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Industries</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {INDUSTRY_OPTIONS.map((ind) => {
-              const active = local.targetIndustries.includes(ind);
-              return (
-                <button
-                  key={ind}
-                  onClick={() => toggleIndustry(ind)}
-                  className={`border px-4 py-2.5 text-xs font-bold transition-colors ${
-                    active
-                      ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                      : "border-white/[0.06] text-text-muted hover:text-white"
-                  }`}
-                >
-                  {ind}
-                </button>
-              );
-            })}
-          </div>
+          <TrackRolePicker selected={local.targetIndustries} onToggle={toggleIndustry} />
           {local.targetIndustries.length > 0 && (
             <p className="mt-3 text-[11px] text-text-muted">{local.targetIndustries.length} selected</p>
           )}
@@ -1210,19 +1194,10 @@ function Wizard({
 
           {step === 2 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Target Industries</p>
-              <h2 className="mt-2 text-xl font-bold text-foreground">What areas of finance are you recruiting for?</h2>
-              <div className="mt-6 flex flex-wrap gap-2">
-                {INDUSTRY_OPTIONS.map((ind) => {
-                  const active = prefs.targetIndustries.includes(ind);
-                  return (
-                    <button
-                      key={ind}
-                      onClick={() => toggleIndustry(ind)}
-                      className={`border px-4 py-2.5 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
-                    >{ind}</button>
-                  );
-                })}
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Target Roles</p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">Which roles are you recruiting for?</h2>
+              <div className="mt-6">
+                <TrackRolePicker selected={prefs.targetIndustries} onToggle={toggleIndustry} />
               </div>
             </div>
           )}

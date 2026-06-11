@@ -25,10 +25,10 @@ import {
   loadSkills,
 } from "@/lib/data/onboarding-options";
 import {
-  INDUSTRY_OPTIONS,
   FIRM_OPTIONS,
   LOCATION_OPTIONS,
 } from "@/lib/data/preference-options";
+import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   parseLinkedInCSV,
   type CsvContact,
@@ -1054,14 +1054,10 @@ export default function OnboardingPage() {
               <div className="mb-3 flex items-center gap-2">
                 <Target size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Target Industries
+                  Target Roles
                 </h2>
               </div>
-              <ChipGroup
-                options={INDUSTRY_OPTIONS}
-                selected={industries}
-                onToggle={toggleIndustry}
-              />
+              <TrackRolePicker selected={industries} onToggle={toggleIndustry} />
             </section>
 
             <section className="border border-white/[0.06] bg-bg-card p-5">

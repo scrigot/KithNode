@@ -9,6 +9,7 @@ import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
 import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw, Lock } from "lucide-react";
 import { IntroModal } from "./intro-modal";
+import { ALL_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -317,6 +318,8 @@ export default function DiscoverPage() {
   });
   const [query, setQuery] = useState("");
   const [activeTier, setActiveTier] = useState<string>("");
+  // Optional career-track filter ("" = all tracks). Refetches the pool on change.
+  const [trackFilter, setTrackFilter] = useState<CareerTrack | "">("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -362,12 +365,13 @@ export default function DiscoverPage() {
   const [pipelineSendState, setPipelineSendState] = useState<Map<string, "idle" | "pending" | "sent">>(new Map());
 
   const search = useCallback(
-    async (q: string, tier: string, src: SourceFilter) => {
+    async (q: string, tier: string, src: SourceFilter, track: string) => {
       setLoading(true);
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (tier) params.set("tier", tier.toLowerCase());
       params.set("source", src);
+      if (track) params.set("track", track);
       const qs = params.toString();
 
       try {
@@ -395,10 +399,12 @@ export default function DiscoverPage() {
     [],
   );
 
-  const fetchBrowseContacts = useCallback(async (src: SourceFilter) => {
+  const fetchBrowseContacts = useCallback(async (src: SourceFilter, track: string) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/discover?source=${src}`);
+      const res = await apiFetch(
+        `/api/discover?source=${src}${track ? `&track=${encodeURIComponent(track)}` : ""}`,
+      );
       if (!res.ok) throw new Error();
       const data = await res.json();
       const unrated: Contact[] = data.contacts || [];
@@ -420,16 +426,16 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (mode !== "search") return;
     const timer = setTimeout(() => {
-      search(query, activeTier, sourceFilter);
+      search(query, activeTier, sourceFilter, trackFilter);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, activeTier, search, mode, sourceFilter]);
+  }, [query, activeTier, search, mode, sourceFilter, trackFilter]);
 
   // Browse mode: load contacts
   useEffect(() => {
     if (mode !== "browse") return;
-    fetchBrowseContacts(sourceFilter);
-  }, [mode, fetchBrowseContacts, sourceFilter]);
+    fetchBrowseContacts(sourceFilter, trackFilter);
+  }, [mode, fetchBrowseContacts, sourceFilter, trackFilter]);
 
   const handleRate = useCallback(
     async (contactId: string, rating: "high_value" | "skip") => {
@@ -638,9 +644,9 @@ export default function DiscoverPage() {
           updated: finalEvent.updated,
         });
         if (mode === "browse") {
-          await fetchBrowseContacts(sourceFilter);
+          await fetchBrowseContacts(sourceFilter, trackFilter);
         } else {
-          await search(query, activeTier, sourceFilter);
+          await search(query, activeTier, sourceFilter, trackFilter);
         }
       }
     } catch (err) {
@@ -656,7 +662,7 @@ export default function DiscoverPage() {
       }, 1200);
       setTimeout(() => setDiscoverResult(null), 8000);
     }
-  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter, trackFilter]);
 
   const handleSourceFilter = useCallback((src: SourceFilter) => {
     setSourceFilter(src);
@@ -783,9 +789,9 @@ export default function DiscoverPage() {
           `Scraped ${finalEvent.scraped} · Inserted ${finalEvent.inserted} · Updated ${finalEvent.updated}`,
         );
         if (mode === "browse") {
-          await fetchBrowseContacts(sourceFilter);
+          await fetchBrowseContacts(sourceFilter, trackFilter);
         } else {
-          await search(query, activeTier, sourceFilter);
+          await search(query, activeTier, sourceFilter, trackFilter);
         }
       }
     } catch (err) {
@@ -801,7 +807,7 @@ export default function DiscoverPage() {
       }, 1200);
       setTimeout(() => setSeedResult(null), 8000);
     }
-  }, [seedLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+  }, [seedLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter, trackFilter]);
 
   const cancelSeed = useCallback(() => {
     if (seedAbortRef.current) {
@@ -980,6 +986,37 @@ export default function DiscoverPage() {
             {discoverLoading ? "Discovering" : "Discover New"}
           </button>
         )}
+      </div>
+
+      {/* ─── Compact career-track filter row ─── narrows the pool to one track;
+          refetches on change. ALL clears it. ─── */}
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+          Track
+        </span>
+        <button
+          onClick={() => setTrackFilter("")}
+          className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            trackFilter === ""
+              ? "border-primary/30 bg-primary/20 text-primary"
+              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          All
+        </button>
+        {ALL_TRACKS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTrackFilter(t)}
+            className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              trackFilter === t
+                ? "border-primary/30 bg-primary/20 text-primary"
+                : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
       {(discoverResult || seedResult) && (

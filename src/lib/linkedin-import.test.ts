@@ -898,3 +898,55 @@ describe("detectAffiliations: manual personType override", () => {
     expect(explicitEmpty).toEqual(auto);
   });
 });
+
+describe("detectAffiliations: Target Industry fires on track/role (taxonomy)", () => {
+  const prefsWith = (overrides: Record<string, unknown> = {}) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    skills: [],
+    pastFirms: [],
+    major: "",
+    minor: "",
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+    ...overrides,
+  });
+
+  it("fires when a prefs role matches the contact's classified ROLE, legacy industry empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ industry: "", track: "AI", role: "AI Engineer" }),
+      prefsWith({ targetIndustries: ["AI Engineer"] }),
+    );
+    expect(affs.some((a) => a.name === "Target Industry" && a.boost === 10)).toBe(true);
+  });
+
+  it("fires when a prefs entry matches the contact's TRACK (role unset)", () => {
+    const affs = detectAffiliations(
+      baseMeta({ industry: "", track: "AI", role: "" }),
+      prefsWith({ targetIndustries: ["AI"] }),
+    );
+    expect(affs.some((a) => a.name === "Target Industry")).toBe(true);
+  });
+
+  it("does NOT fire when neither industry, track, nor role matches", () => {
+    const affs = detectAffiliations(
+      baseMeta({ industry: "", track: "Finance", role: "Investment Banking" }),
+      prefsWith({ targetIndustries: ["AI Engineer"] }),
+    );
+    expect(affs.some((a) => a.name === "Target Industry")).toBe(false);
+  });
+
+  it("still fires off the legacy industry column when track/role are empty", () => {
+    const affs = detectAffiliations(
+      baseMeta({ industry: "Private Equity", track: "", role: "" }),
+      prefsWith({ targetIndustries: ["Private Equity"] }),
+    );
+    expect(affs.some((a) => a.name === "Target Industry")).toBe(true);
+  });
+});

@@ -69,6 +69,8 @@ export function rescoreContact(
     pastFirms: (contact.pastFirms as string) || "",
     personType: (contact.personType as string) || "",
     university: (contact.university as string) || "",
+    track: (contact.track as string) || "",
+    role: (contact.role as string) || "",
     tags,
   };
 

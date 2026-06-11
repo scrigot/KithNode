@@ -66,6 +66,8 @@ export async function GET() {
           : (c.linkedInUrl ? redactLinkedInUrl(c.linkedInUrl) : ""),
         education: c.education || "",
         linkedin_location: c.location || "",
+        track: c.track || "",
+        role: c.role || "",
         why_now: c.affiliations
           ? c.affiliations.split(",").filter(Boolean).join(", ")
           : "",
