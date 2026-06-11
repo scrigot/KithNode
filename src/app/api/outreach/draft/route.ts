@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         .eq("userId", userEmail)
         .eq("contactId", contactId)
         .maybeSingle();
-      if (!rating) {
+      if (!rating || rating.rating !== "high_value") {
         return NextResponse.json({ error: "Contact not found" }, { status: 404 });
       }
     }

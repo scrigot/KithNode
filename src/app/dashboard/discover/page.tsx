@@ -151,7 +151,7 @@ function ContactCard({
         </h3>
         {contact.isRedacted && (
           <span className="mt-0.5 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
-            Blurred · Import to unlock
+            Blurred · Add to unlock
           </span>
         )}
         <p className="mt-0.5 truncate text-[11px] text-muted-foreground">

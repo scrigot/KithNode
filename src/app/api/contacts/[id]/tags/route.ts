@@ -32,7 +32,7 @@ async function checkAccess(
       .eq("userId", userEmail)
       .eq("contactId", contactId)
       .maybeSingle();
-    if (!discover) {
+    if (!discover || discover.rating !== "high_value") {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
   }

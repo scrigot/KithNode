@@ -38,8 +38,8 @@ export function pickEditableFields(
   return out;
 }
 
-// Access check, mirrors the tags route: own contact OR a UserDiscover row,
-// else 404 (never leak existence of contacts the user can't see).
+// Access check: own contact OR high_value-rated UserDiscover row.
+// skip-only or no relationship returns 404 — never leak contact existence.
 async function checkAccess(
   userEmail: string,
   contactId: string,
@@ -61,7 +61,7 @@ async function checkAccess(
       .eq("userId", userEmail)
       .eq("contactId", contactId)
       .maybeSingle();
-    if (!discover) {
+    if (!discover || discover.rating !== "high_value") {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
   }
@@ -100,7 +100,7 @@ export async function GET(
       .eq("userId", userId)
       .eq("contactId", id)
       .maybeSingle();
-    if (!rating) {
+    if (!rating || rating.rating !== "high_value") {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
   }

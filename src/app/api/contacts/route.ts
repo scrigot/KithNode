@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
+import { isUnlocked } from "@/lib/contact-access";
 
 export async function GET() {
   const session = await auth();
@@ -18,20 +19,24 @@ export async function GET() {
       .eq("importedByUserId", userId)
       .order("warmthScore", { ascending: false });
 
-    // Get contacts user discovered and rated high_value
+    // Get contacts user discovered — select rating so we can build the unlock Set
     const { data: discoveries } = await supabase
       .from("UserDiscover")
-      .select("contactId")
-      .eq("userId", userId)
-      .eq("rating", "high_value");
+      .select("contactId, rating")
+      .eq("userId", userId);
+
+    const highValueIds = new Set<string>(
+      (discoveries || [])
+        .filter((d) => d.rating === "high_value")
+        .map((d) => d.contactId),
+    );
 
     let discoveredContacts: typeof ownContacts = [];
-    if (discoveries && discoveries.length > 0) {
-      const discoveredIds = discoveries.map((d) => d.contactId);
+    if (highValueIds.size > 0) {
       const { data } = await supabase
         .from("AlumniContact")
         .select("*")
-        .in("id", discoveredIds);
+        .in("id", Array.from(highValueIds));
       discoveredContacts = data || [];
     }
 
@@ -46,17 +51,17 @@ export async function GET() {
       .sort((a, b) => (b.warmthScore || 0) - (a.warmthScore || 0));
 
     // Transform Supabase data to match RankedContact interface.
-    // Redact PII when the underlying contact wasn't imported by the current user
-    // (e.g. high_value-rated discoveries from the shared pool).
+    // Redact PII only when not unlocked. A contact is unlocked when the viewer
+    // imported it OR has rated it high_value in Discover.
     const ranked = all.map((c) => {
-      const isOwn = c.importedByUserId === userId;
+      const unlocked = isUnlocked(c.importedByUserId, userId, highValueIds, c.id);
       return {
         id: c.id,
-        name: isOwn ? (c.name || "") : redactName(c.name || ""),
+        name: unlocked ? (c.name || "") : redactName(c.name || ""),
         title: c.title || "",
         email: "",
         email_status: "unknown",
-        linkedin_url: isOwn
+        linkedin_url: unlocked
           ? (c.linkedInUrl || "")
           : (c.linkedInUrl ? redactLinkedInUrl(c.linkedInUrl) : ""),
         education: c.education || "",
@@ -85,7 +90,7 @@ export async function GET() {
           total_score: c.warmthScore || 0,
           tier: c.tier || "cold",
         },
-        ...(isOwn ? {} : { isRedacted: true }),
+        ...(unlocked ? {} : { isRedacted: true }),
       };
     });
 
