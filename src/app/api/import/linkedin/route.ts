@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   const results: {
+    id?: string;
     name: string;
     title: string;
     linkedin_url: string;
@@ -173,7 +174,10 @@ export async function POST(request: NextRequest) {
           .eq("linkedInUrl", url)
           .single();
 
+        let contactId: string | undefined;
+
         if (existing) {
+          contactId = existing.id;
           await supabase
             .from("AlumniContact")
             .update({
@@ -191,7 +195,7 @@ export async function POST(request: NextRequest) {
             })
             .eq("id", existing.id);
         } else {
-          const { error: insertError } = await supabase
+          const { data: inserted, error: insertError } = await supabase
             .from("AlumniContact")
             .insert({
               name: meta.name,
@@ -207,12 +211,16 @@ export async function POST(request: NextRequest) {
               tier,
               source: "linkedin_import",
               importedByUserId: userId,
-            });
+            })
+            .select("id")
+            .single();
 
           if (insertError) throw new Error(insertError.message);
+          contactId = inserted?.id;
         }
 
         results.push({
+          id: contactId,
           name: meta.name,
           title: meta.title,
           linkedin_url: url,

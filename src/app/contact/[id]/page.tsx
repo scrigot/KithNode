@@ -242,9 +242,16 @@ export default function ContactDetailPage() {
           >
             &lt; BACK TO SIGNALS
           </Link>
-          <h1 className="mt-1 text-xl font-bold text-foreground">
-            {contact.name}
-          </h1>
+          <div className="mt-1 [&_button]:text-xl [&_button]:font-bold [&_input]:text-xl [&_input]:font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
+            <FieldEditor
+              contactId={contact.id}
+              field="name"
+              label=""
+              initialValue={contact.name || ""}
+              placeholder="Add name"
+              onSaved={loadContact}
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             {contact.title}
             {contact.title && contact.company.name ? " @ " : ""}

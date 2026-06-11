@@ -293,7 +293,7 @@ export interface ImportResult {
   imported: number;
   failed: number;
   contacts: {
-    id: number;
+    id?: string;
     name: string;
     title: string;
     linkedin_url: string;

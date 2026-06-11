@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, type DragEvent, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trackEvent } from "@/lib/posthog";
@@ -24,6 +26,7 @@ const TIER_STYLES: Record<string, string> = {
 const IMPORT_BATCH_SIZE = 50;
 
 export default function ImportPage() {
+  const router = useRouter();
   const [urls, setUrls] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -31,6 +34,10 @@ export default function ImportPage() {
   // Determinate progress for the chunked CSV import.
   const [importDone, setImportDone] = useState(0);
   const [importTotal, setImportTotal] = useState(0);
+  // Track which contact row is being enriched post-import.
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  // How many URLs were in the last submitted URL-import batch.
+  const [lastUrlImportCount, setLastUrlImportCount] = useState(0);
 
   const [csvContacts, setCsvContacts] = useState<CsvContact[]>([]);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
@@ -50,6 +57,7 @@ export default function ImportPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLastUrlImportCount(urlList.length);
 
     try {
       const res = await apiFetch("/api/import/linkedin", {
@@ -67,12 +75,30 @@ export default function ImportPage() {
         failed: data.failed,
         total: urlList.length,
       });
+
+      // Single-URL import: auto-enrich then navigate to the contact profile.
+      const successContacts = data.contacts.filter((c) => !c.error && c.id);
+      if (urlList.length === 1 && data.imported === 1 && successContacts.length === 1) {
+        const contactId = successContacts[0].id!;
+        setEnrichingId(contactId);
+        try {
+          await apiFetch("/api/contacts/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contactId }),
+          });
+        } catch {
+          // Enrich failure is non-fatal — navigate anyway so user can edit manually.
+        }
+        router.push(`/contact/${contactId}`);
+      }
     } catch {
       setError(
         "Import failed. Please try again or check that your URLs are valid LinkedIn profile links.",
       );
     } finally {
       setLoading(false);
+      setEnrichingId(null);
     }
   };
 
@@ -354,8 +380,8 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Enrich tip */}
-      {result && result.imported > 0 && (
+      {/* Enrich tip — hidden for single-URL imports (we enrich + navigate automatically) */}
+      {result && result.imported > 0 && lastUrlImportCount !== 1 && (
         <div className="mt-3 flex items-center gap-2 border border-primary/30 bg-primary/5 px-3 py-2">
           <Sparkles className="h-3 w-3 shrink-0 text-primary" />
           <p className="text-[11px] text-primary">
@@ -380,62 +406,75 @@ export default function ImportPage() {
             </span>
           </div>
           <div className="grid grid-cols-1 gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3">
-            {result.contacts.map((c, i) => (
-              <div
-                key={i}
-                className={`flex items-start justify-between gap-2 border px-2 py-1.5 text-[11px] ${
-                  c.error
-                    ? "border-destructive/30 bg-destructive/5"
-                    : "border-white/[0.06] bg-background"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  {c.error ? (
-                    <div>
-                      <p className="truncate text-muted-foreground">
-                        {c.linkedin_url}
+            {result.contacts.map((c, i) => {
+              const isEnriching = enrichingId === c.id;
+              const inner = (
+                <div
+                  className={`flex items-start justify-between gap-2 border px-2 py-1.5 text-[11px] ${
+                    c.error
+                      ? "border-destructive/30 bg-destructive/5"
+                      : "border-white/[0.06] bg-background"
+                  }${!c.error && c.id ? " hover:border-primary/40 transition-colors" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    {c.error ? (
+                      <div>
+                        <p className="truncate text-muted-foreground">
+                          {c.linkedin_url}
+                        </p>
+                        <p className="text-[9px] text-destructive">{c.error}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="truncate font-bold text-foreground">
+                          {c.name}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {c.title}
+                          {c.company_name ? ` @ ${c.company_name}` : ""}
+                        </p>
+                        {isEnriching && (
+                          <p className="mt-0.5 text-[9px] text-primary">Enriching...</p>
+                        )}
+                        {c.affiliations.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-0.5">
+                            {c.affiliations.slice(0, 3).map((a) => (
+                              <Badge
+                                key={a}
+                                variant="outline"
+                                className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
+                              >
+                                {a}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {!c.error && (
+                    <div className="text-right">
+                      <span
+                        className={`font-mono text-[13px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
+                      >
+                        {Math.round(c.total_score)}
+                      </span>
+                      <p className="text-[8px] uppercase text-muted-foreground">
+                        {c.tier}
                       </p>
-                      <p className="text-[9px] text-destructive">{c.error}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="truncate font-bold text-foreground">
-                        {c.name}
-                      </p>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {c.title}
-                        {c.company_name ? ` @ ${c.company_name}` : ""}
-                      </p>
-                      {c.affiliations.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-0.5">
-                          {c.affiliations.slice(0, 3).map((a) => (
-                            <Badge
-                              key={a}
-                              variant="outline"
-                              className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
-                            >
-                              {a}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
-                {!c.error && (
-                  <div className="text-right">
-                    <span
-                      className={`font-mono text-[13px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
-                    >
-                      {Math.round(c.total_score)}
-                    </span>
-                    <p className="text-[8px] uppercase text-muted-foreground">
-                      {c.tier}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+
+              return !c.error && c.id ? (
+                <Link key={i} href={`/contact/${c.id}`} className="block underline-offset-2 hover:underline">
+                  {inner}
+                </Link>
+              ) : (
+                <div key={i}>{inner}</div>
+              );
+            })}
           </div>
         </div>
       )}

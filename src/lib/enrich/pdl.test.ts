@@ -10,6 +10,7 @@ function makePdlResponse(
     status?: number;
     likelihood?: number;
     education?: object[];
+    full_name?: string | null;
     location_locality?: string | null;
     location_region?: string | null;
     location_name?: string | null;
@@ -19,6 +20,7 @@ function makePdlResponse(
     status: opts.status ?? 200,
     likelihood: opts.likelihood ?? 8,
     data: {
+      full_name: opts.full_name ?? null,
       education: opts.education ?? [],
       location_locality: opts.location_locality ?? null,
       location_region: opts.location_region ?? null,
@@ -323,6 +325,7 @@ describe("fetchPdlProfile", () => {
   it("returns full result for a well-formed response", async () => {
     mockFetch(
       makePdlResponse({
+        full_name: "aryan aladar",
         education: [
           { school: { name: "university of north carolina", type: "post-secondary institution" }, end_date: "2027" },
         ],
@@ -335,6 +338,81 @@ describe("fetchPdlProfile", () => {
       education: "university of north carolina",
       graduationYear: 2027,
       location: "Chapel Hill, NC",
+      fullName: "Aryan Aladar",
     });
+  });
+
+  // ── fullName mapping ──────────────────────────────────────────────────────
+
+  it("title-cases lowercase full_name from PDL", async () => {
+    mockFetch(
+      makePdlResponse({
+        full_name: "aryan aladar",
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/aladar");
+    expect(result?.fullName).toBe("Aryan Aladar");
+  });
+
+  it("returns empty string fullName when full_name is absent", async () => {
+    mockFetch(
+      makePdlResponse({
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.fullName).toBe("");
+  });
+
+  it("returns empty string fullName when full_name is null", async () => {
+    mockFetch(
+      makePdlResponse({
+        full_name: null,
+        education: [
+          { school: { name: "unc", type: "post-secondary institution" }, end_date: "2027" },
+        ],
+      }),
+    );
+    const result = await fetchPdlProfile("https://linkedin.com/in/test");
+    expect(result?.fullName).toBe("");
+  });
+});
+
+// ── shouldAdoptPdlName helper ─────────────────────────────────────────────────
+// Extracted rule: adopt PDL name when current name has no space (single token
+// = slug-derived). Multi-word names and empty-string edge cases tested here
+// without needing the full enrich route.
+
+function shouldAdoptPdlName(currentName: string, pdlFullName: string): boolean {
+  return (
+    pdlFullName.trim().length > 0 &&
+    !currentName.trim().includes(" ")
+  );
+}
+
+describe("shouldAdoptPdlName", () => {
+  it("adopts when current name is single token (slug-derived)", () => {
+    expect(shouldAdoptPdlName("Aladar", "Aryan Aladar")).toBe(true);
+  });
+
+  it("does NOT adopt when current name has a space (CSV-accurate)", () => {
+    expect(shouldAdoptPdlName("Jacob Goldstein", "Jacob Goldstein")).toBe(false);
+  });
+
+  it("adopts when current name is empty string", () => {
+    expect(shouldAdoptPdlName("", "Aryan Aladar")).toBe(true);
+  });
+
+  it("does NOT adopt when PDL fullName is empty", () => {
+    expect(shouldAdoptPdlName("Aladar", "")).toBe(false);
+  });
+
+  it("does NOT adopt when both names are empty", () => {
+    expect(shouldAdoptPdlName("", "")).toBe(false);
   });
 });

@@ -26,8 +26,9 @@ describe("normalizeField", () => {
 });
 
 describe("pickEditableFields", () => {
-  it("keeps known editable keys (now incl. title/firmName/university) and ignores unknown ones", () => {
+  it("keeps known editable keys (incl. name/title/firmName/university) and ignores unknown ones", () => {
     const { fields, invalid } = pickEditableFields({
+      name: "Aryan Aladar",
       education: "UNC",
       highSchool: "ECHHS",
       clubs: "Chi Phi",
@@ -40,6 +41,7 @@ describe("pickEditableFields", () => {
     });
     expect(invalid).toBe(false);
     expect(fields).toEqual({
+      name: "Aryan Aladar",
       education: "UNC",
       highSchool: "ECHHS",
       clubs: "Chi Phi",

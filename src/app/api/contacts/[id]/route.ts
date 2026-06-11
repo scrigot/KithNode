@@ -8,6 +8,7 @@ import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
 // (personType) and the surrounding identity text the matcher keys on.
 const EDITABLE_FIELDS = [
+  "name",
   "education",
   "location",
   "highSchool",

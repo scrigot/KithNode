@@ -45,6 +45,7 @@ interface PdlEducationEntry {
 // hidden") instead of the string value, so location fields must be
 // runtime-checked as strings before use.
 interface PdlPersonData {
+  full_name?: string | null;
   education?: PdlEducationEntry[] | null;
   location_locality?: string | boolean | null;
   location_region?: string | boolean | null;
@@ -61,6 +62,7 @@ export interface PdlResult {
   education: string;
   graduationYear: number;
   location: string;
+  fullName: string;
 }
 
 // High school / pre-college markers. PDL uses school.type = "post-secondary institution"
@@ -170,10 +172,14 @@ export async function fetchPdlProfile(
     const best = pickEducation(entries);
     if (!best) return null;
 
+    const rawFullName = asString(personData.full_name);
+    const fullName = rawFullName ? titleCase(rawFullName) : "";
+
     return {
       education: schoolNameOf(best),
       graduationYear: parseEndYear(best),
       location: buildLocation(personData),
+      fullName,
     };
   } catch (err) {
     console.error("fetchPdlProfile: request failed", {

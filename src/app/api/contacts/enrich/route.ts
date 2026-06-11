@@ -164,6 +164,16 @@ export async function POST(req: NextRequest) {
       const location =
         c.location || pdl?.location || fields.location;
 
+      // Adopt PDL full name when the current name is a single token (slug-derived).
+      // Multi-word names (CSV imports) are considered accurate and never overwritten.
+      // Empty current name is also treated as unset (single-token path).
+      const currentName: string = c.name || "";
+      const shouldAdoptPdlName =
+        pdl?.fullName &&
+        pdl.fullName.trim().length > 0 &&
+        !currentName.trim().includes(" ");
+      const name = shouldAdoptPdlName ? pdl!.fullName : currentName;
+
       // Re-score with personalized prefs in the same loop, via the shared
       // helper so enrich stays in lockstep with the tags route. Load this
       // contact's manual tags first — omitting them is exactly the bug that
@@ -173,7 +183,7 @@ export async function POST(req: NextRequest) {
       // highSchool/clubs/passions ride along from the existing columns.
       const tags = await loadContactTags(userId, c.id);
       const { affiliations, score, tier } = rescoreContact(
-        { ...c, education, location, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
+        { ...c, name, education, location, industry: fields.industry, seniorityLevel: fields.seniorityLevel },
         prefs,
         tags,
       );
@@ -181,6 +191,7 @@ export async function POST(req: NextRequest) {
       const { error: updateError } = await supabase
         .from("AlumniContact")
         .update({
+          name,
           education,
           graduationYear,
           location,

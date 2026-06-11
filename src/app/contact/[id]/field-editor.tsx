@@ -7,6 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 interface FieldEditorProps {
   contactId: string;
   field:
+    | "name"
     | "education"
     | "location"
     | "highSchool"
@@ -153,7 +154,7 @@ function SingleValueEditor({
     if (mode === "options" && loadOptions) {
       return (
         <p className="flex items-center gap-1.5">
-          <span className="text-muted-foreground">{label}: </span>
+          {label && <span className="text-muted-foreground">{label}: </span>}
           <Combobox
             value={draft}
             onSelect={(v) => save(v)}
@@ -168,7 +169,7 @@ function SingleValueEditor({
     }
     return (
       <p className="flex items-center gap-1.5">
-        <span className="text-muted-foreground">{label}: </span>
+        {label && <span className="text-muted-foreground">{label}: </span>}
         <input
           ref={inputRef}
           type="text"
@@ -195,7 +196,7 @@ function SingleValueEditor({
 
   return (
     <p className="group flex items-center gap-1">
-      <span className="text-muted-foreground">{label}: </span>
+      {label && <span className="text-muted-foreground">{label}: </span>}
       <button
         type="button"
         onClick={startEdit}
@@ -267,7 +268,7 @@ function MultiChipEditor({
 
   return (
     <p className="group flex flex-wrap items-center gap-1">
-      <span className="text-muted-foreground">{label}: </span>
+      {label && <span className="text-muted-foreground">{label}: </span>}
       {chips.map((chip) => (
         <span
           key={chip}
