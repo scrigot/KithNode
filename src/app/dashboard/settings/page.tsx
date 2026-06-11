@@ -12,7 +12,6 @@ import {
   loadCities,
   loadHighSchools,
   loadGreekOrgs,
-  loadClubs,
   loadMajors,
   loadMinors,
   loadConcentrations,
@@ -24,6 +23,8 @@ import {
   DEGREE_OPTIONS,
 } from "@/lib/data/preference-options";
 import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
+import type { ClubEntry } from "@/lib/club-memberships";
+import { ClubRowsEditor } from "@/components/club-rows-editor";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   GraduationCap,
@@ -56,7 +57,7 @@ interface Preferences {
   educations: EducationEntry[];
   minors: string[];
   experiences: ExperienceEntry[];
-  clubs: string[];
+  clubMemberships: ClubEntry[];
   skills: string[];
   hometown: string;
   targetLocations: string[];
@@ -79,7 +80,7 @@ function getDefaults(): Preferences {
     educations: [],
     minors: [],
     experiences: [],
-    clubs: [],
+    clubMemberships: [],
     skills: [],
     hometown: "",
     targetLocations: [],
@@ -145,7 +146,7 @@ async function syncToAPI(prefs: Preferences) {
         minor: prefs.minors.join(", "),
         educations: prefs.educations,
         experiences: prefs.experiences,
-        clubs: prefs.clubs,
+        clubMemberships: prefs.clubMemberships,
         skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
@@ -460,7 +461,6 @@ function EditPanel({
   const [customFirmInput, setCustomFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
   const [minorInput, setMinorInput] = useState("");
-  const [clubInput, setClubInput] = useState("");
   const [skillKey, setSkillKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -596,7 +596,22 @@ function EditPanel({
           filled.add("experiences");
         }
         fillList("minors", data.minors, 2);
-        fillList("clubs", data.clubs, 3);
+        // Map resume clubMemberships (or legacy clubs) into rows (only when empty).
+        if (next.clubMemberships.length === 0) {
+          if (Array.isArray(data.clubMemberships) && data.clubMemberships.length > 0) {
+            next.clubMemberships = (data.clubMemberships as ClubEntry[]).slice(0, 6).map((e) => ({
+              club: String(e?.club ?? "").trim(),
+              role: String(e?.role ?? "").trim(),
+            })).filter((e) => e.club);
+            if (next.clubMemberships.length) filled.add("clubMemberships");
+          } else if (Array.isArray(data.clubs) && data.clubs.length > 0) {
+            next.clubMemberships = (data.clubs as string[]).slice(0, 6).map((c) => ({
+              club: String(c).trim(),
+              role: "",
+            })).filter((e) => e.club);
+            if (next.clubMemberships.length) filled.add("clubMemberships");
+          }
+        }
         fillList("skills", data.skills, 10);
         fillList("targetIndustries", data.targetIndustries, 7);
         return next;
@@ -864,44 +879,16 @@ function EditPanel({
             )}
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
-                Top clubs (up to 3)
+                Clubs{" "}
+                <span className="font-mono text-[9px] tabular-nums text-text-muted/60">
+                  {local.clubMemberships.length}/6
+                </span>
               </label>
-              {local.clubs.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {local.clubs.map((club) => (
-                    <span
-                      key={club}
-                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
-                    >
-                      {club}
-                      <button
-                        onClick={() => setLocal((p) => ({ ...p, clubs: p.clubs.filter((c) => c !== club) }))}
-                        className="text-accent-teal/60 hover:text-accent-teal"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {local.clubs.length < 3 && (
-                <Combobox
-                  value={clubInput}
-                  onSelect={(v) => {
-                    const club = v.trim();
-                    if (club && !local.clubs.includes(club) && local.clubs.length < 3) {
-                      setLocal((p) => ({ ...p, clubs: [...p.clubs, club] }));
-                    }
-                    setClubInput("");
-                  }}
-                  loadOptions={loadClubs}
-                  placeholder="Add a club..."
-                  ariaLabel="Top clubs"
-                />
-              )}
-              {local.clubs.length > 0 && (
-                <p className="mt-1 text-[10px] text-text-muted">{local.clubs.length}/3 selected</p>
-              )}
+              <ClubRowsEditor
+                rows={local.clubMemberships}
+                onChange={(rows) => setLocal((p) => ({ ...p, clubMemberships: rows }))}
+                resumeFilled={resumeFilled.has("clubMemberships")}
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
@@ -1546,7 +1533,7 @@ export default function SettingsPage() {
                   ? data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2)
                   : [],
               experiences: Array.isArray(data.experiences) ? data.experiences : [],
-              clubs: Array.isArray(data.clubs) ? data.clubs : [],
+              clubMemberships: Array.isArray(data.clubMemberships) ? data.clubMemberships : [],
               skills: Array.isArray(data.skills) ? data.skills : [],
               hometown: data.hometown || "",
               // DB stores presets + customs as one flat list; split against the

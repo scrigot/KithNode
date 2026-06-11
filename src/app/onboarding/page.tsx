@@ -20,7 +20,6 @@ import {
   loadCities,
   loadHighSchools,
   loadGreekOrgs,
-  loadClubs,
   loadMajors,
   loadMinors,
   loadConcentrations,
@@ -32,8 +31,10 @@ import {
   DEGREE_OPTIONS,
 } from "@/lib/data/preference-options";
 import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
+import type { ClubEntry } from "@/lib/club-memberships";
 import { EducationRowsEditor } from "@/components/education-rows-editor";
 import { ExperienceRowsEditor } from "@/components/experience-rows-editor";
+import { ClubRowsEditor } from "@/components/club-rows-editor";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   parseLinkedInCSV,
@@ -210,8 +211,7 @@ export default function OnboardingPage() {
   const [educations, setEducations] = useState<EducationEntry[]>([]);
   const [minors, setMinors] = useState<string[]>([]);
   const [minorInput, setMinorInput] = useState("");
-  const [clubs, setClubs] = useState<string[]>([]);
-  const [clubInput, setClubInput] = useState("");
+  const [clubMemberships, setClubMemberships] = useState<ClubEntry[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [skillKey, setSkillKey] = useState(0);
 
@@ -293,7 +293,8 @@ export default function OnboardingPage() {
           setMinors(
             data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2),
           );
-        if (Array.isArray(data.clubs)) setClubs(data.clubs.slice(0, 3));
+        if (Array.isArray(data.clubMemberships) && data.clubMemberships.length > 0)
+          setClubMemberships(data.clubMemberships.slice(0, 6));
         if (Array.isArray(data.skills)) setSkills(data.skills.slice(0, 10));
         if (Array.isArray(data.targetIndustries))
           setIndustries(data.targetIndustries);
@@ -327,14 +328,6 @@ export default function OnboardingPage() {
   };
   const removeMinor = (v: string) =>
     setMinors((p) => p.filter((m) => m !== v));
-  const addClub = (v: string) => {
-    const club = v.trim();
-    setClubs((p) =>
-      club && !p.includes(club) && p.length < 3 ? [...p, club] : p,
-    );
-    setClubInput("");
-  };
-  const removeClub = (v: string) => setClubs((p) => p.filter((c) => c !== v));
   const addSkill = (raw: string) => {
     const skill = raw.trim();
     setSkillKey((k) => k + 1); // remount the Combobox to clear its input
@@ -419,7 +412,22 @@ export default function OnboardingPage() {
         filled.add("educations");
       }
       fillList("minors", setMinors, data.minors, minors, 2);
-      fillList("clubs", setClubs, data.clubs, clubs, 3);
+      // Map resume clubMemberships (or legacy clubs) into rows (only when empty).
+      if (clubMemberships.length === 0) {
+        if (Array.isArray(data.clubMemberships) && data.clubMemberships.length > 0) {
+          const rows = (data.clubMemberships as ClubEntry[]).slice(0, 6).map((e) => ({
+            club: String(e?.club ?? "").trim(),
+            role: String(e?.role ?? "").trim(),
+          })).filter((e) => e.club);
+          if (rows.length) { setClubMemberships(rows); filled.add("clubMemberships"); }
+        } else if (Array.isArray(data.clubs) && data.clubs.length > 0) {
+          const rows = (data.clubs as string[]).slice(0, 6).map((c) => ({
+            club: String(c).trim(),
+            role: "",
+          })).filter((e) => e.club);
+          if (rows.length) { setClubMemberships(rows); filled.add("clubMemberships"); }
+        }
+      }
       fillList("skills", setSkills, data.skills, skills, 10);
       // Map resume experiences into rows (only when empty).
       if (experiences.length === 0 && Array.isArray(data.experiences) && data.experiences.length > 0) {
@@ -489,7 +497,7 @@ export default function OnboardingPage() {
           minor: minors.join(", "),
           educations,
           experiences,
-          clubs,
+          clubMemberships,
           skills,
           target_industries: industries,
           target_companies: firms,
@@ -940,44 +948,23 @@ export default function OnboardingPage() {
               </div>
             </section>
 
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section
+              className={`border bg-bg-card p-5 ${resumeFilled.has("clubMemberships") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
+            >
               <div className="mb-3 flex items-center gap-2">
                 <Users size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Top Clubs
+                  Clubs
                 </h2>
                 <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
-                  {clubs.length}/3
+                  {clubMemberships.length}/6
                 </span>
               </div>
-              {clubs.length > 0 && (
-                <div className="mb-3 flex flex-wrap gap-1.5">
-                  {clubs.map((club) => (
-                    <span
-                      key={club}
-                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
-                    >
-                      {club}
-                      <button
-                        type="button"
-                        onClick={() => removeClub(club)}
-                        className="text-accent-teal/60 hover:text-accent-teal"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {clubs.length < 3 && (
-                <Combobox
-                  value={clubInput}
-                  onSelect={addClub}
-                  loadOptions={loadClubs}
-                  placeholder="Add a club..."
-                  ariaLabel="Top clubs"
-                />
-              )}
+              <ClubRowsEditor
+                rows={clubMemberships}
+                onChange={setClubMemberships}
+                resumeFilled={resumeFilled.has("clubMemberships")}
+              />
             </section>
 
             <section className="border border-white/[0.06] bg-bg-card p-5">

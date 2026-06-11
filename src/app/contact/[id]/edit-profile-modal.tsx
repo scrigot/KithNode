@@ -1,23 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { X, Loader2, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { X, Loader2, Plus, Star } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { ChipField, stripCitySuffix } from "./field-editor";
+import { ClubRowsEditor } from "@/components/club-rows-editor";
+import { ExperienceRowsEditor } from "@/components/experience-rows-editor";
 import {
   loadUniversities,
   loadCities,
   loadHighSchools,
   loadGreekOrgs,
-  loadClubs,
   loadMajors,
   loadMinors,
   loadConcentrations,
   loadSkills,
 } from "@/lib/data/onboarding-options";
-import { DEGREE_OPTIONS, FIRM_OPTIONS } from "@/lib/data/preference-options";
+import { DEGREE_OPTIONS } from "@/lib/data/preference-options";
 import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
+import type { ClubEntry } from "@/lib/club-memberships";
+import { SPEAK_FREQUENCIES } from "@/lib/relationship-score";
 import type { ContactDetail } from "@/lib/api";
 
 // LinkedIn-style "Edit profile" modal. A centered overlay over the contact
@@ -45,18 +48,57 @@ interface EditProfileModalProps {
 interface FormState {
   title: string;
   firmName: string;
-  pastFirms: string[];
   education: string;
   // Structured education rows (replaces flat major/degrees/concentration).
   educations: EducationEntry[];
+  // Structured experience rows (replaces flat pastFirms chips).
+  experiences: ExperienceEntry[];
+  // Structured club membership rows (replaces flat clubs chips).
+  clubMemberships: ClubEntry[];
   minor: string[];
   highSchool: string;
   location: string;
   hometown: string;
   greekOrg: string;
-  clubs: string[];
   skills: string[];
   passions: string;
+  // Identity
+  graduationYear: string; // stored as string in the input; sent as number on patch
+  // Relationship
+  isFriend: boolean;
+  speakFrequency: string;
+  lastSpokenAt: string; // ISO date string or ""
+}
+
+// Tolerant parse of a JSON column into ExperienceEntry[].
+function parseExperienceRows(val: unknown): ExperienceEntry[] {
+  if (Array.isArray(val)) {
+    return val
+      .filter((e): e is Record<string, unknown> => e && typeof e === "object")
+      .map((e) => ({
+        title: String(e.title ?? "").trim(),
+        firm: String(e.firm ?? "").trim(),
+        dates: String(e.dates ?? "").trim(),
+      }))
+      .filter((e) => e.title || e.firm)
+      .slice(0, 8);
+  }
+  return [];
+}
+
+// Tolerant parse of a JSON column into ClubEntry[].
+function parseClubRows(val: unknown): ClubEntry[] {
+  if (Array.isArray(val)) {
+    return val
+      .filter((e): e is Record<string, unknown> => e && typeof e === "object")
+      .map((e) => ({
+        club: String(e.club ?? "").trim(),
+        role: String(e.role ?? "").trim(),
+      }))
+      .filter((e) => e.club)
+      .slice(0, 6);
+  }
+  return [];
 }
 
 // Tolerant parse of a JSON or comma-list column into EducationEntry[].
@@ -89,17 +131,24 @@ function initialForm(contact: ContactDetail): FormState {
   return {
     title: contact.title || "",
     firmName: contact.company.name || "",
-    pastFirms: parseChips(contact.past_firms || "", 5),
     education: contact.education || "",
     educations: parseEducationRows(c.educations),
+    experiences: parseExperienceRows(c.experiences),
+    clubMemberships: parseClubRows(c.clubMemberships),
     minor: parseChips(contact.minor || "", 2),
     highSchool: contact.high_school || "",
     location: contact.linkedin_location || "",
     hometown: contact.hometown || "",
     greekOrg: contact.greek_org || "",
-    clubs: parseChips(contact.clubs || "", 5),
     skills: parseChips(contact.skills || "", 12),
     passions: contact.passions || "",
+    graduationYear: c.graduationYear != null ? String(c.graduationYear) : "",
+    isFriend: typeof c.isFriend === "boolean" ? c.isFriend : false,
+    speakFrequency: typeof c.speakFrequency === "string" ? c.speakFrequency : "",
+    lastSpokenAt:
+      typeof c.lastSpokenAt === "string" && c.lastSpokenAt
+        ? c.lastSpokenAt.slice(0, 10) // keep only date part for <input type="date">
+        : "",
   };
 }
 
@@ -332,7 +381,8 @@ export function EditProfileModal({
   }
 
   // Build the PATCH body: only the columns whose value differs from the opened
-  // snapshot. educations and experiences are sent as arrays when changed.
+  // snapshot. Structured rows are sent as arrays when changed; relationship
+  // fields are sent individually.
   function buildPatch(): Record<string, unknown> {
     const patch: Record<string, unknown> = {};
 
@@ -351,24 +401,40 @@ export function EditProfileModal({
       if (next !== (initial[key] as string).trim()) patch[key] = next;
     }
 
-    const chips: (keyof FormState)[] = [
-      "pastFirms",
-      "minor",
-      "clubs",
-      "skills",
-    ];
+    const chips: (keyof FormState)[] = ["minor", "skills"];
     for (const key of chips) {
       const next = (form[key] as string[]).join(", ");
       if (next !== (initial[key] as string[]).join(", ")) patch[key] = next;
     }
 
     // Education rows — diff as JSON-stringified for equality, send as array.
-    const eduNext = JSON.stringify(form.educations);
-    if (eduNext !== JSON.stringify(initial.educations)) {
+    if (JSON.stringify(form.educations) !== JSON.stringify(initial.educations)) {
       patch.educations = form.educations;
     }
 
     // Experience rows — diff as JSON-stringified for equality, send as array.
+    if (JSON.stringify(form.experiences) !== JSON.stringify(initial.experiences)) {
+      patch.experiences = form.experiences;
+    }
+
+    // Club membership rows — diff as JSON-stringified, send as array.
+    if (JSON.stringify(form.clubMemberships) !== JSON.stringify(initial.clubMemberships)) {
+      patch.clubMemberships = form.clubMemberships;
+    }
+
+    // Graduation year — send as number (or null when cleared).
+    if (form.graduationYear !== initial.graduationYear) {
+      const yr = parseInt(form.graduationYear, 10);
+      patch.graduationYear = Number.isFinite(yr) ? yr : null;
+    }
+
+    // Relationship fields.
+    if (form.isFriend !== initial.isFriend) patch.isFriend = form.isFriend;
+    if (form.speakFrequency !== initial.speakFrequency) patch.speakFrequency = form.speakFrequency;
+    if (form.lastSpokenAt !== initial.lastSpokenAt) {
+      // Send as full ISO string (date-only input gives "YYYY-MM-DD"); empty = null.
+      patch.lastSpokenAt = form.lastSpokenAt ? form.lastSpokenAt : null;
+    }
 
     return patch;
   }
@@ -448,13 +514,19 @@ export function EditProfileModal({
               onChange={(v) => set("firmName", v)}
               placeholder="e.g. Goldman Sachs"
             />
-            <ChipField
-              label="Past employers"
-              values={form.pastFirms}
-              onChange={(v) => set("pastFirms", v)}
-              placeholder="Add a past employer, then press Enter..."
-              cap={5}
-            />
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Experience{" "}
+                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                  {form.experiences.length}/8
+                </span>
+              </label>
+              <ExperienceRowsEditor
+                rows={form.experiences}
+                onChange={(rows) => set("experiences", rows)}
+                comboboxInputClassName="h-9 bg-muted text-sm"
+              />
+            </div>
           </section>
 
           {/* EDUCATION */}
@@ -490,6 +562,20 @@ export function EditProfileModal({
               placeholder="Add a minor..."
               cap={2}
             />
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Graduation Year
+              </label>
+              <Input
+                type="number"
+                value={form.graduationYear}
+                min={1950}
+                max={2040}
+                placeholder="e.g. 2027"
+                onChange={(e) => set("graduationYear", e.target.value)}
+                className="h-9 w-32 bg-muted text-sm"
+              />
+            </div>
             <ComboField
               label="High School"
               value={form.highSchool}
@@ -531,14 +617,19 @@ export function EditProfileModal({
               loadOptions={loadGreekOrgs}
               placeholder="e.g. Chi Phi"
             />
-            <ChipField
-              label="Clubs"
-              values={form.clubs}
-              onChange={(v) => set("clubs", v)}
-              loadOptions={loadClubs}
-              placeholder="Add a club..."
-              cap={5}
-            />
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Clubs{" "}
+                <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                  {form.clubMemberships.length}/6
+                </span>
+              </label>
+              <ClubRowsEditor
+                rows={form.clubMemberships}
+                onChange={(rows) => set("clubMemberships", rows)}
+                comboboxInputClassName="h-9 bg-muted text-sm"
+              />
+            </div>
             <ChipField
               label="Skills"
               values={form.skills}
@@ -553,6 +644,52 @@ export function EditProfileModal({
               onChange={(v) => set("passions", v)}
               placeholder="e.g. Sailing, jazz, distance running"
             />
+          </section>
+
+          {/* RELATIONSHIP */}
+          <section className="space-y-3">
+            <SectionLabel>Relationship</SectionLabel>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => set("isFriend", !form.isFriend)}
+                aria-pressed={form.isFriend}
+                className={`flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                  form.isFriend
+                    ? "border-accent-teal/50 bg-accent-teal/10 text-accent-teal"
+                    : "border-white/[0.12] text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Star className={`h-3 w-3 ${form.isFriend ? "fill-current" : ""}`} />
+                Friend
+              </button>
+              <div className="flex-1">
+                <select
+                  aria-label="Speak frequency"
+                  value={form.speakFrequency}
+                  onChange={(e) => set("speakFrequency", e.target.value)}
+                  className="h-9 w-full border border-input bg-muted px-2 text-sm text-foreground focus:border-accent-teal focus:outline-none"
+                >
+                  <option value="">Speak frequency —</option>
+                  {SPEAK_FREQUENCIES.map((f) => (
+                    <option key={f} value={f}>
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Last spoken
+              </label>
+              <input
+                type="date"
+                value={form.lastSpokenAt}
+                onChange={(e) => set("lastSpokenAt", e.target.value)}
+                className="h-9 border border-input bg-muted px-2.5 text-sm text-foreground focus:border-accent-teal focus:outline-none"
+              />
+            </div>
           </section>
 
           {error && (

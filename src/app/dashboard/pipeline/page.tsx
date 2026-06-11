@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle } from "lucide-react";
+import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle, Trash2 } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
 import { Badge } from "@/components/ui/badge";
@@ -250,17 +250,43 @@ function PipelineCard({
   totalStages,
   onMove,
   onDraft,
+  onRemove,
 }: {
   contact: EnrichedPipelineContact;
   stageIndex: number;
   totalStages: number;
   onMove: (contactId: string, direction: "forward" | "backward") => void;
   onDraft: (contact: EnrichedPipelineContact) => void;
+  onRemove: (contactId: string) => void;
 }) {
   const days = daysSince(contact.added_at);
   const tier = (contact.tier || "cold").toLowerCase();
   const canAdvance = stageIndex < totalStages - 1;
   const canRegress = stageIndex > 0;
+
+  // Two-click remove: idle → armed (3s timeout) → confirmed.
+  const [removeState, setRemoveState] = useState<"idle" | "armed">("idle");
+  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (removeState !== "armed") return;
+    removeTimerRef.current = setTimeout(() => setRemoveState("idle"), 3000);
+    return () => {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+    };
+  }, [removeState]);
+
+  function handleRemoveClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (removeState === "idle") {
+      setRemoveState("armed");
+    } else {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+      setRemoveState("idle");
+      onRemove(contact.id);
+    }
+  }
 
   return (
     <div className="border border-white/[0.06] bg-card px-3 py-3 transition-colors hover:border-white/[0.18]">
@@ -381,6 +407,23 @@ function PipelineCard({
             <ArrowRight className="h-3 w-3" />
           </button>
         )}
+        {/* Two-click remove from pipeline */}
+        {removeState === "armed" ? (
+          <button
+            onClick={handleRemoveClick}
+            className="border border-red-500/30 px-1.5 py-1 text-[9px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+          >
+            CONFIRM?
+          </button>
+        ) : (
+          <button
+            onClick={handleRemoveClick}
+            title="Remove from pipeline"
+            className="flex items-center px-1 text-muted-foreground/40 transition-colors hover:text-red-400"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -463,6 +506,29 @@ export default function PipelinePage() {
       await fetchPipeline();
     },
     [data, fetchPipeline],
+  );
+
+  const removeContact = useCallback(
+    async (contactId: string) => {
+      // Optimistic: remove from local state immediately.
+      setData((prev) => {
+        if (!prev) return prev;
+        const nextContacts = { ...prev.contacts };
+        for (const s of prev.stages) {
+          nextContacts[s] = (nextContacts[s] || []).filter((c) => c.id !== contactId);
+        }
+        const total = Object.values(nextContacts).reduce((sum, arr) => sum + arr.length, 0);
+        return { ...prev, contacts: nextContacts, total };
+      });
+      const res = await apiFetch(`/api/pipeline/${contactId}`, { method: "DELETE" });
+      if (res.ok) {
+        trackEvent("pipeline_removed", { contactId });
+      } else {
+        // On failure refetch to restore accurate state.
+        await fetchPipeline();
+      }
+    },
+    [fetchPipeline],
   );
 
   const overdue = useMemo(() => {
@@ -620,6 +686,7 @@ export default function PipelinePage() {
                         totalStages={data.stages.length}
                         onMove={moveStage}
                         onDraft={setDraftTarget}
+                        onRemove={removeContact}
                       />
                     ))
                   )}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -390,12 +390,18 @@ export default function ContactDetailPage() {
     );
   }
 
-  // Read structured education rows + flat fallback fields defensively so this
-  // compiles regardless of api.ts version.
+  // Read structured + flat fields defensively so this compiles regardless of
+  // api.ts version. Relationship fields default defensively when absent.
   const contactExt = contact as {
     degrees?: string;
     concentration?: string;
     educations?: { major: string; degree: string; concentration: string }[];
+    experiences?: { title: string; firm: string; dates: string }[];
+    clubMemberships?: { club: string; role: string }[];
+    graduationYear?: number | null;
+    isFriend?: boolean;
+    speakFrequency?: string;
+    lastSpokenAt?: string;
   };
 
   return (
@@ -424,6 +430,32 @@ export default function ContactDetailPage() {
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
+            {/* Friend star toggle — quick PATCH without opening the full modal */}
+            {(() => {
+              const ext = contact as unknown as Record<string, unknown>;
+              const isFriend = typeof ext.isFriend === "boolean" ? ext.isFriend : false;
+              return (
+                <button
+                  type="button"
+                  title={isFriend ? "Remove friend" : "Mark as friend"}
+                  onClick={async () => {
+                    await fetch(`/api/contacts/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ isFriend: !isFriend }),
+                    });
+                    await loadContact();
+                  }}
+                  className={`flex items-center transition-colors ${
+                    isFriend
+                      ? "text-accent-teal"
+                      : "text-muted-foreground/40 hover:text-accent-teal"
+                  }`}
+                >
+                  <Star className={`h-3.5 w-3.5 ${isFriend ? "fill-current" : ""}`} />
+                </button>
+              );
+            })()}
           </div>
           <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
             <FieldEditor
@@ -742,12 +774,60 @@ export default function ContactDetailPage() {
             {/* Minor is not part of education rows — always render it. */}
             <DetailRow label="Minor" value={contact.minor} />
             <DetailRow label="Skills" value={contact.skills} />
-            <DetailRow label="Past employers" value={contact.past_firms} />
+            {/* Experience rows when present; fall back to flat past_firms. */}
+            {contactExt.experiences && contactExt.experiences.length > 0 ? (
+              <div className="space-y-0.5">
+                <dt className="text-muted-foreground">Experience</dt>
+                {contactExt.experiences.map((exp, i) => {
+                  const parts = [exp.title, exp.firm, exp.dates].filter(Boolean);
+                  return parts.length ? (
+                    <dd key={i} className="text-right text-foreground">
+                      {parts.join(" · ")}
+                    </dd>
+                  ) : null;
+                })}
+              </div>
+            ) : (
+              <DetailRow label="Past employers" value={contact.past_firms} />
+            )}
             <DetailRow label="Location (current)" value={contact.linkedin_location} />
             <DetailRow label="Hometown" value={contact.hometown} />
             <DetailRow label="High School" value={contact.high_school} />
             <DetailRow label="Greek Life" value={contact.greek_org} />
-            <DetailRow label="Clubs" value={contact.clubs} />
+            {/* Club membership rows when present; fall back to flat clubs. */}
+            {contactExt.clubMemberships && contactExt.clubMemberships.length > 0 ? (
+              <div className="space-y-0.5">
+                <dt className="text-muted-foreground">Clubs</dt>
+                {contactExt.clubMemberships.map((m, i) => {
+                  const parts = [m.role, m.club].filter(Boolean);
+                  return parts.length ? (
+                    <dd key={i} className="text-right text-foreground">
+                      {parts.join(" · ")}
+                    </dd>
+                  ) : null;
+                })}
+              </div>
+            ) : (
+              <DetailRow label="Clubs" value={contact.clubs} />
+            )}
+            {contactExt.graduationYear != null && (
+              <DetailRow label="Graduation Year" value={String(contactExt.graduationYear)} />
+            )}
+            {/* Relationship summary line */}
+            {(() => {
+              const parts: string[] = [];
+              if (contactExt.isFriend) parts.push("Friend");
+              if (contactExt.speakFrequency) parts.push(contactExt.speakFrequency);
+              if (contactExt.lastSpokenAt) {
+                const days = Math.floor(
+                  (Date.now() - new Date(contactExt.lastSpokenAt).getTime()) / 86_400_000,
+                );
+                if (!Number.isNaN(days) && days >= 0) parts.push(`spoke ${days}d ago`);
+              }
+              return parts.length > 0 ? (
+                <DetailRow label="Relationship" value={parts.join(" · ")} />
+              ) : null;
+            })()}
             <DetailRow label="Passions" value={contact.passions} />
           </dl>
           <Separator className="my-3" />

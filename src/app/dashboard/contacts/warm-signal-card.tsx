@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Lock, Trash2 } from "lucide-react";
+import { Lock, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedContact } from "@/lib/api";
@@ -75,6 +75,15 @@ export function WarmSignalCard({
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
   const isRedacted = !!contact.isRedacted;
+
+  // Defensive casts for relationship fields that may not yet be in RankedContact type.
+  const contactRel = contact as unknown as Record<string, unknown>;
+  const isFriend = typeof contactRel.is_friend === "boolean" ? contactRel.is_friend : false;
+  const lastSpokenAt = typeof contactRel.last_spoken_at === "string" ? contactRel.last_spoken_at : "";
+  const spokeDays =
+    lastSpokenAt
+      ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
+      : null;
 
   // Two-click delete: null = idle, "armed" = first click done (awaiting confirm).
   const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
@@ -171,7 +180,7 @@ export function WarmSignalCard({
             </p>
           )}
 
-          {/* Meta: education, location, industry */}
+          {/* Meta: education, location, industry, last spoken */}
           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
             {contact.education && (
               <span>{contact.education}</span>
@@ -184,10 +193,15 @@ export function WarmSignalCard({
                 {tag}
               </span>
             ))}
+            {spokeDays !== null && spokeDays >= 0 && (
+              <span className="text-muted-foreground/60">
+                spoke {spokeDays}d ago
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: Score + Tier badge */}
+        {/* Right: Score + Tier badge + Friend indicator */}
         <div className="flex flex-col items-end gap-1">
           <div className="text-right">
             <span className="text-lg font-bold tabular-nums text-foreground">
@@ -195,12 +209,17 @@ export function WarmSignalCard({
             </span>
             <span className="text-xs text-muted-foreground">/100</span>
           </div>
-          <Badge
-            variant="outline"
-            className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
-          >
-            {TIER_LABELS[tier] || "COLD"}
-          </Badge>
+          <div className="flex items-center gap-1">
+            {isFriend && (
+              <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
+            )}
+            <Badge
+              variant="outline"
+              className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
+            >
+              {TIER_LABELS[tier] || "COLD"}
+            </Badge>
+          </div>
         </div>
       </div>
 
