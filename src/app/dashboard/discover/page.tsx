@@ -147,7 +147,16 @@ function ContactCard({
           }`}
         >
           {contact.isRedacted && <Lock className="h-3 w-3 shrink-0 opacity-70" />}
-          <span className="truncate">{contact.name}</span>
+          {contact.isRedacted ? (
+            <span className="truncate">{contact.name}</span>
+          ) : (
+            <a
+              href={`/contact/${contact.id}`}
+              className="truncate hover:underline hover:decoration-white/40"
+            >
+              {contact.name}
+            </a>
+          )}
         </h3>
         {contact.isRedacted && (
           <span className="mt-0.5 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">

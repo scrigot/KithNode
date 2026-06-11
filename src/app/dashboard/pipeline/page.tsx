@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
@@ -262,21 +263,25 @@ function PipelineCard({
   const canRegress = stageIndex > 0;
 
   return (
-    <div className="border border-white/[0.06] bg-card px-3 py-2.5 transition-colors hover:border-white/[0.18]">
+    <div className="border border-white/[0.06] bg-card px-3 py-3 transition-colors hover:border-white/[0.18]">
       <div className="flex items-center gap-1.5">
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshnessClass(days)}`}
           title={`${days}d since added`}
         />
-        <p className="truncate text-[12px] font-bold text-foreground">
+        <Link
+          href={`/contact/${contact.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="truncate text-[13px] font-bold text-foreground hover:underline hover:decoration-white/40"
+        >
           {contact.name}
-        </p>
+        </Link>
         <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
           {days}d
         </span>
       </div>
 
-      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+      <p className="mt-1 truncate text-[11px] text-muted-foreground">
         {contact.title}
         {contact.title && contact.company_name ? " @ " : ""}
         <span className="text-foreground">{contact.company_name}</span>
@@ -599,7 +604,7 @@ export default function PipelinePage() {
                   </span>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-2 border border-t-0 border-white/[0.06] bg-card/30 p-2">
+                <div className="flex max-h-[calc(100vh-220px)] flex-col gap-2 overflow-y-auto border border-t-0 border-white/[0.06] bg-card/30 p-2">
                   {contacts.length === 0 ? (
                     <div className="flex flex-1 items-center justify-center border border-dashed border-white/[0.1] py-6">
                       <span className="text-[10px] text-muted-foreground/60">

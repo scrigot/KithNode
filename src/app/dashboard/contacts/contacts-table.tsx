@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { OutreachSlideOver } from "./outreach-slide-over";
 import { AddContactSlideOver } from "./add-contact-slide-over";
 import { trackEvent } from "@/lib/posthog";
@@ -303,7 +304,12 @@ export function ContactsTable() {
                 <tr key={contact.id} className="hover:bg-white/[0.03]">
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-white">
                     <div className="flex items-center gap-1.5">
-                      <span>{contact.name}</span>
+                      <Link
+                        href={`/contact/${contact.id}`}
+                        className="hover:underline hover:decoration-white/40"
+                      >
+                        {contact.name}
+                      </Link>
                       {contact.linkedin_url &&
                         !contact.linkedin_url.includes("█") &&
                         contact.linkedin_url.includes("linkedin.com") && (

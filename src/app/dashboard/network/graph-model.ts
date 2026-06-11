@@ -46,6 +46,8 @@ export interface NetworkStats {
 // Detail derived for the right-hand panel.
 export interface NodeDetail {
   id: string;
+  /** Raw contact ID (without "c:" prefix) — used for /contact/[id] links */
+  contactId: string;
   name: string;
   title: string;
   firm: string;
@@ -179,6 +181,7 @@ export function buildGraph(
 
     details.set(targetId, {
       id: targetId,
+      contactId: c.id,
       name: c.name || "Unknown",
       title: c.title || "",
       firm: c.company?.name || "",
