@@ -26,8 +26,8 @@ describe("normalizeField", () => {
 });
 
 describe("pickEditableFields", () => {
-  it("keeps only known editable keys and ignores unknown ones", () => {
-    const out = pickEditableFields({
+  it("keeps known editable keys (now incl. title/firmName/university) and ignores unknown ones", () => {
+    const { fields, invalid } = pickEditableFields({
       education: "UNC",
       highSchool: "ECHHS",
       clubs: "Chi Phi",
@@ -35,36 +35,61 @@ describe("pickEditableFields", () => {
       location: "NYC",
       title: "CEO",
       firmName: "Goldman",
+      university: "UNC Kenan-Flagler",
       randomKey: "nope",
     });
-    expect(out).toEqual({
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({
       education: "UNC",
       highSchool: "ECHHS",
       clubs: "Chi Phi",
       passions: "AI",
       location: "NYC",
+      title: "CEO",
+      firmName: "Goldman",
+      university: "UNC Kenan-Flagler",
     });
-    expect(out).not.toHaveProperty("title");
-    expect(out).not.toHaveProperty("firmName");
-    expect(out).not.toHaveProperty("randomKey");
+    expect(fields).not.toHaveProperty("randomKey");
   });
 
   it("normalizes each value (cap 160, collapse whitespace)", () => {
-    const out = pickEditableFields({
+    const { fields } = pickEditableFields({
       clubs: "  a   b  ",
       passions: "y".repeat(200),
     });
-    expect(out.clubs).toBe("a b");
-    expect(out.passions).toHaveLength(160);
+    expect(fields.clubs).toBe("a b");
+    expect(fields.passions).toHaveLength(160);
   });
 
   it("returns an empty object for a payload with no valid string keys", () => {
-    expect(pickEditableFields({})).toEqual({});
-    expect(pickEditableFields({ title: "x", education: 5 as unknown as string })).toEqual({});
+    expect(pickEditableFields({})).toEqual({ fields: {}, invalid: false });
+    expect(
+      pickEditableFields({ unknownKey: "x", education: 5 as unknown as string }),
+    ).toEqual({ fields: {}, invalid: false });
   });
 
   it("skips non-string values for otherwise-valid keys", () => {
-    const out = pickEditableFields({ education: 123 as unknown as string, clubs: "ok" });
-    expect(out).toEqual({ clubs: "ok" });
+    const { fields } = pickEditableFields({
+      education: 123 as unknown as string,
+      clubs: "ok",
+    });
+    expect(fields).toEqual({ clubs: "ok" });
+  });
+
+  it("accepts every valid personType (incl. '' for auto) without normalizing it", () => {
+    for (const pt of ["", "alum", "student", "professor"]) {
+      const { fields, invalid } = pickEditableFields({ personType: pt });
+      expect(invalid).toBe(false);
+      expect(fields.personType).toBe(pt);
+    }
+  });
+
+  it("flags an out-of-range personType as invalid and drops all fields", () => {
+    const { fields, invalid } = pickEditableFields({
+      personType: "wizard",
+      education: "UNC",
+    });
+    expect(invalid).toBe(true);
+    expect(fields).toEqual({});
   });
 });

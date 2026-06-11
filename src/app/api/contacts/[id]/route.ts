@@ -4,9 +4,9 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 
-// Editable free-text contact columns. Title/firmName stay read-only — they are
-// the cross-user identity dedup keys (name + firm), so editing them per-user
-// would fork a shared contact's identity.
+// Editable free-text contact columns. title/firmName/university are now
+// user-correctable: the manual-override flow lets a user fix WHO a contact is
+// (personType) and the surrounding identity text the matcher keys on.
 const EDITABLE_FIELDS = [
   "education",
   "location",
@@ -14,7 +14,16 @@ const EDITABLE_FIELDS = [
   "clubs",
   "passions",
   "greekOrg",
+  "title",
+  "firmName",
+  "university",
+  "personType",
 ] as const;
+
+// personType is a closed enum, not free text: '' = auto (text heuristics),
+// 'alum' | 'student' | 'professor' = manual identity override. Anything else
+// is a 400.
+const VALID_PERSON_TYPES = ["", "alum", "student", "professor"] as const;
 
 const MAX_FIELD_LEN = 160;
 
@@ -24,19 +33,27 @@ export function normalizeField(raw: string): string {
 }
 
 // Pull the editable keys out of an arbitrary PATCH body. Unknown keys ignored;
-// non-string values skipped. Returns {} when nothing valid was supplied so the
-// route can answer 400. Pure — unit-tested without next-auth.
+// non-string values skipped. personType is validated against the closed enum:
+// an out-of-range value sets `invalid` so the route can answer 400 instead of
+// silently dropping it. Returns {} (with invalid=false) when nothing valid was
+// supplied so the route still answers 400. Pure — unit-tested without next-auth.
 export function pickEditableFields(
   body: Record<string, unknown>,
-): Record<string, string> {
+): { fields: Record<string, string>; invalid: boolean } {
   const out: Record<string, string> = {};
   for (const key of EDITABLE_FIELDS) {
     const val = body[key];
-    if (typeof val === "string") {
+    if (typeof val !== "string") continue;
+    if (key === "personType") {
+      if (!VALID_PERSON_TYPES.includes(val as (typeof VALID_PERSON_TYPES)[number])) {
+        return { fields: {}, invalid: true };
+      }
+      out[key] = val; // enum value, no whitespace normalization needed
+    } else {
       out[key] = normalizeField(val);
     }
   }
-  return out;
+  return { fields: out, invalid: false };
 }
 
 // Access check: own contact OR high_value-rated UserDiscover row.
@@ -127,6 +144,8 @@ export async function GET(
     greek_org: contact.greekOrg,
     clubs: contact.clubs,
     passions: contact.passions,
+    person_type: contact.personType || "",
+    university: contact.university || "",
     company: {
       name: contact.firmName,
       domain: "",
@@ -171,7 +190,14 @@ export async function PATCH(
   const { contact } = accessResult;
 
   const body = await request.json().catch(() => ({}));
-  const updates = pickEditableFields(body);
+  const { fields: updates, invalid } = pickEditableFields(body);
+
+  if (invalid) {
+    return NextResponse.json(
+      { error: "Invalid personType" },
+      { status: 400 },
+    );
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(

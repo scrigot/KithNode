@@ -75,6 +75,10 @@ export interface ContactDetail extends RankedContact {
   greek_org: string;
   clubs: string;
   passions: string;
+  // Manual identity override: '' = auto, 'alum' | 'student' | 'professor'.
+  person_type: string;
+  // Where a professor teaches (drives the "Teaches at" editor row).
+  university: string;
   source: string;
   tags?: string[];
   affiliations: { id: number; name: string; boost: number }[];

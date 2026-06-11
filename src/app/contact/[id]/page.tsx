@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +106,70 @@ function ScoreSection({ score }: { score: ContactDetail["score"] }) {
   );
 }
 
+// Manual identity override. One click PATCHes personType; the route rescores
+// the contact server-side, then onSaved refetches so the affiliation chips +
+// score reflect the new identity. AUTO ('') hands WHO-detection back to the
+// title/education heuristics.
+const PERSON_TYPES: { value: string; label: string }[] = [
+  { value: "", label: "AUTO" },
+  { value: "alum", label: "ALUM" },
+  { value: "student", label: "STUDENT" },
+  { value: "professor", label: "PROFESSOR" },
+];
+
+function TypeToggle({
+  contactId,
+  value,
+  onSaved,
+}: {
+  contactId: string;
+  value: string;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  async function select(next: string) {
+    if (next === value || saving) return;
+    setSaving(true);
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personType: next }),
+    });
+    setSaving(false);
+    if (res.ok) onSaved();
+  }
+
+  return (
+    <div className="mb-3">
+      <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        TYPE
+      </h3>
+      <div className="inline-flex border border-border" role="group" aria-label="Contact type">
+        {PERSON_TYPES.map((t) => {
+          const active = t.value === value;
+          return (
+            <button
+              key={t.value || "auto"}
+              type="button"
+              disabled={saving}
+              onClick={() => select(t.value)}
+              aria-pressed={active}
+              className={`border-r border-border px-2 py-1 text-[10px] font-bold tracking-wider transition-colors last:border-r-0 disabled:opacity-50 ${
+                active
+                  ? "bg-accent-blue/20 text-accent-blue"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ContactDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -114,8 +178,10 @@ export default function ContactDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showOutreach, setShowOutreach] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/contacts/${id}`)
+  // Refetch the contact after a field/type edit so the rescored affiliations +
+  // score (computed server-side in the PATCH) replace the stale panel data.
+  const loadContact = useCallback(() => {
+    return fetch(`/api/contacts/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Contact not found");
         return res.json();
@@ -129,6 +195,10 @@ export default function ContactDetailPage() {
         setLoading(false);
       });
   }, [id]);
+
+  useEffect(() => {
+    void loadContact();
+  }, [loadContact]);
 
   if (loading) {
     return (
@@ -221,6 +291,12 @@ export default function ContactDetailPage() {
 
         {/* Affiliations */}
         <div className="border border-border bg-card p-4">
+          <TypeToggle
+            contactId={contact.id}
+            value={contact.person_type || ""}
+            onSaved={loadContact}
+          />
+
           <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             AFFILIATIONS
           </h3>
@@ -254,12 +330,41 @@ export default function ContactDetailPage() {
           <div className="space-y-1 text-[10px]">
             <FieldEditor
               contactId={contact.id}
+              field="title"
+              label="Title"
+              initialValue={contact.title || ""}
+              placeholder="Add title"
+              onSaved={loadContact}
+            />
+            <FieldEditor
+              contactId={contact.id}
+              field="firmName"
+              label="Company"
+              initialValue={contact.company.name || ""}
+              placeholder="Add company"
+              onSaved={loadContact}
+            />
+            {contact.person_type === "professor" && (
+              <FieldEditor
+                contactId={contact.id}
+                field="university"
+                label="Teaches at"
+                initialValue={contact.university || ""}
+                placeholder="Add school"
+                mode="options"
+                loadOptions={loadUniversities}
+                onSaved={loadContact}
+              />
+            )}
+            <FieldEditor
+              contactId={contact.id}
               field="education"
               label="Education"
               initialValue={contact.education || ""}
               placeholder="Add education"
               mode="options"
               loadOptions={loadUniversities}
+              onSaved={loadContact}
             />
             <FieldEditor
               contactId={contact.id}
@@ -269,6 +374,7 @@ export default function ContactDetailPage() {
               placeholder="Add location"
               mode="options"
               loadOptions={loadCities}
+              onSaved={loadContact}
             />
             <FieldEditor
               contactId={contact.id}
@@ -279,6 +385,7 @@ export default function ContactDetailPage() {
               mode="options"
               loadOptions={loadHighSchools}
               stripCitySuffix
+              onSaved={loadContact}
             />
             <FieldEditor
               contactId={contact.id}
@@ -288,6 +395,7 @@ export default function ContactDetailPage() {
               placeholder="Add Greek org"
               mode="options"
               loadOptions={loadGreekOrgs}
+              onSaved={loadContact}
             />
             <FieldEditor
               contactId={contact.id}
@@ -297,6 +405,7 @@ export default function ContactDetailPage() {
               placeholder="Add clubs"
               mode="multi-chip"
               loadOptions={loadClubs}
+              onSaved={loadContact}
             />
             <FieldEditor
               contactId={contact.id}
@@ -304,6 +413,7 @@ export default function ContactDetailPage() {
               label="Passions"
               initialValue={contact.passions || ""}
               placeholder="Add passions"
+              onSaved={loadContact}
             />
             <p>
               <a

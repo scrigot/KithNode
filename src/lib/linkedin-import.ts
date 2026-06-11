@@ -36,6 +36,18 @@ export interface ContactMeta extends LinkedInMeta {
   clubs?: string;
   passions?: string;
   greekOrg?: string;
+  /**
+   * Manual identity override set by the user. '' = auto (text heuristics
+   * decide). 'student' | 'alum' | 'professor' force WHO this contact is and
+   * always win over title/education pattern-matching (see detectAffiliations).
+   */
+  personType?: string;
+  /**
+   * The school this contact is associated with. For professors this is
+   * where-they-teach (drives the "Teaches at Your School" chip); it is NOT
+   * where-they-studied, so it never feeds the education-based Same School match.
+   */
+  university?: string;
 }
 
 interface Affiliation {
@@ -308,26 +320,41 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
   const educationText = meta.education || "";
   const locationText = meta.location || "";
 
+  // Manual personType (set by the user on the contact page) ALWAYS wins over
+  // the title/education text heuristics below. '' = auto (no override, behave
+  // exactly as before). 'student' | 'alum' | 'professor' force WHO the contact
+  // is regardless of what their title/education pattern-matches.
+  const personType = meta.personType || "";
+  const isProfessor = personType === "professor";
+
   // Detect K-12 students from the education field. We never want a high
   // schooler whose self-reported title is "Founder" of a teen project to
-  // get the same +10 leadership boost as a Goldman MD.
+  // get the same +10 leadership boost as a Goldman MD. An 'alum' override
+  // forces this off: a confirmed alum gets full credit no matter what their
+  // education text reads as.
   const isPreCollege =
-    /\bhigh\s*school\b/i.test(educationText) ||
-    /\bcountry\s*day(\s*school)?\b/i.test(educationText) ||
-    /\bpreparatory(\s*school)?\b/i.test(educationText) ||
-    /\bprep\s*school\b/i.test(educationText) ||
-    /\bcharter\s*school\b/i.test(educationText) ||
-    /\bjunior\s*high\b/i.test(educationText) ||
-    /\bmiddle\s*school\b/i.test(educationText);
+    personType !== "alum" &&
+    (/\bhigh\s*school\b/i.test(educationText) ||
+      /\bcountry\s*day(\s*school)?\b/i.test(educationText) ||
+      /\bpreparatory(\s*school)?\b/i.test(educationText) ||
+      /\bprep\s*school\b/i.test(educationText) ||
+      /\bcharter\s*school\b/i.test(educationText) ||
+      /\bjunior\s*high\b/i.test(educationText) ||
+      /\bmiddle\s*school\b/i.test(educationText));
 
-  // Detect "current student / incoming" so we don't credit them as full-time
+  // Detect "current student / incoming" so we don't credit them as full-time.
+  // 'student' forces this true (keeps the halved firm boost + "(Incoming)"
+  // label + seniority suppression); 'alum' forces it false (full firm-tier +
+  // seniority credit even if the title says "Incoming Summer Analyst").
   const isCurrentStudent =
-    isPreCollege ||
-    /\buniversity\b/i.test(companyText) ||
-    /\bstudent\b/i.test(titleText) ||
-    /\bincoming\b/i.test(titleText) ||
-    /\bintern\b/i.test(titleText) ||
-    /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText);
+    personType === "student" ||
+    (personType !== "alum" &&
+      (isPreCollege ||
+        /\buniversity\b/i.test(companyText) ||
+        /\bstudent\b/i.test(titleText) ||
+        /\bincoming\b/i.test(titleText) ||
+        /\bintern\b/i.test(titleText) ||
+        /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText)));
 
   // Surface the pre-college signal so the user sees it instead of guessing
   // why a fancy-sounding founder-titled contact is rated low.
@@ -336,19 +363,46 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
   }
 
   // ── Universal firm tier ──
-  for (const tier of FIRM_TIERS) {
-    if (tier.patterns.some((p) => p.test(companyText))) {
-      const boost = isCurrentStudent ? Math.round(tier.boost / 2) : tier.boost;
-      const label = isCurrentStudent ? `${tier.label} (Incoming)` : tier.label;
-      affiliations.push({ name: label, boost });
-      break;
+  // A professor is suppressed entirely: someone at "Bain & Company executive
+  // education" who teaches must NOT read as MBB. They get a Professor chip below
+  // instead.
+  if (!isProfessor) {
+    for (const tier of FIRM_TIERS) {
+      if (tier.patterns.some((p) => p.test(companyText))) {
+        const boost = isCurrentStudent ? Math.round(tier.boost / 2) : tier.boost;
+        const label = isCurrentStudent ? `${tier.label} (Incoming)` : tier.label;
+        affiliations.push({ name: label, boost });
+        break;
+      }
     }
   }
 
   // ── Universal seniority ──
+  // Suppressed for a professor (their seniority is "Professor", pushed below)
+  // and for any current student.
   const seniority = detectSeniority(meta.title || "");
-  if (seniority.boost > 0 && !isCurrentStudent) {
+  if (seniority.boost > 0 && !isCurrentStudent && !isProfessor) {
     affiliations.push({ name: seniority.level, boost: seniority.boost });
+  }
+
+  // ── Manual professor override ──
+  // A confirmed professor gets a flat Professor chip in place of firm-tier +
+  // seniority. If we know where they teach (meta.university) and it matches the
+  // user's school, add a "Teaches at Your School" chip. Where-they-teach is NOT
+  // where-they-studied, so in that case we deliberately skip the Same School
+  // match that the same university text would otherwise trigger — Same School
+  // can still fire below off their EDUCATION field.
+  let suppressSameSchoolFromUniversity = false;
+  if (isProfessor) {
+    affiliations.push({ name: "Professor", boost: 8 });
+    if (prefs?.university && meta.university) {
+      const aliases = universityAliases(prefs.university);
+      const teachesBlob = norm(`${meta.university} ${educationText}`);
+      if (aliases.some((a) => teachesBlob.includes(a))) {
+        affiliations.push({ name: "Teaches at Your School", boost: 12 });
+        suppressSameSchoolFromUniversity = true;
+      }
+    }
   }
 
   // ── CS-strong school (universal, independent of user's school) ──
@@ -363,10 +417,16 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
       affiliations.push({ name: "Target Firm", boost: 25 });
     }
 
-    // Same school, alias-aware fuzzy match against education + experience text
+    // Same school, alias-aware fuzzy match against education + experience text.
+    // When "Teaches at Your School" already fired for a professor, the school
+    // came from where-they-teach (meta.university, surfaced via companyText for
+    // a teaching institution), which is NOT where-they-studied — so we narrow
+    // this match to EDUCATION only. Same School still fires off their education.
     if (prefs.university) {
       const aliases = universityAliases(prefs.university);
-      const schoolBlob = norm(`${educationText} ${companyText} ${tagsText}`);
+      const schoolBlob = suppressSameSchoolFromUniversity
+        ? norm(`${educationText} ${tagsText}`)
+        : norm(`${educationText} ${companyText} ${tagsText}`);
       if (aliases.some((a) => schoolBlob.includes(a))) {
         affiliations.push({ name: "Same School", boost: 15 });
       }

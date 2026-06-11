@@ -129,6 +129,21 @@ export async function POST(request: NextRequest) {
       })
       .join(", ");
 
+    // Manual identity override: when set, tell the model WHO this contact is so
+    // a professor is addressed as a professor, not auto-read as a banker.
+    const roleLine = (() => {
+      switch (contact.personType) {
+        case "alum":
+          return "\n- Role: alum";
+        case "student":
+          return "\n- Role: current student";
+        case "professor":
+          return `\n- Role: professor${contact.university ? ` (teaches at ${contact.university})` : ""}`;
+        default:
+          return "";
+      }
+    })();
+
     const prompt = `Generate a personalized warm outreach email requesting a 15-minute coffee chat.
 
 CONTACT INFO:
@@ -136,7 +151,7 @@ CONTACT INFO:
 - Title: ${contact.title || "Unknown"}
 - Company: ${contact.firmName || "Unknown"}
 - Location: ${contact.location || "Unknown"}
-- Education: ${contact.education || "Unknown"}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
+- Education: ${contact.education || "Unknown"}${roleLine}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
 - Affiliations: ${affiliationNames.join(", ") || "None"}
 - Warm Connection Phrases: ${warmConnections || "professional connection"}${manualTags.length > 0 ? `\n- Manual tags (user-added context): ${manualTags.join(", ")}` : ""}
 

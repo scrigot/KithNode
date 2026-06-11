@@ -6,10 +6,21 @@ import { Combobox } from "@/components/ui/combobox";
 
 interface FieldEditorProps {
   contactId: string;
-  field: "education" | "location" | "highSchool" | "clubs" | "passions" | "greekOrg";
+  field:
+    | "education"
+    | "location"
+    | "highSchool"
+    | "clubs"
+    | "passions"
+    | "greekOrg"
+    | "title"
+    | "firmName"
+    | "university";
   label: string;
   initialValue: string;
   placeholder?: string;
+  /** Fired after a successful PATCH so the page can refresh score/affiliations. */
+  onSaved?: () => void;
   /**
    * "plain" (default): bare text input.
    * "options": typeahead Combobox over `loadOptions`; free text still allowed.
@@ -51,6 +62,7 @@ export function FieldEditor({
   label,
   initialValue,
   placeholder,
+  onSaved,
   mode = "plain",
   loadOptions,
   stripCitySuffix,
@@ -63,6 +75,7 @@ export function FieldEditor({
         label={label}
         initialValue={initialValue}
         placeholder={placeholder}
+        onSaved={onSaved}
         loadOptions={loadOptions}
       />
     );
@@ -74,6 +87,7 @@ export function FieldEditor({
       label={label}
       initialValue={initialValue}
       placeholder={placeholder}
+      onSaved={onSaved}
       mode={mode}
       loadOptions={loadOptions}
       stripCitySuffix={stripCitySuffix}
@@ -89,11 +103,12 @@ function SingleValueEditor({
   label,
   initialValue,
   placeholder,
+  onSaved,
   mode,
   loadOptions,
   stripCitySuffix,
 }: Required<Pick<FieldEditorProps, "contactId" | "field" | "label" | "initialValue" | "mode">> &
-  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "stripCitySuffix">) {
+  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "stripCitySuffix" | "onSaved">) {
   const [value, setValue] = useState(initialValue);
   const [draft, setDraft] = useState(initialValue);
   const [editing, setEditing] = useState(false);
@@ -130,6 +145,7 @@ function SingleValueEditor({
     if (res.ok) {
       setValue(next);
       setEditing(false);
+      onSaved?.();
     }
   }
 
@@ -213,9 +229,10 @@ function MultiChipEditor({
   label,
   initialValue,
   placeholder,
+  onSaved,
   loadOptions,
 }: Required<Pick<FieldEditorProps, "contactId" | "field" | "label" | "initialValue">> &
-  Pick<FieldEditorProps, "placeholder" | "loadOptions">) {
+  Pick<FieldEditorProps, "placeholder" | "loadOptions" | "onSaved">) {
   const [chips, setChips] = useState<string[]>(() => parseChips(initialValue));
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -228,7 +245,10 @@ function MultiChipEditor({
       body: JSON.stringify({ [field]: next.join(", ") }),
     });
     setSaving(false);
-    if (res.ok) setChips(next);
+    if (res.ok) {
+      setChips(next);
+      onSaved?.();
+    }
   }
 
   function addChip(raw: string) {

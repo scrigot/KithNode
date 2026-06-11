@@ -62,6 +62,8 @@ export function rescoreContact(
     clubs: (contact.clubs as string) || "",
     passions: (contact.passions as string) || "",
     greekOrg: (contact.greekOrg as string) || "",
+    personType: (contact.personType as string) || "",
+    university: (contact.university as string) || "",
     tags,
   };
 

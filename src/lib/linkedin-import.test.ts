@@ -331,3 +331,148 @@ describe("detectAffiliations seniority: student-org vs firm officer", () => {
     expect(affs.some((a) => a.name === "VP" && a.boost === 7)).toBe(true);
   });
 });
+
+describe("detectAffiliations: manual personType override", () => {
+  const prefsWith = (overrides: Record<string, unknown> = {}) => ({
+    university: "",
+    highSchool: "",
+    hometown: "",
+    greekOrg: "",
+    targetIndustries: [],
+    targetFirms: [],
+    targetLocations: [],
+    clubs: [],
+    recruitingDate: null,
+    weeklyGoalTarget: 3,
+    ...overrides,
+  });
+
+  it("'student' forces the (Incoming) halving on a full-time-titled Goldman analyst", () => {
+    // Title "Analyst" has no incoming/student marker, so without the override
+    // this would read as a full Bulge Bracket (+18). The override forces the
+    // student path: halved boost + "(Incoming)" label + no seniority.
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Goldman Sachs",
+        title: "Analyst",
+        personType: "student",
+      }),
+    );
+    const tier = affs.find((a) => a.name === "Bulge Bracket (Incoming)");
+    expect(tier).toBeDefined();
+    expect(tier?.boost).toBe(9); // round(18 / 2)
+    expect(affs.some((a) => a.name === "Bulge Bracket" && !a.name.includes("Incoming"))).toBe(false);
+    expect(affs.some((a) => a.name === "Analyst")).toBe(false);
+  });
+
+  it("'alum' with an 'Incoming Summer Analyst' title still gets FULL firm boost (no Incoming label)", () => {
+    // Title literally says "Incoming Summer Analyst" — auto would halve + label.
+    // The alum override forces full-time: full +18 Bulge Bracket, no "(Incoming)".
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Goldman Sachs",
+        title: "Incoming Summer Analyst",
+        personType: "alum",
+      }),
+    );
+    const tier = affs.find((a) => a.name === "Bulge Bracket");
+    expect(tier).toBeDefined();
+    expect(tier?.boost).toBe(18);
+    expect(affs.some((a) => a.name.includes("(Incoming)"))).toBe(false);
+  });
+
+  it("'alum' forces full credit even when education text looks pre-college", () => {
+    // "Greenwich High School" trips the pre-college detector under auto. The
+    // alum override forces isPreCollege/isCurrentStudent off → full firm boost,
+    // no Pre-College chip.
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "Greenwich High School",
+        experience: "Goldman Sachs",
+        title: "Analyst",
+        personType: "alum",
+      }),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+    expect(affs.some((a) => a.name === "Bulge Bracket" && a.boost === 18)).toBe(true);
+  });
+
+  it("'professor' at 'Bain' gets NO MBB tier, gets a Professor chip", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Bain & Company executive education",
+        title: "Senior Lecturer",
+        personType: "professor",
+      }),
+    );
+    expect(affs.some((a) => a.name === "MBB")).toBe(false);
+    expect(affs.some((a) => a.name === "Professor" && a.boost === 8)).toBe(true);
+    // seniority is suppressed too — no Lecturer chip from the title
+    expect(affs.some((a) => a.name === "Lecturer")).toBe(false);
+  });
+
+  it("'professor' with prefs.university + matching teaches-at gets 'Teaches at Your School' but NOT Same School (education empty)", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Bain & Company executive education",
+        title: "Professor",
+        personType: "professor",
+        university: "UNC Kenan-Flagler",
+      }),
+      prefsWith({ university: "University of North Carolina at Chapel Hill" }),
+    );
+    expect(affs.some((a) => a.name === "Teaches at Your School" && a.boost === 12)).toBe(true);
+    expect(affs.some((a) => a.name === "Same School")).toBe(false);
+    expect(affs.some((a) => a.name === "MBB")).toBe(false);
+  });
+
+  it("'professor' fires BOTH Same School and Teaches at Your School when their EDUCATION matches (spec: teaches-at OR education)", () => {
+    // Studied at UNC, teaches at a random college. Per spec the Teaches chip
+    // fires on a teaches-at OR education match, so it fires via education here;
+    // and Same School is never suppressed off education, so it fires too.
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        experience: "Some Random College",
+        title: "Professor",
+        personType: "professor",
+        university: "Some Random College",
+      }),
+      prefsWith({ university: "University of North Carolina at Chapel Hill" }),
+    );
+    expect(affs.some((a) => a.name === "Same School" && a.boost === 15)).toBe(true);
+    expect(affs.some((a) => a.name === "Teaches at Your School" && a.boost === 12)).toBe(true);
+  });
+
+  it("'professor' teaches-at match (education empty) fires Teaches at Your School but NOT Same School", () => {
+    // The discriminating case for the suppression: the ONLY school signal is
+    // where-they-teach (meta.university). Teaches chip fires; Same School must
+    // stay silent because where-they-teach is not where-they-studied.
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "",
+        experience: "UNC Kenan-Flagler Business School",
+        title: "Professor",
+        personType: "professor",
+        university: "UNC Kenan-Flagler",
+      }),
+      prefsWith({ university: "University of North Carolina at Chapel Hill" }),
+    );
+    expect(affs.some((a) => a.name === "Teaches at Your School" && a.boost === 12)).toBe(true);
+    expect(affs.some((a) => a.name === "Same School")).toBe(false);
+  });
+
+  it("'' (auto) is unchanged vs omitting personType entirely (regression)", () => {
+    const meta = {
+      education: "Phillips Exeter Academy",
+      experience: "Goldman Sachs",
+      title: "Incoming Summer Analyst",
+    };
+    const auto = detectAffiliations(baseMeta(meta), prefsWith());
+    const explicitEmpty = detectAffiliations(
+      baseMeta({ ...meta, personType: "" }),
+      prefsWith(),
+    );
+    expect(explicitEmpty).toEqual(auto);
+  });
+});
