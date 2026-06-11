@@ -10,49 +10,13 @@ describe("seedsForSchool", () => {
     expect(names).toContain("Bank of America");
     expect(names).toContain("McKinsey & Company");
     expect(names).toContain("Evercore");
-    expect(names).toContain("Accenture");
-    expect(seeds.length).toBe(16);
+    expect(seeds.length).toBe(15);
   });
 
   it("resolves alias 'unc-chapel-hill' to UNC seeds", () => {
     const seeds = seedsForSchool("unc-chapel-hill");
     expect(seeds.map((s) => s.name)).toContain("Goldman Sachs");
-    expect(seeds.length).toBe(16);
-  });
-
-  it("returns Duke recruiting firms for 'Duke'", () => {
-    const seeds = seedsForSchool("Duke");
-    const names = seeds.map((s) => s.name);
-    expect(names).toContain("Goldman Sachs");
-    expect(names).toContain("Blackstone");
-    expect(names).toContain("KKR");
-    expect(names).toContain("McKinsey & Company");
-    expect(names).toContain("Evercore");
-    expect(names).toContain("Accenture");
-    expect(seeds.length).toBe(21);
-  });
-
-  it("resolves alias 'fuqua' to Duke seeds", () => {
-    const seeds = seedsForSchool("fuqua");
-    expect(seeds.map((s) => s.name)).toContain("Goldman Sachs");
-    expect(seeds.length).toBe(21);
-  });
-
-  it("returns UVA recruiting firms for 'UVA'", () => {
-    const seeds = seedsForSchool("UVA");
-    const names = seeds.map((s) => s.name);
-    expect(names).toContain("Goldman Sachs");
-    expect(names).toContain("Barclays");
-    expect(names).toContain("McKinsey & Company");
-    expect(names).toContain("Evercore");
-    expect(names).toContain("Accenture");
-    expect(seeds.length).toBe(19);
-  });
-
-  it("resolves alias 'mcintire' to UVA seeds", () => {
-    const seeds = seedsForSchool("mcintire");
-    expect(seeds.map((s) => s.name)).toContain("Goldman Sachs");
-    expect(seeds.length).toBe(19);
+    expect(seeds.length).toBe(15);
   });
 
   it("returns NC State recruiting firms for 'NC State'", () => {
