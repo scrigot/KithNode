@@ -1121,11 +1121,22 @@ export default function SettingsPage() {
               greekOrganization: data.greekOrg || "",
               clubs: Array.isArray(data.clubs) ? data.clubs : [],
               hometown: data.hometown || "",
-              targetLocations: Array.isArray(data.targetLocations) ? data.targetLocations : [],
-              customLocations: [],
+              // DB stores presets + customs as one flat list; split against the
+              // preset option arrays or custom entries render nowhere (and the
+              // dupe-guard then silently blocks re-adding them).
+              targetLocations: Array.isArray(data.targetLocations)
+                ? data.targetLocations.filter((l: string) => LOCATION_OPTIONS.includes(l))
+                : [],
+              customLocations: Array.isArray(data.targetLocations)
+                ? data.targetLocations.filter((l: string) => !LOCATION_OPTIONS.includes(l))
+                : [],
               targetIndustries: Array.isArray(data.targetIndustries) ? data.targetIndustries : [],
-              targetFirms: Array.isArray(data.targetFirms) ? data.targetFirms : [],
-              customFirms: [],
+              targetFirms: Array.isArray(data.targetFirms)
+                ? data.targetFirms.filter((f: string) => FIRM_OPTIONS.includes(f))
+                : [],
+              customFirms: Array.isArray(data.targetFirms)
+                ? data.targetFirms.filter((f: string) => !FIRM_OPTIONS.includes(f))
+                : [],
               recruitingDate: data.recruitingDate
                 ? String(data.recruitingDate).slice(0, 10)
                 : "",

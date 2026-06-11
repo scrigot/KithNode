@@ -31,6 +31,18 @@ export async function POST(request: NextRequest) {
         .slice(0, 3)
     : [];
 
+  const recruitingDate =
+    typeof body.recruiting_date === "string" &&
+    !Number.isNaN(Date.parse(body.recruiting_date))
+      ? new Date(body.recruiting_date).toISOString()
+      : null;
+
+  const weeklyGoalRaw = Number(body.weekly_goal_target);
+  const weeklyGoalTarget =
+    Number.isFinite(weeklyGoalRaw) && weeklyGoalRaw > 0
+      ? Math.min(99, Math.round(weeklyGoalRaw))
+      : 3;
+
   const { error } = await supabase
     .from("User")
     .update({
@@ -42,6 +54,8 @@ export async function POST(request: NextRequest) {
       targetFirms: serializeList(body.target_companies),
       targetLocations: serializeList(body.target_locations),
       clubs: JSON.stringify(rawClubs),
+      recruitingDate,
+      weeklyGoalTarget,
     })
     .eq("email", email);
 
