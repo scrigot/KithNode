@@ -57,6 +57,9 @@ export default [
         File: "readonly",
         FileReader: "readonly",
         FormData: "readonly",
+        PointerEvent: "readonly",
+        Node: "readonly",
+        MutationObserver: "readonly",
       },
     },
     rules: {
