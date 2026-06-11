@@ -128,6 +128,21 @@ function buildLocation(data: PdlPersonData): string {
 }
 
 /**
+ * True when PDL's fullName should replace the contact's current name.
+ * Adopts when pdlFullName is non-empty AND currentName has no space
+ * (single token = slug-derived, or empty). Multi-word names (CSV imports)
+ * are considered accurate and never overwritten.
+ */
+export function shouldAdoptPdlName(
+  currentName: string,
+  pdlFullName: string,
+): boolean {
+  return (
+    pdlFullName.trim().length > 0 && !currentName.trim().includes(" ")
+  );
+}
+
+/**
  * Fetch a PDL person profile by LinkedIn URL and map it to the fields
  * KithNode stores. Returns null on missing API key, 404 (no match), any other
  * non-200, any network/parse error, or when the profile has no usable

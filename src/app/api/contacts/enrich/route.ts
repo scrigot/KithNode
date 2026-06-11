@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { requireSubscription } from "@/lib/subscription";
-import { fetchPdlProfile } from "@/lib/enrich/pdl";
+import { fetchPdlProfile, shouldAdoptPdlName } from "@/lib/enrich/pdl";
 
 const BATCH_LIMIT = 25;
 
@@ -168,11 +168,10 @@ export async function POST(req: NextRequest) {
       // Multi-word names (CSV imports) are considered accurate and never overwritten.
       // Empty current name is also treated as unset (single-token path).
       const currentName: string = c.name || "";
-      const shouldAdoptPdlName =
-        pdl?.fullName &&
-        pdl.fullName.trim().length > 0 &&
-        !currentName.trim().includes(" ");
-      const name = shouldAdoptPdlName ? pdl!.fullName : currentName;
+      const name =
+        pdl?.fullName && shouldAdoptPdlName(currentName, pdl.fullName)
+          ? pdl.fullName
+          : currentName;
 
       // Re-score with personalized prefs in the same loop, via the shared
       // helper so enrich stays in lockstep with the tags route. Load this

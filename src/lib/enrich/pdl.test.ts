@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchPdlProfile } from "./pdl";
+import { fetchPdlProfile, shouldAdoptPdlName } from "./pdl";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -387,13 +387,6 @@ describe("fetchPdlProfile", () => {
 // Extracted rule: adopt PDL name when current name has no space (single token
 // = slug-derived). Multi-word names and empty-string edge cases tested here
 // without needing the full enrich route.
-
-function shouldAdoptPdlName(currentName: string, pdlFullName: string): boolean {
-  return (
-    pdlFullName.trim().length > 0 &&
-    !currentName.trim().includes(" ")
-  );
-}
 
 describe("shouldAdoptPdlName", () => {
   it("adopts when current name is single token (slug-derived)", () => {
