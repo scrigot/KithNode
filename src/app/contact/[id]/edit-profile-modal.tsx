@@ -166,6 +166,19 @@ export function EditProfileModal({
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Exit guard: with unsaved changes, every close path (Esc, backdrop, X,
+  // CANCEL) routes through a confirm dialog — explicit Save or Discard only.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  // Computed before the Escape effect below — its deps array evaluates at
+  // render time. buildPatch is a hoisted function declaration, so this is safe.
+  const dirtyCount = Object.keys(buildPatch()).length;
+
+  function requestClose() {
+    if (saving) return;
+    if (dirtyCount > 0) setConfirmDiscard(true);
+    else onClose();
+  }
 
   // Lock body scroll + Escape closes (unless a save is in flight). Matches the
   // intro-modal convention.
@@ -173,14 +186,21 @@ export function EditProfileModal({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !saving) onClose();
+      if (e.key !== "Escape" || saving) return;
+      if (confirmDiscard) {
+        setConfirmDiscard(false); // Esc on the confirm = keep editing
+      } else if (dirtyCount > 0) {
+        setConfirmDiscard(true);
+      } else {
+        onClose();
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", handleKey);
     };
-  }, [saving, onClose]);
+  }, [saving, onClose, confirmDiscard, dirtyCount]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -219,8 +239,6 @@ export function EditProfileModal({
     return patch;
   }
 
-  const dirtyCount = Object.keys(buildPatch()).length;
-
   async function handleSave() {
     const patch = buildPatch();
     if (Object.keys(patch).length === 0) {
@@ -244,6 +262,7 @@ export function EditProfileModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed. Try again.");
       setSaving(false);
+      setConfirmDiscard(false); // surface the error in the form, nothing lost
     }
   }
 
@@ -255,7 +274,7 @@ export function EditProfileModal({
       aria-labelledby="edit-profile-title"
       onMouseDown={(e) => {
         // Backdrop click closes; clicks inside the card don't bubble here.
-        if (e.target === e.currentTarget && !saving) onClose();
+        if (e.target === e.currentTarget && !saving) requestClose();
       }}
     >
       <div className="flex max-h-[90vh] w-full max-w-[600px] flex-col border border-primary/30 bg-card shadow-2xl shadow-primary/20">
@@ -269,7 +288,7 @@ export function EditProfileModal({
           </h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={saving}
             className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
             aria-label="Close"
@@ -409,7 +428,7 @@ export function EditProfileModal({
         <div className="flex shrink-0 gap-2 border-t border-white/[0.06] px-5 py-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={saving}
             className="flex-1 border border-white/[0.12] bg-muted py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground disabled:opacity-50"
           >
@@ -434,6 +453,55 @@ export function EditProfileModal({
           </button>
         </div>
       </div>
+
+      {/* Unsaved-changes guard: explicit Save or Discard only */}
+      {confirmDiscard && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setConfirmDiscard(false);
+          }}
+        >
+          <div className="w-full max-w-[400px] border border-primary/30 bg-card p-5 shadow-2xl">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+              Unsaved changes
+            </p>
+            <p className="mt-2 text-[12px] text-muted-foreground">
+              You have {dirtyCount} unsaved {dirtyCount === 1 ? "field" : "fields"}.
+              Save or discard before leaving.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDiscard(false);
+                  onClose();
+                }}
+                className="flex-1 border border-red-500/30 bg-red-500/5 py-2 text-[11px] font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/10"
+              >
+                DISCARD
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDiscard(false);
+                  void handleSave();
+                }}
+                className="flex-1 bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-primary/80"
+              >
+                SAVE CHANGES
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmDiscard(false)}
+              className="mt-3 w-full text-center text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Keep editing
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
