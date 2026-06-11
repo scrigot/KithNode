@@ -152,8 +152,17 @@ export async function GET(request: NextRequest) {
   // so they stay clear.
   const redacted = enriched.map((c) => maybeRedact(c, userId));
 
+  // The user's own import count, so the UI can tell "you have no network"
+  // apart from "you've rated everyone in this tab" (total = pool AFTER
+  // exclusions, which legitimately hits 0 once the deck is exhausted).
+  const { count: networkSize } = await supabase
+    .from("AlumniContact")
+    .select("*", { count: "exact", head: true })
+    .eq("importedByUserId", userId);
+
   return NextResponse.json({
     contacts: redacted,
     total: redacted.length,
+    networkSize: networkSize ?? 0,
   });
 }

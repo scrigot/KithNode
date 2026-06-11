@@ -377,7 +377,9 @@ export default function DiscoverPage() {
         setContacts(data.contacts || []);
         setTotal(data.total || 0);
 
-        if (!q && !tier && (data.contacts || []).length === 0) {
+        // "No network" only when the user truly has no imports — an exhausted
+        // pool (rated everyone in this tab) must NOT read as no-network.
+        if (!q && !tier && (data.contacts || []).length === 0 && (data.networkSize || 0) === 0) {
           setHasAnyContacts(false);
         } else {
           setHasAnyContacts(true);
@@ -403,7 +405,9 @@ export default function DiscoverPage() {
 
       setAllRated(unrated.length === 0);
       setBrowseContacts(unrated);
-      setHasAnyContacts(unrated.length > 0 || (data.total || 0) > 0);
+      setHasAnyContacts(
+        unrated.length > 0 || (data.total || 0) > 0 || (data.networkSize || 0) > 0,
+      );
     } catch (err) {
     Sentry.captureException(err);
       setBrowseContacts([]);
