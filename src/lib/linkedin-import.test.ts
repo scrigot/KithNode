@@ -65,6 +65,68 @@ describe("scrapeLinkedInMeta", () => {
   });
 });
 
+describe("detectAffiliations: manual tags", () => {
+  it("Same Greek Org fires when greekOrg matches a manual tag", () => {
+    const prefs = {
+      university: "",
+      hometown: "",
+      greekOrg: "Chi Phi",
+      targetIndustries: [],
+      targetFirms: [],
+      targetLocations: [],
+      recruitingDate: null,
+      weeklyGoalTarget: 3,
+    };
+    const affs = detectAffiliations(baseMeta({ tags: ["chi phi"] }), prefs);
+    expect(affs.some((a) => a.name === "Same Greek Org")).toBe(true);
+  });
+
+  it("Same School fires when a tag matches a university alias", () => {
+    const prefs = {
+      university: "University of North Carolina at Chapel Hill",
+      hometown: "",
+      greekOrg: "",
+      targetIndustries: [],
+      targetFirms: [],
+      targetLocations: [],
+      recruitingDate: null,
+      weeklyGoalTarget: 3,
+    };
+    // "kenan flagler" is a registered alias for UNC
+    const affs = detectAffiliations(baseMeta({ tags: ["Kenan Flagler"] }), prefs);
+    expect(affs.some((a) => a.name === "Same School")).toBe(true);
+  });
+
+  it("a 'high school friend' tag does NOT flag the contact as Pre-College", () => {
+    const affs = detectAffiliations(
+      baseMeta({
+        education: "University of North Carolina at Chapel Hill",
+        experience: "Goldman Sachs",
+        title: "Analyst",
+        tags: ["high school friend"],
+      }),
+    );
+    expect(affs.some((a) => a.name === "Pre-College")).toBe(false);
+    expect(affs.some((a) => a.name.includes("(Incoming)"))).toBe(false);
+  });
+
+  it("no tags = unchanged behavior (regression)", () => {
+    const prefs = {
+      university: "Duke University",
+      hometown: "",
+      greekOrg: "Chi Phi",
+      targetIndustries: [],
+      targetFirms: [],
+      targetLocations: [],
+      recruitingDate: null,
+      weeklyGoalTarget: 3,
+    };
+    const affsWithout = detectAffiliations(baseMeta({ education: "Yale University" }), prefs);
+    const affsWith = detectAffiliations(baseMeta({ education: "Yale University", tags: [] }), prefs);
+    expect(affsWithout).toEqual(affsWith);
+  });
+});
+
 describe("detectAffiliations seniority: student-org vs firm officer", () => {
   it("does NOT credit a club VP with professional seniority", () => {
     const affs = detectAffiliations(baseMeta({ title: "VP of Finance Club" }));

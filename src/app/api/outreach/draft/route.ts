@@ -104,6 +104,15 @@ export async function POST(request: NextRequest) {
       ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())
       : [];
 
+    // Fetch per-user manual tags for this contact
+    const { data: tagRows } = await supabase
+      .from("contact_tags")
+      .select("tag")
+      .eq("user_id", userEmail)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: true });
+    const manualTags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
+
     const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
     const userSchool = prefs.university || "my school";
     const userIndustryFocus =
@@ -129,7 +138,7 @@ CONTACT INFO:
 - Location: ${contact.location || "Unknown"}
 - Education: ${contact.education || "Unknown"}
 - Affiliations: ${affiliationNames.join(", ") || "None"}
-- Warm Connection Phrases: ${warmConnections || "professional connection"}
+- Warm Connection Phrases: ${warmConnections || "professional connection"}${manualTags.length > 0 ? `\n- Manual tags (user-added context): ${manualTags.join(", ")}` : ""}
 
 SENDER CONTEXT:
 - ${senderFullName || "Me"}, a student at ${userSchool}

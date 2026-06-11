@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
+import { TagEditor } from "./tag-editor";
 import { trackEvent } from "@/lib/posthog";
 import type { ContactDetail } from "@/lib/api";
 
@@ -330,6 +331,9 @@ export default function ContactDetailPage() {
             </p>
           )}
         </div>
+
+        {/* Tags */}
+        <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
 
         {/* Outreach History */}
         <div className="border border-border bg-card p-4">

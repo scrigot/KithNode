@@ -51,8 +51,11 @@ vi.mock("@/lib/supabase", () => ({
           // AlumniContact fetch: .select().eq().single()
           single: vi.fn(() => nextResult()),
           // UserDiscover ownership lookup: .select().eq().eq().maybeSingle()
+          // contact_tags fetch: .select().eq().eq().order()
           eq: vi.fn(() => ({
             maybeSingle: vi.fn(() => nextRating()),
+            // contact_tags: .select().eq().eq().order() -> empty tags by default
+            order: vi.fn(() => Promise.resolve({ data: [], error: null })),
           })),
         })),
       })),

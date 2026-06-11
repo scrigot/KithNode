@@ -22,10 +22,16 @@ export interface LinkedInMeta {
  * ContactMeta extends LinkedInMeta with optional enrichment fields.
  * Used by the enrichment route after Claude infers industry/seniority
  * from a contact's name + company + title.
+ *
+ * `tags` — per-user manual labels (e.g. "Chi Phi", "Fintech Club") stored in
+ * contact_tags. They feed the Same School and Same Greek Org matchers (no new
+ * scoring rules) but are kept out of the K-12/pre-college detector and
+ * universal quality signals.
  */
 export interface ContactMeta extends LinkedInMeta {
   industry?: string;
   seniorityLevel?: string;
+  tags?: string[];
 }
 
 interface Affiliation {
@@ -283,6 +289,10 @@ function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
 export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affiliation[] {
   const affiliations: Affiliation[] = [];
 
+  // Tags feed the per-user relationship matchers (Same School, Same Greek Org)
+  // but never the K-12/pre-college detector or universal quality signals — a
+  // "high school friend" tag must not flag a college contact as Pre-College.
+  const tagsText = (meta.tags ?? []).join(" ");
   const companyText = (meta.experience || "").toLowerCase();
   const titleText = (meta.title || "").toLowerCase();
   const educationText = meta.education || "";
@@ -346,7 +356,7 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
     // Same school, alias-aware fuzzy match against education + experience text
     if (prefs.university) {
       const aliases = universityAliases(prefs.university);
-      const schoolBlob = norm(`${educationText} ${companyText}`);
+      const schoolBlob = norm(`${educationText} ${companyText} ${tagsText}`);
       if (aliases.some((a) => schoolBlob.includes(a))) {
         affiliations.push({ name: "Same School", boost: 15 });
       }
@@ -354,7 +364,7 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
 
     // Same greek org
     if (prefs.greekOrg) {
-      const allText = `${educationText} ${locationText} ${companyText} ${titleText}`;
+      const allText = `${educationText} ${locationText} ${companyText} ${titleText} ${tagsText}`;
       if (norm(allText).includes(norm(prefs.greekOrg))) {
         affiliations.push({ name: "Same Greek Org", boost: 12 });
       }

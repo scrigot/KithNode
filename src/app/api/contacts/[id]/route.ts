@@ -38,6 +38,15 @@ export async function GET(
     }
   }
 
+  // Fetch per-user manual tags for this contact
+  const { data: tagRows } = await supabase
+    .from("contact_tags")
+    .select("tag")
+    .eq("user_id", userId)
+    .eq("contact_id", id)
+    .order("created_at", { ascending: true });
+  const tags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
+
   return NextResponse.json({
     id: contact.id,
     name: contact.name,
@@ -70,5 +79,6 @@ export async function GET(
     warm_path: contact.university || "",
     outreach_history: [],
     signals: [],
+    tags,
   });
 }

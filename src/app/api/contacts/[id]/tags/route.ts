@@ -1,0 +1,192 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { getUserPrefs } from "@/lib/user-prefs";
+import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
+
+const MAX_TAGS = 10;
+const MAX_TAG_LEN = 40;
+
+function normalizeTag(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").slice(0, MAX_TAG_LEN);
+}
+
+async function checkAccess(
+  userEmail: string,
+  contactId: string,
+): Promise<{ contact: Record<string, unknown> } | NextResponse> {
+  const { data: contact, error } = await supabase
+    .from("AlumniContact")
+    .select("*")
+    .eq("id", contactId)
+    .single();
+
+  if (error || !contact) {
+    return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  }
+
+  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+    const { data: discover } = await supabase
+      .from("UserDiscover")
+      .select("rating")
+      .eq("userId", userEmail)
+      .eq("contactId", contactId)
+      .maybeSingle();
+    if (!discover) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+  }
+
+  return { contact };
+}
+
+async function recomputeScoring(
+  userEmail: string,
+  contact: Record<string, unknown>,
+  contactId: string,
+): Promise<void> {
+  const { data: tagsRows } = await supabase
+    .from("contact_tags")
+    .select("tag")
+    .eq("user_id", userEmail)
+    .eq("contact_id", contactId);
+
+  const tags = (tagsRows ?? []).map((r: { tag: string }) => r.tag);
+
+  const prefs = await getUserPrefs(userEmail);
+
+  const meta = {
+    name: (contact.name as string) || "",
+    education: (contact.education as string) || "",
+    location: (contact.location as string) || "",
+    experience: (contact.firmName as string) || "",
+    title: (contact.title as string) || "",
+    industry: (contact.industry as string) || "",
+    seniorityLevel: (contact.seniorityLevel as string) || "",
+    tags,
+  };
+
+  const affiliations = detectAffiliations(meta, prefs);
+  const { score, tier } = computeWarmthScore(affiliations);
+
+  await supabase
+    .from("AlumniContact")
+    .update({
+      affiliations: affiliations.map((a) => a.name).join(","),
+      warmthScore: score,
+      tier,
+    })
+    .eq("id", contactId);
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userEmail = session.user.email;
+  const { id: contactId } = await params;
+
+  const accessResult = await checkAccess(userEmail, contactId);
+  if (accessResult instanceof NextResponse) return accessResult;
+
+  const { data: rows } = await supabase
+    .from("contact_tags")
+    .select("tag")
+    .eq("user_id", userEmail)
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: true });
+
+  const tags = (rows ?? []).map((r: { tag: string }) => r.tag);
+  return NextResponse.json({ tags });
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userEmail = session.user.email;
+  const { id: contactId } = await params;
+
+  const accessResult = await checkAccess(userEmail, contactId);
+  if (accessResult instanceof NextResponse) return accessResult;
+  const { contact } = accessResult as { contact: Record<string, unknown> };
+
+  const body = await req.json().catch(() => ({}));
+  const raw: string = body.tag ?? "";
+  const tag = normalizeTag(raw);
+
+  if (!tag) {
+    return NextResponse.json({ error: "tag is required" }, { status: 400 });
+  }
+
+  // Check cap
+  const { count } = await supabase
+    .from("contact_tags")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userEmail)
+    .eq("contact_id", contactId);
+
+  if ((count ?? 0) >= MAX_TAGS) {
+    return NextResponse.json(
+      { error: `Maximum ${MAX_TAGS} tags per contact` },
+      { status: 400 },
+    );
+  }
+
+  // Upsert — unique(user_id, contact_id, tag) handles duplicates
+  const { error } = await supabase.from("contact_tags").upsert(
+    { user_id: userEmail, contact_id: contactId, tag },
+    { onConflict: "user_id,contact_id,tag", ignoreDuplicates: true },
+  );
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  await recomputeScoring(userEmail, contact, contactId);
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userEmail = session.user.email;
+  const { id: contactId } = await params;
+
+  const accessResult = await checkAccess(userEmail, contactId);
+  if (accessResult instanceof NextResponse) return accessResult;
+  const { contact } = accessResult as { contact: Record<string, unknown> };
+
+  const body = await req.json().catch(() => ({}));
+  const raw: string = body.tag ?? "";
+  const tag = normalizeTag(raw);
+
+  if (!tag) {
+    return NextResponse.json({ error: "tag is required" }, { status: 400 });
+  }
+
+  await supabase
+    .from("contact_tags")
+    .delete()
+    .eq("user_id", userEmail)
+    .eq("contact_id", contactId)
+    .eq("tag", tag);
+
+  await recomputeScoring(userEmail, contact, contactId);
+
+  return NextResponse.json({ ok: true });
+}
