@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Gauge,
+  HelpCircle,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
@@ -27,24 +28,24 @@ const NAV_GROUPS = [
   {
     label: "PAGES",
     items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-      { href: "/dashboard/contacts", label: "Warm Signals", icon: Users },
-      { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch },
-      { href: "/dashboard/discover", label: "Discover", icon: Compass },
-      { href: "/dashboard/network", label: "Network", icon: Share2 },
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboard, tour: "overview" },
+      { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, tour: "warm-signals" },
+      { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, tour: "pipeline" },
+      { href: "/dashboard/discover", label: "Discover", icon: Compass, tour: "discover" },
+      { href: "/dashboard/network", label: "Network", icon: Share2, tour: "network" },
     ],
   },
   {
     label: "DATA",
     items: [
-      { href: "/dashboard/import", label: "Import", icon: Upload },
+      { href: "/dashboard/import", label: "Import", icon: Upload, tour: "import" },
     ],
   },
   {
     label: "ACCOUNT",
     items: [
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-      { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings, tour: "settings" },
+      { href: "/dashboard/billing", label: "Billing", icon: CreditCard, tour: undefined },
     ],
   },
 ];
@@ -53,7 +54,7 @@ const NAV_GROUPS = [
 const FOUNDER_NAV_GROUP = {
   label: "FOUNDER",
   items: [
-    { href: "/dashboard/ops", label: "Ops", icon: Gauge },
+    { href: "/dashboard/ops", label: "Ops", icon: Gauge, tour: undefined },
   ],
 };
 
@@ -87,6 +88,7 @@ function NavContent({
   trialDaysLeft,
   isFounderUser,
   collapsed,
+  creditBalance,
   onNavClick,
   onToggleCollapse,
 }: {
@@ -96,6 +98,7 @@ function NavContent({
   trialDaysLeft: number | null;
   isFounderUser: boolean;
   collapsed?: boolean;
+  creditBalance: number | null;
   onNavClick?: () => void;
   onToggleCollapse?: () => void;
 }) {
@@ -155,6 +158,7 @@ function NavContent({
                   href={item.href}
                   onClick={onNavClick}
                   title={collapsed ? item.label : undefined}
+                  data-tour={item.tour}
                   className={`mb-0.5 flex items-center border-l-2 transition-all duration-200 ${
                     collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"
                   } text-[13px] ${
@@ -180,6 +184,46 @@ function NavContent({
           </div>
         ))}
       </nav>
+
+      {/* Credits meter + tour trigger */}
+      <div className={`border-t border-white/[0.06] ${collapsed ? "px-2 py-2" : "px-4 py-2"}`}>
+        {/* Credits meter */}
+        <Link
+          href="/dashboard/usage"
+          data-tour="credits-meter"
+          title={collapsed ? `${creditBalance ?? "?"} credits` : undefined}
+          className={`flex items-center transition-colors duration-150 hover:text-accent-teal text-text-muted ${collapsed ? "justify-center py-1.5" : "gap-2 py-1.5"}`}
+        >
+          {collapsed ? (
+            <span className="text-[10px] font-bold tabular-nums text-accent-teal">
+              {creditBalance ?? "?"}
+            </span>
+          ) : (
+            <div className="flex flex-1 flex-col gap-0.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Credits</span>
+                <span className="text-[11px] font-bold tabular-nums text-accent-teal">{creditBalance ?? "--"} cr</span>
+              </div>
+              <div className="h-px w-full bg-white/[0.06]">
+                <div
+                  className="h-px bg-accent-teal/60 transition-all duration-300"
+                  style={{ width: `${Math.min(100, ((creditBalance ?? 0) / 200) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </Link>
+        {/* Take the tour */}
+        <button
+          data-tour="sidebar-collapse"
+          onClick={() => window.dispatchEvent(new CustomEvent("kn:start-tour"))}
+          title={collapsed ? "Take the tour" : undefined}
+          className={`mt-1 flex items-center transition-colors duration-150 text-text-muted hover:text-accent-teal text-[11px] ${collapsed ? "w-full justify-center py-1.5" : "gap-2 py-1"}`}
+        >
+          <HelpCircle size={13} />
+          {!collapsed && <span>Take the tour</span>}
+        </button>
+      </div>
 
       {/* User section */}
       <div className={`border-t border-white/[0.06] ${collapsed ? "px-2 py-3" : "px-4 py-3"}`}>
@@ -237,6 +281,7 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
 
   // Lazy-init from localStorage, SSR-safe.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -284,10 +329,25 @@ export function Sidebar({
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/user/credits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        setCreditBalance(typeof d.balance === "number" ? d.balance : null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <>
       {/* Desktop sidebar: hidden below lg */}
       <aside
+        data-tour="sidebar-collapse"
         className={`hidden lg:flex flex-col border-r border-white/[0.06] bg-bg-secondary transition-all duration-200 ${
           collapsed ? "w-14" : "w-[220px]"
         }`}
@@ -299,6 +359,7 @@ export function Sidebar({
           trialDaysLeft={trialDaysLeft}
           isFounderUser={isFounderUser}
           collapsed={collapsed}
+          creditBalance={creditBalance}
           onToggleCollapse={() => setCollapsed((c) => !c)}
         />
       </aside>
@@ -347,6 +408,7 @@ export function Sidebar({
           subscriptionStatus={subscriptionStatus}
           trialDaysLeft={trialDaysLeft}
           isFounderUser={isFounderUser}
+          creditBalance={creditBalance}
           onNavClick={() => setOpen(false)}
         />
       </aside>

@@ -26,6 +26,7 @@ import { healthColor, type Health } from "@/lib/ops/metrics";
 import { addOpsTask, toggleOpsTask } from "../actions";
 import { OpsTile, OpsEmpty } from "./ops-tile";
 import { healthChip, relativeTime } from "./state";
+import { BetaCodesPanel } from "./beta-codes-panel";
 
 // ─── (f) Roadmap / milestone strip — hardcoded const for v1 ──────────────────
 type MilestoneStatus = "done" | "upcoming" | "at-risk" | "overdue";
@@ -171,6 +172,11 @@ export function OpsCockpit() {
               <RecentSignupsTile data={data} />
             </div>
             <TotalBurnTile data={data} />
+          </div>
+
+          {/* ─── Row 4: beta codes (full width) ──────────────────────────── */}
+          <div className="mt-4">
+            <BetaCodesPanel />
           </div>
         </>
       )}

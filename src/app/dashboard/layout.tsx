@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { UpgradeToast } from "./upgrade-toast";
+import { DashboardTour } from "@/components/dashboard-tour";
 import { auth } from "@/lib/auth";
 import { isFounder } from "@/lib/founder";
 import { getUserPrefs } from "@/lib/user-prefs";
+import { checkSubscription } from "@/lib/subscription";
 
 export default async function DashboardLayout({
   children,
@@ -26,6 +28,11 @@ export default async function DashboardLayout({
     if (prefs.university === "") {
       redirect("/onboarding");
     }
+    // Subscription gate: no active subscription or trial → activation flow.
+    const access = await checkSubscription(email);
+    if (!access.allow) {
+      redirect("/onboarding?activate=1");
+    }
   }
 
   return (
@@ -36,6 +43,7 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
       <UpgradeToast />
+      <DashboardTour />
     </div>
   );
 }
