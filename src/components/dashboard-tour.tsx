@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 interface TourStep {
   target: string; // data-tour value
@@ -95,7 +95,15 @@ function TooltipCard({
   onSkip: () => void;
 }) {
   const TOOLTIP_W = 280;
-  const TOOLTIP_H = 140;
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Measure the real card height (description length varies per step) so the
+  // viewport clamp below never lets the Back/Next footer spill off-screen.
+  const [measuredH, setMeasuredH] = useState(170);
+  useLayoutEffect(() => {
+    const h = cardRef.current?.offsetHeight;
+    if (h && Math.abs(h - measuredH) > 1) setMeasuredH(h);
+  });
+  const TOOLTIP_H = measuredH;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
 
@@ -128,6 +136,7 @@ function TooltipCard({
 
   return (
     <div
+      ref={cardRef}
       role="dialog"
       aria-label={`Tour step ${stepIndex + 1} of ${total}: ${step.title}`}
       style={{ position: "fixed", top, left, width: TOOLTIP_W, zIndex: 10001 }}

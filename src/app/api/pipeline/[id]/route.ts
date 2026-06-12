@@ -56,14 +56,28 @@ export async function POST(
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Unique violation = a concurrent add won the race — idempotent success,
+      // same as the existing-row short-circuit above.
+      if (error.code === "23505") {
+        return NextResponse.json({
+          contact_id: contactId,
+          stage: "researched",
+          already_exists: true,
+        });
+      }
+      throw new Error(error.message);
+    }
 
     return NextResponse.json({
       contact_id: contactId,
       pipeline_id: entry.id,
       stage: entry.stage,
     });
-  } catch {
+  } catch (err) {
+    // Surface the real failure in server logs — a silent catch hid a broken
+    // unique constraint here for weeks.
+    console.error("Pipeline add error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
       { error: "Failed to add to pipeline" },
       { status: 500 },

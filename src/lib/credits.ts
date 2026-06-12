@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { CREDIT_COSTS, CREDIT_ALLOTMENTS, type CreditAction } from "@/lib/credit-costs";
+
+// Re-export so existing server imports from "@/lib/credits" keep working.
+export { CREDIT_COSTS, CREDIT_ALLOTMENTS };
+export type { CreditAction };
 
 /**
  * Credit metering. A second gate (on top of requireSubscription) over the
@@ -10,24 +15,6 @@ import { supabase } from "@/lib/supabase";
  * Postgres functions so deduct-if-sufficient is race-free (see the
  * add_paywall_credits_onboarding migration).
  */
-
-export type CreditAction = "enrich" | "discover" | "draft" | "resume";
-
-/** Credit cost per action. enrich is charged once PER CONTACT. Tune freely. */
-export const CREDIT_COSTS: Record<CreditAction, number> = {
-  enrich: 1,
-  discover: 5,
-  draft: 1,
-  resume: 2,
-};
-
-/** Credits granted by each source. Beta code is a one-time bundle; plans refill
- * monthly to their allotment. Tune freely. */
-export const CREDIT_ALLOTMENTS = {
-  betaCode: 50,
-  monthly: 200,
-  annual: 200,
-} as const;
 
 export type SpendResult =
   | { ok: true; balance: number }

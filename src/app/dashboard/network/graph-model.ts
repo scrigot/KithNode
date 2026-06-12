@@ -35,6 +35,7 @@ export interface GraphData {
 export interface NetworkStats {
   contacts: number;
   warmPaths: number;
+  kith: number;
   hot: number;
   warm: number;
   monitor: number;
@@ -84,7 +85,7 @@ function affGlyph(name: string): string {
 function tierRadius(tier: Tier, score: number): number {
   // Size by warmth; tier sets a floor so hot reads big even with sparse data.
   const base = 8 + (Math.max(0, Math.min(100, score)) / 100) * 8;
-  const floor = tier === "hot" ? 12 : tier === "warm" ? 10 : 8;
+  const floor = tier === "kith" ? 14 : tier === "hot" ? 12 : tier === "warm" ? 10 : 8;
   return Math.max(base, floor);
 }
 
@@ -118,7 +119,7 @@ export function buildGraph(
   const affTargets = new Map<string, Set<string>>(); // affNodeId -> contactIds
   const targetScore = new Map<string, number>(); // targetId -> score (O(1) lookup)
 
-  const tiers = { hot: 0, warm: 0, monitor: 0, cold: 0 };
+  const tiers = { kith: 0, hot: 0, warm: 0, monitor: 0, cold: 0 };
   let scoreSum = 0;
   let warmPaths = 0;
 
@@ -219,6 +220,7 @@ export function buildGraph(
   const stats: NetworkStats = {
     contacts: contacts.length,
     warmPaths,
+    kith: tiers.kith,
     hot: tiers.hot,
     warm: tiers.warm,
     monitor: tiers.monitor,

@@ -5,8 +5,10 @@ import * as Sentry from "@sentry/nextjs";
 import { ContactsList } from "./contacts-list";
 import { RefreshCw, Sparkles, Square, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { CreditCost } from "@/components/credit-cost";
 
 interface TierCounts {
+  kith: number;
   hot: number;
   warm: number;
   monitor: number;
@@ -33,7 +35,7 @@ export default function ContactsPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        const counts: TierCounts = { hot: 0, warm: 0, monitor: 0, cold: 0, total: 0 };
+        const counts: TierCounts = { kith: 0, hot: 0, warm: 0, monitor: 0, cold: 0, total: 0 };
         for (const c of data || []) {
           const t = (c?.score?.tier || "cold").toLowerCase();
           if (t in counts) counts[t as keyof Omit<TierCounts, "total">]++;
@@ -156,6 +158,7 @@ export default function ContactsPage() {
             >
               <Sparkles size={10} />
               Enrich All
+              <CreditCost action="enrich" per="each" />
             </button>
           )}
           <button
@@ -172,7 +175,15 @@ export default function ContactsPage() {
 
       {/* Tier counts strip */}
       {tierCounts && tierCounts.total > 0 && (
-        <div className="mt-3 grid grid-cols-5 gap-2">
+        <div className="mt-3 grid grid-cols-6 gap-2">
+          <div className="border border-amber-400/40 bg-amber-400/5 px-3 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-amber-300">
+              KITH
+            </p>
+            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-amber-300">
+              {tierCounts.kith}
+            </p>
+          </div>
           <div className="border border-white/[0.06] bg-card px-3 py-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
               Total

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Lock, Star, Trash2 } from "lucide-react";
+import { CreditCost } from "@/components/credit-cost";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedContact } from "@/lib/api";
@@ -11,6 +12,7 @@ import { composeWhyNow } from "@/lib/why-now";
 type WarmSignalContact = RankedContact & { isRedacted?: boolean };
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "bg-amber-400/15 text-amber-300 border-amber-400/40",
   hot: "bg-red-500/15 text-red-400 border-red-500/20",
   warm: "bg-blue-500/15 text-blue-400 border-blue-500/20",
   monitor: "bg-amber-500/15 text-amber-400 border-amber-500/20",
@@ -18,6 +20,7 @@ const TIER_STYLES: Record<string, string> = {
 };
 
 const TIER_LABELS: Record<string, string> = {
+  kith: "KITH",
   hot: "HOT",
   warm: "WARM",
   monitor: "MONITOR",
@@ -79,7 +82,9 @@ export function WarmSignalCard({
   // Defensive casts for relationship fields that may not yet be in RankedContact type.
   const contactRel = contact as unknown as Record<string, unknown>;
   const isFriend = typeof contactRel.is_friend === "boolean" ? contactRel.is_friend : false;
+  const speakFrequency = typeof contactRel.speak_frequency === "string" ? contactRel.speak_frequency : "";
   const lastSpokenAt = typeof contactRel.last_spoken_at === "string" ? contactRel.last_spoken_at : "";
+  const isDormant = typeof contactRel.dormant === "boolean" ? contactRel.dormant : false;
   const spokeDays =
     lastSpokenAt
       ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
@@ -223,26 +228,31 @@ export function WarmSignalCard({
         </div>
       </div>
 
-      {/* Score breakdown bars */}
+      {/* Score breakdown */}
       <div className="mt-3 space-y-1">
         <ScoreBar
           label="FIT"
           value={contact.score.fit_score}
-          max={50}
+          max={100}
           color="bg-accent-blue"
         />
-        <ScoreBar
-          label="SIG"
-          value={contact.score.signal_score}
-          max={30}
-          color="bg-accent-orange"
-        />
-        <ScoreBar
-          label="ENG"
-          value={contact.score.engagement_score}
-          max={20}
-          color="bg-accent-green"
-        />
+        {/* Relationship line */}
+        {(isFriend || speakFrequency || spokeDays !== null || isDormant) && (
+          <div className="flex items-center gap-2 pt-0.5 text-[10px] text-muted-foreground">
+            {isFriend && (
+              <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
+            )}
+            {speakFrequency && <span>{speakFrequency}</span>}
+            {spokeDays !== null && spokeDays >= 0 && (
+              <span>spoke {spokeDays}d ago</span>
+            )}
+            {isDormant && (
+              <span className="border border-amber-400/40 bg-amber-400/10 px-1 py-px text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                DORMANT
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Bottom row: Affiliations + Actions */}
@@ -320,6 +330,7 @@ export function WarmSignalCard({
                   }}
                 >
                   DRAFT
+                  <CreditCost action="draft" className="ml-1" />
                 </Button>
               )}
               {onDelete && (

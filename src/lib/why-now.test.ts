@@ -57,3 +57,21 @@ describe("composeWhyNow", () => {
     );
   });
 });
+
+describe("dormant kith reconnect line", () => {
+  it("overrides every prospecting angle with the reconnect copy", () => {
+    const line = composeWhyNow({
+      affiliations: ["Target Firm", "Same School"],
+      firm: "Goldman Sachs",
+      dormant: true,
+      daysQuiet: 94,
+    });
+    expect(line).toContain("94 days quiet");
+    expect(line).toContain("kith");
+    expect(line).not.toContain("target firms");
+  });
+
+  it("handles a missing daysQuiet gracefully", () => {
+    expect(composeWhyNow({ affiliations: [], dormant: true })).toContain("gone quiet");
+  });
+});

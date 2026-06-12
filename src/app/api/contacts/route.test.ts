@@ -46,45 +46,22 @@ describe("GET /api/contacts", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns contacts from Supabase", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
-
+  // Wires the route's three list queries: AlumniContact (select→eq→order),
+  // UserDiscover (select→eq→eq), PipelineEntry (select→eq).
+  function mockListQueries(contacts: Record<string, unknown>[], pipeline: Record<string, unknown>[] = []) {
     let callCount = 0;
     mockFrom.mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        // AlumniContact own contacts
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              order: vi.fn(() =>
-                Promise.resolve({
-                  data: [
-                    {
-                      id: "1",
-                      name: "Jane Doe",
-                      title: "Analyst",
-                      warmthScore: 65,
-                      tier: "warm",
-                      linkedInUrl: "",
-                      education: "",
-                      location: "",
-                      affiliations: "",
-                      university: "",
-                      firmName: "GS",
-                      importedByUserId: "test@unc.edu",
-                      createdAt: "2026-06-11T12:00:00.000Z",
-                    },
-                  ],
-                  error: null,
-                }),
-              ),
+              order: vi.fn(() => Promise.resolve({ data: contacts, error: null })),
             })),
           })),
         };
       }
       if (callCount === 2) {
-        // UserDiscover
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -93,17 +70,77 @@ describe("GET /api/contacts", () => {
           })),
         };
       }
+      if (callCount === 3) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: pipeline, error: null })),
+          })),
+        };
+      }
       return makeSelectChain([], { withOrder: true });
     });
+  }
+
+  const baseContact = {
+    title: "Analyst",
+    linkedInUrl: "",
+    education: "",
+    location: "",
+    affiliations: "",
+    university: "",
+    firmName: "GS",
+    importedByUserId: "test@unc.edu",
+    createdAt: "2026-06-11T12:00:00.000Z",
+  };
+
+  it("returns contacts from Supabase", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockListQueries([
+      { ...baseContact, id: "1", name: "Jane Doe", warmthScore: 65, tier: "warm" },
+    ]);
 
     const response = await GET();
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body).toHaveLength(1);
     expect(body[0].name).toBe("Jane Doe");
-    expect(body[0]).toHaveProperty("score");
+    // Two-axis model: the score IS the raw affiliation fit.
     expect(body[0].score.fit_score).toBe(65);
+    expect(body[0].score.total_score).toBe(65);
+    expect(body[0].relationship_class).toBe("");
+    expect(body[0].score.tier).toBe("warm");
     // created_at is surfaced for the Warm Signals "Newest" sort.
     expect(body[0].created_at).toBe("2026-06-11T12:00:00.000Z");
+  });
+
+  it("kith outranks every fit tier: friend sorts first and tier reads kith", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockListQueries([
+      { ...baseContact, id: "stranger", name: "Perfect Stranger", warmthScore: 100, tier: "hot" },
+      { ...baseContact, id: "friend", name: "Cooper", warmthScore: 60, tier: "warm", isFriend: true },
+    ]);
+
+    const response = await GET();
+    const body = await response.json();
+    expect(body[0].id).toBe("friend");
+    expect(body[0].score.tier).toBe("kith");
+    expect(body[0].relationship_class).toBe("kith");
+    // The stranger keeps the full fit score + hot tier right below the class.
+    expect(body[1].id).toBe("stranger");
+    expect(body[1].score.tier).toBe("hot");
+    expect(body[1].score.total_score).toBe(100);
+  });
+
+  it("a responded pipeline stage promotes to kith", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockListQueries(
+      [{ ...baseContact, id: "replied", name: "Replied Guy", warmthScore: 70, tier: "warm" }],
+      [{ contactId: "replied", stage: "responded" }],
+    );
+
+    const response = await GET();
+    const body = await response.json();
+    expect(body[0].relationship_class).toBe("kith");
+    expect(body[0].score.tier).toBe("kith");
   });
 });

@@ -15,6 +15,7 @@ import {
 import { Upload, Link2, AlertTriangle, Sparkles, X } from "lucide-react";
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",

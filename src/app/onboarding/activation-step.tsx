@@ -40,9 +40,9 @@ const PLANS: {
     name: "Annual",
     price: "$120",
     cadence: "/yr",
-    sub: "7-day free trial, then $10/mo billed annually",
+    sub: "$10/mo, billed annually",
     badge: "Save $60",
-    cta: "Start 7-day free trial",
+    cta: "Subscribe · $120/yr",
     highlight: true,
     features: [
       "Everything in Monthly",
@@ -266,9 +266,8 @@ export function ActivationStep() {
       )}
 
       <p className="border border-white/[0.06] bg-bg-card px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-        The annual plan includes a 7-day free trial. You won&apos;t be charged
-        until it ends. Monthly is charged immediately. Cancel anytime. Payments
-        are securely processed by Stripe.
+        Both plans are charged immediately. Cancel anytime. Payments are
+        securely processed by Stripe.
       </p>
     </div>
   );

@@ -44,6 +44,7 @@ import {
   Upload,
   Loader2,
 } from "lucide-react";
+import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
 
 const TOTAL_STEPS = 5;
@@ -679,6 +680,7 @@ function EditPanel({
               <>
                 <Upload className="h-3.5 w-3.5" />
                 Upload PDF
+                <CreditCost action="resume" />
               </>
             )}
             <input

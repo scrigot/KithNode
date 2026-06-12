@@ -9,8 +9,9 @@ import { X, Star, Search, Sparkles, Loader2, GraduationCap, RefreshCw } from "lu
 import { IntroModal } from "./intro-modal";
 import { DeckCard, type DeckContact, type WarmPath } from "./deck-card";
 import { ALL_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
+import { CreditCost } from "@/components/credit-cost";
 
-const TIERS = ["HOT", "WARM", "MONITOR", "COLD"] as const;
+const TIERS = ["KITH", "HOT", "WARM", "MONITOR", "COLD"] as const;
 
 type SourceFilter = "alumni" | "professor" | "student";
 
@@ -698,6 +699,7 @@ export default function DiscoverPage() {
               <Sparkles className="h-3 w-3" />
             )}
             {discoverLoading ? "Discovering" : "Discover New"}
+            {!discoverLoading && <CreditCost action="discover" />}
           </button>
         )}
       </div>

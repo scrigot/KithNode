@@ -57,6 +57,7 @@ import {
   Network,
   Lock,
 } from "lucide-react";
+import { CreditCost } from "@/components/credit-cost";
 
 // Contacts are POSTed to /api/import/linkedin in batches so the client can
 // render a determinate progress bar instead of one long opaque request.
@@ -862,8 +863,11 @@ function OnboardingFunnel() {
     "Here are the people who already share your school, Greek org, or clubs.";
 
   return (
-    <div className="min-h-screen bg-bg-primary px-4 py-8">
-      <div className="mx-auto w-full max-w-2xl">
+    <div className="flex min-h-screen flex-col bg-bg-primary px-4 py-8">
+      {/* my-auto centers the board vertically when the step is short; for tall
+          steps the auto margins collapse so it top-aligns and the page scrolls
+          (no clipping). max-w-4xl makes the board noticeably larger. */}
+      <div className="mx-auto my-auto w-full max-w-4xl">
         {/* Header */}
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
@@ -1246,6 +1250,7 @@ function OnboardingFunnel() {
                       <>
                         <Upload className="h-3.5 w-3.5" />
                         Upload PDF
+                        <CreditCost action="resume" />
                       </>
                     )}
                     <input

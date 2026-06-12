@@ -2,9 +2,10 @@
 
 import { Input } from "@/components/ui/input";
 
-const TIERS = ["all", "hot", "warm", "monitor", "cold"] as const;
+const TIERS = ["all", "kith", "hot", "warm", "monitor", "cold"] as const;
 
 const TIER_BUTTON_STYLES: Record<string, string> = {
+  kith: "data-[active=true]:bg-amber-400/20 data-[active=true]:text-amber-300 data-[active=true]:border-amber-400/40",
   hot: "data-[active=true]:bg-red-500/20 data-[active=true]:text-red-400 data-[active=true]:border-red-500/30",
   warm: "data-[active=true]:bg-blue-500/20 data-[active=true]:text-blue-400 data-[active=true]:border-blue-500/30",
   monitor: "data-[active=true]:bg-amber-500/20 data-[active=true]:text-amber-400 data-[active=true]:border-amber-500/30",

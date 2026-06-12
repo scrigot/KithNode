@@ -50,6 +50,7 @@ const STAGE_BADGE_COLORS: Record<string, string> = {
 };
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",
@@ -57,6 +58,7 @@ const TIER_STYLES: Record<string, string> = {
 };
 
 const TIER_BADGE_STYLES: Record<string, string> = {
+  kith: "bg-amber-300/20 text-amber-300 border-amber-300/30",
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
   warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -298,7 +300,7 @@ function PipelineCard({
         <Link
           href={`/contact/${contact.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="truncate text-[13px] font-bold text-foreground hover:underline hover:decoration-white/40"
+          className="min-w-0 break-words text-[13px] font-bold leading-snug text-foreground hover:underline hover:decoration-white/40"
         >
           {contact.name}
         </Link>
@@ -307,7 +309,7 @@ function PipelineCard({
         </span>
       </div>
 
-      <p className="mt-1 truncate text-[11px] text-muted-foreground">
+      <p className="mt-1 break-words text-[11px] leading-snug text-muted-foreground">
         {contact.title}
         {contact.title && contact.company_name ? " @ " : ""}
         <span className="text-foreground">{contact.company_name}</span>
@@ -342,15 +344,7 @@ function PipelineCard({
       </div>
 
       {contact.warmPaths && contact.warmPaths.length > 0 && (
-        <p
-          className="mt-1.5 truncate border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[9px] text-primary"
-          title={contact.warmPaths
-            .map(
-              (wp) =>
-                `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.firmName}`,
-            )
-            .join(" · ")}
-        >
+        <p className="mt-1.5 break-words border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[9px] leading-snug text-primary">
           <span className="text-muted-foreground">via </span>
           {contact.warmPaths[0].intermediaryName}
           {contact.warmPaths.length > 1 && (
@@ -363,8 +357,8 @@ function PipelineCard({
       )}
 
       {contact.affiliations.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-0.5">
-          {contact.affiliations.slice(0, 2).map((a) => (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {contact.affiliations.map((a) => (
             <Badge
               key={a}
               variant="outline"
@@ -373,11 +367,6 @@ function PipelineCard({
               {a}
             </Badge>
           ))}
-          {contact.affiliations.length > 2 && (
-            <span className="text-[8px] text-muted-foreground/60">
-              +{contact.affiliations.length - 2}
-            </span>
-          )}
         </div>
       )}
 
@@ -652,7 +641,7 @@ export default function PipelinePage() {
 
       {/* Horizontal 6-col kanban */}
       <div className="mt-3 flex-1 overflow-x-auto">
-        <div className="grid min-w-[1200px] grid-cols-6 gap-2">
+        <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(6, 320px)" }}>
           {data.stages.map((stage, stageIndex) => {
             const contacts = data.contacts[stage] || [];
             return (

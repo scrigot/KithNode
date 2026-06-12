@@ -16,8 +16,10 @@ import { EditProfileModal } from "./edit-profile-modal";
 import { trackEvent } from "@/lib/posthog";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 import type { ContactDetail } from "@/lib/api";
+import { CreditCost } from "@/components/credit-cost";
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "bg-amber-400/15 text-amber-300 border-amber-400/40",
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
   warm: "bg-green-500/20 text-green-400 border-green-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -58,8 +60,30 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function ScoreSection({ score }: { score: ContactDetail["score"] }) {
+function ScoreSection({
+  score,
+  isFriend,
+  speakFrequency,
+  lastSpokenAt,
+  pipelineStage,
+  relationshipClass,
+  dormant,
+}: {
+  score: ContactDetail["score"];
+  isFriend?: boolean;
+  speakFrequency?: string;
+  lastSpokenAt?: string;
+  pipelineStage?: string;
+  relationshipClass?: string;
+  dormant?: boolean;
+}) {
   if (!score) return null;
+
+  const spokeDays =
+    lastSpokenAt
+      ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
+      : null;
+
   return (
     <div className="border border-border bg-card p-4">
       <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -83,37 +107,74 @@ function ScoreSection({ score }: { score: ContactDetail["score"] }) {
           <div className="flex justify-between text-[10px]">
             <span className="text-muted-foreground">FIT</span>
             <span className="tabular-nums text-accent-blue">
-              {Math.round(score.fit_score)}/50
+              {Math.round(score.fit_score)}/100
             </span>
           </div>
           <Progress
-            value={(score.fit_score / 50) * 100}
+            value={score.fit_score}
             className="h-1.5 bg-muted [&>div]:bg-accent-blue"
           />
         </div>
-        <div>
-          <div className="flex justify-between text-[10px]">
-            <span className="text-muted-foreground">SIGNAL</span>
-            <span className="tabular-nums text-accent-amber">
-              {Math.round(score.signal_score)}/30
+      </div>
+
+      {/* Relationship panel */}
+      <div className="mt-3 border border-border bg-background/40 p-3">
+        <h4 className="mb-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+          RELATIONSHIP
+        </h4>
+        <div className="space-y-1 text-[10px]">
+          <div className="flex items-center gap-2">
+            {relationshipClass === "kith" ? (
+              <span className="border border-amber-400/40 bg-amber-400/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                KITH
+              </span>
+            ) : (
+              <span className="border border-zinc-500/30 bg-zinc-500/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                SIGNAL
+              </span>
+            )}
+            {isFriend && (
+              <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span>
+              Friend:{" "}
+              <span className={isFriend ? "text-accent-teal" : "text-foreground"}>
+                {isFriend ? "Yes" : "No"}
+              </span>
+            </span>
+            {speakFrequency && (
+              <span>
+                Frequency: <span className="text-foreground">{speakFrequency}</span>
+              </span>
+            )}
+          </div>
+          <div className="text-muted-foreground">
+            Last spoke:{" "}
+            <span className="text-foreground">
+              {spokeDays !== null && !Number.isNaN(spokeDays) && spokeDays >= 0
+                ? `${spokeDays}d ago`
+                : "Not logged"}
             </span>
           </div>
-          <Progress
-            value={(score.signal_score / 30) * 100}
-            className="h-1.5 bg-muted [&>div]:bg-accent-amber"
-          />
-        </div>
-        <div>
-          <div className="flex justify-between text-[10px]">
-            <span className="text-muted-foreground">ENGAGEMENT</span>
-            <span className="tabular-nums text-accent-green">
-              {Math.round(score.engagement_score)}/20
-            </span>
-          </div>
-          <Progress
-            value={(score.engagement_score / 20) * 100}
-            className="h-1.5 bg-muted [&>div]:bg-accent-green"
-          />
+          {pipelineStage && (
+            <div className="text-muted-foreground">
+              Pipeline: <span className="font-bold uppercase text-foreground">{pipelineStage}</span>
+            </div>
+          )}
+          {dormant && (
+            <div className="mt-1 flex items-center gap-2">
+              <span className="border border-amber-400/40 bg-amber-400/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                DORMANT
+              </span>
+              {spokeDays !== null && !Number.isNaN(spokeDays) && (
+                <span className="text-muted-foreground">
+                  Reconnect - {spokeDays}d quiet
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -403,6 +464,9 @@ export default function ContactDetailPage() {
     isFriend?: boolean;
     speakFrequency?: string;
     lastSpokenAt?: string;
+    relationship_class?: string;
+    dormant?: boolean;
+    pipeline_stage?: string;
   };
 
   return (
@@ -489,10 +553,11 @@ export default function ContactDetailPage() {
         ) : (
           <Button
             variant="outline"
-            className="text-xs text-primary hover:bg-primary hover:text-primary-foreground"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
             onClick={() => setShowOutreach(true)}
           >
             DRAFT OUTREACH
+            <CreditCost action="draft" />
           </Button>
         )}
       </div>
@@ -549,7 +614,15 @@ export default function ContactDetailPage() {
       {tab === "signals" && (
         <div className="space-y-4">
           {/* Score */}
-          <ScoreSection score={contact.score} />
+          <ScoreSection
+            score={contact.score}
+            isFriend={contactExt.isFriend}
+            speakFrequency={contactExt.speakFrequency}
+            lastSpokenAt={contactExt.lastSpokenAt}
+            pipelineStage={contactExt.pipeline_stage}
+            relationshipClass={contactExt.relationship_class}
+            dormant={contactExt.dormant}
+          />
 
           {/* Signals */}
           <div className="border border-border bg-card p-4">
