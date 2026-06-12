@@ -3,74 +3,40 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
-import { X, Star, Search, Layers, Sparkles, Loader2, GraduationCap, RefreshCw, Lock } from "lucide-react";
+import { X, Star, Search, Sparkles, Loader2, GraduationCap, RefreshCw } from "lucide-react";
 import { IntroModal } from "./intro-modal";
-
-const TIER_STYLES: Record<string, string> = {
-  hot: "bg-red-500/20 text-red-400 border-red-500/30",
-  warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  cold: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-};
-
-const SCORE_STYLES: Record<string, string> = {
-  hot: "text-red-400",
-  warm: "text-blue-400",
-  monitor: "text-amber-400",
-  cold: "text-zinc-400",
-};
+import { DeckCard, type DeckContact, type WarmPath } from "./deck-card";
+import { ALL_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
 
 const TIERS = ["HOT", "WARM", "MONITOR", "COLD"] as const;
 
-interface WarmPath {
-  intermediaryName: string;
-  intermediaryRelation: string;
-  firmName: string;
-  title: string;
-}
-
-interface Contact {
-  id: string;
-  name: string;
-  title: string;
-  firmName: string;
-  email: string;
-  linkedInUrl: string;
-  education: string;
-  location: string;
-  warmthScore: number;
-  tier: string;
-  affiliations: string;
-  source: string;
-  warmPaths?: WarmPath[];
-  isRedacted?: boolean;
-}
-
-type ViewMode = "browse" | "search";
 type SourceFilter = "alumni" | "professor" | "student";
+
+interface RateResult {
+  ok: boolean;
+  contact?: DeckContact | null;
+}
 
 async function rateContact(
   contactId: string,
-  rating: "high_value" | "skip",
-): Promise<boolean> {
+  rating: "high_value" | "skip" | "later",
+): Promise<RateResult> {
   try {
     const res = await apiFetch("/api/discover/rate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contactId, rating }),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const data = await res.json();
+    return { ok: true, contact: data.contact ?? null };
   } catch (err) {
     Sentry.captureException(err);
-    return false;
+    return { ok: false };
   }
 }
-
-const warmPathFiredRef = { current: false };
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
@@ -80,220 +46,10 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Shared card used in both Browse (triage) and Search (explore) modes.
-// Variant controls the footer buttons.
-function ContactCard({
-  contact,
-  variant,
-  focused,
-  onRate,
-  onAskIntro,
-  onAddToPipeline,
-  pipelineState,
-}: {
-  contact: Contact;
-  variant: "rate" | "explore";
-  focused?: boolean;
-  onRate?: (rating: "high_value" | "skip") => void;
-  onAskIntro?: (contact: Contact, warmPath: WarmPath) => void;
-  onAddToPipeline?: (contactId: string) => void;
-  pipelineState?: "idle" | "pending" | "added";
-}) {
-  const isProfessor = contact.source === "professor";
-  if (
-    contact.warmPaths &&
-    contact.warmPaths.length > 0 &&
-    !warmPathFiredRef.current
-  ) {
-    warmPathFiredRef.current = true;
-    trackEvent("first_warm_path_viewed", {
-      contact_id: contact.id,
-      warm_path_count: contact.warmPaths.length,
-    });
-  }
-
-  const tierKey = (contact.tier || "cold").toLowerCase();
-  const affiliationList = contact.affiliations
-    ? contact.affiliations.split(",").filter(Boolean)
-    : [];
-  const extraChipCount = Math.max(0, affiliationList.length - 3);
-
-  return (
-    <div
-      className={`flex flex-col border bg-card transition-colors ${
-        focused
-          ? "border-primary shadow-sm shadow-primary/20"
-          : "border-white/[0.06] hover:border-white/[0.12]"
-      }`}
-    >
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
-        <Badge
-          variant="outline"
-          className={`text-[9px] font-bold ${TIER_STYLES[tierKey] || TIER_STYLES.cold}`}
-        >
-          {(contact.tier || "COLD").toUpperCase()}
-        </Badge>
-        <span
-          className={`text-xl font-bold tabular-nums ${SCORE_STYLES[tierKey] || "text-zinc-400"}`}
-        >
-          {Math.round(contact.warmthScore || 0)}
-        </span>
-      </div>
-
-      <div className="flex-1 px-4 py-3">
-        <h3
-          className={`flex items-center gap-1 truncate text-[13px] font-bold ${
-            contact.isRedacted ? "text-muted-foreground/80" : "text-foreground"
-          }`}
-        >
-          {contact.isRedacted && <Lock className="h-3 w-3 shrink-0 opacity-70" />}
-          <span className="truncate">{contact.name}</span>
-        </h3>
-        {contact.isRedacted && (
-          <span className="mt-0.5 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
-            Blurred · Import to unlock
-          </span>
-        )}
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-          {contact.title}
-          {contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : ""}
-          <span className="text-foreground">{contact.firmName}</span>
-        </p>
-
-        {contact.warmPaths && contact.warmPaths.length > 0 && (
-          <button
-            type="button"
-            onClick={() =>
-              onAskIntro && onAskIntro(contact, contact.warmPaths![0])
-            }
-            disabled={!onAskIntro}
-            title={contact.warmPaths
-              .map(
-                (wp) =>
-                  `Via ${wp.intermediaryName} (${wp.intermediaryRelation}) -> ${wp.title} at ${wp.firmName}`,
-              )
-              .join(" · ")}
-            className="mt-2 block w-full truncate border border-primary/20 bg-primary/5 px-2 py-1 text-left font-mono text-[10px] text-primary enabled:hover:bg-primary/10 disabled:cursor-default"
-          >
-            <span className="text-muted-foreground">via </span>
-            {contact.warmPaths[0].intermediaryName}
-            <span className="text-muted-foreground"> -&gt; </span>
-            {contact.warmPaths[0].firmName}
-            {contact.warmPaths.length > 1 && (
-              <span className="text-muted-foreground">
-                {" "}
-                (+{contact.warmPaths.length - 1})
-              </span>
-            )}
-          </button>
-        )}
-
-        {affiliationList.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {affiliationList.slice(0, 3).map((a) => (
-              <span
-                key={a}
-                className="border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary"
-              >
-                {a.trim()}
-              </span>
-            ))}
-            {extraChipCount > 0 && (
-              <span className="px-1 py-0.5 text-[9px] text-muted-foreground/60">
-                +{extraChipCount}
-              </span>
-            )}
-          </div>
-        )}
-
-        {(contact.education || contact.location) && (
-          <div className="mt-2 space-y-0.5 text-[10px] text-muted-foreground">
-            {contact.education && <p className="truncate">{contact.education}</p>}
-            {contact.location && <p className="truncate">{contact.location}</p>}
-          </div>
-        )}
-      </div>
-
-      {variant === "rate" && onRate && (
-        <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
-          <button
-            onClick={() => onRate("skip")}
-            className="flex flex-1 items-center justify-center gap-1 border border-white/[0.12] py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
-            aria-label={`Skip ${contact.name}`}
-          >
-            <X className="h-3 w-3" />
-            SKIP
-          </button>
-          <button
-            onClick={() => onRate("high_value")}
-            className="flex flex-1 items-center justify-center gap-1 bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80"
-            aria-label={`Rate ${contact.name} high value`}
-          >
-            <Star className="h-3 w-3" />
-            HIGH VALUE
-          </button>
-        </div>
-      )}
-
-      {variant === "explore" && (
-        <div className="flex gap-1 border-t border-white/[0.06] px-2 py-2">
-          {contact.isRedacted ? (
-            <button
-              type="button"
-              disabled
-              className="flex flex-1 cursor-default items-center justify-center gap-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground/60"
-              title="Import contacts to reveal this profile"
-            >
-              <Lock className="h-3 w-3" />
-              IMPORT TO REVEAL
-            </button>
-          ) : contact.linkedInUrl ? (
-            <a
-              href={contact.linkedInUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
-            >
-              VIEW PROFILE
-            </a>
-          ) : (
-            <a
-              href={`https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(contact.name)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 border border-border bg-muted py-1.5 text-center text-[10px] font-bold text-muted-foreground hover:text-foreground"
-            >
-              SEARCH PROFILE
-            </a>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            className={`flex-1 text-[10px] font-bold ${
-              pipelineState === "added"
-                ? "border-green-500/30 text-green-400"
-                : "border-primary/30 text-primary hover:bg-primary/20"
-            }`}
-            disabled={pipelineState === "pending" || pipelineState === "added"}
-            onClick={() => onAddToPipeline && onAddToPipeline(contact.id)}
-          >
-            {pipelineState === "added"
-              ? "ADDED"
-              : pipelineState === "pending"
-                ? "..."
-                : "+ PIPELINE"}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main Page ─────────────────────────────────────────────────────
 export default function DiscoverPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<ViewMode>("browse");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(() => {
     const s = searchParams.get("source");
     if (s === "professor" || s === "student") return s;
@@ -301,12 +57,18 @@ export default function DiscoverPage() {
   });
   const [query, setQuery] = useState("");
   const [activeTier, setActiveTier] = useState<string>("");
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [total, setTotal] = useState(0);
+  // Optional career-track filter ("" = all tracks). Refetches the pool on change.
+  const [trackFilter, setTrackFilter] = useState<CareerTrack | "">("");
+
+  // The fetched deck (pre-sorted by warmthScore desc) and the local cursor.
+  const [deck, setDeck] = useState<DeckContact[]>([]);
+  const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
-  const [addingToPipeline, setAddingToPipeline] = useState<string | null>(null);
-  const [pipelineAdded, setPipelineAdded] = useState<Set<string>>(new Set());
+  const [reviewed, setReviewed] = useState(0);
+
+  // Card exit transition: "" | "left" (skip) | "right" (high value) | "down" (later).
+  const [exitDir, setExitDir] = useState<"" | "left" | "right" | "down">("");
 
   // Discover pipeline modal state: streamed NDJSON progress.
   const [discoverLoading, setDiscoverLoading] = useState(false);
@@ -330,41 +92,55 @@ export default function DiscoverPage() {
 
   // Intro modal state
   const [introTarget, setIntroTarget] = useState<{
-    contact: Contact;
+    contact: DeckContact;
     warmPath: WarmPath;
   } | null>(null);
   const [userName, setUserName] = useState("");
 
-  // Browse mode: list of unrated contacts. Rated cards are spliced out of state.
-  const [browseContacts, setBrowseContacts] = useState<Contact[]>([]);
-  const [allRated, setAllRated] = useState(false);
+  // High-value confirm reveal: the unlocked contact shown after a positive
+  // rating, awaiting "keep browsing" or "send to pipeline".
+  const [confirmCard, setConfirmCard] = useState<DeckContact | null>(null);
+  const [pipelineSendState, setPipelineSendState] = useState<"idle" | "pending" | "sent">("idle");
   const ratingLockRef = useRef(false);
 
-  const search = useCallback(
-    async (q: string, tier: string, src: SourceFilter) => {
+  const fetchDeck = useCallback(
+    async (q: string, tier: string, src: SourceFilter, track: string) => {
       setLoading(true);
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (tier) params.set("tier", tier.toLowerCase());
       params.set("source", src);
+      if (track) params.set("track", track);
       const qs = params.toString();
 
       try {
         const res = await apiFetch(`/api/discover${qs ? `?${qs}` : ""}`);
         if (!res.ok) throw new Error();
         const data = await res.json();
-        setContacts(data.contacts || []);
-        setTotal(data.total || 0);
+        const next: DeckContact[] = data.contacts || [];
+        setDeck(next);
+        setIndex(0);
+        setReviewed(0);
+        setConfirmCard(null);
+        setPipelineSendState("idle");
 
-        if (!q && !tier && (data.contacts || []).length === 0) {
+        // "No network" only when the user truly has no imports — an exhausted
+        // pool (rated everyone) or an empty search must NOT read as no-network.
+        if (
+          !q &&
+          !tier &&
+          next.length === 0 &&
+          (data.total || 0) === 0 &&
+          (data.networkSize || 0) === 0
+        ) {
           setHasAnyContacts(false);
         } else {
           setHasAnyContacts(true);
         }
       } catch (err) {
-    Sentry.captureException(err);
-        setContacts([]);
-        setTotal(0);
+        Sentry.captureException(err);
+        setDeck([]);
+        setIndex(0);
       } finally {
         setLoading(false);
       }
@@ -372,80 +148,149 @@ export default function DiscoverPage() {
     [],
   );
 
-  const fetchBrowseContacts = useCallback(async (src: SourceFilter) => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/discover?source=${src}`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const unrated: Contact[] = data.contacts || [];
-
-      setAllRated(unrated.length === 0);
-      setBrowseContacts(unrated);
-      setHasAnyContacts(unrated.length > 0 || (data.total || 0) > 0);
-    } catch (err) {
-    Sentry.captureException(err);
-      setBrowseContacts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Search mode: debounced search
+  // Debounced refetch on any filter change. Resets the deck index to 0.
   useEffect(() => {
-    if (mode !== "search") return;
     const timer = setTimeout(() => {
-      search(query, activeTier, sourceFilter);
+      fetchDeck(query, activeTier, sourceFilter, trackFilter);
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, activeTier, search, mode, sourceFilter]);
+  }, [query, activeTier, sourceFilter, trackFilter, fetchDeck]);
 
-  // Browse mode: load contacts
+  const current = deck[index] ?? null;
+  const exhausted = !loading && deck.length > 0 && index >= deck.length && !confirmCard;
+
+  // Fire the first-warm-path analytics event once, the first time a card with a
+  // warm path becomes the active card.
+  const warmPathFiredRef = useRef(false);
   useEffect(() => {
-    if (mode !== "browse") return;
-    fetchBrowseContacts(sourceFilter);
-  }, [mode, fetchBrowseContacts, sourceFilter]);
-
-  const handleRate = useCallback(
-    (contactId: string, rating: "high_value" | "skip") => {
-      if (ratingLockRef.current) return;
-      ratingLockRef.current = true;
-
-      rateContact(contactId, rating);
-      trackEvent("discover_rate", { contact_id: contactId, rating });
-
-      setBrowseContacts((prev) => {
-        const next = prev.filter((c) => c.id !== contactId);
-        if (next.length === 0) setAllRated(true);
-        return next;
+    if (warmPathFiredRef.current) return;
+    if (current && current.warmPaths && current.warmPaths.length > 0) {
+      warmPathFiredRef.current = true;
+      trackEvent("first_warm_path_viewed", {
+        contact_id: current.id,
+        warm_path_count: current.warmPaths.length,
       });
+    }
+  }, [current]);
 
-      setTimeout(() => {
-        ratingLockRef.current = false;
-      }, 80);
+  /** Advance the cursor with a directional slide, then settle. */
+  const advance = useCallback((dir: "left" | "right" | "down") => {
+    setExitDir(dir);
+    setTimeout(() => {
+      setIndex((i) => i + 1);
+      setReviewed((r) => r + 1);
+      setExitDir("");
+    }, 200);
+  }, []);
+
+  const handleSkip = useCallback(() => {
+    if (ratingLockRef.current || !current) return;
+    ratingLockRef.current = true;
+    trackEvent("discover_rate", { contact_id: current.id, rating: "skip" });
+    // Skip: fire-and-forget, advance immediately with a left slide.
+    rateContact(current.id, "skip");
+    advance("left");
+    setTimeout(() => {
+      ratingLockRef.current = false;
+    }, 220);
+  }, [current, advance]);
+
+  const handleLater = useCallback(() => {
+    if (ratingLockRef.current || !current) return;
+    ratingLockRef.current = true;
+    trackEvent("discover_rate", { contact_id: current.id, rating: "later" });
+    // Later: fire-and-forget, advance immediately with a down slide.
+    rateContact(current.id, "later");
+    advance("down");
+    setTimeout(() => {
+      ratingLockRef.current = false;
+    }, 220);
+  }, [current, advance]);
+
+  const handleHighValue = useCallback(async () => {
+    if (ratingLockRef.current || !current) return;
+    ratingLockRef.current = true;
+    const target = current;
+    trackEvent("discover_rate", { contact_id: target.id, rating: "high_value" });
+    // High value: await the rate call so we get the unlocked contact back, then
+    // reveal it as the confirm card (slid in from the right).
+    const result = await rateContact(target.id, "high_value");
+    const unlocked: DeckContact = result.contact
+      ? { ...target, ...result.contact, isRedacted: false }
+      : { ...target, isRedacted: false };
+    setExitDir("right");
+    setTimeout(() => {
+      setIndex((i) => i + 1);
+      setReviewed((r) => r + 1);
+      setConfirmCard(unlocked);
+      setPipelineSendState("idle");
+      setExitDir("");
+      ratingLockRef.current = false;
+    }, 200);
+  }, [current]);
+
+  /** Dismiss the confirm reveal and continue the deck. */
+  const handleKeepBrowsing = useCallback(() => {
+    setConfirmCard(null);
+    setPipelineSendState("idle");
+  }, []);
+
+  /** Send the confirmed card to the pipeline, then continue. */
+  const handleSendToPipeline = useCallback(async () => {
+    if (!confirmCard) return;
+    const contactId = confirmCard.id;
+    setPipelineSendState("pending");
+    try {
+      const res = await apiFetch(`/api/pipeline/${contactId}`, { method: "POST" });
+      if (res.ok) {
+        trackEvent("discover_add_pipeline", { contact_id: contactId, source: "confirm_state" });
+        setPipelineSendState("sent");
+        setTimeout(() => {
+          setConfirmCard(null);
+          setPipelineSendState("idle");
+        }, 900);
+      } else {
+        setConfirmCard(null);
+        setPipelineSendState("idle");
+      }
+    } catch (err) {
+      Sentry.captureException(err);
+      setConfirmCard(null);
+      setPipelineSendState("idle");
+    }
+  }, [confirmCard]);
+
+  const handleAskIntro = useCallback(
+    (contact: DeckContact, warmPath: WarmPath) => {
+      setIntroTarget({ contact, warmPath });
     },
     [],
   );
 
-  // Keyboard: act on the top (first) unrated contact.
+  // Keyboard: ArrowLeft = skip, ArrowRight = high value, ArrowDown = later.
+  // Ignored while a request is in flight, a confirm card is showing, or any modal is open.
   useEffect(() => {
-    if (mode !== "browse" || allRated || browseContacts.length === 0) return;
+    const anyModalOpen =
+      introTarget !== null || discoverLoading || seedLoading;
+    if (anyModalOpen || confirmCard || !current) return;
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
-      const top = browseContacts[0];
-      if (!top) return;
-      if (e.key === "ArrowLeft" || e.key === "j" || e.key === "3") {
+      if (ratingLockRef.current) return;
+      if (e.key === "ArrowLeft") {
         e.preventDefault();
-        handleRate(top.id, "skip");
-      } else if (e.key === "ArrowRight" || e.key === "k" || e.key === "1") {
+        handleSkip();
+      } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        handleRate(top.id, "high_value");
+        handleHighValue();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        handleLater();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [mode, allRated, browseContacts, handleRate]);
+  }, [current, confirmCard, introTarget, discoverLoading, seedLoading, handleSkip, handleHighValue, handleLater]);
 
   // Fetch user name for intro modal
   useEffect(() => {
@@ -457,13 +302,6 @@ export default function DiscoverPage() {
       })
       .catch(() => {});
   }, []);
-
-  const handleAskIntro = useCallback(
-    (contact: Contact, warmPath: WarmPath) => {
-      setIntroTarget({ contact, warmPath });
-    },
-    [],
-  );
 
   const runDiscover = useCallback(async () => {
     if (discoverLoading) return;
@@ -554,11 +392,7 @@ export default function DiscoverPage() {
           imported: finalEvent.imported,
           updated: finalEvent.updated,
         });
-        if (mode === "browse") {
-          await fetchBrowseContacts(sourceFilter);
-        } else {
-          await search(query, activeTier, sourceFilter);
-        }
+        await fetchDeck(query, activeTier, sourceFilter, trackFilter);
       }
     } catch (err) {
       if ((err as Error)?.name === "AbortError") {
@@ -573,7 +407,7 @@ export default function DiscoverPage() {
       }, 1200);
       setTimeout(() => setDiscoverResult(null), 8000);
     }
-  }, [discoverLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+  }, [discoverLoading, fetchDeck, query, activeTier, sourceFilter, trackFilter]);
 
   const handleSourceFilter = useCallback((src: SourceFilter) => {
     setSourceFilter(src);
@@ -699,11 +533,7 @@ export default function DiscoverPage() {
         setSeedResult(
           `Scraped ${finalEvent.scraped} · Inserted ${finalEvent.inserted} · Updated ${finalEvent.updated}`,
         );
-        if (mode === "browse") {
-          await fetchBrowseContacts(sourceFilter);
-        } else {
-          await search(query, activeTier, sourceFilter);
-        }
+        await fetchDeck(query, activeTier, sourceFilter, trackFilter);
       }
     } catch (err) {
       if ((err as Error)?.name === "AbortError") {
@@ -718,7 +548,7 @@ export default function DiscoverPage() {
       }, 1200);
       setTimeout(() => setSeedResult(null), 8000);
     }
-  }, [seedLoading, mode, fetchBrowseContacts, search, query, activeTier, sourceFilter]);
+  }, [seedLoading, fetchDeck, query, activeTier, sourceFilter, trackFilter]);
 
   const cancelSeed = useCallback(() => {
     if (seedAbortRef.current) {
@@ -749,30 +579,6 @@ export default function DiscoverPage() {
       window.removeEventListener("keydown", blockEscape, true);
     };
   }, [seedLoading]);
-
-  const handleAddToPipeline = async (contactId: string) => {
-    setAddingToPipeline(contactId);
-    try {
-      const res = await apiFetch(`/api/pipeline/${contactId}`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        setPipelineAdded((prev) => new Set(prev).add(contactId));
-        trackEvent("discover_add_pipeline", { contact_id: contactId });
-      }
-    } catch (err) {
-    Sentry.captureException(err);
-      // silently fail
-    } finally {
-      setAddingToPipeline(null);
-    }
-  };
-
-  const pipelineStateFor = (contactId: string): "idle" | "pending" | "added" => {
-    if (pipelineAdded.has(contactId)) return "added";
-    if (addingToPipeline === contactId) return "pending";
-    return "idle";
-  };
 
   // Empty state: no contacts imported at all
   if (!loading && !hasAnyContacts) {
@@ -807,9 +613,12 @@ export default function DiscoverPage() {
     );
   }
 
+  const total = deck.length;
+  const position = Math.min(index + 1, total);
+
   return (
     <div className="flex min-h-full flex-col p-5">
-      {/* ─── Header: title + source filter (left)   primary action (right) ─── */}
+      {/* ─── Header: title + source filter (left) · primary action (right) ─── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-end gap-4">
           <div>
@@ -821,17 +630,11 @@ export default function DiscoverPage() {
                   : "ALUMNI"}
             </h2>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {mode === "browse"
-                ? sourceFilter === "professor"
-                  ? "Rate professors from the shared pool"
-                  : sourceFilter === "student"
-                    ? "Rate active students from the shared pool"
-                    : "Rate contacts from the shared pool"
-                : sourceFilter === "professor"
-                  ? "Search the professor network"
-                  : sourceFilter === "student"
-                    ? "Search the student network"
-                    : "Search the shared network"}
+              {sourceFilter === "professor"
+                ? "Review professors one at a time"
+                : sourceFilter === "student"
+                  ? "Review active students one at a time"
+                  : "Review contacts one at a time"}
             </p>
           </div>
 
@@ -899,195 +702,213 @@ export default function DiscoverPage() {
         )}
       </div>
 
+      {/* ─── Compact career-track filter row ─── narrows the pool to one track;
+          refetches + resets the deck on change. ALL clears it. ─── */}
+      <div className="mt-3 flex flex-wrap items-center gap-1">
+        <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+          Track
+        </span>
+        <button
+          onClick={() => setTrackFilter("")}
+          className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            trackFilter === ""
+              ? "border-primary/30 bg-primary/20 text-primary"
+              : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          All
+        </button>
+        {ALL_TRACKS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTrackFilter(t)}
+            className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              trackFilter === t
+                ? "border-primary/30 bg-primary/20 text-primary"
+                : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {(discoverResult || seedResult) && (
         <div className="mt-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
           {discoverResult || seedResult}
         </div>
       )}
 
-      {/* ─── Mode tab strip (Browse | Search) ─── */}
-      <div className="mt-3 flex items-center justify-between border-b border-white/[0.06]">
-        <div className="flex">
+      {/* ─── Search + tier filter row ─── refetch + reset the deck ─── */}
+      <div className="mt-3 flex flex-col gap-2 border-b border-white/[0.06] pb-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, company, title, education, location..."
+            className="w-full border border-input bg-muted py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
           <button
-            onClick={() => setMode("browse")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              mode === "browse"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+            onClick={() => setActiveTier("")}
+            className={`border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              !activeTier
+                ? "border-primary bg-primary/20 text-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Layers className="h-3 w-3" />
-            Browse
+            ALL
           </button>
-          <button
-            onClick={() => setMode("search")}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              mode === "search"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Search className="h-3 w-3" />
-            Search
-          </button>
-        </div>
-
-        {mode === "browse" && !loading && !allRated && browseContacts.length > 0 && (
-          <div className="flex items-center gap-2 py-1 text-[10px] text-muted-foreground">
-            <span className="tabular-nums">{browseContacts.length} unrated</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="flex items-center gap-1">
-              <Kbd>1</Kbd>
-              <Kbd>→</Kbd>
-              <span className="text-muted-foreground">high value</span>
-            </span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="flex items-center gap-1">
-              <Kbd>3</Kbd>
-              <Kbd>←</Kbd>
-              <span className="text-muted-foreground">skip</span>
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ═══════ BROWSE MODE: triage grid ═══════ */}
-      {mode === "browse" && (
-        <div className="mt-4 flex-1">
-          {loading && (
-            <div className="flex h-full items-center justify-center">
-              <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
-            </div>
-          )}
-
-          {!loading && allRated && (
-            <div className="flex h-full flex-col items-center justify-center gap-4">
-              <div className="border border-white/[0.06] bg-card px-10 py-8 text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center border border-primary/30 bg-primary/10">
-                  <Star className="h-6 w-6 text-primary" />
-                </div>
-                <p className="text-lg font-bold text-foreground">All Caught Up!</p>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  You&apos;ve rated every contact in the pool.
-                </p>
-                <a
-                  href="/dashboard/contacts"
-                  className="mt-5 inline-flex items-center gap-2 bg-primary px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-primary/80"
-                >
-                  VIEW WARM SIGNALS
-                </a>
-              </div>
-            </div>
-          )}
-
-          {!loading && !allRated && browseContacts.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {browseContacts.map((c, i) => (
-                <ContactCard
-                  key={c.id}
-                  contact={c}
-                  variant="rate"
-                  focused={i === 0}
-                  onRate={(rating) => handleRate(c.id, rating)}
-                  onAskIntro={handleAskIntro}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ═══════ SEARCH MODE: explore grid ═══════ */}
-      {mode === "search" && (
-        <div className="mt-4 flex flex-1 flex-col">
-          <div className="relative mb-3">
-            <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, company, title, education, location..."
-              className="w-full border border-input bg-muted py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-            />
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          {TIERS.map((t) => (
             <button
-              onClick={() => setActiveTier("")}
+              key={t}
+              onClick={() =>
+                setActiveTier(activeTier === t.toLowerCase() ? "" : t.toLowerCase())
+              }
               className={`border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                !activeTier
+                activeTier === t.toLowerCase()
                   ? "border-primary bg-primary/20 text-primary"
                   : "border-border text-muted-foreground hover:text-foreground"
               }`}
             >
-              ALL
+              {t}
             </button>
-            {TIERS.map((t) => (
-              <button
-                key={t}
-                onClick={() =>
-                  setActiveTier(
-                    activeTier === t.toLowerCase() ? "" : t.toLowerCase(),
-                  )
-                }
-                className={`border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                  activeTier === t.toLowerCase()
-                    ? "border-primary bg-primary/20 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-            {total > 0 && (
-              <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">
-                {total} result{total !== 1 ? "s" : ""}
-              </span>
-            )}
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Progress indicator + keyboard hints ─── */}
+      {!loading && !exhausted && (current || confirmCard) && (
+        <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span className="font-mono tabular-nums">
+            {position} / {total}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1">
+              <Kbd>←</Kbd>
+              <span className="text-muted-foreground">skip</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
+              <Kbd>↓</Kbd>
+              <span className="text-muted-foreground">later</span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1">
+              <Kbd>→</Kbd>
+              <span className="text-muted-foreground">high value</span>
+            </span>
           </div>
-
-          {loading && (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
-            </div>
-          )}
-
-          {!loading && contacts.length === 0 && hasAnyContacts && (
-            <div className="flex flex-1 items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                No contacts match your search.
-              </p>
-            </div>
-          )}
-
-          {!loading && contacts.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {contacts.map((c) => (
-                <ContactCard
-                  key={c.id}
-                  contact={c}
-                  variant="explore"
-                  onAskIntro={handleAskIntro}
-                  onAddToPipeline={handleAddToPipeline}
-                  pipelineState={pipelineStateFor(c.id)}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
+
+      {/* ═══════ DECK ═══════ */}
+      <div className="mt-4 flex flex-1 items-start justify-center">
+        {loading && (
+          <div className="flex h-full items-center justify-center py-20">
+            <div className="h-6 w-6 animate-spin border-2 border-muted border-t-primary" />
+          </div>
+        )}
+
+        {/* No search matches (pool exists, but the query/tier filtered to empty). */}
+        {!loading && deck.length === 0 && hasAnyContacts && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-sm text-muted-foreground">
+              No contacts match your filters.
+            </p>
+            {(query || activeTier || trackFilter) && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setActiveTier("");
+                  setTrackFilter("");
+                }}
+                className="mt-3 border border-white/[0.12] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Deck exhausted — reviewed everything in this batch. */}
+        {exhausted && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-full max-w-md border border-white/[0.06] bg-card px-10 py-8 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center border border-primary/30 bg-primary/10">
+                <Star className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-lg font-bold text-foreground">Deck Complete</p>
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                You reviewed{" "}
+                <span className="font-bold tabular-nums text-foreground">{reviewed}</span>{" "}
+                {reviewed === 1 ? "contact" : "contacts"} in this deck.
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground/70">
+                Switch tabs, adjust the track filter, or import more to keep going.
+              </p>
+              <div className="mt-5 flex justify-center gap-2">
+                <button
+                  onClick={() => fetchDeck(query, activeTier, sourceFilter, trackFilter)}
+                  className="inline-flex items-center gap-1.5 border border-white/[0.12] px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Reload
+                </button>
+                <a
+                  href="/dashboard/contacts"
+                  className="inline-flex items-center gap-2 bg-primary px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80"
+                >
+                  View Warm Signals
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active card: confirm reveal takes priority over the rate card. */}
+        {!loading && (confirmCard || (current && !exhausted)) && (
+          <div className="w-full max-w-2xl">
+            <div
+              className={`transition-all duration-200 ease-out ${
+                exitDir === "left"
+                  ? "-translate-x-8 opacity-0"
+                  : exitDir === "right"
+                    ? "translate-x-8 opacity-0"
+                    : exitDir === "down"
+                      ? "translate-y-8 opacity-0"
+                      : "translate-x-0 opacity-100"
+              }`}
+            >
+              {confirmCard ? (
+                <DeckCard
+                  key={`confirm-${confirmCard.id}`}
+                  contact={confirmCard}
+                  phase="confirm"
+                  pipelineState={pipelineSendState}
+                  onAskIntro={(wp) => handleAskIntro(confirmCard, wp)}
+                  onKeepBrowsing={handleKeepBrowsing}
+                  onSendToPipeline={handleSendToPipeline}
+                />
+              ) : current ? (
+                <DeckCard
+                  key={current.id}
+                  contact={current}
+                  phase="rate"
+                  inFlight={false}
+                  onSkip={handleSkip}
+                  onLater={handleLater}
+                  onHighValue={handleHighValue}
+                  onAskIntro={(wp) => handleAskIntro(current, wp)}
+                />
+              ) : null}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ═══════ INTRO REQUEST MODAL ═══════ */}
       {introTarget && (

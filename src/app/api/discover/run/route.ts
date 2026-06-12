@@ -25,6 +25,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { findContacts, type CompanyInput } from "@/lib/discover/contact-finder";
+import { isLikelyPersonName } from "@/lib/discover/name-validator";
 import { detectSignals } from "@/lib/discover/signal-detector";
 import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
@@ -226,11 +227,26 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // ── Persistence boundary guard ───────────────────────────────
+        // Final safety net: reject any candidate whose name doesn't look like
+        // a real person's name, regardless of how it entered the pipeline.
+        // "candidatesFound" already counted everything; "filtered" tracks what
+        // was dropped here so the banner stays accurate.
+        let filtered = 0;
+        const safeEnriched = enriched.filter((row) => {
+          if (isLikelyPersonName(row.candidate.name)) return true;
+          console.warn(
+            `[discover] filtered non-person name at persistence boundary: "${row.candidate.name}" (${row.candidate.company})`,
+          );
+          filtered++;
+          return false;
+        });
+
         // ── Persistence ─────────────────────────────────────────────
         send({
           type: "stage",
           stage: "saving",
-          message: `Saving ${enriched.length} contacts`,
+          message: `Saving ${safeEnriched.length} contacts${filtered > 0 ? ` (${filtered} filtered)` : ""}`,
           progress: 92,
         });
 
@@ -247,7 +263,7 @@ export async function POST(request: NextRequest) {
           signalCount: number;
         }> = [];
 
-        for (const row of enriched) {
+        for (const row of safeEnriched) {
           if (aborted.value) {
             send({ type: "aborted" });
             return;

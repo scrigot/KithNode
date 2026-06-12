@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
+import { isUnlocked } from "@/lib/contact-access";
 
 const STAGES = [
   "researched",
@@ -47,6 +48,17 @@ export async function GET() {
       (contacts || []).map((c) => [c.id, c]),
     );
 
+    // Fetch high_value discovers for unlock check
+    const { data: discoverRows } = await supabase
+      .from("UserDiscover")
+      .select("contactId, rating")
+      .eq("userId", userId);
+    const highValueIds = new Set<string>(
+      (discoverRows || [])
+        .filter((d) => d.rating === "high_value")
+        .map((d) => d.contactId),
+    );
+
     // Group pipeline entries by stage, transforming to PipelineContact shape
     const grouped: Record<string, Array<{
       id: string;
@@ -87,11 +99,13 @@ export async function GET() {
         firmPathCache.set(contact.firmName || "", warmPaths);
       }
 
-      // Redact PII when the underlying contact wasn't imported by the current user.
-      // Pipeline entries can reference contacts another user imported (added via Discover).
-      const isOwn = contact.importedByUserId === userId;
-      const safeName = isOwn ? (contact.name || "") : redactName(contact.name || "");
-      const safeLinkedIn = isOwn
+      // Redact PII only when not unlocked. A contact is unlocked when the viewer
+      // imported it OR has rated it high_value in Discover. Pipeline contacts
+      // added from Discover (high_value) must show full identity since the user
+      // is actively reaching out to them.
+      const unlocked = isUnlocked(contact.importedByUserId, userId, highValueIds, contact.id);
+      const safeName = unlocked ? (contact.name || "") : redactName(contact.name || "");
+      const safeLinkedIn = unlocked
         ? (contact.linkedInUrl || "")
         : (contact.linkedInUrl ? redactLinkedInUrl(contact.linkedInUrl) : "");
 
@@ -113,7 +127,7 @@ export async function GET() {
           ? contact.affiliations.split(",").map((a: string) => a.trim()).filter(Boolean)
           : [],
         warmPaths: warmPaths.filter((wp) => wp.intermediaryName !== contact.name),
-        ...(isOwn ? {} : { isRedacted: true }),
+        ...(unlocked ? {} : { isRedacted: true }),
       });
     }
 

@@ -48,6 +48,10 @@ export interface RankedContact {
   linkedin_url: string;
   education: string;
   linkedin_location: string;
+  // Career-track taxonomy: track is one of CAREER_TRACKS keys, role one of its
+  // values. Both "" when unclassified. Drives the Warm Signals + Discover tabs.
+  track: string;
+  role: string;
   why_now: string;
   warm_path: string;
   affiliations: { name: string; boost: number }[];
@@ -65,13 +69,39 @@ export interface RankedContact {
     total_score: number;
     tier: string;
   };
+  /** Whether this contact is marked as a personal friend. */
+  is_friend: boolean;
+  /** How often the user speaks with this contact ("daily" | "weekly" | etc, or ""). */
+  speak_frequency: string;
+  /** ISO date string of the last conversation, or "" when unset. */
+  last_spoken_at: string;
+  /** Graduation year (e.g. 2026), or null when unknown. */
+  graduation_year: number | null;
+  created_at: string;
 }
 
 export interface ContactDetail extends RankedContact {
   email_confidence: string;
   education: string;
   linkedin_location: string;
+  // Manually-entered or high-school-deduced hometown ("City, ST"). "" when unset.
+  hometown: string;
+  high_school: string;
+  greek_org: string;
+  clubs: string;
+  passions: string;
+  major: string;
+  minor: string;
+  // Comma-joined skills list (PDL-enriched or manually edited).
+  skills: string;
+  // Comma-joined past-employers list (PDL-enriched or manually edited).
+  past_firms: string;
+  // Manual identity override: '' = auto, 'alum' | 'student' | 'professor'.
+  person_type: string;
+  // Where a professor teaches (drives the "Teaches at" editor row).
+  university: string;
   source: string;
+  tags?: string[];
   affiliations: { id: number; name: string; boost: number }[];
   outreach_history: {
     id: number;
@@ -284,7 +314,7 @@ export interface ImportResult {
   imported: number;
   failed: number;
   contacts: {
-    id: number;
+    id?: string;
     name: string;
     title: string;
     linkedin_url: string;

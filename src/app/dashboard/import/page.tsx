@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useRef, type DragEvent, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
 import type { ImportResult } from "@/lib/api";
+import {
+  parseLinkedInCSV,
+  type CsvContact,
+} from "@/lib/linkedin-csv";
 import { Upload, Link2, AlertTriangle, Sparkles, X } from "lucide-react";
 
 const TIER_STYLES: Record<string, string> = {
@@ -15,134 +21,23 @@ const TIER_STYLES: Record<string, string> = {
   cold: "text-zinc-400",
 };
 
-interface CsvContact {
-  name: string;
-  title: string;
-  firmName: string;
-  email: string;
-  education: string;
-  location: string;
-  linkedInUrl: string;
-}
-
-function parseCSVField(field: string): string {
-  let f = field.trim();
-  if (f.startsWith('"') && f.endsWith('"')) {
-    f = f.slice(1, -1).replace(/""/g, '"');
-  }
-  return f;
-}
-
-function parseCSVLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        fields.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
-}
-
-function parseLinkedInCSV(text: string): CsvContact[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return [];
-
-  let headerIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const lower = lines[i].toLowerCase();
-    if (lower.includes("first name") && lower.includes("last name")) {
-      headerIdx = i;
-      break;
-    }
-  }
-
-  if (headerIdx === -1) {
-    throw new Error(
-      "LinkedIn may have changed their export format. Expected columns: First Name, Last Name, Company, Position. Try re-exporting from LinkedIn Settings > Get a copy of your data > Connections.",
-    );
-  }
-
-  const headers = parseCSVLine(lines[headerIdx]).map((h) =>
-    h.toLowerCase().trim(),
-  );
-  const firstNameIdx = headers.findIndex((h) => h === "first name");
-  const lastNameIdx = headers.findIndex((h) => h === "last name");
-  const emailIdx = headers.findIndex((h) => h === "email address");
-  const companyIdx = headers.findIndex((h) => h === "company");
-  const positionIdx = headers.findIndex((h) => h === "position");
-  const urlIdx = headers.findIndex((h) => h === "url");
-
-  const contacts: CsvContact[] = [];
-
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const fields = parseCSVLine(lines[i]);
-    const firstName =
-      firstNameIdx >= 0 ? parseCSVField(fields[firstNameIdx] || "") : "";
-    const lastName =
-      lastNameIdx >= 0 ? parseCSVField(fields[lastNameIdx] || "") : "";
-    const name = `${firstName} ${lastName}`.trim();
-    if (!name) continue;
-
-    const email = emailIdx >= 0 ? parseCSVField(fields[emailIdx] || "") : "";
-    const firmName =
-      companyIdx >= 0 ? parseCSVField(fields[companyIdx] || "") : "";
-    const title = positionIdx >= 0 ? parseCSVField(fields[positionIdx] || "") : "";
-
-    const csvUrl = urlIdx >= 0 ? parseCSVField(fields[urlIdx] || "") : "";
-    let linkedInUrl = csvUrl;
-    if (!linkedInUrl) {
-      const slug = `${firstName}-${lastName}`
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
-      linkedInUrl = slug ? `https://linkedin.com/in/${slug}` : "";
-    }
-
-    contacts.push({
-      name,
-      title,
-      firmName,
-      email,
-      education: "",
-      location: "",
-      linkedInUrl,
-    });
-  }
-
-  return contacts;
-}
+// Chunk CSV contacts so the import bar advances per batch instead of hanging
+// on one slow request for the whole file.
+const IMPORT_BATCH_SIZE = 50;
 
 export default function ImportPage() {
+  const router = useRouter();
   const [urls, setUrls] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Determinate progress for the chunked CSV import.
+  const [importDone, setImportDone] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
+  // Track which contact row is being enriched post-import.
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  // How many URLs were in the last submitted URL-import batch.
+  const [lastUrlImportCount, setLastUrlImportCount] = useState(0);
 
   const [csvContacts, setCsvContacts] = useState<CsvContact[]>([]);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
@@ -162,6 +57,7 @@ export default function ImportPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLastUrlImportCount(urlList.length);
 
     try {
       const res = await apiFetch("/api/import/linkedin", {
@@ -179,12 +75,30 @@ export default function ImportPage() {
         failed: data.failed,
         total: urlList.length,
       });
+
+      // Single-URL import: auto-enrich then navigate to the contact profile.
+      const successContacts = data.contacts.filter((c) => !c.error && c.id);
+      if (urlList.length === 1 && data.imported === 1 && successContacts.length === 1) {
+        const contactId = successContacts[0].id!;
+        setEnrichingId(contactId);
+        try {
+          await apiFetch("/api/contacts/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contactId }),
+          });
+        } catch {
+          // Enrich failure is non-fatal — navigate anyway so user can edit manually.
+        }
+        router.push(`/contact/${contactId}?from=import`);
+      }
     } catch {
       setError(
         "Import failed. Please try again or check that your URLs are valid LinkedIn profile links.",
       );
     } finally {
       setLoading(false);
+      setEnrichingId(null);
     }
   };
 
@@ -230,21 +144,31 @@ export default function ImportPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setImportTotal(csvContacts.length);
+    setImportDone(0);
 
+    const merged: ImportResult = { imported: 0, failed: 0, contacts: [] };
     try {
-      const res = await apiFetch("/api/import/linkedin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contacts: csvContacts }),
-      });
+      for (let i = 0; i < csvContacts.length; i += IMPORT_BATCH_SIZE) {
+        const batch = csvContacts.slice(i, i + IMPORT_BATCH_SIZE);
+        const res = await apiFetch("/api/import/linkedin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contacts: batch }),
+        });
 
-      if (!res.ok) throw new Error("Import failed");
+        if (!res.ok) throw new Error("Import failed");
 
-      const data: ImportResult = await res.json();
-      setResult(data);
+        const data: ImportResult = await res.json();
+        merged.imported += data.imported;
+        merged.failed += data.failed;
+        merged.contacts.push(...data.contacts);
+        setImportDone(Math.min(i + batch.length, csvContacts.length));
+        setResult({ ...merged });
+      }
       trackEvent("linkedin_csv_import", {
-        imported: data.imported,
-        failed: data.failed,
+        imported: merged.imported,
+        failed: merged.failed,
         total: csvContacts.length,
       });
     } catch {
@@ -381,13 +305,32 @@ export default function ImportPage() {
                   </div>
                 </div>
 
+                {loading && importTotal > 0 && (
+                  <div className="mt-1">
+                    <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-primary">
+                      <span>Importing</span>
+                      <span className="font-mono tabular-nums">
+                        {importDone}/{importTotal}
+                      </span>
+                    </div>
+                    <div className="h-1 w-full bg-white/[0.08]">
+                      <div
+                        className="h-full bg-primary transition-all duration-200"
+                        style={{
+                          width: `${Math.round((importDone / importTotal) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleCSVImport}
                   disabled={loading}
                   className="mt-1 w-full bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-primary/80"
                 >
                   {loading
-                    ? "Importing..."
+                    ? `Importing ${importDone}/${importTotal}...`
                     : `Import ${csvContacts.length} Contacts`}
                 </Button>
               </>
@@ -437,8 +380,8 @@ export default function ImportPage() {
         </div>
       )}
 
-      {/* Enrich tip */}
-      {result && result.imported > 0 && (
+      {/* Enrich tip — hidden for single-URL imports (we enrich + navigate automatically) */}
+      {result && result.imported > 0 && lastUrlImportCount !== 1 && (
         <div className="mt-3 flex items-center gap-2 border border-primary/30 bg-primary/5 px-3 py-2">
           <Sparkles className="h-3 w-3 shrink-0 text-primary" />
           <p className="text-[11px] text-primary">
@@ -463,62 +406,75 @@ export default function ImportPage() {
             </span>
           </div>
           <div className="grid grid-cols-1 gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3">
-            {result.contacts.map((c, i) => (
-              <div
-                key={i}
-                className={`flex items-start justify-between gap-2 border px-2 py-1.5 text-[11px] ${
-                  c.error
-                    ? "border-destructive/30 bg-destructive/5"
-                    : "border-white/[0.06] bg-background"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  {c.error ? (
-                    <div>
-                      <p className="truncate text-muted-foreground">
-                        {c.linkedin_url}
+            {result.contacts.map((c, i) => {
+              const isEnriching = enrichingId === c.id;
+              const inner = (
+                <div
+                  className={`flex items-start justify-between gap-2 border px-2 py-1.5 text-[11px] ${
+                    c.error
+                      ? "border-destructive/30 bg-destructive/5"
+                      : "border-white/[0.06] bg-background"
+                  }${!c.error && c.id ? " hover:border-primary/40 transition-colors" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    {c.error ? (
+                      <div>
+                        <p className="truncate text-muted-foreground">
+                          {c.linkedin_url}
+                        </p>
+                        <p className="text-[9px] text-destructive">{c.error}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="truncate font-bold text-foreground">
+                          {c.name}
+                        </p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {c.title}
+                          {c.company_name ? ` @ ${c.company_name}` : ""}
+                        </p>
+                        {isEnriching && (
+                          <p className="mt-0.5 text-[9px] text-primary">Enriching...</p>
+                        )}
+                        {c.affiliations.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-0.5">
+                            {c.affiliations.slice(0, 3).map((a) => (
+                              <Badge
+                                key={a}
+                                variant="outline"
+                                className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
+                              >
+                                {a}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {!c.error && (
+                    <div className="text-right">
+                      <span
+                        className={`font-mono text-[13px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
+                      >
+                        {Math.round(c.total_score)}
+                      </span>
+                      <p className="text-[8px] uppercase text-muted-foreground">
+                        {c.tier}
                       </p>
-                      <p className="text-[9px] text-destructive">{c.error}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="truncate font-bold text-foreground">
-                        {c.name}
-                      </p>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {c.title}
-                        {c.company_name ? ` @ ${c.company_name}` : ""}
-                      </p>
-                      {c.affiliations.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-0.5">
-                          {c.affiliations.slice(0, 3).map((a) => (
-                            <Badge
-                              key={a}
-                              variant="outline"
-                              className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
-                            >
-                              {a}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
-                {!c.error && (
-                  <div className="text-right">
-                    <span
-                      className={`font-mono text-[13px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
-                    >
-                      {Math.round(c.total_score)}
-                    </span>
-                    <p className="text-[8px] uppercase text-muted-foreground">
-                      {c.tier}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+
+              return !c.error && c.id ? (
+                <Link key={i} href={`/contact/${c.id}`} className="block underline-offset-2 hover:underline">
+                  {inner}
+                </Link>
+              ) : (
+                <div key={i}>{inner}</div>
+              );
+            })}
           </div>
         </div>
       )}

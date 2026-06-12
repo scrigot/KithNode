@@ -83,3 +83,78 @@ export function isValidPersonName(name: string): boolean {
 
   return true;
 }
+
+// ── isLikelyPersonName ────────────────────────────────────────────────────
+//
+// Stricter variant added to block webpage headings like "We Build Safer
+// Systems" and "Managed Agents" that passed isValidPersonName because they
+// are well-formed capitalized phrases but contain corporate/marketing words.
+//
+// Rules:
+//   1. 2–4 whitespace-separated tokens
+//   2. Each token starts with uppercase followed by lowercase, OR is a
+//      single-letter middle initial like "J." (uppercase + optional period)
+//   3. Tokens may contain hyphens and apostrophes ("Smith-Jones", "O'Brien")
+//   4. Reject if ANY token (case-insensitive) is in NON_PERSON_WORDS
+//   5. Reject if the name contains digits
+//   6. Reject if any token has 3+ consecutive uppercase letters (acronyms)
+
+const NON_PERSON_WORDS = new Set([
+  "agents", "agent", "systems", "system", "platform", "solutions",
+  "services", "technologies", "labs", "build", "builds", "managed",
+  "official", "team", "careers", "about", "jobs", "news", "blog",
+  "docs", "research", "enterprise", "pricing", "product", "products",
+  "api", "cloud", "software", "group", "partners", "capital",
+  "the", "we", "your", "our",
+]);
+
+// Single-letter middle initial: "J." or just "J" (standalone uppercase).
+const INITIAL_RE = /^[A-Z]\.?$/;
+
+// Token shape: uppercase start, rest may be lowercase/uppercase, hyphens,
+// apostrophes (O'Brien, Smith-Jones).
+const NAME_TOKEN_RE = /^[A-Z][a-zA-Z'-]*$/;
+
+// All-uppercase token of 2+ letters (acronym like VP, EVP, CEO, etc.).
+const ALL_CAPS_TOKEN_RE = /^[A-Z]{2,}$/;
+
+/**
+ * Returns true if `name` looks like a real person's name.
+ *
+ * More permissive than isValidPersonName on punctuation (allows apostrophes,
+ * hyphens, middle initials) but adds a per-token corporate-word blocklist that
+ * catches page headings scraped as contacts ("We Build Safer Systems",
+ * "Managed Agents").
+ */
+export function isLikelyPersonName(name: string): boolean {
+  if (!name || name.length < 4) return false;
+
+  // No digits anywhere
+  if (/\d/.test(name)) return false;
+
+  const tokens = name.trim().split(/\s+/);
+  if (tokens.length < 2 || tokens.length > 4) return false;
+
+  for (const token of tokens) {
+    if (!token) return false;
+
+    // Must be a valid name-token shape or a middle initial
+    if (!INITIAL_RE.test(token) && !NAME_TOKEN_RE.test(token)) return false;
+
+    // Reject all-caps tokens of 2+ letters (VP, CEO, MANAGED, etc.)
+    if (ALL_CAPS_TOKEN_RE.test(token)) return false;
+
+    // Reject camelCase splice (lowercase letter directly followed by uppercase)
+    // — strong signal of concatenated "name + title", e.g. "PoirierChief".
+    for (let i = 1; i < token.length; i++) {
+      const prev = token[i - 1];
+      const cur = token[i];
+      if (prev >= "a" && prev <= "z" && cur >= "A" && cur <= "Z") return false;
+    }
+
+    // Reject any token that is a known non-person corporate/marketing word
+    if (NON_PERSON_WORDS.has(token.toLowerCase())) return false;
+  }
+
+  return true;
+}

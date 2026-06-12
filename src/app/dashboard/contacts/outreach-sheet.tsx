@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -52,7 +52,12 @@ export function OutreachSheet({
         body: JSON.stringify({ contactId }),
       });
 
-      if (!res.ok) throw new Error("Failed to generate draft");
+      if (!res.ok) {
+        if (res.status === 402) {
+          throw new Error("402");
+        }
+        throw new Error(`Failed to generate draft (HTTP ${res.status})`);
+      }
 
       const data = await res.json();
       setDraft(data.draft);
@@ -67,23 +72,40 @@ export function OutreachSheet({
         contact_id: contactId,
         contact_name: contactName,
       });
-    } catch {
-      setError("Could not generate draft. Check that the backend is running.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setError(
+        msg === "402"
+          ? "Drafting is a Pro feature. Upgrade to use it."
+          : "Could not generate draft. Check that the backend is running.",
+      );
     } finally {
       setLoading(false);
     }
   }, [contactId, contactName]);
 
+  // Track which contactId we last triggered generation for so we don't fire
+  // twice when `open` and `contactId` both change in the same render.
+  const lastGeneratedRef = useRef<string | null>(null);
+
+  // Fire generation whenever the sheet opens programmatically via the `open`
+  // prop. Radix onOpenChange only fires on user-driven interactions — it never
+  // fires when the parent sets open={true} directly, so callers that open the
+  // sheet by setting a state variable would otherwise get a blank draft.
+  useEffect(() => {
+    if (!open || !contactId) return;
+    if (lastGeneratedRef.current === contactId) return;
+    lastGeneratedRef.current = contactId;
+    setDraft("");
+    setSubject("");
+    setOutreachId(null);
+    setStatus(null);
+    setCopied(false);
+    setError("");
+    generateDraft();
+  }, [open, contactId, generateDraft]);
+
   const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && contactId) {
-      setDraft("");
-      setSubject("");
-      setOutreachId(null);
-      setStatus(null);
-      setCopied(false);
-      setError("");
-      generateDraft();
-    }
     if (!isOpen) {
       if (draft && status !== "sent" && !copied) {
         trackEvent("outreach_draft_abandoned", {

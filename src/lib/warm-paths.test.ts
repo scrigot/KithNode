@@ -56,12 +56,14 @@ describe("findWarmPaths", () => {
     expect(paths[0]).toEqual({
       intermediaryName: "Jake Bennett",
       intermediaryRelation: "Chi Phi,UNC",
+      intermediaryLinkedInUrl: "",
       firmName: "Moelis & Company",
       title: "Analyst",
     });
     expect(paths[1]).toEqual({
       intermediaryName: "Sarah Lee",
       intermediaryRelation: "Duke",
+      intermediaryLinkedInUrl: "",
       firmName: "Moelis",
       title: "Associate",
     });

@@ -19,11 +19,22 @@ import type { UserPrefs } from "@/lib/user-prefs";
 
 const PREFS: UserPrefs = {
   university: "UNC Chapel Hill",
+  highSchool: "",
   hometown: "Charlotte, NC",
   greekOrg: "Chi Phi",
   targetIndustries: ["Investment Banking"],
   targetFirms: ["Goldman Sachs"],
   targetLocations: ["New York, NY"],
+  clubs: [],
+  skills: [],
+  pastFirms: [],
+  major: "",
+  minor: "",
+  concentration: "",
+  degrees: "",
+  educations: [],
+  experiences: [],
+  clubMemberships: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
 };

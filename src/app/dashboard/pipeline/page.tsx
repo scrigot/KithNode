@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
+import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle, Trash2 } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
 import { Badge } from "@/components/ui/badge";
@@ -249,34 +250,64 @@ function PipelineCard({
   totalStages,
   onMove,
   onDraft,
+  onRemove,
 }: {
   contact: EnrichedPipelineContact;
   stageIndex: number;
   totalStages: number;
   onMove: (contactId: string, direction: "forward" | "backward") => void;
   onDraft: (contact: EnrichedPipelineContact) => void;
+  onRemove: (contactId: string) => void;
 }) {
   const days = daysSince(contact.added_at);
   const tier = (contact.tier || "cold").toLowerCase();
   const canAdvance = stageIndex < totalStages - 1;
   const canRegress = stageIndex > 0;
 
+  // Two-click remove: idle → armed (3s timeout) → confirmed.
+  const [removeState, setRemoveState] = useState<"idle" | "armed">("idle");
+  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (removeState !== "armed") return;
+    removeTimerRef.current = setTimeout(() => setRemoveState("idle"), 3000);
+    return () => {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+    };
+  }, [removeState]);
+
+  function handleRemoveClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (removeState === "idle") {
+      setRemoveState("armed");
+    } else {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+      setRemoveState("idle");
+      onRemove(contact.id);
+    }
+  }
+
   return (
-    <div className="border border-white/[0.06] bg-card px-3 py-2.5 transition-colors hover:border-white/[0.18]">
+    <div className="border border-white/[0.06] bg-card px-3 py-3 transition-colors hover:border-white/[0.18]">
       <div className="flex items-center gap-1.5">
         <span
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshnessClass(days)}`}
           title={`${days}d since added`}
         />
-        <p className="truncate text-[12px] font-bold text-foreground">
+        <Link
+          href={`/contact/${contact.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="truncate text-[13px] font-bold text-foreground hover:underline hover:decoration-white/40"
+        >
           {contact.name}
-        </p>
+        </Link>
         <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
           {days}d
         </span>
       </div>
 
-      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+      <p className="mt-1 truncate text-[11px] text-muted-foreground">
         {contact.title}
         {contact.title && contact.company_name ? " @ " : ""}
         <span className="text-foreground">{contact.company_name}</span>
@@ -294,16 +325,20 @@ function PipelineCard({
         >
           {contact.tier}
         </Badge>
-        {contact.linkedin_url && (
-          <a
-            href={contact.linkedin_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto text-[9px] font-bold uppercase tracking-wider text-primary hover:underline"
-          >
-            LI
-          </a>
-        )}
+        {contact.linkedin_url &&
+          !contact.linkedin_url.includes("█") &&
+          contact.linkedin_url.includes("linkedin.com") && (
+            <a
+              href={contact.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="ml-auto text-slate-500 transition-colors hover:text-accent-teal"
+              title="LinkedIn profile"
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z"/></svg>
+            </a>
+          )}
       </div>
 
       {contact.warmPaths && contact.warmPaths.length > 0 && (
@@ -370,6 +405,23 @@ function PipelineCard({
             className="border border-primary/30 bg-primary px-1.5 py-1 text-white transition-colors hover:bg-primary/80"
           >
             <ArrowRight className="h-3 w-3" />
+          </button>
+        )}
+        {/* Two-click remove from pipeline */}
+        {removeState === "armed" ? (
+          <button
+            onClick={handleRemoveClick}
+            className="border border-red-500/30 px-1.5 py-1 text-[9px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+          >
+            CONFIRM?
+          </button>
+        ) : (
+          <button
+            onClick={handleRemoveClick}
+            title="Remove from pipeline"
+            className="flex items-center px-1 text-muted-foreground/40 transition-colors hover:text-red-400"
+          >
+            <Trash2 className="h-3 w-3" />
           </button>
         )}
       </div>
@@ -454,6 +506,29 @@ export default function PipelinePage() {
       await fetchPipeline();
     },
     [data, fetchPipeline],
+  );
+
+  const removeContact = useCallback(
+    async (contactId: string) => {
+      // Optimistic: remove from local state immediately.
+      setData((prev) => {
+        if (!prev) return prev;
+        const nextContacts = { ...prev.contacts };
+        for (const s of prev.stages) {
+          nextContacts[s] = (nextContacts[s] || []).filter((c) => c.id !== contactId);
+        }
+        const total = Object.values(nextContacts).reduce((sum, arr) => sum + arr.length, 0);
+        return { ...prev, contacts: nextContacts, total };
+      });
+      const res = await apiFetch(`/api/pipeline/${contactId}`, { method: "DELETE" });
+      if (res.ok) {
+        trackEvent("pipeline_removed", { contactId });
+      } else {
+        // On failure refetch to restore accurate state.
+        await fetchPipeline();
+      }
+    },
+    [fetchPipeline],
   );
 
   const overdue = useMemo(() => {
@@ -595,7 +670,7 @@ export default function PipelinePage() {
                   </span>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-2 border border-t-0 border-white/[0.06] bg-card/30 p-2">
+                <div className="flex max-h-[calc(100vh-220px)] flex-col gap-2 overflow-y-auto border border-t-0 border-white/[0.06] bg-card/30 p-2">
                   {contacts.length === 0 ? (
                     <div className="flex flex-1 items-center justify-center border border-dashed border-white/[0.1] py-6">
                       <span className="text-[10px] text-muted-foreground/60">
@@ -611,6 +686,7 @@ export default function PipelinePage() {
                         totalStages={data.stages.length}
                         onMove={moveStage}
                         onDraft={setDraftTarget}
+                        onRemove={removeContact}
                       />
                     ))
                   )}

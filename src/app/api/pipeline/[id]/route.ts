@@ -71,6 +71,31 @@ export async function POST(
   }
 }
 
+/** DELETE: Remove this user's PipelineEntry for the contact */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+  const { id: contactId } = await params;
+
+  const { error, count } = await supabase
+    .from("PipelineEntry")
+    .delete({ count: "exact" })
+    .eq("contactId", contactId)
+    .eq("userId", userId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, removed: count ?? 0 });
+}
+
 /** PATCH: Advance a contact to the next stage (or set a specific stage) */
 export async function PATCH(
   request: NextRequest,

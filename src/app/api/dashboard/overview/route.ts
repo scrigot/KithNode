@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName } from "@/lib/redact";
+import { isUnlocked } from "@/lib/contact-access";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -117,27 +118,44 @@ export async function GET() {
 
     let topOverdue: OverdueContact[] = [];
     if (topOverdueIds.length > 0) {
-      const { data: overdueContacts } = await supabase
-        .from("AlumniContact")
-        .select("id, name, firmName, importedByUserId")
-        .in(
-          "id",
-          topOverdueIds.map((e) => e.id),
-        );
+      const [{ data: overdueContacts }, { data: overdueDiscovers }] =
+        await Promise.all([
+          supabase
+            .from("AlumniContact")
+            .select("id, name, firmName, importedByUserId")
+            .in(
+              "id",
+              topOverdueIds.map((e) => e.id),
+            ),
+          supabase
+            .from("UserDiscover")
+            .select("contactId, rating")
+            .eq("userId", userId)
+            .in(
+              "contactId",
+              topOverdueIds.map((e) => e.id),
+            ),
+        ]);
+
+      const overdueHighValueIds = new Set<string>(
+        (overdueDiscovers || [])
+          .filter((d) => d.rating === "high_value")
+          .map((d) => d.contactId),
+      );
+
       topOverdue = topOverdueIds
         .map((e) => {
           const c = (overdueContacts || []).find((x) => x.id === e.id);
           if (!c) return null;
-          // Pipeline entries can reference contacts another user imported (via Discover).
-          // Redact PII for those.
-          const isOwn = c.importedByUserId === userId;
+          // Redact PII only when not unlocked (own or high_value-rated).
+          const unlocked = isUnlocked(c.importedByUserId, userId, overdueHighValueIds, c.id);
           return {
             contactId: c.id,
-            contactName: isOwn ? (c.name || "") : redactName(c.name || ""),
+            contactName: unlocked ? (c.name || "") : redactName(c.name || ""),
             firmName: c.firmName || "",
             stage: e.stage,
             days: e.days,
-            ...(isOwn ? {} : { isRedacted: true }),
+            ...(unlocked ? {} : { isRedacted: true }),
           };
         })
         .filter((x): x is OverdueContact => x !== null);

@@ -76,7 +76,7 @@ export default function NetworkPage() {
   // ─── Loading ──────────────────────────────────────────────────────────
   if (contacts === null) {
     return (
-      <div className="flex h-[calc(100vh-49px)] items-center justify-center lg:h-screen">
+      <div className="flex h-full items-center justify-center">
         <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground/60">
           Loading network…
         </span>
@@ -87,7 +87,7 @@ export default function NetworkPage() {
   // ─── Empty state — guide Import / Discover, never a blank canvas ───────
   if (contacts.length === 0) {
     return (
-      <div className="flex h-[calc(100vh-49px)] flex-col items-center justify-center px-6 text-center lg:h-screen">
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <div className="flex h-12 w-12 items-center justify-center border border-accent-teal/30 bg-accent-teal/10">
           <Share2 className="h-5 w-5 text-accent-teal" />
         </div>
@@ -120,9 +120,9 @@ export default function NetworkPage() {
 
   // ─── Graph view ───────────────────────────────────────────────────────
   return (
-    <div className="flex h-[calc(100vh-49px)] flex-col lg:h-screen">
-      {/* Top bar: title + live stats + tier filters */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-white/[0.06] bg-card px-4 py-2">
+    <div className="flex h-full flex-col">
+      {/* Top bar: title + live stats + tier filters + tier counts */}
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-y-1 border-b border-white/[0.06] bg-card px-4 py-2">
         <div className="flex items-center gap-4">
           <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-foreground">
             Network
@@ -135,9 +135,33 @@ export default function NetworkPage() {
             <Stat label="affiliations" value={stats.affiliations} />
             <Sep />
             <Stat label="avg warmth" value={stats.avgWarmth} />
-            <Sep />
-            <Stat label="HOT" value={stats.hot} accent="#F87171" />
           </div>
+        </div>
+        {/* Tier count chips — always visible, no longer absolutely positioned */}
+        <div className="flex items-center gap-3 border border-white/[0.06] bg-bg-primary px-3 py-1">
+          {(
+            [
+              ["hot", stats.hot, "#F87171"],
+              ["warm", stats.warm, "#60A5FA"],
+              ["monitor", stats.monitor, "#FBBF24"],
+              ["cold", stats.cold, "#A1A1AA"],
+            ] as const
+          ).map(([lbl, val, col], i) => (
+            <div key={lbl} className="flex items-center gap-3">
+              {i > 0 && <div className="h-4 w-px bg-white/[0.06]" />}
+              <div className="flex items-baseline gap-1">
+                <span
+                  className="font-mono text-sm font-medium leading-none tabular-nums"
+                  style={{ color: col }}
+                >
+                  {val}
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.07em] text-muted-foreground/60">
+                  {lbl}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
         <div className="flex items-center gap-1.5">
           {(["all", "hot", "warm", "monitor", "cold"] as const).map((t) => {
@@ -200,33 +224,6 @@ export default function NetworkPage() {
                   style={{ background: TIER_DOT[t as Tier] }}
                 />
                 {lbl}
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom-left tier count strip (mirrors mockup) */}
-          <div className="absolute bottom-4 left-4 flex gap-4 border border-white/[0.06] bg-card px-3.5 py-2">
-            {(
-              [
-                ["hot", stats.hot, "#F87171"],
-                ["warm", stats.warm, "#60A5FA"],
-                ["monitor", stats.monitor, "#FBBF24"],
-                ["cold", stats.cold, "#A1A1AA"],
-              ] as const
-            ).map(([lbl, val, col], i) => (
-              <div key={lbl} className="flex items-center gap-4">
-                {i > 0 && <div className="h-7 w-px bg-white/[0.06]" />}
-                <div className="text-center">
-                  <div
-                    className="font-mono text-lg font-medium leading-none tabular-nums"
-                    style={{ color: col }}
-                  >
-                    {val}
-                  </div>
-                  <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.07em] text-muted-foreground/60">
-                    {lbl}
-                  </div>
-                </div>
               </div>
             ))}
           </div>
@@ -406,7 +403,13 @@ function DetailPanel({
       </div>
 
       {/* Action */}
-      <div className="border-t border-white/[0.06] p-4">
+      <div className="flex flex-col gap-2 border-t border-white/[0.06] p-4">
+        <Link
+          href={`/contact/${detail.contactId}`}
+          className="flex w-full items-center justify-center border border-white/[0.10] px-3 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:border-white/20 hover:text-foreground"
+        >
+          Open Contact
+        </Link>
         <Link
           href="/dashboard/contacts"
           className="flex w-full items-center justify-center bg-accent-teal px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-bg-primary transition-opacity hover:opacity-90"

@@ -14,7 +14,7 @@
 // contact's name in the same document.
 
 import * as cheerio from "cheerio";
-import { isValidPersonName } from "./name-validator";
+import { isLikelyPersonName } from "./name-validator";
 import { decodeDdgHref } from "./entity-finder";
 
 const USER_AGENT =
@@ -140,7 +140,7 @@ export function extractPeopleFromHtml(
     const nameEl = $card.find("h2, h3, h4, strong, b").first();
     if (!nameEl.length) return;
     const name = nameEl.text().trim();
-    if (!isValidPersonName(name)) return;
+    if (!isLikelyPersonName(name)) return;
 
     // Title: first p / span / h5 / h6 nearby. Cap length so we don't
     // grab a whole bio paragraph.
@@ -187,7 +187,7 @@ export function extractPeopleFromHtml(
     const $a = $(a);
     const href = $a.attr("href") || "";
     const text = $a.text().trim();
-    if (!text || !isValidPersonName(text)) return;
+    if (!text || !isLikelyPersonName(text)) return;
     const key = text.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
@@ -263,7 +263,7 @@ export async function searchLinkedInContacts(
       (!!domainStem && companySegments.includes(domainStem));
     if (!anchored) return;
 
-    if (!isValidPersonName(name)) return;
+    if (!isLikelyPersonName(name)) return;
     const key = name.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);

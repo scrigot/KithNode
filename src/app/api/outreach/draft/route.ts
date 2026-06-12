@@ -6,6 +6,7 @@ import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
 import { anthropicCost } from "@/lib/ai-cost";
+import { formatExperiencePeriod } from "@/lib/educations";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -69,7 +70,9 @@ export async function POST(request: NextRequest) {
   const prefs = await getUserPrefs(userEmail);
 
   const body = await request.json();
-  const { contactId } = body;
+  // Accept contactId (canonical) or connectionId/id from older callers — all
+  // hold the AlumniContact id; the param name just drifted across surfaces.
+  const contactId = body.contactId ?? body.connectionId ?? body.id;
 
   if (!contactId) {
     return NextResponse.json({ error: "contactId is required" }, { status: 400 });
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
         .eq("userId", userEmail)
         .eq("contactId", contactId)
         .maybeSingle();
-      if (!rating) {
+      if (!rating || rating.rating !== "high_value") {
         return NextResponse.json({ error: "Contact not found" }, { status: 404 });
       }
     }
@@ -101,6 +104,54 @@ export async function POST(request: NextRequest) {
     const affiliationNames: string[] = contact.affiliations
       ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())
       : [];
+
+    // Fetch per-user manual tags for this contact
+    const { data: tagRows } = await supabase
+      .from("contact_tags")
+      .select("tag")
+      .eq("user_id", userEmail)
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: true });
+    const manualTags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
+
+    // Structured experience lines: when the user has structured rows, render
+    // them as "<title> at <firm> (<start> - <end>)" for richer prompt context.
+    // Falls back to the flat pastFirms list when no rows exist.
+    const experienceLines =
+      (prefs.experiences ?? []).length > 0
+        ? prefs.experiences
+            .filter((e) => e.title || e.firm)
+            .map((e) => {
+              const period = formatExperiencePeriod(e);
+              const datePart = period ? ` (${period})` : "";
+              if (e.title && e.firm) return `${e.title} at ${e.firm}${datePart}`;
+              if (e.firm) return `${e.firm}${datePart}`;
+              return `${e.title}${datePart}`;
+            })
+        : [];
+
+    // Shared-employer overlap: the user's OWN past employers against the
+    // contact's current firm + their past firms, normalized + either-direction
+    // containment (same rule as the Shared Employer matcher). The first match is
+    // surfaced in CONTACT INFO so the email can name the shared employer.
+    const normFirm = (s: string): string =>
+      s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const contactPastFirms: string = contact.pastFirms || "";
+    const sharedEmployer = (() => {
+      const userFirms = prefs.pastFirms.map(normFirm).filter((f) => f.length > 1);
+      if (!userFirms.length) return "";
+      const contactFirms = [contact.firmName || "", contactPastFirms]
+        .join(",")
+        .split(",")
+        .map(normFirm)
+        .filter((f) => f.length > 1);
+      for (const u of prefs.pastFirms) {
+        const un = normFirm(u);
+        if (un.length <= 1) continue;
+        if (contactFirms.some((c) => un.includes(c) || c.includes(un))) return u;
+      }
+      return "";
+    })();
 
     const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
     const userSchool = prefs.university || "my school";
@@ -118,6 +169,21 @@ export async function POST(request: NextRequest) {
       })
       .join(", ");
 
+    // Manual identity override: when set, tell the model WHO this contact is so
+    // a professor is addressed as a professor, not auto-read as a banker.
+    const roleLine = (() => {
+      switch (contact.personType) {
+        case "alum":
+          return "\n- Role: alum";
+        case "student":
+          return "\n- Role: current student";
+        case "professor":
+          return `\n- Role: professor${contact.university ? ` (teaches at ${contact.university})` : ""}`;
+        default:
+          return "";
+      }
+    })();
+
     const prompt = `Generate a personalized warm outreach email requesting a 15-minute coffee chat.
 
 CONTACT INFO:
@@ -125,14 +191,14 @@ CONTACT INFO:
 - Title: ${contact.title || "Unknown"}
 - Company: ${contact.firmName || "Unknown"}
 - Location: ${contact.location || "Unknown"}
-- Education: ${contact.education || "Unknown"}
+- Education: ${contact.education || "Unknown"}${contact.major ? `\n- Major: ${contact.major}` : ""}${roleLine}${contact.highSchool ? `\n- High School: ${contact.highSchool}` : ""}${contact.greekOrg ? `\n- Greek Life: ${contact.greekOrg}` : ""}${contact.clubs ? `\n- Clubs: ${contact.clubs}` : ""}${contact.skills ? `\n- Skills: ${contact.skills}` : ""}${contactPastFirms ? `\n- Past employers: ${contactPastFirms}` : ""}${sharedEmployer ? `\n- Shared employer: ${sharedEmployer} (the sender also worked there)` : ""}${contact.passions ? `\n- Passions: ${contact.passions}` : ""}
 - Affiliations: ${affiliationNames.join(", ") || "None"}
-- Warm Connection Phrases: ${warmConnections || "professional connection"}
+- Warm Connection Phrases: ${warmConnections || "professional connection"}${manualTags.length > 0 ? `\n- Manual tags (user-added context): ${manualTags.join(", ")}` : ""}
 
 SENDER CONTEXT:
 - ${senderFullName || "Me"}, a student at ${userSchool}
 - Interested in ${userIndustryFocus}
-${userGreek ? `- Member of ${userGreek}` : ""}
+${userGreek ? `- Member of ${userGreek}` : ""}${experienceLines.length > 0 ? `\n- Past experience: ${experienceLines.join("; ")}` : prefs.pastFirms.length > 0 ? `\n- Past employers: ${prefs.pastFirms.join(", ")}` : ""}
 - Genuine interest in learning from professionals
 
 TONE REQUIREMENTS:

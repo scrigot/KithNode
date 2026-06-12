@@ -37,6 +37,16 @@ export function SignInPanel() {
             Continue with Google
           </button>
 
+          {process.env.NEXT_PUBLIC_MICROSOFT_AUTH_ENABLED === "true" && (
+            <button
+              type="button"
+              onClick={() => signIn("microsoft-entra-id", { callbackUrl: "/dashboard" })}
+              className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50"
+            >
+              Continue with Microsoft (UNC email)
+            </button>
+          )}
+
           <p className="mt-5 text-center text-xs text-slate-500">
             Need access first?{" "}
             <Link

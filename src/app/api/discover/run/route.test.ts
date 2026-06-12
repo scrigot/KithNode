@@ -168,6 +168,7 @@ const PREFS = {
   targetIndustries: ["Investment Banking"],
   targetFirms: ["Goldman Sachs"],
   targetLocations: ["New York, NY"],
+  pastFirms: [],
 };
 
 beforeEach(() => {

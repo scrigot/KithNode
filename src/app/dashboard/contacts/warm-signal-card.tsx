@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedContact } from "@/lib/api";
+import { composeWhyNow } from "@/lib/why-now";
 
 type WarmSignalContact = RankedContact & { isRedacted?: boolean };
 
@@ -62,15 +64,62 @@ export function WarmSignalCard({
   onDraftOutreach,
   onAddToPipeline,
   pipelineAdded,
+  onDelete,
 }: {
   contact: WarmSignalContact;
   onDraftOutreach?: (id: string) => void;
   onAddToPipeline?: (id: string) => void;
   pipelineAdded?: boolean;
+  onDelete?: (id: string) => void;
 }) {
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
   const isRedacted = !!contact.isRedacted;
+
+  // Defensive casts for relationship fields that may not yet be in RankedContact type.
+  const contactRel = contact as unknown as Record<string, unknown>;
+  const isFriend = typeof contactRel.is_friend === "boolean" ? contactRel.is_friend : false;
+  const lastSpokenAt = typeof contactRel.last_spoken_at === "string" ? contactRel.last_spoken_at : "";
+  const spokeDays =
+    lastSpokenAt
+      ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
+      : null;
+
+  // Two-click delete: null = idle, "armed" = first click done (awaiting confirm).
+  const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset armed state on any outside click or after 3s.
+  useEffect(() => {
+    if (deleteState !== "armed") return;
+    resetTimerRef.current = setTimeout(() => setDeleteState("idle"), 3000);
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, [deleteState]);
+
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (deleteState === "idle") {
+      setDeleteState("armed");
+    } else {
+      // Second click — confirmed.
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      setDeleteState("idle");
+      onDelete?.(contact.id);
+    }
+  }
+
+  // Compose Why Now from real affiliations instead of the raw CSV string.
+  const whyNowText = contact.affiliations?.length
+    ? composeWhyNow({
+        affiliations: contact.affiliations.map((a) => a.name),
+        title: contact.title,
+        firm: contact.company.name,
+        tier: contact.score.tier,
+      })
+    : contact.why_now;
 
   const NameBlock = (
     <>
@@ -106,15 +155,21 @@ export function WarmSignalCard({
             <Link
               href={`/contact/${contact.id}`}
               className="block hover:text-primary"
+              onClick={() => {
+                sessionStorage.setItem(
+                  "warm-signals-scroll",
+                  String(window.scrollY),
+                );
+              }}
             >
               {NameBlock}
             </Link>
           )}
 
-          {/* WHY NOW */}
-          {contact.why_now && (
+          {/* WHY NOW — composed from real affiliations */}
+          {whyNowText && (
             <p className="mt-1 text-[10px] text-accent-blue">
-              {contact.why_now}
+              {whyNowText}
             </p>
           )}
 
@@ -125,7 +180,7 @@ export function WarmSignalCard({
             </p>
           )}
 
-          {/* Meta: education, location, industry */}
+          {/* Meta: education, location, industry, last spoken */}
           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
             {contact.education && (
               <span>{contact.education}</span>
@@ -138,10 +193,15 @@ export function WarmSignalCard({
                 {tag}
               </span>
             ))}
+            {spokeDays !== null && spokeDays >= 0 && (
+              <span className="text-muted-foreground/60">
+                spoke {spokeDays}d ago
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: Score + Tier badge */}
+        {/* Right: Score + Tier badge + Friend indicator */}
         <div className="flex flex-col items-end gap-1">
           <div className="text-right">
             <span className="text-lg font-bold tabular-nums text-foreground">
@@ -149,12 +209,17 @@ export function WarmSignalCard({
             </span>
             <span className="text-xs text-muted-foreground">/100</span>
           </div>
-          <Badge
-            variant="outline"
-            className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
-          >
-            {TIER_LABELS[tier] || "COLD"}
-          </Badge>
+          <div className="flex items-center gap-1">
+            {isFriend && (
+              <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
+            )}
+            <Badge
+              variant="outline"
+              className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
+            >
+              {TIER_LABELS[tier] || "COLD"}
+            </Badge>
+          </div>
         </div>
       </div>
 
@@ -216,17 +281,20 @@ export function WarmSignalCard({
                   MUTUAL
                 </a>
               )}
-              {contact.linkedin_url && (
-                <a
-                  href={contact.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-muted-foreground hover:text-accent-blue"
-                  title={contact.linkedin_url}
-                >
-                  LI
-                </a>
-              )}
+              {contact.linkedin_url &&
+                !contact.linkedin_url.includes("█") &&
+                contact.linkedin_url.includes("linkedin.com") && (
+                  <a
+                    href={contact.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-slate-500 transition-colors hover:text-accent-teal"
+                    title="LinkedIn profile"
+                  >
+                    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z"/></svg>
+                  </a>
+                )}
               {onAddToPipeline && (
                 <Button
                   size="sm"
@@ -253,6 +321,26 @@ export function WarmSignalCard({
                 >
                   DRAFT
                 </Button>
+              )}
+              {onDelete && (
+                deleteState === "armed" ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="h-6 border border-red-500/30 px-2 text-[10px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+                  >
+                    CONFIRM?
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="flex h-6 items-center px-1 text-muted-foreground/40 transition-colors hover:text-red-400"
+                    title="Delete contact"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )
               )}
             </>
           )}
