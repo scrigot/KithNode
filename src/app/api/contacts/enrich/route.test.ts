@@ -165,7 +165,7 @@ describe("POST /api/contacts/enrich — per-contact credit metering", () => {
       error: null,
     };
     supabaseState.remaining = 1;
-    // First contact pays; second charge fails -> loop breaks before enriching c2.
+    // First contact pays; second charge fails -> loop breaks before persisting c2.
     mockSpendCredits
       .mockResolvedValueOnce({ ok: true, balance: 0 })
       .mockResolvedValueOnce({ ok: false, reason: "insufficient", balance: 0 });
@@ -175,10 +175,11 @@ describe("POST /api/contacts/enrich — per-contact credit metering", () => {
     const body = await res.json();
     expect(body.outOfCredits).toBe(true);
     expect(body.enriched).toBe(1);
-    // Charged twice (the failing second charge is what stops the loop), but only
-    // the first contact was actually enriched.
+    // Charge-after-success: both contacts are enriched by the model first, then
+    // charged. The second charge fails and stops the loop BEFORE c2 is written,
+    // so only the first contact is persisted and counted.
     expect(mockSpendCredits).toHaveBeenCalledTimes(2);
-    expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
     expect(supabaseState.updateCalls).toBe(1);
   });
 
@@ -194,5 +195,58 @@ describe("POST /api/contacts/enrich — per-contact credit metering", () => {
     const body = await res.json();
     expect(body.outOfCredits).toBe(false);
     expect(body.enriched).toBe(1);
+  });
+
+  it("does NOT charge for a contact whose enrichment fails (charge-after-success)", async () => {
+    supabaseState.fetchResult = {
+      data: [{ id: "c1", name: "Alice", title: "Analyst", firmName: "GS" }],
+      error: null,
+    };
+    supabaseState.remaining = 1;
+    mockSpendCredits.mockResolvedValue({ ok: true, balance: 5 });
+    // Model returns no parseable JSON -> enrichOne returns null -> failed, no charge.
+    mockGenerateText.mockResolvedValue({ text: "the gateway returned an error page" });
+
+    const res = await POST(makeRequest({}));
+    const body = await res.json();
+    expect(body.enriched).toBe(0);
+    expect(body.failed).toBe(1);
+    // The credit was never spent for the failed contact, and no row was written.
+    expect(mockSpendCredits).not.toHaveBeenCalled();
+    expect(supabaseState.updateCalls).toBe(0);
+  });
+
+  it("charges only the contacts that succeed in a mixed batch", async () => {
+    supabaseState.fetchResult = {
+      data: [
+        { id: "c1", name: "Alice", title: "Analyst", firmName: "GS" },
+        { id: "c2", name: "Bob", title: "Analyst", firmName: "JPM" },
+      ],
+      error: null,
+    };
+    supabaseState.remaining = 1;
+    mockSpendCredits.mockResolvedValue({ ok: true, balance: 5 });
+    // c1 enriches (valid JSON), c2 fails (no JSON) -> only c1 is charged.
+    mockGenerateText
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          industry: "Investment Banking",
+          seniorityLevel: "Analyst",
+          education: "",
+          location: "",
+          track: "",
+          role: "",
+        }),
+      })
+      .mockResolvedValueOnce({ text: "gateway 502" });
+
+    const res = await POST(makeRequest({}));
+    const body = await res.json();
+    expect(body.enriched).toBe(1);
+    expect(body.failed).toBe(1);
+    // Two AI attempts, but only the successful contact was charged.
+    expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    expect(mockSpendCredits).toHaveBeenCalledTimes(1);
+    expect(mockSpendCredits).toHaveBeenCalledWith("test@unc.edu", 1, "enrich", { contactId: "c1" });
   });
 });

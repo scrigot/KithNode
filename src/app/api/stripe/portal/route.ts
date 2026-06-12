@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -31,7 +31,7 @@ export async function POST() {
 
     const portalSession = await getStripe().billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/dashboard/billing`,
+      return_url: `${req.nextUrl.origin}/dashboard/billing`,
     });
 
     return NextResponse.json({ url: portalSession.url });

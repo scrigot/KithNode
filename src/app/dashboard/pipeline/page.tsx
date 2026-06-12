@@ -97,7 +97,7 @@ function DraftModal({
         const res = await apiFetch("/api/outreach/draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contact_id: contact.id }),
+          body: JSON.stringify({ contactId: contact.id }),
         });
         if (res.status === 402) {
           if (!cancelled) setUpgradeRequired(true);

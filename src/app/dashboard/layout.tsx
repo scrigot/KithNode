@@ -30,6 +30,9 @@ export default async function DashboardLayout({
       redirect("/onboarding");
     }
     // Subscription gate: no active subscription or trial → activation flow.
+    // The post-checkout race (webhook may lag the redirect) is handled BEFORE
+    // the user reaches here: Stripe's success_url points at /checkout/success,
+    // which verifies the paid session and activates before sending them on.
     const access = await checkSubscription(email);
     if (!access.allow) {
       redirect("/onboarding?activate=1");

@@ -491,6 +491,17 @@ export async function PATCH(
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult;
 
+  // The AlumniContact row is shared across the Discover pool; checkAccess admits
+  // any user holding a high_value rating, but only the importer may MUTATE the
+  // canonical row. A non-owner write would rewrite owner A's identity
+  // (name/title/firmName) and personal relationship fields (isFriend/
+  // lastSpokenAt/speakFrequency) and recompute warmth/tier from B's prefs.
+  // An empty importedByUserId is legacy-owned (matches checkAccess/DELETE), so
+  // gate only when a non-empty importer is someone else.
+  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const { fields: updates, invalid } = pickEditableFields(body);
 

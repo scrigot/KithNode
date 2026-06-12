@@ -168,14 +168,6 @@ export async function POST(req: NextRequest) {
     let outOfCredits = false;
 
     for (const c of contacts) {
-      // Charge per contact before doing any work. Stop the batch the moment the
-      // next charge fails so a partial run never enriches what it can't pay for.
-      const sp = await spendCredits(userId, CREDIT_COSTS.enrich, "enrich", { contactId: c.id });
-      if (!sp.ok) {
-        outOfCredits = true;
-        break;
-      }
-
       // ── PDL first: real structured education by LinkedIn URL ──
       // Only spend a lookup when the contact has a LinkedIn URL (cost guard) and
       // the API key is configured. fetchPdlProfile no-ops to null when the
@@ -200,6 +192,16 @@ export async function POST(req: NextRequest) {
       if (!fields) {
         failed++;
         continue;
+      }
+
+      // Charge only AFTER this contact's enrichment actually succeeded — a
+      // gateway outage (handled above as !fields -> continue) must never burn a
+      // credit. Stop the batch the moment a charge fails so a partial run never
+      // enriches what it can't pay for; the unpaid contact is left untouched.
+      const sp = await spendCredits(userId, CREDIT_COSTS.enrich, "enrich", { contactId: c.id });
+      if (!sp.ok) {
+        outOfCredits = true;
+        break;
       }
 
       // Real PDL data wins over the LLM guess for education + grad year.

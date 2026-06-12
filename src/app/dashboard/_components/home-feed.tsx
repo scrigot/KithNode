@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { RankedContact } from "@/lib/api";
 import { CreditCost } from "@/components/credit-cost";
@@ -173,9 +174,20 @@ export function FeedRow({
   onSelect: () => void;
   onDraft: () => void;
   onSkip: () => void;
-  onAddToPipeline: () => void;
+  onAddToPipeline: () => Promise<void> | void;
   pipelineAdded: boolean;
 }) {
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
+  async function handleAddToPipeline() {
+    setPipelineError(null);
+    try {
+      await onAddToPipeline();
+    } catch {
+      setPipelineError("Failed to add to pipeline");
+    }
+  }
+
   return (
     <div
       onClick={onSelect}
@@ -265,16 +277,19 @@ export function FeedRow({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onAddToPipeline();
+                handleAddToPipeline();
               }}
               disabled={pipelineAdded}
               className={`px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
                 pipelineAdded
                   ? "cursor-default border border-green-500/30 bg-green-500/10 text-green-400"
-                  : "border border-accent-amber/30 bg-accent-amber/10 text-accent-amber hover:bg-accent-amber/20"
+                  : pipelineError
+                    ? "border border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border border-accent-amber/30 bg-accent-amber/10 text-accent-amber hover:bg-accent-amber/20"
               }`}
+              title={pipelineError ?? undefined}
             >
-              {pipelineAdded ? "In Pipeline" : "+ Pipeline"}
+              {pipelineAdded ? "In Pipeline" : pipelineError ? "Failed" : "+ Pipeline"}
             </button>
           )}
           {item.linkedInUrl &&

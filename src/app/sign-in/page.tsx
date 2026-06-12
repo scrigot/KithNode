@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { SignInPanel } from "./sign-in-panel";
 
 export const metadata = {
@@ -6,5 +7,12 @@ export const metadata = {
 };
 
 export default function SignInPage() {
-  return <SignInPanel />;
+  // SignInPanel reads ?error via useSearchParams(), which requires a Suspense
+  // boundary for static prerender in the App Router (Next.js build error
+  // otherwise). The panel is tiny, so an empty fallback is fine.
+  return (
+    <Suspense fallback={null}>
+      <SignInPanel />
+    </Suspense>
+  );
 }

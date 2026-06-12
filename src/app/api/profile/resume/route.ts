@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
-import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
+import { requireCredits, grantCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
 import {
   resumeSchema,
@@ -28,16 +28,31 @@ export async function POST(request: NextRequest) {
   }
   const userEmail = session.user.email;
 
-  const gate = await requireSubscription(userEmail);
-  if (gate) return gate;
-
-  const creditGate = await requireCredits(userEmail, CREDIT_COSTS.resume, "resume");
-  if (creditGate) return creditGate;
-
+  // Validate the PDF BEFORE charging — a malformed upload must never burn the 2
+  // credits (and never reaches the model).
   const body = await request.json().catch(() => ({}));
   const valid = validateResumePdf(body?.pdf);
   if (!valid.ok) {
     return NextResponse.json({ error: valid.error }, { status: 400 });
+  }
+
+  // Onboarding bypass: a brand-new user (subscriptionStatus "none", 0 credits)
+  // must be able to autofill from their resume in onboarding step 6 without
+  // hitting the subscription/credit gate. Only ACTIVATED users (any other
+  // status) are gated + charged; for them we refund on extraction failure.
+  const { data: subRow } = await supabase
+    .from("User")
+    .select("subscriptionStatus")
+    .eq("email", userEmail)
+    .maybeSingle();
+  const onboarding = (subRow?.subscriptionStatus || "").toLowerCase() === "none";
+
+  if (!onboarding) {
+    const gate = await requireSubscription(userEmail);
+    if (gate) return gate;
+
+    const creditGate = await requireCredits(userEmail, CREDIT_COSTS.resume, "resume");
+    if (creditGate) return creditGate;
   }
 
   try {
@@ -85,6 +100,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(buildResumeResult(object));
   } catch (error) {
     console.error("Resume extraction error:", error);
+    // Extraction failed after a successful charge — refund so the user is never
+    // billed for work that produced nothing. Onboarding never charged, so skip.
+    if (!onboarding) {
+      await grantCredits(userEmail, CREDIT_COSTS.resume);
+    }
     return NextResponse.json(
       { error: "Failed to extract resume" },
       { status: 500 },

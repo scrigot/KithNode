@@ -158,10 +158,18 @@ export async function GET(request: NextRequest) {
     }),
   );
 
-  // Redact PII for contacts not imported by the current user.
-  // Warm paths reference the user's OWN imports (see src/lib/warm-paths.ts),
-  // so they stay clear.
-  const redacted = enriched.map((c) => maybeRedact(c, userId));
+  // Project each pool contact down to the safe field allowlist and redact PII
+  // for contacts not imported by the current user. maybeRedact drops the
+  // owner's private columns (importedByUserId, email, isFriend, lastSpokenAt,
+  // speakFrequency, hometown, highSchool, passions) entirely — the service-role
+  // client returns them via select(*), so this projection is the only guard.
+  // warmPaths / deferred are route-computed UI metadata (warm paths reference
+  // the user's OWN imports, see src/lib/warm-paths.ts), so re-attach them after
+  // redaction strips everything off-allowlist.
+  const redacted = enriched.map(({ warmPaths, deferred, ...c }) => {
+    const safe = maybeRedact(c, userId);
+    return { ...safe, warmPaths, ...(deferred ? { deferred: true } : {}) };
+  });
 
   // The user's own import count, so the UI can tell "you have no network"
   // apart from "you've rated everyone in this tab" (total = pool AFTER

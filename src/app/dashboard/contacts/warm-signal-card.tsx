@@ -71,7 +71,7 @@ export function WarmSignalCard({
 }: {
   contact: WarmSignalContact;
   onDraftOutreach?: (id: string) => void;
-  onAddToPipeline?: (id: string) => void;
+  onAddToPipeline?: (id: string) => Promise<void> | void;
   pipelineAdded?: boolean;
   onDelete?: (id: string) => void;
 }) {
@@ -89,6 +89,18 @@ export function WarmSignalCard({
     lastSpokenAt
       ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
       : null;
+
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
+  async function handleAddToPipeline() {
+    if (!onAddToPipeline) return;
+    setPipelineError(null);
+    try {
+      await onAddToPipeline(contact.id);
+    } catch {
+      setPipelineError("Failed to add to pipeline");
+    }
+  }
 
   // Two-click delete: null = idle, "armed" = first click done (awaiting confirm).
   const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
@@ -309,14 +321,21 @@ export function WarmSignalCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  className={`h-6 px-2 text-[10px] ${pipelineAdded ? "text-green-400 border-green-500/30 cursor-default" : "text-accent-amber hover:bg-accent-amber/20"}`}
+                  className={`h-6 px-2 text-[10px] ${
+                    pipelineAdded
+                      ? "text-green-400 border-green-500/30 cursor-default"
+                      : pipelineError
+                        ? "text-red-400 border-red-500/30"
+                        : "text-accent-amber hover:bg-accent-amber/20"
+                  }`}
                   disabled={pipelineAdded}
+                  title={pipelineError ?? undefined}
                   onClick={(e) => {
                     e.preventDefault();
-                    if (!pipelineAdded) onAddToPipeline(contact.id);
+                    if (!pipelineAdded) handleAddToPipeline();
                   }}
                 >
-                  {pipelineAdded ? "IN PIPELINE" : "+ PIPELINE"}
+                  {pipelineAdded ? "IN PIPELINE" : pipelineError ? "FAILED" : "+ PIPELINE"}
                 </Button>
               )}
               {onDraftOutreach && process.env.NEXT_PUBLIC_ENABLE_OUTREACH_DRAFTS !== 'false' && (

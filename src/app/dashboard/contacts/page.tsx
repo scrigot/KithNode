@@ -97,6 +97,15 @@ export default function ContactsPage() {
         }
         if (!res.ok) throw new Error("Enrich failed");
         const data = await res.json();
+        if (data.outOfCredits) {
+          const remaining: number = data.remaining ?? 0;
+          setStatusMsg({
+            kind: "upgrade",
+            text: `Out of credits — enriched ${totalEnriched + (data.enriched || 0)}, ${remaining} left.`,
+          });
+          setRefreshKey((k) => k + 1);
+          return;
+        }
         totalEnriched += data.enriched || 0;
         totalFailed += data.failed || 0;
         const remaining: number = data.remaining ?? 0;

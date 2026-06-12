@@ -23,7 +23,7 @@ export async function apiFetch(
       .catch(() => ({}));
     window.dispatchEvent(
       new CustomEvent("kithnode:upgrade-required", {
-        detail: { reason: data.reason || "no_sub" },
+        detail: { reason: data.reason || "no_sub", error: data.error },
       }),
     );
   }

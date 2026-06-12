@@ -27,6 +27,7 @@ export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
   pages: {
     signIn: "/sign-in",
+    error: "/sign-in",
   },
   callbacks: {
     authorized: ({ auth, request }) => {
