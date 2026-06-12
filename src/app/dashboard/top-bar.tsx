@@ -3,15 +3,35 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Mail } from "lucide-react";
+import { Search, Bell, Mail, ChevronRight, LogOut, User, CreditCard, BarChart2 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { apiFetch } from "@/lib/api-client";
 import type { SearchResult } from "@/app/api/search/route";
 
+interface OverdueLite {
+  contactId: string;
+  contactName: string;
+  firmName: string;
+  stage: string;
+  days: number;
+  isRedacted?: boolean;
+}
+
+interface UnratedLite {
+  contactId: string;
+  contactName: string;
+  firmName: string;
+  score: number;
+  tier: string;
+}
+
 interface OverviewLite {
   reminders_count: number;
-  top_unrated: Array<unknown>;
+  top_overdue: OverdueLite[];
+  top_unrated: UnratedLite[];
   subscription_status: string;
   trial_days_left: number | null;
+  ratings: { high_value: number; total: number };
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -24,10 +44,15 @@ function tierColor(tier: string) {
   return TIER_COLORS[tier] ?? TIER_COLORS.cold;
 }
 
+type Panel = "bell" | "mail" | "profile" | null;
+
 export function TopBar({ userName }: { userName: string }) {
   const router = useRouter();
   const [overdue, setOverdue] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [overdueList, setOverdueList] = useState<OverdueLite[]>([]);
+  const [unratedList, setUnratedList] = useState<UnratedLite[]>([]);
+  const [credits, setCredits] = useState<number | null>(null);
 
   // Search state
   const [query, setQuery] = useState("");
@@ -36,8 +61,14 @@ export function TopBar({ userName }: { userName: string }) {
   const [loading, setLoading] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
 
+  // Panel state — only one open at a time
+  const [activePanel, setActivePanel] = useState<Panel>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
+  const mailRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ⌘K / Ctrl+K global focus
@@ -48,12 +79,15 @@ export function TopBar({ userName }: { userName: string }) {
         inputRef.current?.focus();
         inputRef.current?.select();
       }
+      if (e.key === "Escape") {
+        setActivePanel(null);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Click outside closes dropdown
+  // Click outside closes search dropdown
   useEffect(() => {
     function onPointer(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -65,7 +99,25 @@ export function TopBar({ userName }: { userName: string }) {
     return () => document.removeEventListener("pointerdown", onPointer);
   }, []);
 
-  // Dashboard overview counts
+  // Click outside closes popovers
+  useEffect(() => {
+    if (!activePanel) return;
+    function onMouseDown(e: globalThis.MouseEvent) {
+      const refs: Record<NonNullable<Panel>, React.RefObject<HTMLDivElement | null>> = {
+        bell: bellRef,
+        mail: mailRef,
+        profile: profileRef,
+      };
+      const ref = activePanel ? refs[activePanel] : null;
+      if (ref?.current && !ref.current.contains(e.target as Node)) {
+        setActivePanel(null);
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [activePanel]);
+
+  // Dashboard overview counts + lists
   useEffect(() => {
     let cancelled = false;
     apiFetch("/api/dashboard/overview")
@@ -73,13 +125,26 @@ export function TopBar({ userName }: { userName: string }) {
       .then((d: OverviewLite | null) => {
         if (cancelled || !d) return;
         setOverdue(d.reminders_count || 0);
-        setUnread((d.top_unrated || []).length);
+        setUnread(d.ratings?.high_value || (d.top_unrated || []).length);
+        setOverdueList(d.top_overdue || []);
+        setUnratedList(d.top_unrated || []);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Fetch credits when profile panel opens
+  useEffect(() => {
+    if (activePanel !== "profile" || credits !== null) return;
+    apiFetch("/api/user/credits")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { balance: number } | null) => {
+        if (d?.balance !== undefined) setCredits(d.balance);
+      })
+      .catch(() => {});
+  }, [activePanel, credits]);
 
   // Debounced search fetch
   const doSearch = useCallback((q: string) => {
@@ -136,6 +201,10 @@ export function TopBar({ userName }: { userName: string }) {
     }
   }
 
+  function togglePanel(panel: Panel) {
+    setActivePanel((prev) => (prev === panel ? null : panel));
+  }
+
   const initials =
     userName
       .split(" ")
@@ -173,7 +242,7 @@ export function TopBar({ userName }: { userName: string }) {
           )}
         </div>
 
-        {/* Dropdown */}
+        {/* Search Dropdown */}
         {open && (
           <div className="absolute left-0 right-0 top-[calc(100%+2px)] z-50 border border-white/[0.06] bg-bg-secondary shadow-lg">
             {results.length === 0 ? (
@@ -217,39 +286,234 @@ export function TopBar({ userName }: { userName: string }) {
 
       {/* Right cluster */}
       <div className="flex items-center gap-3">
-        <Link
-          href="/dashboard/pipeline"
-          aria-label="Overdue follow-ups"
-          className="relative border border-white/[0.06] bg-card p-1.5 hover:border-white/[0.18]"
-        >
-          <Bell size={14} className="text-text-secondary" />
-          {overdue > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center border border-bg-secondary bg-accent-amber px-1 font-mono text-[9px] font-bold tabular-nums text-bg-primary">
-              {overdue}
-            </span>
-          )}
-        </Link>
-        <Link
-          href="/dashboard/discover"
-          aria-label="Unrated discoveries"
-          className="relative border border-white/[0.06] bg-card p-1.5 hover:border-white/[0.18]"
-        >
-          <Mail size={14} className="text-text-secondary" />
-          {unread > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center border border-bg-secondary bg-accent-teal px-1 font-mono text-[9px] font-bold tabular-nums text-bg-primary">
-              {unread}
-            </span>
-          )}
-        </Link>
+        {/* Bell — overdue follow-ups */}
+        <div className="relative" ref={bellRef}>
+          <button
+            type="button"
+            onClick={() => togglePanel("bell")}
+            aria-label="Overdue follow-ups"
+            className={[
+              "relative border bg-card p-1.5 transition-colors",
+              activePanel === "bell"
+                ? "border-white/[0.18] bg-white/[0.04]"
+                : "border-white/[0.06] hover:border-white/[0.18]",
+            ].join(" ")}
+          >
+            <Bell size={14} className="text-text-secondary" />
+            {overdue > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center border border-bg-secondary bg-accent-amber px-1 font-mono text-[9px] font-bold tabular-nums text-bg-primary">
+                {overdue}
+              </span>
+            )}
+          </button>
 
-        <div className="flex items-center gap-2 border border-white/[0.06] bg-card px-2 py-1">
-          <div className="flex h-7 w-7 items-center justify-center bg-accent-teal/15 text-[10px] font-bold text-accent-teal">
-            {initials}
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-bold leading-tight text-foreground">{userName}</span>
-            <span className="text-[9px] uppercase tracking-wider leading-tight text-text-muted">Operator</span>
-          </div>
+          {activePanel === "bell" && (
+            <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-[300px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
+              <div className="border-b border-white/[0.06] px-3 py-2 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted">
+                  Overdue Follow-ups
+                </span>
+                {overdue > 0 && (
+                  <span className="border border-accent-amber/30 bg-accent-amber/10 px-1.5 py-px font-mono text-[9px] font-bold text-accent-amber">
+                    {overdue}
+                  </span>
+                )}
+              </div>
+              {overdueList.length === 0 ? (
+                <div className="px-3 py-4 text-[11px] text-text-muted text-center">
+                  No overdue follow-ups
+                </div>
+              ) : (
+                <div>
+                  {overdueList.map((item) => (
+                    <Link
+                      key={item.contactId}
+                      href={`/contact/${item.contactId}`}
+                      onClick={() => setActivePanel(null)}
+                      className="flex items-start justify-between gap-2 border-b border-white/[0.04] px-3 py-2 last:border-b-0 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-foreground truncate">
+                          {item.contactName}
+                        </div>
+                        <div className="text-[10px] text-text-muted truncate">
+                          {item.firmName}
+                        </div>
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-red-400 whitespace-nowrap">
+                        {item.days}d overdue
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <div className="border-t border-white/[0.06] px-3 py-2">
+                <Link
+                  href="/dashboard/pipeline"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-1 text-[10px] text-text-muted hover:text-foreground transition-colors"
+                >
+                  View pipeline
+                  <ChevronRight size={10} />
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mail — warm signals */}
+        <div className="relative" ref={mailRef}>
+          <button
+            type="button"
+            onClick={() => togglePanel("mail")}
+            aria-label="Warm signals"
+            className={[
+              "relative border bg-card p-1.5 transition-colors",
+              activePanel === "mail"
+                ? "border-white/[0.18] bg-white/[0.04]"
+                : "border-white/[0.06] hover:border-white/[0.18]",
+            ].join(" ")}
+          >
+            <Mail size={14} className="text-text-secondary" />
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center border border-bg-secondary bg-accent-teal px-1 font-mono text-[9px] font-bold tabular-nums text-bg-primary">
+                {unread}
+              </span>
+            )}
+          </button>
+
+          {activePanel === "mail" && (
+            <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-[300px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
+              <div className="border-b border-white/[0.06] px-3 py-2 flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted">
+                  Warm Signals
+                </span>
+                {unread > 0 && (
+                  <span className="border border-accent-teal/30 bg-accent-teal/10 px-1.5 py-px font-mono text-[9px] font-bold text-accent-teal">
+                    {unread}
+                  </span>
+                )}
+              </div>
+              {unratedList.length > 0 ? (
+                <div>
+                  {unratedList.slice(0, 6).map((item) => (
+                    <Link
+                      key={item.contactId}
+                      href={`/contact/${item.contactId}`}
+                      onClick={() => setActivePanel(null)}
+                      className="flex items-start justify-between gap-2 border-b border-white/[0.04] px-3 py-2 last:border-b-0 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[12px] font-medium text-foreground truncate">
+                          {item.contactName}
+                        </div>
+                        <div className="text-[10px] text-text-muted truncate">
+                          {item.firmName}
+                        </div>
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-accent-teal">
+                        {Math.round(item.score)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : unread > 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-[12px] font-medium text-foreground">{unread} high-value contacts</p>
+                  <p className="text-[10px] text-text-muted mt-1">Rate in Discover to map warm paths</p>
+                </div>
+              ) : (
+                <div className="px-3 py-4 text-[11px] text-text-muted text-center">
+                  No warm signals right now
+                </div>
+              )}
+              <div className="border-t border-white/[0.06] px-3 py-2">
+                <Link
+                  href="/dashboard/contacts"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-1 text-[10px] text-text-muted hover:text-foreground transition-colors"
+                >
+                  Open Warm Signals
+                  <ChevronRight size={10} />
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Profile block */}
+        <div className="relative" ref={profileRef}>
+          <button
+            type="button"
+            onClick={() => togglePanel("profile")}
+            className={[
+              "flex items-center gap-2 border bg-card px-2 py-1 transition-colors",
+              activePanel === "profile"
+                ? "border-white/[0.18] bg-white/[0.04]"
+                : "border-white/[0.06] hover:border-white/[0.18]",
+            ].join(" ")}
+          >
+            <div className="flex h-7 w-7 items-center justify-center bg-accent-teal/15 text-[10px] font-bold text-accent-teal">
+              {initials}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold leading-tight text-foreground">{userName}</span>
+              <span className="text-[9px] uppercase tracking-wider leading-tight text-text-muted">Operator</span>
+            </div>
+          </button>
+
+          {activePanel === "profile" && (
+            <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-[220px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
+              {/* Header */}
+              <div className="border-b border-white/[0.06] px-3 py-2.5">
+                <div className="text-[12px] font-bold text-foreground truncate">{userName}</div>
+                {credits !== null && (
+                  <div className="mt-0.5 font-mono text-[10px] text-text-muted">
+                    <span className="text-accent-teal font-bold">{credits}</span> cr
+                  </div>
+                )}
+              </div>
+
+              {/* Menu items */}
+              <div className="py-1">
+                <Link
+                  href="/dashboard/settings"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
+                >
+                  <User size={12} className="shrink-0" />
+                  Profile / Settings
+                </Link>
+                <Link
+                  href="/dashboard/billing"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
+                >
+                  <CreditCard size={12} className="shrink-0" />
+                  Billing
+                </Link>
+                <Link
+                  href="/dashboard/usage"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
+                >
+                  <BarChart2 size={12} className="shrink-0" />
+                  Usage
+                </Link>
+              </div>
+
+              <div className="border-t border-white/[0.06] py-1">
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-[11px] text-text-muted hover:bg-white/[0.04] hover:text-red-400 transition-colors"
+                >
+                  <LogOut size={12} className="shrink-0" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

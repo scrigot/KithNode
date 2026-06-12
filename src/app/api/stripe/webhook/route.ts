@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
+import { CREDIT_ALLOTMENTS } from "@/lib/credits";
 import Stripe from "stripe";
 
 /**
@@ -79,10 +80,21 @@ export async function POST(req: NextRequest) {
         const plan = session.metadata?.plan || "";
         const userEmail = session.metadata?.userId || ""; // checkout writes email to metadata.userId
 
+        // Activation also seeds the credit wallet: set the monthly allotment for
+        // the plan, grant it in full now, and arm the renewal a month out (the
+        // lazy refill in lib/credits advances it from there).
+        const allotment =
+          CREDIT_ALLOTMENTS[plan === "annual" ? "annual" : "monthly"];
+        const renewAt = new Date();
+        renewAt.setMonth(renewAt.getMonth() + 1);
+
         const update = {
           stripeCustomerId: customerId,
           subscriptionStatus: "active",
           subscriptionPlan: plan,
+          creditsMonthlyAllotment: allotment,
+          credits: allotment,
+          creditsRenewAt: renewAt.toISOString(),
         };
 
         // Primary lookup by stripeCustomerId; fall back to email if no match

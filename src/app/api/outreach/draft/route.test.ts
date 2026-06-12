@@ -26,6 +26,13 @@ vi.mock("@/lib/subscription", () => ({
   requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
+// Credits gate: allow by default (returns null); a dedicated test asserts 402.
+const mockRequireCredits = vi.fn();
+vi.mock("@/lib/credits", () => ({
+  requireCredits: (...args: unknown[]) => mockRequireCredits(...args),
+  CREDIT_COSTS: { enrich: 1, discover: 5, draft: 1, resume: 2 },
+}));
+
 const supabaseResults: Array<{ data: unknown; error: unknown }> = [];
 let supabaseCallIndex = 0;
 const ratingResults: Array<{ data: unknown; error: unknown }> = [];
@@ -96,12 +103,15 @@ describe("POST /api/outreach/draft", () => {
     ratingCallIndex = 0;
     mockGetUserPrefs.mockResolvedValue(DEFAULT_PREFS);
     mockRequireSubscription.mockResolvedValue(null);
+    mockRequireCredits.mockResolvedValue(null);
   });
 
-  it("returns 400 when contactId is missing", async () => {
+  it("returns 400 when contactId is missing — and never charges a credit", async () => {
     mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
     const response = await POST(makeRequest({}));
     expect(response.status).toBe(400);
+    // Credit ordering: a request with no contactId must not burn a credit.
+    expect(mockRequireCredits).not.toHaveBeenCalled();
   });
 
   it("returns 402 when the subscription gate denies", async () => {
@@ -111,6 +121,22 @@ describe("POST /api/outreach/draft", () => {
     );
     const response = await POST(makeRequest({ contactId: "1" }));
     expect(response.status).toBe(402);
+  });
+
+  it("returns 402 when out of credits (after the contact is validated)", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    // The credit gate now runs AFTER the contact fetch + ownership check, so a
+    // valid contact must resolve first for the gate to be reached.
+    supabaseResults.push({
+      data: { id: "1", name: "Jane Doe", title: "Analyst", firmName: "GS", affiliations: "" },
+      error: null,
+    });
+    mockRequireCredits.mockResolvedValue(
+      NextResponse.json({ error: "out_of_credits", balance: 0, needed: 1 }, { status: 402 }),
+    );
+    const response = await POST(makeRequest({ contactId: "1" }));
+    expect(response.status).toBe(402);
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   it("returns draft for valid contact", async () => {
@@ -157,6 +183,19 @@ describe("POST /api/outreach/draft", () => {
 
     const response = await POST(makeRequest({ contactId: "99" }));
     expect(response.status).toBe(404);
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    // Credit ordering: an unauthorized contact must not burn a credit.
+    expect(mockRequireCredits).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the contact does not exist — and never charges a credit", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    // Contact fetch resolves with no row -> 404 before the credit gate.
+    supabaseResults.push({ data: null, error: { message: "not found" } });
+
+    const response = await POST(makeRequest({ contactId: "does-not-exist" }));
+    expect(response.status).toBe(404);
+    expect(mockRequireCredits).not.toHaveBeenCalled();
     expect(mockGenerateText).not.toHaveBeenCalled();
   });
 

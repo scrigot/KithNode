@@ -92,6 +92,39 @@ export async function POST(request: NextRequest) {
       ? Math.min(99, Math.round(weeklyGoalRaw))
       : 3;
 
+  // ── Conversion-funnel diagnose answers ──────────────────────────────────
+  // Single-select goal + timeline: trimmed free-ish strings, capped at 80.
+  const onboardingGoal =
+    typeof body.onboarding_goal === "string"
+      ? body.onboarding_goal.trim().slice(0, 80)
+      : undefined;
+  const onboardingTimeline =
+    typeof body.onboarding_timeline === "string"
+      ? body.onboarding_timeline.trim().slice(0, 80)
+      : undefined;
+  // Multi-select pain: trim, cap each at 120, cap the list at 8, JSON-stringify.
+  const onboardingPain = Array.isArray(body.onboarding_pain)
+    ? JSON.stringify(
+        body.onboarding_pain
+          .map((p: unknown) => String(p).trim().slice(0, 120))
+          .filter(Boolean)
+          .slice(0, 8),
+      )
+    : undefined;
+  // Tutorial completion marker: accept an ISO string (parsed → ISO) or explicit
+  // null to clear it. Another lane's dashboard tour POSTs this on completion.
+  let tutorialDoneAt: string | null | undefined;
+  if (body.tutorial_done_at === null) {
+    tutorialDoneAt = null;
+  } else if (
+    typeof body.tutorial_done_at === "string" &&
+    !Number.isNaN(Date.parse(body.tutorial_done_at))
+  ) {
+    tutorialDoneAt = new Date(body.tutorial_done_at).toISOString();
+  } else {
+    tutorialDoneAt = undefined;
+  }
+
   // When educations array is present, derive major/degrees/concentration from
   // it. Otherwise fall back to legacy flat handling (back-compat).
   let major: string;
@@ -141,27 +174,45 @@ export async function POST(request: NextRequest) {
     clubsJson = JSON.stringify(clubsFlatFromMemberships(parsedMemberships).split(", ").filter(Boolean));
   }
 
-  const patch: Record<string, unknown> = {
-    university: body.current_university || "",
-    highSchool: body.high_school || "",
-    hometown: body.hometown || "",
-    greekOrg: body.greek_life || "",
-    major,
-    minor,
-    concentration,
-    degrees,
-    targetIndustries: serializeList(body.target_industries),
-    targetFirms: serializeList(body.target_companies),
-    targetLocations: serializeList(body.target_locations),
-    clubs: clubsJson,
-    skills: JSON.stringify(rawSkills),
-    pastFirms: pastFirmsJson,
-    recruitingDate,
-    weeklyGoalTarget,
-  };
+  // PATCH semantics: only write a column when the request actually carries it.
+  // A partial POST (the tour marking tutorialDoneAt, or a single funnel step)
+  // must NEVER blank the rest of the profile. Full-body callers (settings,
+  // onboarding profile steps) send every key, so they still write everything.
+  const patch: Record<string, unknown> = {};
+  if ("current_university" in body) patch.university = body.current_university || "";
+  if ("high_school" in body) patch.highSchool = body.high_school || "";
+  if ("hometown" in body) patch.hometown = body.hometown || "";
+  if ("greek_life" in body) patch.greekOrg = body.greek_life || "";
+  if ("minor" in body) patch.minor = minor;
+  if ("target_industries" in body) patch.targetIndustries = serializeList(body.target_industries);
+  if ("target_companies" in body) patch.targetFirms = serializeList(body.target_companies);
+  if ("target_locations" in body) patch.targetLocations = serializeList(body.target_locations);
+  if ("skills" in body) patch.skills = JSON.stringify(rawSkills);
+  if ("recruiting_date" in body) patch.recruitingDate = recruitingDate;
+  if ("weekly_goal_target" in body) patch.weeklyGoalTarget = weeklyGoalTarget;
+
+  // Education trio: written from structured rows when present, else from any
+  // legacy flat education key supplied.
+  if (educationsJson !== undefined || "major" in body || "degrees" in body || "concentration" in body) {
+    patch.major = major;
+    patch.degrees = degrees;
+    patch.concentration = concentration;
+  }
   if (educationsJson !== undefined) patch.educations = educationsJson;
+  if (experiencesJson !== undefined || "past_firms" in body) patch.pastFirms = pastFirmsJson;
   if (experiencesJson !== undefined) patch.experiences = experiencesJson;
+  if (clubMembershipsJson !== undefined || "clubs" in body) patch.clubs = clubsJson;
   if (clubMembershipsJson !== undefined) patch.clubMemberships = clubMembershipsJson;
+
+  if (onboardingGoal !== undefined) patch.onboardingGoal = onboardingGoal;
+  if (onboardingPain !== undefined) patch.onboardingPain = onboardingPain;
+  if (onboardingTimeline !== undefined) patch.onboardingTimeline = onboardingTimeline;
+  if (tutorialDoneAt !== undefined) patch.tutorialDoneAt = tutorialDoneAt;
+
+  // Empty body → nothing to write; succeed without a no-op update.
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ ok: true });
+  }
 
   const { error } = await supabase
     .from("User")

@@ -31,6 +31,7 @@ import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
 import { seedsForIndustries, seedsForSchool } from "@/lib/discover/seeds";
 import { requireSubscription } from "@/lib/subscription";
+import { requireCredits, grantCredits, CREDIT_COSTS } from "@/lib/credits";
 
 function dedupeSeeds(seeds: import("@/lib/discover/seeds").FirmSeed[]) {
   const seen = new Set<string>();
@@ -137,11 +138,21 @@ export async function POST(request: NextRequest) {
   const seeds = allSeeds.slice(0, seedCap);
   const hunterApiKey = process.env.HUNTER_API_KEY || undefined;
 
+  // Charge once per run, up front — after no_seeds validation so an empty run
+  // never burns credits. 402 returns as plain JSON before the stream opens.
+  const creditGate = await requireCredits(userId, CREDIT_COSTS.discover, "discover");
+  if (creditGate) return creditGate;
+
   // ── Streaming pipeline ──────────────────────────────────────────────
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = makeEmitter(controller);
       const aborted = { value: false };
+      // Flipped true only once the run emits its `done` summary. Any earlier
+      // exit (kill-switch abort or a pipeline error) leaves it false, which
+      // triggers the refund in `finally` so the user is never charged 5 credits
+      // for a run that produced no results.
+      let completed = false;
       const onAbort = () => {
         aborted.value = true;
       };
@@ -351,12 +362,19 @@ export async function POST(request: NextRequest) {
           hunterBudget,
           contacts: persistedSummaries,
         });
+        completed = true;
       } catch (err) {
         send({
           type: "error",
           message: err instanceof Error ? err.message : "discover pipeline failed",
         });
       } finally {
+        // Refund the up-front 5-credit charge when the run never reached its
+        // `done` summary — i.e. the user hit the kill switch (abort) or the
+        // pipeline threw. A completed run keeps the charge.
+        if (!completed) {
+          await grantCredits(userId, CREDIT_COSTS.discover);
+        }
         request.signal.removeEventListener("abort", onAbort);
         try {
           controller.close();

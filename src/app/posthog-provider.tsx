@@ -22,7 +22,12 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         email: session.user.email ?? undefined,
         name: session.user.name ?? undefined,
       });
-      trackEvent("user_signed_up");
+      // Once per browser session. This used to capture "user_signed_up" on
+      // EVERY authenticated page load, which made the signup funnel garbage.
+      if (!sessionStorage.getItem("kn:signin-tracked")) {
+        sessionStorage.setItem("kn:signin-tracked", "1");
+        trackEvent("user_signed_in");
+      }
     }
   }, [status, session]);
 

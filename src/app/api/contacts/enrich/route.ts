@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 import { requireSubscription } from "@/lib/subscription";
+import { spendCredits, CREDIT_COSTS } from "@/lib/credits";
 import { fetchPdlProfile, shouldAdoptPdlName } from "@/lib/enrich/pdl";
 import { deduceHometown } from "@/lib/deduce-hometown";
 import { classifyCareer } from "@/lib/classify-career";
@@ -164,6 +165,7 @@ export async function POST(req: NextRequest) {
     let failed = 0;
     let pdlOk = 0;
     let pdlFail = 0;
+    let outOfCredits = false;
 
     for (const c of contacts) {
       // ── PDL first: real structured education by LinkedIn URL ──
@@ -190,6 +192,16 @@ export async function POST(req: NextRequest) {
       if (!fields) {
         failed++;
         continue;
+      }
+
+      // Charge only AFTER this contact's enrichment actually succeeded — a
+      // gateway outage (handled above as !fields -> continue) must never burn a
+      // credit. Stop the batch the moment a charge fails so a partial run never
+      // enriches what it can't pay for; the unpaid contact is left untouched.
+      const sp = await spendCredits(userId, CREDIT_COSTS.enrich, "enrich", { contactId: c.id });
+      if (!sp.ok) {
+        outOfCredits = true;
+        break;
       }
 
       // Real PDL data wins over the LLM guess for education + grad year.
@@ -324,6 +336,7 @@ export async function POST(req: NextRequest) {
       failed,
       total: contacts.length,
       remaining: remainingCount ?? 0,
+      outOfCredits,
     });
   } catch (error) {
     console.error("Enrich route error:", error);

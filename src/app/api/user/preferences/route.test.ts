@@ -2,9 +2,59 @@ import { describe, it, expect, vi } from "vitest";
 
 // Mock module-level deps that pull next-auth / next/server so we can test the
 // pure derivation logic without routing runtime.
-vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
+const mockAuth = vi.fn();
+let capturedPatch: Record<string, unknown> | null = null;
+vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    from: () => ({
+      update: (p: Record<string, unknown>) => {
+        capturedPatch = p;
+        return { eq: () => Promise.resolve({ error: null }) };
+      },
+    }),
+  },
+}));
 vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
+
+import { POST } from "./route";
+
+function postBody(body: unknown) {
+  return POST({ json: async () => body } as unknown as Parameters<typeof POST>[0]);
+}
+
+describe("POST /api/user/preferences — partial saves never wipe the profile", () => {
+  it("a tutorial-only POST writes ONLY tutorialDoneAt", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "a@unc.edu" } });
+    capturedPatch = null;
+    await postBody({ tutorial_done_at: "2026-06-12T00:00:00.000Z" });
+    expect(Object.keys(capturedPatch ?? {})).toEqual(["tutorialDoneAt"]);
+    expect(capturedPatch).not.toHaveProperty("university");
+    expect(capturedPatch).not.toHaveProperty("major");
+    expect(capturedPatch).not.toHaveProperty("clubs");
+  });
+
+  it("a funnel-only POST (goal) writes ONLY onboardingGoal", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "a@unc.edu" } });
+    capturedPatch = null;
+    await postBody({ onboarding_goal: "Investment Banking" });
+    expect(Object.keys(capturedPatch ?? {})).toEqual(["onboardingGoal"]);
+    expect(capturedPatch).not.toHaveProperty("targetIndustries");
+  });
+
+  it("a full profile body still writes the core fields", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "a@unc.edu" } });
+    capturedPatch = null;
+    await postBody({
+      current_university: "UNC",
+      target_industries: ["IB"],
+      clubs: ["Chess"],
+    });
+    expect(capturedPatch).toHaveProperty("university", "UNC");
+    expect(capturedPatch).toHaveProperty("targetIndustries");
+    expect(capturedPatch).toHaveProperty("clubs");
+  });
+});
 
 // We only test the derivation helpers (flatFromEducations, firmsFromExperiences)
 // and the round-trip logic directly via the educations lib — the route itself is

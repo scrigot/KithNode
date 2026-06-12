@@ -27,6 +27,7 @@ const NetworkGraph = dynamic(
 );
 
 const TIER_DOT: Record<Tier, string> = {
+  kith: "#FCD34D",
   hot: "#F87171",
   warm: "#60A5FA",
   monitor: "#FBBF24",
@@ -141,6 +142,7 @@ export default function NetworkPage() {
         <div className="flex items-center gap-3 border border-white/[0.06] bg-bg-primary px-3 py-1">
           {(
             [
+              ["kith", stats.kith, "#FCD34D"],
               ["hot", stats.hot, "#F87171"],
               ["warm", stats.warm, "#60A5FA"],
               ["monitor", stats.monitor, "#FBBF24"],
@@ -164,7 +166,7 @@ export default function NetworkPage() {
           ))}
         </div>
         <div className="flex items-center gap-1.5">
-          {(["all", "hot", "warm", "monitor", "cold"] as const).map((t) => {
+          {(["all", "kith", "hot", "warm", "monitor", "cold"] as const).map((t) => {
             const on = tierFilter === t;
             return (
               <button
@@ -209,6 +211,7 @@ export default function NetworkPage() {
             </div>
             {(
               [
+                ["kith", "KITH · promoted"],
                 ["hot", "HOT · ≥ 85"],
                 ["warm", "WARM · 60–84"],
                 ["monitor", "MONITOR · 35–59"],

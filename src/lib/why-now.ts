@@ -12,6 +12,11 @@ export interface WhyNowInput {
   firm?: string;
   /** Warmth tier; "hot" swaps the closer for an urgency line. */
   tier?: string;
+  /** Dormant kith: a real connection gone quiet — overrides everything with a
+   * reconnect line (dormant strong ties are the highest-value reactivations). */
+  dormant?: boolean;
+  /** Days since last contact, for the dormant line. */
+  daysQuiet?: number;
 }
 
 type FragmentBuilder = (ctx: { firm: string }) => string;
@@ -50,7 +55,16 @@ export function composeWhyNow({
   title = "",
   firm = "",
   tier = "",
+  dormant = false,
+  daysQuiet,
 }: WhyNowInput): string {
+  // A dormant connection beats every prospecting angle: you already know them,
+  // they just went quiet. One message revives more value than ten cold opens.
+  if (dormant) {
+    const quiet = daysQuiet && daysQuiet > 0 ? `${daysQuiet} days quiet` : "gone quiet";
+    return `Your kith, ${quiet}. One message revives a warm door no cold contact can match.`;
+  }
+
   const present = new Set(affiliations.map((a) => a.trim()));
   const hits = PRIORITY.filter(([name]) => present.has(name)).slice(0, 2);
 

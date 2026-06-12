@@ -4,7 +4,7 @@ import type { Mock } from "vitest";
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
 
-import { DELETE } from "./route";
+import { DELETE, POST } from "./route";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
@@ -15,6 +15,45 @@ function makeDeleteRequest(id: string) {
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) };
 }
+
+describe("POST /api/pipeline/[id] — unique-violation race is idempotent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns already_exists (200) when the insert hits 23505 instead of 500", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: "sam@example.com" } });
+
+    // First query: existing-row check finds nothing. Second: insert returns a
+    // unique-violation error (concurrent add won the race).
+    let call = 0;
+    (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation(() => {
+      call++;
+      if (call === 1) {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+        };
+      }
+      return {
+        insert: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        single: vi
+          .fn()
+          .mockResolvedValue({ data: null, error: { code: "23505", message: "duplicate key" } }),
+      };
+    });
+
+    const res = await POST(
+      new Request("http://localhost/api/pipeline/c1", { method: "POST" }) as import("next/server").NextRequest,
+      makeParams("c1"),
+    );
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.already_exists).toBe(true);
+  });
+});
 
 describe("DELETE /api/pipeline/[id]", () => {
   const USER = "sam@example.com";

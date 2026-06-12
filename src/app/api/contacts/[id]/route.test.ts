@@ -13,9 +13,11 @@ vi.mock("@/lib/rescore-contact", () => ({
 }));
 vi.mock("@/lib/deduce-hometown", () => ({ deduceHometown: vi.fn() }));
 
-import { normalizeField, pickEditableFields, DELETE } from "./route";
+import { normalizeField, pickEditableFields, DELETE, PATCH } from "./route";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { getUserPrefs } from "@/lib/user-prefs";
+import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
 
 describe("normalizeField", () => {
   it("trims and collapses inner whitespace", () => {
@@ -419,5 +421,112 @@ describe("DELETE /api/contacts/[id]", () => {
       makeParams("c3"),
     );
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/contacts/[id] — cross-tenant write guard (CVE fix)
+//
+// The AlumniContact row is shared in the Discover pool. checkAccess admits any
+// user holding a high_value UserDiscover rating, so the route must separately
+// reject a NON-OWNER mutation: only the importer may write the canonical row.
+// ---------------------------------------------------------------------------
+
+function makePatchRequest(id: string, body: unknown) {
+  return new Request(`http://localhost/api/contacts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
+  const USER = "sam@example.com";
+  const OTHER = "owner@example.com";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects a non-owner PATCH with 403 and never updates the shared row", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+
+    // A non-owner who holds a high_value rating clears checkAccess but must be
+    // blocked by the ownership guard before any write.
+    const updateSpy = vi.fn().mockReturnThis();
+    const makeBuilder = (table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn().mockReturnValue(b);
+      b.eq = vi.fn().mockReturnValue(b);
+      b.update = updateSpy;
+      // checkAccess: contact owned by someone else.
+      b.single = vi.fn().mockResolvedValue({
+        data: { id: "c1", importedByUserId: OTHER, hometown: "" },
+        error: null,
+      });
+      // checkAccess: this user DOES hold a high_value rating (passes access).
+      b.maybeSingle = vi
+        .fn()
+        .mockResolvedValue({ data: { rating: "high_value" }, error: null });
+      b.then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ data: null, error: null }).then(r);
+      return b;
+    };
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockImplementation((t: string) => makeBuilder(t));
+
+    const res = await PATCH(
+      makePatchRequest("c1", { name: "Hijacked Name" }) as import("next/server").NextRequest,
+      makeParams("c1"),
+    );
+
+    expect(res.status).toBe(403);
+    // The shared AlumniContact row must NOT have been written.
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it("lets the owner PATCH their own contact (200, updates the row)", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (loadContactTags as Mock).mockResolvedValue([]);
+    (getUserPrefs as Mock).mockResolvedValue({});
+    (rescoreContact as Mock).mockReturnValue({
+      affiliations: [{ name: "UNC", boost: 10 }],
+      score: 80,
+      tier: "hot",
+    });
+
+    const updateSpy = vi.fn().mockReturnThis();
+    const makeBuilder = (table: string) => {
+      const b: Record<string, unknown> = {};
+      b.select = vi.fn().mockReturnValue(b);
+      b.eq = vi.fn().mockReturnValue(b);
+      b.update = updateSpy;
+      // checkAccess: contact owned by THIS user.
+      b.single = vi.fn().mockResolvedValue({
+        data: { id: "c1", importedByUserId: USER, hometown: "" },
+        error: null,
+      });
+      b.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+      // .update(...).eq(...) resolves to no error.
+      b.then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ error: null }).then(r);
+      return b;
+    };
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockImplementation((t: string) => makeBuilder(t));
+
+    const res = await PATCH(
+      makePatchRequest("c1", { name: "Aryan Aladar" }) as import("next/server").NextRequest,
+      makeParams("c1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.score).toBe(80);
+    expect(body.tier).toBe("hot");
+    // The owner's write reaches the shared row.
+    expect(updateSpy).toHaveBeenCalled();
   });
 });

@@ -63,12 +63,22 @@ export interface RankedContact {
     industry_tags: string[];
   };
   score: {
+    /** The affiliation fit score, 0..100 (two-axis model: score = fit only). */
     fit_score: number;
+    /** Retired from the score; always 0. Relationship lives in relationship_class. */
     signal_score: number;
+    /** 0..20 — orders contacts within a class; never summed into the score. */
     engagement_score: number;
+    /** Equals fit_score (the displayed number IS the fit axis). */
     total_score: number;
+    /** Display tier: "kith" when promoted, else the stored fit tier. */
     tier: string;
   };
+  /** "kith" when the contact crossed from signal to connection (friend, proven
+   * pipeline stage, or spoke within 30d); "" while still a signal. */
+  relationship_class: "kith" | "";
+  /** Kith whose last logged contact is >90 days old — reconnect nudge. */
+  dormant: boolean;
   /** Whether this contact is marked as a personal friend. */
   is_friend: boolean;
   /** How often the user speaks with this contact ("daily" | "weekly" | etc, or ""). */

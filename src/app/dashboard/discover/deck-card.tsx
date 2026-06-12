@@ -4,6 +4,7 @@ import { Lock, X, Star, ExternalLink, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "bg-amber-300/20 text-amber-300 border-amber-300/30",
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
   warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -11,6 +12,7 @@ const TIER_STYLES: Record<string, string> = {
 };
 
 const SCORE_STYLES: Record<string, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",

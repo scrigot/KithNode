@@ -60,9 +60,8 @@ const PLANS: {
     price: "$120",
     perMonth: "$10/mo",
     badge: "Save $60",
-    trialBadge: "7-Day Free Trial",
-    buttonText: "Start 7-day free trial",
-    buttonSubtext: "then $120/yr ($10/mo)",
+    buttonText: "Subscribe · $120/yr",
+    buttonSubtext: "$10/mo billed annually",
     features: [
       "Everything in Monthly",
       "2 months free",
@@ -467,10 +466,8 @@ export default function BillingPage() {
       {/* Fine print */}
       <div className="mt-3 border border-white/[0.06] bg-card px-4 py-3">
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          The annual plan includes a 7-day free trial. You won&apos;t be charged
-          until the trial ends. The monthly plan is charged immediately. Cancel
-          anytime from the Stripe portal. Payments are securely processed by
-          Stripe.
+          Both plans are charged immediately. Cancel anytime from the Stripe
+          portal. Payments are securely processed by Stripe.
         </p>
       </div>
     </div>

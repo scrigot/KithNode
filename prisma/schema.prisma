@@ -37,6 +37,13 @@ model User {
   subscriptionPlan   String?      @default("")
   trialEndsAt        DateTime?    @default(dbgenerated("(now() + '7 days'::interval)"))
   subscriptionEndsAt DateTime?
+  credits                 Int       @default(0)
+  creditsMonthlyAllotment Int       @default(0)
+  creditsRenewAt          DateTime? @db.Timestamptz(6)
+  onboardingGoal          String    @default("")
+  onboardingPain          String    @default("")
+  onboardingTimeline      String    @default("")
+  tutorialDoneAt          DateTime? @db.Timestamptz(6)
   createdAt          DateTime     @default(now())
   connections        Connection[]
 }
@@ -119,6 +126,8 @@ model PipelineEntry {
   updatedAt DateTime      @default(now())
   userId    String        @default("")
   contact   AlumniContact @relation(fields: [contactId], references: [id])
+
+  @@unique([contactId, userId])
 }
 
 model UserDiscover {
@@ -158,4 +167,35 @@ model IntroRequest {
   created_at         DateTime? @default(now()) @db.Timestamptz(6)
 
   @@map("intro_requests")
+}
+
+model PromoCode {
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @unique
+  days            Int       @default(7)
+  credits         Int       @default(50)
+  plan            String    @default("trial")
+  note            String    @default("")
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  redeemedByEmail String?
+  redeemedAt      DateTime?
+}
+
+model UsageEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userEmail String
+  action    String
+  credits   Int      @default(0)
+  costUsd   Decimal  @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  meta      Json     @default("{}")
+}
+
+model Feedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  userEmail String
+  page      String   @default("")
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 }

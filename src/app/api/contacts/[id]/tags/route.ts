@@ -45,6 +45,14 @@ async function recomputeScoring(
   contact: Record<string, unknown>,
   contactId: string,
 ): Promise<void> {
+  // warmthScore/tier/affiliations live on the shared AlumniContact row, so only
+  // the importer may write them — a non-owner tagging a pool contact must not
+  // corrupt the owner's score. Tags themselves are per-user (contact_tags) and
+  // already saved by the caller; this guards only the shared-row scoring write.
+  // Empty importedByUserId is legacy-owned (matches checkAccess), so persist.
+  const importer = contact.importedByUserId as string | undefined;
+  if (importer && importer !== userEmail) return;
+
   const [tags, prefs] = await Promise.all([
     loadContactTags(userEmail, contactId),
     getUserPrefs(userEmail),

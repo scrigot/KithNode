@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { LogoIcon } from "@/components/logo";
 
 export function SignInPanel() {
+  const searchParams = useSearchParams();
+  const isAccessDenied = searchParams.get("error") === "AccessDenied";
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9]">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-16">
@@ -25,9 +29,32 @@ export function SignInPanel() {
           <h1 className="mt-8 font-heading text-3xl font-bold tracking-tight text-slate-900">
             Sign in
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-slate-600">
-            Access is currently limited to approved alpha users and UNC emails.
-          </p>
+
+          {isAccessDenied ? (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-sm font-medium text-amber-800">
+                That email isn&apos;t on the alpha list yet.
+              </p>
+              <p className="mt-1 text-sm text-amber-700">
+                Request access by emailing{" "}
+                <a
+                  href="mailto:samrigot31@gmail.com"
+                  className="font-semibold underline hover:text-amber-900"
+                >
+                  samrigot31@gmail.com
+                </a>{" "}
+                or{" "}
+                <Link href="/waitlist" className="font-semibold underline hover:text-amber-900">
+                  joining the waitlist
+                </Link>
+                .
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              Access is currently limited to approved alpha users and UNC emails.
+            </p>
+          )}
 
           <button
             type="button"

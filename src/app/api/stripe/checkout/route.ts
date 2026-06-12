@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getStripe, STRIPE_PRICES, TRIAL_DAYS } from "@/lib/stripe";
+import { getStripe, STRIPE_PRICES } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
@@ -66,10 +66,7 @@ export async function POST(req: NextRequest) {
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      ...(plan === "annual"
-        ? { subscription_data: { trial_period_days: TRIAL_DAYS } }
-        : {}),
-      success_url: `${origin}/dashboard?checkout=success`,
+      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard/billing`,
       metadata: {
         userId: userEmail,

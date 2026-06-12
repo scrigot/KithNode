@@ -86,6 +86,16 @@ vi.mock("@/lib/subscription", () => ({
   requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
+// Credits gate: allow by default (returns null); a dedicated test asserts 402.
+// grantCredits is the refund path exercised when a run aborts or errors.
+const mockRequireCredits = vi.fn();
+const mockGrantCredits = vi.fn();
+vi.mock("@/lib/credits", () => ({
+  requireCredits: (...args: unknown[]) => mockRequireCredits(...args),
+  grantCredits: (...args: unknown[]) => mockGrantCredits(...args),
+  CREDIT_COSTS: { enrich: 1, discover: 5, draft: 1, resume: 2 },
+}));
+
 const mockGetUserPrefs = vi.fn();
 vi.mock("@/lib/user-prefs", () => ({
   getUserPrefs: (...args: unknown[]) => mockGetUserPrefs(...args),
@@ -179,6 +189,10 @@ beforeEach(() => {
   mockSeedsForSchool.mockReturnValue([]);
   // Default: subscription allows. Individual tests override for the deny path.
   mockRequireSubscription.mockResolvedValue(null);
+  // Default: credits allow (null). One test overrides for the 402 deny path.
+  mockRequireCredits.mockResolvedValue(null);
+  // Default: refund resolves. Tests assert when it is / isn't called.
+  mockGrantCredits.mockResolvedValue(0);
 });
 
 afterEach(() => {
@@ -199,6 +213,42 @@ describe("POST /api/discover/run", () => {
     );
     const res = await POST(makeRequest({ mode: "quick" }));
     expect(res.status).toBe(402);
+  });
+
+  it("returns 402 (plain JSON, no stream) when out of credits", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockGetUserPrefs.mockResolvedValue(PREFS);
+    mockSeedsForIndustries.mockReturnValue([
+      { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
+    ]);
+    mockRequireCredits.mockResolvedValue(
+      NextResponse.json({ error: "out_of_credits", balance: 0, needed: 5 }, { status: 402 }),
+    );
+    const res = await POST(makeRequest({ mode: "quick" }));
+    expect(res.status).toBe(402);
+    // Gate fires before the pipeline opens, so no contact-finding happens.
+    expect(mockFindContacts).not.toHaveBeenCalled();
+    // The charge never went through, so there is nothing to refund.
+    expect(mockGrantCredits).not.toHaveBeenCalled();
+  });
+
+  it("refunds the 5-credit charge when the pipeline errors mid-run", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockGetUserPrefs.mockResolvedValue(PREFS);
+    mockSeedsForIndustries.mockReturnValue([
+      { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
+    ]);
+    // findContacts throws -> pipeline never reaches `done` -> refund in finally.
+    mockFindContacts.mockRejectedValue(new Error("scanner exploded"));
+
+    const res = await POST(makeRequest({ mode: "quick" }));
+    expect(res.status).toBe(200); // stream already opened; error is an in-band event
+    const events = await readNdjson(res);
+    expect(events.some((e) => e.type === "error")).toBe(true);
+    expect(events.some((e) => e.type === "done")).toBe(false);
+    // Charged up front, refunded because the run produced no results.
+    expect(mockRequireCredits).toHaveBeenCalledWith("test@unc.edu", 5, "discover");
+    expect(mockGrantCredits).toHaveBeenCalledWith("test@unc.edu", 5);
   });
 
   it("returns 400 with friendly message when no industries are set", async () => {
@@ -276,6 +326,8 @@ describe("POST /api/discover/run", () => {
     // We should also see at least one stage event before the done.
     const stageEvents = events.filter((e) => e.type === "stage");
     expect(stageEvents.length).toBeGreaterThanOrEqual(2);
+    // A completed run keeps the charge — no refund.
+    expect(mockGrantCredits).not.toHaveBeenCalled();
   });
 
   it("updates instead of inserting when LinkedIn URL is already in DB", async () => {

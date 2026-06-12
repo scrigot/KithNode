@@ -5,6 +5,7 @@ import { getUserPrefs, type UserPrefs } from "@/lib/user-prefs";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
+import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
 import { formatExperiencePeriod } from "@/lib/educations";
 
@@ -100,6 +101,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Contact not found" }, { status: 404 });
       }
     }
+
+    // Charge ONLY after contactId validation + ownership checks pass, so a bad
+    // or unauthorized request (400/404 above) never burns a credit.
+    const creditGate = await requireCredits(userEmail, CREDIT_COSTS.draft, "draft");
+    if (creditGate) return creditGate;
 
     const affiliationNames: string[] = contact.affiliations
       ? contact.affiliations.split(",").filter(Boolean).map((s: string) => s.trim())

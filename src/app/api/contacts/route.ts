@@ -5,9 +5,9 @@ import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
 import {
   engagementScore,
-  signalScore,
-  combinedTotal,
-  tierFromTotal,
+  relationshipClass,
+  isDormantKith,
+  displayTier,
 } from "@/lib/relationship-score";
 
 export async function GET() {
@@ -30,6 +30,16 @@ export async function GET() {
       .from("UserDiscover")
       .select("contactId, rating")
       .eq("userId", userId);
+
+    // Pipeline stages prove relationships: responded/meeting_set promotes a
+    // contact into the KITH class (see relationshipClass).
+    const { data: pipelineRows } = await supabase
+      .from("PipelineEntry")
+      .select("contactId, stage")
+      .eq("userId", userId);
+    const stageByContact = new Map<string, string>(
+      (pipelineRows || []).map((p) => [p.contactId as string, (p.stage as string) || ""]),
+    );
 
     const highValueIds = new Set<string>(
       (discoveries || [])
@@ -66,17 +76,22 @@ export async function GET() {
         const affiliationNames: string[] = c.affiliations
           ? c.affiliations.split(",").filter(Boolean).map((n: string) => n.trim())
           : [];
+        // Two-axis model: score IS the stored affiliation fit (0..100);
+        // relationship promotes into the KITH class above the fit tiers.
+        // Engagement only orders contacts within a class + flags dormancy.
         const fit = c.warmthScore || 0;
-        const signal = signalScore({
+        const klass = relationshipClass({
           isFriend: c.isFriend,
-          affiliationNames,
+          pipelineStage: stageByContact.get(c.id),
+          lastSpokenAt: c.lastSpokenAt,
+          now,
         });
         const engagement = engagementScore({
           lastSpokenAt: c.lastSpokenAt,
           speakFrequency: c.speakFrequency,
           now,
         });
-        const total = combinedTotal(fit, signal, engagement);
+        const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: c.lastSpokenAt, now });
         return {
           id: c.id,
           name: unlocked ? (c.name || "") : redactName(c.name || ""),
@@ -102,11 +117,13 @@ export async function GET() {
           },
           score: {
             fit_score: fit,
-            signal_score: signal,
+            signal_score: 0,
             engagement_score: engagement,
-            total_score: total,
-            tier: tierFromTotal(total),
+            total_score: fit,
+            tier: displayTier(c.tier, klass),
           },
+          relationship_class: klass,
+          dormant,
           is_friend: !!c.isFriend,
           speak_frequency: c.speakFrequency || "",
           last_spoken_at: c.lastSpokenAt || "",
@@ -115,7 +132,17 @@ export async function GET() {
           ...(unlocked ? {} : { isRedacted: true }),
         };
       })
-      .sort((a, b) => b.score.total_score - a.score.total_score);
+      .sort((a, b) => {
+        // KITH class outranks every fit tier; fit orders within a class;
+        // engagement breaks fit ties (most-recently-engaged first).
+        const ak = a.relationship_class === "kith" ? 1 : 0;
+        const bk = b.relationship_class === "kith" ? 1 : 0;
+        if (ak !== bk) return bk - ak;
+        if (b.score.total_score !== a.score.total_score) {
+          return b.score.total_score - a.score.total_score;
+        }
+        return b.score.engagement_score - a.score.engagement_score;
+      });
 
     return NextResponse.json(ranked);
   } catch {

@@ -20,9 +20,9 @@ import {
 } from "@/lib/club-memberships";
 import {
   engagementScore,
-  signalScore,
-  combinedTotal,
-  tierFromTotal,
+  relationshipClass,
+  isDormantKith,
+  displayTier,
   SPEAK_FREQUENCIES,
 } from "@/lib/relationship-score";
 
@@ -310,20 +310,35 @@ export async function GET(
         .filter(Boolean)
         .map((firm: string) => ({ title: "", firm, start: "", end: "" })) ?? [];
 
-  // Live score breakdown: fit from rescored warmth; signal + engagement from
-  // relationship fields; combined total + tier.
+  // Two-axis score: fit IS the stored affiliation warmth (0..100); the
+  // relationship (friend / proven pipeline stage / recent contact) promotes
+  // into the KITH class above the fit tiers. Engagement only orders within a
+  // class and drives the dormant reconnect nudge.
+  const { data: pipelineEntry } = await supabase
+    .from("PipelineEntry")
+    .select("stage")
+    .eq("contactId", id)
+    .eq("userId", userId)
+    .maybeSingle();
   const fit = (contact.warmthScore as number) || 0;
-  const signal = signalScore({
+  const klass = relationshipClass({
     isFriend: contact.isFriend as boolean | undefined,
-    affiliationNames: liveAffiliations.map((a) => a.name),
+    pipelineStage: pipelineEntry?.stage as string | undefined,
+    lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
+    now: Date.now(),
   });
   const engagement = engagementScore({
     lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
     speakFrequency: contact.speakFrequency as string | null | undefined,
     now: Date.now(),
   });
-  const total = combinedTotal(fit, signal, engagement);
-  const tier = tierFromTotal(total);
+  const dormant =
+    klass === "kith" &&
+    isDormantKith({
+      lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
+      now: Date.now(),
+    });
+  const tier = displayTier(contact.tier as string | undefined, klass);
 
   return NextResponse.json({
     id: contact.id,
@@ -366,11 +381,14 @@ export async function GET(
     },
     score: {
       fit_score: fit,
-      signal_score: signal,
+      signal_score: 0,
       engagement_score: engagement,
-      total_score: total,
+      total_score: fit,
       tier,
     },
+    relationship_class: klass,
+    dormant,
+    pipeline_stage: (pipelineEntry?.stage as string) || "",
     affiliations: liveAffiliations.map((a, i) => ({
       id: i,
       name: a.name,
@@ -472,6 +490,17 @@ export async function PATCH(
   const accessResult = await checkAccess(userEmail, contactId);
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult;
+
+  // The AlumniContact row is shared across the Discover pool; checkAccess admits
+  // any user holding a high_value rating, but only the importer may MUTATE the
+  // canonical row. A non-owner write would rewrite owner A's identity
+  // (name/title/firmName) and personal relationship fields (isFriend/
+  // lastSpokenAt/speakFrequency) and recompute warmth/tier from B's prefs.
+  // An empty importedByUserId is legacy-owned (matches checkAccess/DELETE), so
+  // gate only when a non-empty importer is someone else.
+  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const { fields: updates, invalid } = pickEditableFields(body);
