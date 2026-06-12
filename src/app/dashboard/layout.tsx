@@ -3,6 +3,7 @@ import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { UpgradeToast } from "./upgrade-toast";
 import { DashboardTour } from "@/components/dashboard-tour";
+import { HelpWidget } from "@/components/help-widget";
 import { auth } from "@/lib/auth";
 import { isFounder } from "@/lib/founder";
 import { getUserPrefs } from "@/lib/user-prefs";
@@ -44,6 +45,7 @@ export default async function DashboardLayout({
       </div>
       <UpgradeToast />
       <DashboardTour />
+      <HelpWidget />
     </div>
   );
 }

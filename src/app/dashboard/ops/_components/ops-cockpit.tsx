@@ -27,6 +27,7 @@ import { addOpsTask, toggleOpsTask } from "../actions";
 import { OpsTile, OpsEmpty } from "./ops-tile";
 import { healthChip, relativeTime } from "./state";
 import { BetaCodesPanel } from "./beta-codes-panel";
+import { FeedbackPanel } from "./feedback-panel";
 
 // ─── (f) Roadmap / milestone strip — hardcoded const for v1 ──────────────────
 type MilestoneStatus = "done" | "upcoming" | "at-risk" | "overdue";
@@ -177,6 +178,11 @@ export function OpsCockpit() {
           {/* ─── Row 4: beta codes (full width) ──────────────────────────── */}
           <div className="mt-4">
             <BetaCodesPanel />
+          </div>
+
+          {/* ─── Row 5: tester feedback (full width) ─────────────────────── */}
+          <div className="mt-4">
+            <FeedbackPanel />
           </div>
         </>
       )}

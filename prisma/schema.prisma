@@ -126,6 +126,8 @@ model PipelineEntry {
   updatedAt DateTime      @default(now())
   userId    String        @default("")
   contact   AlumniContact @relation(fields: [contactId], references: [id])
+
+  @@unique([contactId, userId])
 }
 
 model UserDiscover {
@@ -187,4 +189,13 @@ model UsageEvent {
   costUsd   Decimal  @default(0)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   meta      Json     @default("{}")
+}
+
+model Feedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  userEmail String
+  page      String   @default("")
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
 }
