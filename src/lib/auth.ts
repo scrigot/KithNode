@@ -18,19 +18,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       // Upsert user row so billing/settings routes can find the user.
-      // ignoreDuplicates ensures trial defaults only land on first insert,
-      // not on every sign-in (idempotent).
+      // ignoreDuplicates ensures defaults only land on first insert, not on
+      // every sign-in (idempotent) — so existing users keep their status.
+      // NO default trial: access is code-or-pay. A fresh user lands with
+      // subscriptionStatus "none" (no access) and 0 credits until they redeem a
+      // beta code or subscribe at the end of onboarding.
       const { supabase } = await import("./supabase");
-      const trialEndsAt = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString();
       await supabase.from("User").upsert(
         {
           email: user.email,
           name: user.name ?? "",
           image: user.image ?? "",
-          subscriptionStatus: "trial",
-          trialEndsAt,
+          subscriptionStatus: "none",
         },
         { onConflict: "email", ignoreDuplicates: true }
       );

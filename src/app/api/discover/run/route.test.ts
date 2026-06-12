@@ -86,6 +86,13 @@ vi.mock("@/lib/subscription", () => ({
   requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
+// Credits gate: allow by default (returns null); a dedicated test asserts 402.
+const mockRequireCredits = vi.fn();
+vi.mock("@/lib/credits", () => ({
+  requireCredits: (...args: unknown[]) => mockRequireCredits(...args),
+  CREDIT_COSTS: { enrich: 1, discover: 5, draft: 1, resume: 2 },
+}));
+
 const mockGetUserPrefs = vi.fn();
 vi.mock("@/lib/user-prefs", () => ({
   getUserPrefs: (...args: unknown[]) => mockGetUserPrefs(...args),
@@ -179,6 +186,8 @@ beforeEach(() => {
   mockSeedsForSchool.mockReturnValue([]);
   // Default: subscription allows. Individual tests override for the deny path.
   mockRequireSubscription.mockResolvedValue(null);
+  // Default: credits allow (null). One test overrides for the 402 deny path.
+  mockRequireCredits.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -199,6 +208,21 @@ describe("POST /api/discover/run", () => {
     );
     const res = await POST(makeRequest({ mode: "quick" }));
     expect(res.status).toBe(402);
+  });
+
+  it("returns 402 (plain JSON, no stream) when out of credits", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockGetUserPrefs.mockResolvedValue(PREFS);
+    mockSeedsForIndustries.mockReturnValue([
+      { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
+    ]);
+    mockRequireCredits.mockResolvedValue(
+      NextResponse.json({ error: "out_of_credits", balance: 0, needed: 5 }, { status: 402 }),
+    );
+    const res = await POST(makeRequest({ mode: "quick" }));
+    expect(res.status).toBe(402);
+    // Gate fires before the pipeline opens, so no contact-finding happens.
+    expect(mockFindContacts).not.toHaveBeenCalled();
   });
 
   it("returns 400 with friendly message when no industries are set", async () => {

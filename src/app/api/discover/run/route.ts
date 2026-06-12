@@ -31,6 +31,7 @@ import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
 import { seedsForIndustries, seedsForSchool } from "@/lib/discover/seeds";
 import { requireSubscription } from "@/lib/subscription";
+import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
 
 function dedupeSeeds(seeds: import("@/lib/discover/seeds").FirmSeed[]) {
   const seen = new Set<string>();
@@ -136,6 +137,11 @@ export async function POST(request: NextRequest) {
   const hunterBudget = mode === "deep" ? DEEP_HUNTER_BUDGET : QUICK_HUNTER_BUDGET;
   const seeds = allSeeds.slice(0, seedCap);
   const hunterApiKey = process.env.HUNTER_API_KEY || undefined;
+
+  // Charge once per run, up front — after no_seeds validation so an empty run
+  // never burns credits. 402 returns as plain JSON before the stream opens.
+  const creditGate = await requireCredits(userId, CREDIT_COSTS.discover, "discover");
+  if (creditGate) return creditGate;
 
   // ── Streaming pipeline ──────────────────────────────────────────────
   const stream = new ReadableStream<Uint8Array>({

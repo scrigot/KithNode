@@ -26,6 +26,13 @@ vi.mock("@/lib/subscription", () => ({
   requireSubscription: (...args: unknown[]) => mockRequireSubscription(...args),
 }));
 
+// Credits gate: allow by default (returns null); a dedicated test asserts 402.
+const mockRequireCredits = vi.fn();
+vi.mock("@/lib/credits", () => ({
+  requireCredits: (...args: unknown[]) => mockRequireCredits(...args),
+  CREDIT_COSTS: { enrich: 1, discover: 5, draft: 1, resume: 2 },
+}));
+
 const supabaseResults: Array<{ data: unknown; error: unknown }> = [];
 let supabaseCallIndex = 0;
 const ratingResults: Array<{ data: unknown; error: unknown }> = [];
@@ -96,6 +103,7 @@ describe("POST /api/outreach/draft", () => {
     ratingCallIndex = 0;
     mockGetUserPrefs.mockResolvedValue(DEFAULT_PREFS);
     mockRequireSubscription.mockResolvedValue(null);
+    mockRequireCredits.mockResolvedValue(null);
   });
 
   it("returns 400 when contactId is missing", async () => {
@@ -111,6 +119,16 @@ describe("POST /api/outreach/draft", () => {
     );
     const response = await POST(makeRequest({ contactId: "1" }));
     expect(response.status).toBe(402);
+  });
+
+  it("returns 402 when out of credits", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockRequireCredits.mockResolvedValue(
+      NextResponse.json({ error: "out_of_credits", balance: 0, needed: 1 }, { status: 402 }),
+    );
+    const response = await POST(makeRequest({ contactId: "1" }));
+    expect(response.status).toBe(402);
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   it("returns draft for valid contact", async () => {

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
+import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
 import {
   resumeSchema,
@@ -29,6 +30,9 @@ export async function POST(request: NextRequest) {
 
   const gate = await requireSubscription(userEmail);
   if (gate) return gate;
+
+  const creditGate = await requireCredits(userEmail, CREDIT_COSTS.resume, "resume");
+  if (creditGate) return creditGate;
 
   const body = await request.json().catch(() => ({}));
   const valid = validateResumePdf(body?.pdf);

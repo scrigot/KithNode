@@ -42,6 +42,19 @@ export interface UserPrefs {
   clubMemberships: ClubEntry[];
   recruitingDate: string | null;
   weeklyGoalTarget: number;
+  /** Conversion-funnel diagnose answers. Single-select goal (e.g. "Investment
+   * Banking"). Drives the reveal copy + seeds targetIndustries. Optional so the
+   * many existing UserPrefs literals (tests, scoring fixtures) stay valid — the
+   * scorer never reads these; only the onboarding funnel + GET/POST do.
+   * getUserPrefs always populates it. */
+  onboardingGoal?: string;
+  /** Multi-select networking pain points, stored JSON-stringified. Parsed to a
+   * string[] for the reveal step's echo copy. */
+  onboardingPain?: string[];
+  /** Single-select recruiting timeline (e.g. "This fall"). */
+  onboardingTimeline?: string;
+  /** ISO timestamp set when the dashboard tour completes; null until then. */
+  tutorialDoneAt?: string | null;
 }
 
 export type { EducationEntry, ExperienceEntry, ClubEntry };
@@ -66,6 +79,10 @@ const EMPTY_PREFS: UserPrefs = {
   clubMemberships: [],
   recruitingDate: null,
   weeklyGoalTarget: 3,
+  onboardingGoal: "",
+  onboardingPain: [],
+  onboardingTimeline: "",
+  tutorialDoneAt: null,
 };
 
 function parseList(val: string | null | undefined): string[] {
@@ -95,7 +112,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, weeklyGoalTarget"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt"
     )
     .eq("email", email)
     .single();
@@ -122,5 +139,9 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     clubMemberships: parseClubMemberships(data.clubMemberships),
     recruitingDate: data.recruitingDate ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
+    onboardingGoal: data.onboardingGoal || "",
+    onboardingPain: parseList(data.onboardingPain),
+    onboardingTimeline: data.onboardingTimeline || "",
+    tutorialDoneAt: data.tutorialDoneAt ?? null,
   };
 }
