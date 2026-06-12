@@ -201,7 +201,7 @@ describe("resumeSchema", () => {
   });
 
   it("rejects more than 8 experiences", () => {
-    const row = { title: "Analyst", firm: "Goldman Sachs", dates: "Summer 2026" };
+    const row = { title: "Analyst", firm: "Goldman Sachs", start: "Summer 2026", end: "" };
     const result = resumeSchema.safeParse({
       university: "",
       highSchool: "",
@@ -278,8 +278,8 @@ describe("buildResumeResult", () => {
       // Legacy flat pastFirms should be overridden when rows are present.
       pastFirms: ["Legacy Corp"],
       experiences: [
-        { title: "Summer Analyst", firm: "Goldman Sachs", dates: "Summer 2026" },
-        { title: "Intern", firm: "Evercore", dates: "Summer 2025" },
+        { title: "Summer Analyst", firm: "Goldman Sachs", start: "Summer 2026", end: "" },
+        { title: "Intern", firm: "Evercore", start: "Summer 2025", end: "" },
       ],
     };
     const result = buildResumeResult(raw);
@@ -328,9 +328,9 @@ describe("buildResumeResult", () => {
     const raw: ResumeExtract = {
       ...BASE_RAW,
       experiences: [
-        { title: "Analyst", firm: "Goldman Sachs", dates: "Summer 2026" },
-        { title: "Associate", firm: "Goldman Sachs", dates: "Summer 2025" },
-        { title: "Intern", firm: "Evercore", dates: "Summer 2024" },
+        { title: "Analyst", firm: "Goldman Sachs", start: "Summer 2026", end: "" },
+        { title: "Associate", firm: "Goldman Sachs", start: "Summer 2025", end: "" },
+        { title: "Intern", firm: "Evercore", start: "Summer 2024", end: "" },
       ],
     };
     const result = buildResumeResult(raw);

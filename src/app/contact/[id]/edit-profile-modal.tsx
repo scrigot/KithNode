@@ -78,7 +78,9 @@ function parseExperienceRows(val: unknown): ExperienceEntry[] {
       .map((e) => ({
         title: String(e.title ?? "").trim(),
         firm: String(e.firm ?? "").trim(),
-        dates: String(e.dates ?? "").trim(),
+        // Legacy rows carried a single `dates` string — fold into `start`.
+        start: String(e.start ?? e.dates ?? "").trim(),
+        end: String(e.end ?? "").trim(),
       }))
       .filter((e) => e.title || e.firm)
       .slice(0, 8);

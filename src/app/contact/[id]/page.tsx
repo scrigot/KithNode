@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Star, Trash2 } from "lucide-react";
+import { formatExperiencePeriod } from "@/lib/educations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -396,7 +397,7 @@ export default function ContactDetailPage() {
     degrees?: string;
     concentration?: string;
     educations?: { major: string; degree: string; concentration: string }[];
-    experiences?: { title: string; firm: string; dates: string }[];
+    experiences?: { title: string; firm: string; start: string; end: string }[];
     clubMemberships?: { club: string; role: string }[];
     graduationYear?: number | null;
     isFriend?: boolean;
@@ -779,7 +780,7 @@ export default function ContactDetailPage() {
               <div className="space-y-0.5">
                 <dt className="text-muted-foreground">Experience</dt>
                 {contactExt.experiences.map((exp, i) => {
-                  const parts = [exp.title, exp.firm, exp.dates].filter(Boolean);
+                  const parts = [exp.title, exp.firm, formatExperiencePeriod(exp)].filter(Boolean);
                   return parts.length ? (
                     <dd key={i} className="text-right text-foreground">
                       {parts.join(" · ")}

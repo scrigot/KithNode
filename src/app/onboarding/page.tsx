@@ -431,10 +431,11 @@ export default function OnboardingPage() {
       fillList("skills", setSkills, data.skills, skills, 10);
       // Map resume experiences into rows (only when empty).
       if (experiences.length === 0 && Array.isArray(data.experiences) && data.experiences.length > 0) {
-        setExperiences((data.experiences as ExperienceEntry[]).slice(0, 8).map((e) => ({
+        setExperiences((data.experiences as Record<string, unknown>[]).slice(0, 8).map((e) => ({
           title: String(e?.title ?? "").trim(),
           firm: String(e?.firm ?? "").trim(),
-          dates: String(e?.dates ?? "").trim(),
+          start: String(e?.start ?? e?.dates ?? "").trim(),
+          end: String(e?.end ?? "").trim(),
         })));
         filled.add("experiences");
       }

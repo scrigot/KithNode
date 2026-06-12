@@ -21,8 +21,10 @@ export interface EducationEntry {
 export interface ExperienceEntry {
   title: string;
   firm: string;
-  /** Free text, e.g. "Summer 2026". */
-  dates: string;
+  /** Period start, free text e.g. "Jun 2025". */
+  start: string;
+  /** Period end, free text e.g. "Aug 2025", or "Present" when ongoing. */
+  end: string;
 }
 
 export const MAX_EDUCATIONS = 6;
@@ -80,13 +82,25 @@ export function parseExperiences(val: string | null | undefined): ExperienceEntr
       .map((e: Record<string, unknown>) => ({
         title: clean(e?.title, 160),
         firm: clean(e?.firm, 160),
-        dates: clean(e?.dates, 40),
+        // Legacy rows stored a single `dates` string — fold it into `start` so
+        // existing experiences keep rendering after the start/end split.
+        start: clean(e?.start, 40) || clean(e?.dates, 40),
+        end: clean(e?.end, 40),
       }))
       .filter((e) => e.title || e.firm)
       .slice(0, MAX_EXPERIENCES);
   } catch {
     return [];
   }
+}
+
+/** Render an experience period for display: "Jun 2025 - Aug 2025", or a single
+ * endpoint when only one is set ("Present"), or "" when neither. */
+export function formatExperiencePeriod(e: { start: string; end: string }): string {
+  const s = (e.start || "").trim();
+  const en = (e.end || "").trim();
+  if (s && en) return `${s} - ${en}`;
+  return s || en;
 }
 
 /** Synthesize rows from the legacy flat columns (profiles saved before rows

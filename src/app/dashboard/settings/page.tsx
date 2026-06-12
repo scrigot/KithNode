@@ -25,6 +25,7 @@ import {
 import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
 import type { ClubEntry } from "@/lib/club-memberships";
 import { ClubRowsEditor } from "@/components/club-rows-editor";
+import { ExperiencePeriod } from "@/components/experience-rows-editor";
 import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   GraduationCap,
@@ -387,7 +388,7 @@ function ExperienceRowsEditor({
 
   function addRow() {
     if (rows.length >= 8) return;
-    onChange([...rows, { title: "", firm: "", dates: "" }]);
+    onChange([...rows, { title: "", firm: "", start: "", end: "" }]);
   }
 
   const loadFirmOptions = useCallback(async () => FIRM_OPTIONS, []);
@@ -396,7 +397,7 @@ function ExperienceRowsEditor({
     <div className={resumeFilled ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
       <div className="space-y-1.5">
         {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-1.5">
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
             {/* Position */}
             <Input
               value={row.title}
@@ -412,14 +413,6 @@ function ExperienceRowsEditor({
               placeholder="Firm"
               ariaLabel="Firm"
             />
-            {/* Dates */}
-            <Input
-              value={row.dates}
-              onChange={(e) => updateRow(i, { dates: e.target.value.slice(0, 40) })}
-              placeholder="Summer 2026"
-              className="h-9 w-28 bg-muted text-sm"
-              maxLength={40}
-            />
             {/* Remove */}
             <button
               type="button"
@@ -429,6 +422,15 @@ function ExperienceRowsEditor({
             >
               <X className="h-3.5 w-3.5" />
             </button>
+            {/* Start – End (with "Now" → Present) */}
+            <div className="col-span-3">
+              <ExperiencePeriod
+                start={row.start}
+                end={row.end}
+                onStart={(v) => updateRow(i, { start: v })}
+                onEnd={(v) => updateRow(i, { end: v })}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -588,10 +590,11 @@ function EditPanel({
         }
         // Map resume experiences array into rows (only when empty).
         if (next.experiences.length === 0 && Array.isArray(data.experiences) && data.experiences.length > 0) {
-          next.experiences = (data.experiences as ExperienceEntry[]).slice(0, 8).map((e) => ({
+          next.experiences = (data.experiences as Record<string, unknown>[]).slice(0, 8).map((e) => ({
             title: String(e?.title ?? "").trim(),
             firm: String(e?.firm ?? "").trim(),
-            dates: String(e?.dates ?? "").trim(),
+            start: String(e?.start ?? e?.dates ?? "").trim(),
+            end: String(e?.end ?? "").trim(),
           }));
           filled.add("experiences");
         }

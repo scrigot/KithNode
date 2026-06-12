@@ -5,6 +5,7 @@ import {
   educationsFromFlat,
   flatFromEducations,
   firmsFromExperiences,
+  formatExperiencePeriod,
   MAX_EDUCATIONS,
   MAX_EXPERIENCES,
 } from "./educations";
@@ -46,17 +47,32 @@ describe("parseExperiences", () => {
   it("returns [] on garbage and drops rows with neither title nor firm", () => {
     expect(parseExperiences("nope")).toEqual([]);
     expect(
-      parseExperiences(JSON.stringify([{ title: "", firm: "", dates: "Summer 2026" }])),
+      parseExperiences(JSON.stringify([{ title: "", firm: "", start: "Jun 2025", end: "" }])),
     ).toEqual([]);
   });
 
-  it("keeps title/firm/dates and caps at MAX_EXPERIENCES", () => {
+  it("keeps title/firm/start/end and caps at MAX_EXPERIENCES", () => {
     const rows = parseExperiences(
-      JSON.stringify([{ title: "Intern", firm: "CSUSA", dates: "Summer 2026" }]),
+      JSON.stringify([{ title: "Intern", firm: "CSUSA", start: "Jun 2025", end: "Present" }]),
     );
-    expect(rows).toEqual([{ title: "Intern", firm: "CSUSA", dates: "Summer 2026" }]);
-    const many = Array.from({ length: 12 }, (_, i) => ({ title: `T${i}`, firm: "F", dates: "" }));
+    expect(rows).toEqual([{ title: "Intern", firm: "CSUSA", start: "Jun 2025", end: "Present" }]);
+    const many = Array.from({ length: 12 }, (_, i) => ({ title: `T${i}`, firm: "F", start: "", end: "" }));
     expect(parseExperiences(JSON.stringify(many))).toHaveLength(MAX_EXPERIENCES);
+  });
+
+  it("migrates a legacy `dates` string into `start`", () => {
+    expect(
+      parseExperiences(JSON.stringify([{ title: "Intern", firm: "CSUSA", dates: "Summer 2026" }])),
+    ).toEqual([{ title: "Intern", firm: "CSUSA", start: "Summer 2026", end: "" }]);
+  });
+});
+
+describe("formatExperiencePeriod", () => {
+  it("joins start and end, handles Present and single endpoints", () => {
+    expect(formatExperiencePeriod({ start: "Jun 2025", end: "Aug 2025" })).toBe("Jun 2025 - Aug 2025");
+    expect(formatExperiencePeriod({ start: "Jun 2025", end: "Present" })).toBe("Jun 2025 - Present");
+    expect(formatExperiencePeriod({ start: "Summer 2026", end: "" })).toBe("Summer 2026");
+    expect(formatExperiencePeriod({ start: "", end: "" })).toBe("");
   });
 });
 
@@ -110,10 +126,10 @@ describe("firmsFromExperiences", () => {
   it("dedupes case-insensitively, preserves order, skips empty firms", () => {
     expect(
       firmsFromExperiences([
-        { title: "Intern", firm: "Goldman Sachs", dates: "" },
-        { title: "Analyst", firm: "goldman sachs", dates: "" },
-        { title: "Founder", firm: "", dates: "" },
-        { title: "Intern", firm: "CSUSA", dates: "Summer 2026" },
+        { title: "Intern", firm: "Goldman Sachs", start: "", end: "" },
+        { title: "Analyst", firm: "goldman sachs", start: "", end: "" },
+        { title: "Founder", firm: "", start: "", end: "" },
+        { title: "Intern", firm: "CSUSA", start: "Summer 2026", end: "" },
       ]),
     ).toEqual(["Goldman Sachs", "CSUSA"]);
   });

@@ -34,7 +34,7 @@ export async function GET() {
   const experiences =
     prefs.experiences.length > 0
       ? prefs.experiences
-      : prefs.pastFirms.map((firm) => ({ title: "", firm, dates: "" }));
+      : prefs.pastFirms.map((firm) => ({ title: "", firm, start: "", end: "" }));
 
   // Synthesize club membership rows from the flat clubs list when no rows exist.
   const clubMemberships =

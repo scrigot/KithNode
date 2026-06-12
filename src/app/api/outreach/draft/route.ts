@@ -6,6 +6,7 @@ import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { requireSubscription } from "@/lib/subscription";
 import { anthropicCost } from "@/lib/ai-cost";
+import { formatExperiencePeriod } from "@/lib/educations";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -114,14 +115,15 @@ export async function POST(request: NextRequest) {
     const manualTags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
     // Structured experience lines: when the user has structured rows, render
-    // them as "<title> at <firm> (<dates>)" for richer prompt context. Falls
-    // back to the flat pastFirms list when no rows exist.
+    // them as "<title> at <firm> (<start> - <end>)" for richer prompt context.
+    // Falls back to the flat pastFirms list when no rows exist.
     const experienceLines =
       (prefs.experiences ?? []).length > 0
         ? prefs.experiences
             .filter((e) => e.title || e.firm)
             .map((e) => {
-              const datePart = e.dates ? ` (${e.dates})` : "";
+              const period = formatExperiencePeriod(e);
+              const datePart = period ? ` (${period})` : "";
               if (e.title && e.firm) return `${e.title} at ${e.firm}${datePart}`;
               if (e.firm) return `${e.firm}${datePart}`;
               return `${e.title}${datePart}`;

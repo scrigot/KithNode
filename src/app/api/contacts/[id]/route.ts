@@ -308,7 +308,7 @@ export async function GET(
         ?.split(",")
         .map((f: string) => f.trim())
         .filter(Boolean)
-        .map((firm: string) => ({ title: "", firm, dates: "" })) ?? [];
+        .map((firm: string) => ({ title: "", firm, start: "", end: "" })) ?? [];
 
   // Live score breakdown: fit from rescored warmth; signal + engagement from
   // relationship fields; combined total + tier.

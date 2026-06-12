@@ -54,7 +54,12 @@ export const resumeSchema = z.object({
     .max(4),
   experiences: z
     .array(
-      z.object({ title: z.string(), firm: z.string(), dates: z.string() }),
+      z.object({
+        title: z.string(),
+        firm: z.string(),
+        start: z.string(),
+        end: z.string(),
+      }),
     )
     .max(8),
 });
@@ -127,7 +132,7 @@ Return:
 - targetIndustries: up to 4 industries the candidate targets/works in, chosen from the INDUSTRIES list.
 - pastFirms: up to 5 employers from the candidate's work experience section (company names only).
 - educations: up to 4 education entries, each as { major, degree, concentration }. Pair each degree with its corresponding major; map degree from the DEGREES list (${ALL_DEGREES.join(", ")}), map major against the MAJORS list, map concentration against the CONCENTRATIONS list. Unknown tokens use "" not a guess.
-- experiences: up to 8 work experience entries, each as { title, firm, dates }. dates is short free text like "Summer 2026" or "Jan 2025 - May 2026".
+- experiences: up to 8 work experience entries, each as { title, firm, start, end }. start and end are short free text like "Jun 2025"; set end to "Present" if the person still works there.
 
 INDUSTRIES: ${INDUSTRY_OPTIONS.join(", ")}
 
