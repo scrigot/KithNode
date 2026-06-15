@@ -110,7 +110,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
                     : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
                 }
               />
-              Private alpha &middot; 17 of 50 founding seats left
+              Private alpha &middot; free for early users
             </span>
           </motion.div>
 
@@ -160,8 +160,8 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             className="mt-10 max-w-xl text-sm text-white/50"
             variants={fadeUp}
           >
-            500+ alumni mapped. 32% reply rate. 23 founding students already
-            shipping intros.
+            Built solo by a UNC student who got tired of cold outreach going
+            nowhere. Try the live demo above, no signup required.
           </motion.p>
         </motion.div>
 

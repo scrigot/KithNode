@@ -1,33 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useEffect } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion } from "framer-motion";
 
 // ---------------------------------------------------------------------------
 // Dense mesh -- more nodes + edges than solutions-section (this is the climax)
 // ---------------------------------------------------------------------------
-
-const TRUST_SCHOOLS = [
-  "UNC",
-  "Wharton",
-  "Stern",
-  "Booth",
-  "Georgetown",
-  "Harvard",
-  "Yale",
-  "Princeton",
-  "Columbia",
-  "MIT",
-  "Stanford",
-  "Duke",
-  "Cornell",
-  "Dartmouth",
-  "Ross",
-  "Kellogg",
-  "Notre Dame",
-  "Haas",
-];
 
 const MESH_NODES = [
   { x: 2,  y: 5  }, { x: 12, y: 2  }, { x: 22, y: 8  }, { x: 32, y: 3  },
@@ -84,38 +62,6 @@ const CONVERGENCE_PATHS = [
   "M 10 75 Q 30 63 50 50",
   "M 90 75 Q 70 63 50 50",
 ] as const;
-
-// ---------------------------------------------------------------------------
-// CountUp -- same pattern as solutions-section
-// ---------------------------------------------------------------------------
-
-function CountUp({ end }: { end: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true, amount: 0.5 });
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (!isInView || started.current || !ref.current) return;
-    started.current = true;
-
-    const duration = 1800;
-    const startTime = performance.now();
-    const el = ref.current;
-
-    function tick(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const value = Math.round(eased * end);
-      if (el) el.textContent = value.toLocaleString();
-      if (progress < 1) requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
-  }, [isInView, end]);
-
-  return <span ref={ref}>0</span>;
-}
 
 // ---------------------------------------------------------------------------
 // ConvergenceLine -- single animated path drawing toward center
@@ -359,83 +305,7 @@ export function CTASection() {
           extension required.
         </p>
 
-        {/* Trust ticker */}
-        <motion.div
-          className="mt-8 flex w-full flex-col items-center gap-3"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
-            Used by students at
-          </p>
-          <div className="relative w-full max-w-4xl overflow-hidden">
-            <div className="flex">
-              <div className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8">
-                {TRUST_SCHOOLS.map((school) => (
-                  <span
-                    key={`a-${school}`}
-                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                    {school}
-                  </span>
-                ))}
-              </div>
-              <div
-                className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8"
-                aria-hidden
-              >
-                {TRUST_SCHOOLS.map((school) => (
-                  <span
-                    key={`b-${school}`}
-                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                    {school}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent" />
-          </div>
-          <style jsx>{`
-            @keyframes trust-ticker-slide {
-              0% {
-                transform: translateX(0);
-              }
-              100% {
-                transform: translateX(-100%);
-              }
-            }
-            .trust-ticker-track {
-              animation: trust-ticker-slide 45s linear infinite;
-            }
-          `}</style>
-        </motion.div>
 
-        {/* Live join counter */}
-        <motion.div
-          className="mt-10 inline-flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-6 py-4 backdrop-blur-sm"
-          initial={{ opacity: 0, scale: 0.92 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.48, ease: "easeOut" }}
-        >
-          {/* Pulsing status dot */}
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0EA5E9] opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#0EA5E9]" />
-          </span>
-          <span className="font-mono text-2xl font-bold tabular-nums text-[#0EA5E9]">
-            <CountUp end={127} />{/* TODO: replace with real DB count */}
-          </span>
-          <span className="text-[11px] font-medium uppercase tracking-widest text-white/50">
-            students joined this week
-          </span>
-        </motion.div>
       </motion.div>
     </section>
   );
