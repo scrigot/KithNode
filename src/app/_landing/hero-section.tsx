@@ -135,10 +135,10 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg lg:mt-8 lg:text-xl"
             variants={fadeUp}
           >
-            KithNode maps every alum at the firms you care about, ranks each
-            warm path by shared signals (school, club, Greek, hometown), and
-            drafts the message. Warm intros land replies 5x more often than
-            cold emails.
+            KithNode finds the alumni who can actually introduce you, scores
+            each warm path by real shared signals, and drafts the message. You
+            send it yourself, no automation, no bots, nothing that ever touches
+            your LinkedIn account.
           </motion.p>
 
           {/* CTAs */}

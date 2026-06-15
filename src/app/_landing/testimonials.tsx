@@ -92,29 +92,17 @@ function FounderCard() {
         {/* Body copy */}
         <div className="space-y-5 text-base leading-relaxed text-white/80">
           <p>
-            Every finance hire traces back to the same pattern. A{" "}
-            <span className="font-bold text-[#0EA5E9]">
-              warm connection
-            </span>{" "}
-            two or three degrees away that surfaced at the right moment. The
-            pattern is well documented. The execution, finding those
-            connections, scoring them, and drafting outreach that
-            doesn&apos;t feel robotic, is what kills candidates.
+            I&apos;m Sam, a UNC freshman. I&apos;m not in the business school
+            yet, I don&apos;t have a target-school resume or a high GPA. But
+            I&apos;m interning at a Fortune 500 building enterprise-scale RAG
+            systems and at a PE firm building AI automations like deal
+            sourcing, and I got the PE one through a friend in my pledge class
+            who introduced me. Not a cold app. A warm path.
           </p>
           <p>
-            KithNode was built by an operator who ran this exact playbook
-            manually. That playbook landed a{" "}
-            <span className="font-bold text-[#0EA5E9]">
-              Fortune 500 internship
-            </span>{" "}
-            freshman year. Every feature in the product exists because a
-            student tried it at 2am and found the friction. We&apos;re not
-            shipping theories. We&apos;re shipping the method that already
-            works.
-          </p>
-          <p>
-            Founding access is open now. If you&apos;re serious about 2026
-            recruiting, request access below.
+            That&apos;s the whole thesis: the intro beats the resume. KithNode
+            is the method I used, automated. If it worked for me with none of
+            the pedigree, it&apos;ll work for you.
           </p>
         </div>
 
@@ -129,8 +117,7 @@ function FounderCard() {
           <div>
             <p className="text-sm font-bold text-white">Sam Rigot</p>
             <p className="text-xs text-white/60">
-              Founder &middot; UNC Chapel Hill &apos;29 &middot; Fortune 500
-              Intern, Summer 2026
+              Founder &middot; UNC Chapel Hill &apos;29
             </p>
           </div>
         </div>

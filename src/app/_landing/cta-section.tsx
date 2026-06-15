@@ -253,11 +253,9 @@ export function CTASection() {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
         >
-          Your{" "}
-          <span className="text-[#0EA5E9]">warm path</span>{" "}
-          to the{" "}
+          Stop cold-emailing strangers.{" "}
           <br className="hidden md:block" />
-          room where it happens.
+          Walk in <span className="text-[#0EA5E9]">warm</span>.
         </motion.h2>
 
         {/* Subhead */}

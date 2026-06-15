@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { signIn } from "next-auth/react";
 import { LogoIcon } from "@/components/logo";
 
 export function Navbar() {
@@ -37,14 +36,16 @@ export function Navbar() {
           </span>
         </motion.span>
         <div className="hidden items-center gap-6 md:flex">
-          {(["Products", "Solutions", "How It Works"] as const).map((label) => (
+          {(
+            [
+              { label: "How it works", href: "#how-it-works" },
+              { label: "Demo", href: "/demo" },
+              { label: "Why KithNode", href: "/manifesto" },
+            ] as const
+          ).map(({ label, href }) => (
             <motion.a
               key={label}
-              href={
-                label === "How It Works"
-                  ? "/demo"
-                  : `#${label.toLowerCase().replace(/ /g, "-")}`
-              }
+              href={href}
               className="text-sm font-medium transition-colors"
               style={{
                 color: useTransform(scrolled, (v) =>
@@ -58,17 +59,6 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <motion.button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-          className="cursor-pointer text-sm font-medium transition-colors"
-          style={{
-            color: useTransform(scrolled, (v) =>
-              v > 0.5 ? "#0f172a" : "rgba(255,255,255,0.85)"
-            ),
-          }}
-        >
-          Sign in
-        </motion.button>
         <Link
           href="/waitlist"
           className="rounded-lg bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"

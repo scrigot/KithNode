@@ -5,12 +5,10 @@ import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { ProductCards } from "./_landing/product-cards";
-import { SolutionsSection } from "./_landing/solutions-section";
-import { ValueProps } from "./_landing/value-props";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
+import { FAQ } from "./_landing/faq";
 import { PanelScoring } from "@/app/demo/_components/panel-scoring";
-import { PanelOutreach } from "@/app/demo/_components/panel-outreach";
 import Link from "next/link";
 
 export default async function Home({
@@ -40,32 +38,22 @@ export default async function Home({
       </HeroSection>
       <ProductCards />
 
-      {/* Real product output: the actual demo panels (not a mockup), so visitors
-          see the algorithm's real scoring + drafted outreach inline before being
-          asked for anything. Addresses the "no real output anywhere" finding. */}
       <section className="relative bg-black px-4 py-20 sm:py-28">
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
-              Real output, not a mockup
+              The math, not magic
             </span>
             <h2 className="mt-5 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              See exactly what you get
+              Know exactly who to talk to, and why.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/60">
-              A scored warm path and the outreach it drafts, straight from the
-              live demo with sample data. No signup to look.
+              Every warm path gets a score you can see straight through. Real output from the live demo, sample data.
             </p>
           </div>
-          <div className="flex flex-col gap-8">
-            <PanelScoring />
-            <PanelOutreach />
-          </div>
+          <PanelScoring />
           <div className="mt-10 text-center">
-            <Link
-              href="/demo"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-base font-semibold text-white/90 backdrop-blur-sm transition-all hover:border-[#0EA5E9]/50 hover:bg-[#0EA5E9]/10 hover:text-white"
-            >
+            <Link href="/demo" className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-base font-semibold text-white/90 backdrop-blur-sm transition-all hover:border-[#0EA5E9]/50 hover:bg-[#0EA5E9]/10 hover:text-white">
               Explore the full live demo &rarr;
             </Link>
           </div>
@@ -115,9 +103,35 @@ export default async function Home({
         </div>
       </section>
 
-      <SolutionsSection />
-      <ValueProps />
+      <section className="relative bg-black px-4 py-20 sm:py-24">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-10 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
+              What KithNode won&apos;t do
+            </span>
+            <h2 className="mt-5 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              The stuff you&apos;re actually worried about
+            </h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7">
+              <h3 className="font-heading text-lg font-bold text-white">Won&apos;t get your LinkedIn banned</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">No automation, no scraping, no bots. KithNode never logs into your account, and never sends on its own. You send every message yourself.</p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7">
+              <h3 className="font-heading text-lg font-bold text-white">Won&apos;t make you sound like a robot</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">Every draft is grounded in a real shared connection and is a starting point you edit before sending. Not send-ready spam.</p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7">
+              <h3 className="font-heading text-lg font-bold text-white">Won&apos;t make you the 100th identical message</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">Built on your specific shared signals, so no two students send the same thing.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <Testimonials />
+      <FAQ />
       <CTASection />
 
       {/* Footer */}
@@ -167,6 +181,12 @@ export default async function Home({
           {/* Company */}
           <div className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold text-slate-900">Company</h4>
+            <a
+              href="/manifesto"
+              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+            >
+              Why KithNode
+            </a>
             <a
               href="https://www.linkedin.com/in/samrigot"
               target="_blank"
