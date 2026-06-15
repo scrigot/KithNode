@@ -78,14 +78,14 @@ Return:
 - skills: up to 25 of their skills (the "Skills" and "Top skills" sections), mapped to the SKILLS list when confident.
 - experiences: up to 10 work experiences, each { title, firm, start, end }. start/end are short like "Jun 2025"; set end to "Present" if current.
 - educations: up to 6, each { school, degree, major }. Map degree to one of: ${ALL_DEGREES.join(", ")}. Map major to the MAJORS list when confident.
-- clubs: up to 10 clubs / student orgs / volunteering / organizations, mapped to the CLUBS list when confident.
+- clubs: up to 10 of the person's COLLEGE student organizations / clubs / Greek life, mapped to the CLUBS list when confident. Do NOT include volunteering, charities, or high-school-era activities — only college clubs/orgs.
 - mutuals: the mutual connections between the VIEWER and the profile owner. LinkedIn surfaces these as blocks like "Khalil Rahman, Maria Lopez, and 9 other mutual connections" or "You and <owner> both know …". Return each NAMED person as { name }. Include slug ONLY if a literal /in/<slug> URL is visible for that person; otherwise omit slug entirely. A trailing "N other" count with no visible names must NOT produce entries. Never invent names. These are people the viewer and the profile owner both know — look for "mutual connections" text on the page.
 - highSchool: their high school if shown.
 - graduationYear: the year they graduate/graduated — read from the education entry's date-range END year or a "Class of 20XX" line. Return a number only (e.g. 2027); omit if unknown.
 - notes: a 1-2 sentence plain-text summary for OUTREACH context, drawn from their About / headline / current role — not a list, just useful personal context to warm up a message.
 - tags: up to 5 short career labels for this person (e.g. "Investment Banking", "AI", "Recruiter").
 
-CLASSIFICATION RULE: student organizations, Greek fraternities/sororities, clubs, and volunteering ALWAYS go under clubs (each entry with the person's role if shown), NOT under experiences. experiences is for real jobs / internships ONLY — never put a club, fraternity, sorority, student org, or volunteering role in experiences.
+CLASSIFICATION RULES: (1) college student organizations, Greek fraternities/sororities, and clubs go under clubs (each with the person's role if shown), NOT under experiences. experiences is for real jobs / internships ONLY — never put a club, fraternity, sorority, or student-org role in experiences. (2) EXCLUDE volunteering, charity work, and any high-school-era activities ENTIRELY — do NOT put them in clubs OR experiences (they are not useful affiliations).
 
 SKILLS: ${(skills as string[]).join(", ")}
 

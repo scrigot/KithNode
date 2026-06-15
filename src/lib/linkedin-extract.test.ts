@@ -48,6 +48,11 @@ describe("buildLinkedInPrompt", () => {
     const prompt = buildLinkedInPrompt("some page text");
     expect(prompt).toContain("NOT under experiences");
   });
+
+  it("excludes volunteering and high-school activities from clubs", () => {
+    const prompt = buildLinkedInPrompt("some page text");
+    expect(prompt).toContain("EXCLUDE volunteering");
+  });
 });
 
 const validBase = {
