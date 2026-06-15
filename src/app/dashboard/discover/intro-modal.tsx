@@ -20,6 +20,9 @@ interface IntroModalProps {
   };
   warmPath: WarmPath;
   userName: string;
+  /** When the intermediary is already a saved contact (e.g. launched from the
+   * mutual-connections card), suppress the "not on KithNode yet / invite" copy. */
+  intermediaryIsContact?: boolean;
   onClose: () => void;
 }
 
@@ -29,6 +32,7 @@ export function IntroModal({
   contact,
   warmPath,
   userName,
+  intermediaryIsContact,
   onClose,
 }: IntroModalProps) {
   const defaultMessage = `Hi ${warmPath.intermediaryName}, I'm ${userName} at UNC. I noticed you might know ${contact.name} at ${contact.firmName}. Would you be willing to make an introduction? I'm currently recruiting for ${contact.firmName.includes("Capital") || contact.firmName.includes("Partners") || contact.firmName.includes("Advisors") ? "finance" : "industry"} roles and would love to learn more about their experience.`;
@@ -195,13 +199,16 @@ export function IntroModal({
                 </div>
               </div>
 
-              {/* Not on KithNode notice */}
-              <div className="border border-amber-500/20 bg-amber-500/5 px-3 py-2">
-                <p className="text-[10px] text-amber-400">
-                  {warmPath.intermediaryName} isn't on KithNode yet. We'll send
-                  them an email with your intro request and an invite to join.
-                </p>
-              </div>
+              {/* Not on KithNode notice — suppressed when the intermediary is a
+                  saved contact (the mutual-connections entry point). */}
+              {!intermediaryIsContact && (
+                <div className="border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                  <p className="text-[10px] text-amber-400">
+                    {warmPath.intermediaryName} isn't on KithNode yet. We'll send
+                    them an email with your intro request and an invite to join.
+                  </p>
+                </div>
+              )}
 
               {/* Message textarea */}
               <div>
