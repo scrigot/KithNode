@@ -13,6 +13,9 @@ import {
   type CsvContact,
 } from "@/lib/linkedin-csv";
 import { Upload, Link2, AlertTriangle, Sparkles, X } from "lucide-react";
+import BrainDumpPanel from "./brain-dump-panel";
+
+type ImportMode = "csv" | "ai";
 
 const TIER_STYLES: Record<string, string> = {
   kith: "text-amber-300",
@@ -28,6 +31,7 @@ const IMPORT_BATCH_SIZE = 50;
 
 export default function ImportPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<ImportMode>("csv");
   const [urls, setUrls] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -205,13 +209,42 @@ export default function ImportPage() {
             IMPORT
           </h2>
           <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            Paste LinkedIn URLs or upload a CSV
+            {mode === "csv"
+              ? "Paste LinkedIn URLs or upload a CSV"
+              : "Brain-dump your network with your own AI, then import"}
           </p>
+        </div>
+        <div className="flex border border-white/[0.06]">
+          <button
+            onClick={() => setMode("csv")}
+            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              mode === "csv"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            CSV / URLs
+          </button>
+          <button
+            onClick={() => setMode("ai")}
+            className={`flex items-center gap-1 border-l border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              mode === "ai"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sparkles className="h-3 w-3" />
+            Enrich with AI
+          </button>
         </div>
       </div>
 
       <div className="mt-3 h-px bg-border" />
 
+      {mode === "ai" && <BrainDumpPanel />}
+
+      {mode === "csv" && (
+        <>
       {/* Two-column inputs: CSV + URL paste */}
       <div className="mt-3 grid flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
         {/* CSV Upload */}
@@ -478,6 +511,8 @@ export default function ImportPage() {
             })}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
