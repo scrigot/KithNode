@@ -5,7 +5,11 @@ import type { Mock } from "vitest";
 // the other module-level deps so we can import the PURE helpers without ever
 // pulling next-auth's runtime.
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/supabase", () => ({ supabase: {} }));
+// Supabase is configurable per-test via mockFrom (mirrors contacts/route.test).
+const mockFrom = vi.fn();
+vi.mock("@/lib/supabase", () => ({
+  supabase: { from: (...args: unknown[]) => mockFrom(...args) },
+}));
 vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
 vi.mock("@/lib/rescore-contact", () => ({
   rescoreContact: vi.fn(),
@@ -13,7 +17,7 @@ vi.mock("@/lib/rescore-contact", () => ({
 }));
 vi.mock("@/lib/deduce-hometown", () => ({ deduceHometown: vi.fn() }));
 
-import { normalizeField, pickEditableFields, DELETE, PATCH } from "./route";
+import { normalizeField, pickEditableFields, GET, DELETE, PATCH } from "./route";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
@@ -557,5 +561,150 @@ describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
     expect(body.tier).toBe("hot");
     // The owner's write reaches the shared row.
     expect(updateSpy).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/contacts/[id]: pool-safe field blanking for a non-owner viewer
+//
+// A non-owner reaches a foreign contact only via a high_value UserDiscover
+// link. The owner's private/personal columns (notes, hometown, highSchool,
+// passions, isFriend, speakFrequency, lastSpokenAt) must be blanked, and the
+// owner's isFriend must NOT promote the viewer into the "kith" relationship
+// class.
+// ---------------------------------------------------------------------------
+
+function makeGetRequest(id: string) {
+  return new Request(`http://localhost/api/contacts/${id}`, { method: "GET" });
+}
+
+function makeGetParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("blanks the owner's private fields and does not promote relationship_class for a non-owner viewing a pooled contact", async () => {
+    (auth as Mock).mockResolvedValue({ user: { email: "viewer@unc.edu" } });
+    (getUserPrefs as Mock).mockResolvedValue({});
+    (rescoreContact as Mock).mockReturnValue({
+      affiliations: [],
+      score: 0,
+      tier: "cold",
+    });
+    (loadContactTags as Mock).mockResolvedValue([]);
+
+    // Earlier DELETE/PATCH tests reassign supabase.from directly; restore the
+    // mockFrom delegate so this GET test controls the query chain.
+    (supabase as unknown as Record<string, unknown>).from = (...args: unknown[]) =>
+      mockFrom(...args);
+
+    const foreignContact = {
+      id: "c1",
+      name: "Foreign Owner",
+      importedByUserId: "someone-else@x.com",
+      isFriend: true,
+      notes: "private owner note",
+      hometown: "Charlotte",
+      highSchool: "West Forsyth HS",
+      passions: "sailing",
+      lastSpokenAt: "2026-06-01T12:00:00.000Z",
+      speakFrequency: "weekly",
+      title: "Analyst",
+      firmName: "GS",
+      warmthScore: 70,
+      tier: "warm",
+      graduationYear: 2027,
+      education: "",
+      location: "",
+      university: "",
+      affiliations: "",
+    };
+
+    // Wire the detail GET's query chain by call order:
+    //  1. AlumniContact  → select.eq.single → the foreign contact row
+    //  2. UserDiscover   → select.eq.eq.maybeSingle → high_value rating (access)
+    //  3. ContactConnection → select.eq.eq → [] (viewer-scoped edges)
+    //  4. contact_tags   → select.eq.eq.order → []
+    //  5. PipelineEntry  → select.eq.eq.maybeSingle → null
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(() =>
+                Promise.resolve({ data: foreignContact, error: null }),
+              ),
+            })),
+          })),
+        };
+      }
+      if (callCount === 2) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(() =>
+                  Promise.resolve({ data: { rating: "high_value" }, error: null }),
+                ),
+              })),
+            })),
+          })),
+        };
+      }
+      if (callCount === 3) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+            })),
+          })),
+        };
+      }
+      if (callCount === 4) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+              })),
+            })),
+          })),
+        };
+      }
+      // callCount === 5: PipelineEntry
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+            })),
+          })),
+        })),
+      };
+    });
+
+    const res = await GET(
+      makeGetRequest("c1") as import("next/server").NextRequest,
+      makeGetParams("c1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // Owner's private/personal columns blanked for the non-owner viewer.
+    expect(body.notes).toBe("");
+    expect(body.hometown).toBe("");
+    expect(body.high_school).toBe("");
+    expect(body.passions).toBe("");
+    expect(body.isFriend).toBe(false);
+    expect(body.speakFrequency).toBe("");
+    expect(body.lastSpokenAt).toBe("");
+    // The owner's isFriend must NOT promote the viewer into the kith class.
+    expect(body.relationship_class).not.toBe("kith");
   });
 });

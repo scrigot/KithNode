@@ -160,4 +160,85 @@ describe("GET /api/contacts", () => {
     expect(body[0].relationship_class).toBe("kith");
     expect(body[0].score.tier).toBe("kith");
   });
+
+  it("blanks the owner's private relationship fields for a non-owner viewing a pooled high_value contact", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "viewer@unc.edu" } });
+    let callCount = 0;
+    mockFrom.mockImplementation(() => {
+      callCount++;
+      // Call #1: AlumniContact own imports (select→eq→order), viewer owns nothing.
+      if (callCount === 1) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+            })),
+          })),
+        };
+      }
+      // Call #2: UserDiscover (select→eq), viewer rated foreign1 high_value.
+      if (callCount === 2) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() =>
+              Promise.resolve({
+                data: [{ contactId: "foreign1", rating: "high_value" }],
+                error: null,
+              }),
+            ),
+          })),
+        };
+      }
+      // Call #3: PipelineEntry (select→eq), no pipeline rows for the viewer.
+      if (callCount === 3) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        };
+      }
+      // Call #4: AlumniContact discovered (select→in), the foreign pool row,
+      // carrying the OWNER's private relationship data the viewer must not see.
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn(() =>
+            Promise.resolve({
+              data: [
+                {
+                  id: "foreign1",
+                  name: "Foreign Owner",
+                  title: "Analyst",
+                  linkedInUrl: "",
+                  education: "",
+                  location: "",
+                  affiliations: "",
+                  university: "",
+                  firmName: "GS",
+                  warmthScore: 70,
+                  tier: "warm",
+                  importedByUserId: "someone-else@x.com",
+                  isFriend: true,
+                  lastSpokenAt: "2026-06-01T12:00:00.000Z",
+                  speakFrequency: "weekly",
+                  createdAt: "2026-06-01T12:00:00.000Z",
+                },
+              ],
+              error: null,
+            }),
+          ),
+        })),
+      };
+    });
+
+    const response = await GET();
+    const body = await response.json();
+    // Owner's private relationship fields are blanked for the non-owner viewer.
+    expect(body[0].is_friend).toBe(false);
+    expect(body[0].speak_frequency).toBe("");
+    expect(body[0].last_spoken_at).toBe("");
+    // Owner's isFriend must NOT promote the viewer's relationship class.
+    expect(body[0].relationship_class).not.toBe("kith");
+    // Positive control: high_value unlock still reveals the identity.
+    expect(body[0].name).toBe("Foreign Owner");
+  });
 });
