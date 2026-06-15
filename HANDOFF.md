@@ -1,7 +1,8 @@
 # KithNode — Session Handoff (2026-06-15)
 
 > Single source of truth for consolidating to ONE working session. Read this first.
-> Everything below is as of commit `9240068` on branch `feat/contact-intelligence`.
+> As of HEAD `db86844` on branch `feat/contact-intelligence`. Both sessions' work is
+> now committed, the working tree is CLEAN, and the full suite is green at HEAD.
 
 ## 0. Where the repo lives now
 - Repo was **MOVED**: `/Users/scrigot/projects/kithnode` → **`/Users/scrigot/projects/apps/kithnode`** (the whole `projects/` tree was reorganized into `apps/` on 2026-06-15, mid-session).
@@ -18,7 +19,7 @@
   - Sanitized unique-violation errors (no raw DB/constraint-name leak).
 
 ## 2. Verification status
-- Full suite: **1124 tests / 103 files PASS**; `tsc --noEmit` clean.
+- Re-verified at consolidated HEAD `db86844` (after the other session's commits landed): **1125 tests / 103 files PASS**, `tsc --noEmit` clean, working tree clean.
 - Independent review of `9240068`: **PASS-WITH-NITS** (no CRITICAL/HIGH). Confirmed: no takeover reintroduced, link-on-match correct, privacy scoping complete across all 3 GETs, tests non-tautological. `UserDiscover_userId_contactId_key` confirmed against the live DB.
 
 ## 3. Open follow-ups (all LOW / non-blocking)
@@ -29,16 +30,12 @@
 2. **[LOW]** `src/app/api/import/linkedin/route.ts` `findPoolRow` uses `.single()` → switch to `.maybeSingle()`. The 0-row "no pool match" case is the common path; `.single()` logs a PGRST116 each time. Behavior is already correct (error ignored).
 3. **[INFO, pre-existing]** `prisma/schema.prisma` `UserDiscover` lacks the `@@unique([userId, contactId])` the DB actually has. Matches this repo's "Supabase owns constraints" convention — not a bug.
 
-## 4. Multi-session reconciliation — DO THIS FIRST
-At handoff a second session was editing the SAME working tree. Uncommitted files that were NOT part of the shipped commits:
-- `src/app/_landing/cta-section.tsx`, `src/app/waitlist/page.tsx`, `src/app/waitlist/waitlist-form.tsx`
-- `src/lib/linkedin-import.ts` (+ `.test.ts`), `src/lib/rescore-contact.ts`, `src/lib/classify-career.ts` (+ `.test.ts`), `src/lib/data/career-info.ts`, `src/lib/data/career-tracks.ts`
-- `src/app/contact/[id]/page.tsx`, `src/app/api/contacts/[id]/route.test.ts`
+## 4. Multi-session reconciliation — DONE (verified)
+A second session was editing the same working tree during handoff; it has since committed everything (`0174e59 fix(waitlist)`, `8b542c1 feat(contacts)`). State now:
+- Working tree is **clean** — nothing stranded, nothing to reconcile.
+- Full suite **green at HEAD `db86844` (1125 pass)** — confirms the other session's `contacts/[id]/route.test.ts` edits pass against the privacy change in `9240068` (no collision).
 
-Steps:
-1. `git -C /Users/scrigot/projects/apps/kithnode status` — for each uncommitted file, commit or discard intentionally.
-2. **Re-run `npx vitest run`.** Specifically confirm `contacts/[id]/route.test.ts` (the other session edited it) still passes against the privacy change in `9240068` — if it asserts pre-privacy behavior it will need updating.
-3. `git worktree prune` the stale `my-pipelines` worktree if done with it.
+Only residual: `git worktree prune` the stale `my-pipelines` worktree registration if you're done with it.
 
 ## 5. Architecture facts for building features
 - **`AlumniContact` = GLOBAL shared pool**, one row per `linkedInUrl` (globally `@unique`). `importedByUserId` = canonical owner. Intentional — Discover reuses enrichment across users.
