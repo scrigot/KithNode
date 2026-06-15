@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MeshBg } from "@/app/_landing/mesh-bg";
 
 export const metadata = {
   title: "Why KithNode exists",
@@ -7,8 +8,9 @@ export const metadata = {
 
 export default function ManifestoPage() {
   return (
-    <main className="min-h-screen bg-black px-6 py-20">
-      <div className="mx-auto max-w-2xl">
+    <main className="relative min-h-screen overflow-hidden bg-black px-6 py-20">
+      <MeshBg />
+      <div className="relative mx-auto max-w-2xl">
         <Link href="/" className="text-sm font-medium text-white/50 transition-colors hover:text-white">
           &larr; Back
         </Link>

@@ -8,6 +8,7 @@ import { ProductCards } from "./_landing/product-cards";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
 import { FAQ } from "./_landing/faq";
+import { MeshBg } from "./_landing/mesh-bg";
 import { PanelScoring } from "@/app/demo/_components/panel-scoring";
 import Link from "next/link";
 
@@ -39,7 +40,8 @@ export default async function Home({
       <ProductCards />
 
       <section className="relative bg-black px-4 py-20 sm:py-28">
-        <div className="mx-auto max-w-5xl">
+        <MeshBg />
+        <div className="relative mx-auto max-w-5xl">
           <div className="mb-12 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
               The math, not magic
@@ -63,7 +65,8 @@ export default async function Home({
       {/* Transparency: plain-English how-the-score-works + data sourcing. Kills the
           black-box trust finding and establishes data origin before the request flow. */}
       <section className="relative bg-black px-4 py-20 sm:py-24">
-        <div className="mx-auto max-w-5xl">
+        <MeshBg />
+        <div className="relative mx-auto max-w-5xl">
           <div className="mb-10 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
               No black box
@@ -104,7 +107,8 @@ export default async function Home({
       </section>
 
       <section className="relative bg-black px-4 py-20 sm:py-24">
-        <div className="mx-auto max-w-5xl">
+        <MeshBg />
+        <div className="relative mx-auto max-w-5xl">
           <div className="mb-10 text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
               What KithNode won&apos;t do

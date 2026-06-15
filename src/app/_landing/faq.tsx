@@ -1,3 +1,5 @@
+import { MeshBg } from "./mesh-bg";
+
 const FAQS: { q: string; a: string }[] = [
   { q: "Will this get my LinkedIn restricted or banned?", a: "No. KithNode never automates, scrapes, or logs into your LinkedIn. Nothing runs on your account, and nothing sends on its own. You copy each message and send it yourself." },
   { q: "Where does the contact data come from?", a: "Permitted public sources and the LinkedIn data export you choose to share. Never your private account, never your password." },
@@ -10,7 +12,8 @@ const FAQS: { q: string; a: string }[] = [
 export function FAQ() {
   return (
     <section id="faq" className="relative bg-black px-4 py-20 sm:py-24">
-      <div className="mx-auto max-w-3xl">
+      <MeshBg />
+      <div className="relative mx-auto max-w-3xl">
         <h2 className="text-center font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
           Questions, answered
         </h2>
