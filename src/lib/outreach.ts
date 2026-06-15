@@ -17,6 +17,9 @@ export interface OutreachContext {
   alumniFirm: string;
   alumniUniversity: string;
   strengthScore: number;
+  // Free-text relationship memory the user keeps on this contact. Personalizes
+  // the outreach only — never an input to scoring.
+  notes?: string;
   // Professor channel fields (all optional):
   alumniSource?: "alumni" | "professor" | "discover_run";
   profType?: "research-heavy" | "teaching-heavy" | "mixed";
@@ -86,6 +89,12 @@ function buildBody(ctx: OutreachContext, signals: SharedSignal[]): string {
       `I'm particularly curious about what drew you to ${ctx.userTargetIndustry} and how you've seen the industry evolve.`,
     );
   }
+
+  // The user's free-text `notes` are deliberately NOT injected into this
+  // deterministic template: a raw "On a personal note, …" sentence reads
+  // robotically and would dump untrusted scraped text verbatim into the body.
+  // Notes are woven in only by the LLM draft path (api/outreach/draft), which
+  // phrases them naturally and treats them as untrusted reference data.
 
   return parts.join(" ");
 }

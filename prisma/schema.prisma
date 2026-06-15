@@ -61,6 +61,7 @@ model AlumniContact {
   highSchool       String          @default("")
   clubs            String          @default("")
   passions         String          @default("")
+  notes            String          @default("")
   affiliations     String          @default("")
   warmthScore      Float           @default(0)
   tier             String          @default("cold")
@@ -198,4 +199,20 @@ model Feedback {
   message   String
   status    String   @default("new")
   createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model ContactConnection {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId     String
+  contactId       String
+  mutualName      String
+  mutualSlug      String   @default("")
+  mutualKey       String
+  mutualContactId String?
+  source          String   @default("linkedin_extension")
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([ownerUserId, contactId, mutualKey])
+  @@index([ownerUserId, contactId])
+  @@index([ownerUserId, mutualContactId])
 }

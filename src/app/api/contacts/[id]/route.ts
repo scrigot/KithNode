@@ -25,6 +25,8 @@ import {
   displayTier,
   SPEAK_FREQUENCIES,
 } from "@/lib/relationship-score";
+import { edgesToResolvedMutuals } from "@/lib/mutuals";
+import { contactNeedsInfo } from "@/lib/needs-info";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -37,6 +39,7 @@ const EDITABLE_FIELDS = [
   "highSchool",
   "clubs",
   "passions",
+  "notes",
   "greekOrg",
   "title",
   "firmName",
@@ -121,6 +124,10 @@ export function pickEditableFields(
       // Closed-set validation (canonical casing, dedupe, junk dropped). Like
       // clubs/skills it is forgiving — never a 400.
       out[key] = normalizeDegrees(val);
+    } else if (key === "notes") {
+      // Notes are a free-text outreach/memory field — bounded but roomier than
+      // the 160-char single-field cap, matching the capture ingest.
+      out[key] = val.trim().slice(0, 280);
     } else {
       out[key] = normalizeField(val);
     }
@@ -272,6 +279,15 @@ export async function GET(
     }
   }
 
+  // Mutual-connection edges, SCOPED TO THE VIEWER: a non-owner high_value rater
+  // correctly sees [] (these are the owner's captured warm paths, not theirs).
+  const { data: edgeRows } = await supabase
+    .from("ContactConnection")
+    .select("mutualName, mutualSlug, mutualContactId")
+    .eq("ownerUserId", userId)
+    .eq("contactId", id);
+  const mutuals = edgesToResolvedMutuals(edgeRows ?? []);
+
   // Fetch per-user manual tags for this contact
   const { data: tagRows } = await supabase
     .from("contact_tags")
@@ -353,6 +369,7 @@ export async function GET(
     greek_org: contact.greekOrg,
     clubs: contact.clubs,
     passions: contact.passions,
+    notes: contact.notes || "",
     major: contact.major || "",
     minor: contact.minor || "",
     concentration: contact.concentration || "",
@@ -388,6 +405,7 @@ export async function GET(
     },
     relationship_class: klass,
     dormant,
+    needs_info: contactNeedsInfo(contact, tier),
     pipeline_stage: (pipelineEntry?.stage as string) || "",
     affiliations: liveAffiliations.map((a, i) => ({
       id: i,
@@ -399,6 +417,7 @@ export async function GET(
     outreach_history: [],
     signals: [],
     tags,
+    mutuals,
   });
 }
 

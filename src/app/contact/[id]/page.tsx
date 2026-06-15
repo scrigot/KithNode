@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Star, Trash2 } from "lucide-react";
-import { formatExperiencePeriod } from "@/lib/educations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
+import { IntroModal } from "@/app/dashboard/discover/intro-modal";
+import { CareerTimeline } from "@/components/career-timeline";
 import { TagEditor } from "./tag-editor";
 import { FieldEditor } from "./field-editor";
 import { EditProfileModal } from "./edit-profile-modal";
@@ -62,6 +63,7 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
 
 function ScoreSection({
   score,
+  needsInfo,
   isFriend,
   speakFrequency,
   lastSpokenAt,
@@ -70,6 +72,7 @@ function ScoreSection({
   dormant,
 }: {
   score: ContactDetail["score"];
+  needsInfo?: boolean;
   isFriend?: boolean;
   speakFrequency?: string;
   lastSpokenAt?: string;
@@ -90,17 +93,37 @@ function ScoreSection({
         SCORE BREAKDOWN
       </h3>
       <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tabular-nums text-foreground">
-          {Math.round(score.total_score)}
-        </span>
-        <span className="text-sm text-muted-foreground">/100</span>
-        <Badge
-          variant="outline"
-          className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
-        >
-          {score.tier.toUpperCase()}
-        </Badge>
+        {needsInfo ? (
+          <span className="text-3xl font-bold tabular-nums text-muted-foreground/50">—</span>
+        ) : (
+          <>
+            <span className="text-3xl font-bold tabular-nums text-foreground">
+              {Math.round(score.total_score)}
+            </span>
+            <span className="text-sm text-muted-foreground">/100</span>
+          </>
+        )}
+        {needsInfo ? (
+          <span className="ml-2 border border-dashed border-slate-500/40 bg-transparent text-slate-400 text-[10px] font-bold tracking-wider px-1.5 py-0.5">
+            NEEDS INFO
+          </span>
+        ) : (
+          <Badge
+            variant="outline"
+            className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
+          >
+            {score.tier.toUpperCase()}
+          </Badge>
+        )}
       </div>
+      {needsInfo && (
+        <p className="mb-3 text-[10px] text-muted-foreground">
+          Add their school, clubs, or hometown to score them{" "}
+          <Link href="/dashboard/import" className="text-accent-blue hover:underline text-[10px]">
+            Enrich with AI →
+          </Link>
+        </p>
+      )}
 
       <div className="space-y-2">
         <div>
@@ -379,9 +402,22 @@ export default function ContactDetailPage() {
     searchParams.get("edit") === "1",
   );
   const [tab, setTab] = useState<"signals" | "profile">("signals");
+  const [introMutual, setIntroMutual] = useState<{ name: string } | null>(null);
+  const [userName, setUserName] = useState("");
   // Two-click delete for the contact page header.
   const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch user name for the intro modal warm-path preview.
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.name) setUserName(data.user.name);
+        else if (data?.user?.email) setUserName(data.user.email.split("@")[0]);
+      })
+      .catch(() => {});
+  }, []);
 
   // Reset the armed delete state after 3s or on outside interaction.
   useEffect(() => {
@@ -467,7 +503,11 @@ export default function ContactDetailPage() {
     relationship_class?: string;
     dormant?: boolean;
     pipeline_stage?: string;
+    notes?: string;
   };
+
+  // Mutual-connection edges, resolved server-side in GET /api/contacts/[id].
+  const mutuals = contact.mutuals ?? [];
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -616,6 +656,7 @@ export default function ContactDetailPage() {
           {/* Score */}
           <ScoreSection
             score={contact.score}
+            needsInfo={(contact as unknown as { needs_info?: boolean }).needs_info}
             isFriend={contactExt.isFriend}
             speakFrequency={contactExt.speakFrequency}
             lastSpokenAt={contactExt.lastSpokenAt}
@@ -750,7 +791,11 @@ export default function ContactDetailPage() {
       {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
           rows, mutual/LinkedIn links, and the tags editor. ─── */}
       {tab === "profile" && (
-      <div className="grid items-start grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
+        {/* Career history timeline — full-width, above the detail grid. Renders
+            null for contacts with no experience. */}
+        <CareerTimeline experiences={contactExt.experiences ?? []} />
+        <div className="grid items-start grid-cols-1 gap-4 lg:grid-cols-2">
         {/* LEFT — Classification & signals */}
         <div className="border border-border bg-card p-4">
           <TypeToggle
@@ -848,20 +893,9 @@ export default function ContactDetailPage() {
             {/* Minor is not part of education rows — always render it. */}
             <DetailRow label="Minor" value={contact.minor} />
             <DetailRow label="Skills" value={contact.skills} />
-            {/* Experience rows when present; fall back to flat past_firms. */}
-            {contactExt.experiences && contactExt.experiences.length > 0 ? (
-              <div className="space-y-0.5">
-                <dt className="text-muted-foreground">Experience</dt>
-                {contactExt.experiences.map((exp, i) => {
-                  const parts = [exp.title, exp.firm, formatExperiencePeriod(exp)].filter(Boolean);
-                  return parts.length ? (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  ) : null;
-                })}
-              </div>
-            ) : (
+            {/* Career history now lives in the timeline card above; only fall
+                back to flat past_firms when there are no structured experiences. */}
+            {!(contactExt.experiences && contactExt.experiences.length > 0) && (
               <DetailRow label="Past employers" value={contact.past_firms} />
             )}
             <DetailRow label="Location (current)" value={contact.linkedin_location} />
@@ -904,6 +938,21 @@ export default function ContactDetailPage() {
             })()}
             <DetailRow label="Passions" value={contact.passions} />
           </dl>
+          {/* NOTES — relationship memory + outreach personalization. Read
+              defensively; render only when the user has set something. */}
+          {contactExt.notes?.trim() && (
+            <>
+              <Separator className="my-3" />
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  NOTES
+                </h4>
+                <p className="whitespace-pre-wrap text-xs text-foreground">
+                  {contactExt.notes.trim()}
+                </p>
+              </div>
+            </>
+          )}
           <Separator className="my-3" />
           <div className="space-y-1.5 text-xs">
             <p>
@@ -918,7 +967,7 @@ export default function ContactDetailPage() {
             </p>
             <p>
               <span className="text-muted-foreground">LinkedIn: </span>
-              {contact.linkedin_url ? (
+              {/^https?:\/\//i.test(contact.linkedin_url) ? (
                 <a
                   href={contact.linkedin_url}
                   target="_blank"
@@ -946,7 +995,82 @@ export default function ContactDetailPage() {
             )}
           </div>
         </div>
+        </div>
+
+        {/* MUTUAL CONNECTIONS — full-width, bottom of the Profile tab. Captured
+            from enriched profile data; the LinkedIn search link is the fallback
+            for contacts with none yet. */}
+        <div className="border border-border bg-card p-4">
+          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            MUTUAL CONNECTIONS
+          </h3>
+          {mutuals.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {mutuals.map((m, i) =>
+                m.contactId ? (
+                  <span key={i} className="inline-flex items-center gap-1">
+                    <Link
+                      href={`/contact/${m.contactId}`}
+                      className="border border-white/[0.12] px-2 py-0.5 text-xs text-foreground transition-colors hover:text-primary"
+                    >
+                      {m.name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setIntroMutual({ name: m.name })}
+                      className="border border-white/[0.12] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      ASK FOR INTRO
+                    </button>
+                  </span>
+                ) : (
+                  <span
+                    key={i}
+                    className="border border-white/[0.12] px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {m.name}
+                  </span>
+                ),
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No mutual connections captured yet. Enrich their profile to surface
+              shared paths.
+            </p>
+          )}
+          <p className="mt-3 text-xs">
+            <a
+              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-blue hover:underline"
+            >
+              Check Mutual Connections
+            </a>
+          </p>
+        </div>
       </div>
+      )}
+
+      {introMutual && (
+        <IntroModal
+          contact={{
+            id: contact.id,
+            name: contact.name,
+            title: contact.title,
+            firmName: contact.company.name,
+          }}
+          warmPath={{
+            intermediaryName: introMutual.name,
+            intermediaryRelation: "mutual connection",
+            firmName: "",
+            title: "",
+          }}
+          intermediaryIsContact
+          userName={userName || "a KithNode user"}
+          onClose={() => setIntroMutual(null)}
+        />
       )}
     </div>
   );
