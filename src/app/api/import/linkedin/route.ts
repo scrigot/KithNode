@@ -70,13 +70,19 @@ export async function POST(request: NextRequest) {
         const { score, tier } = computeWarmthScore(affiliations);
         const linkedInUrl = contact.linkedInUrl || "";
 
-        // Check if contact already exists by name or linkedInUrl
+        // Look up an existing contact to merge onto — SCOPED TO THE CALLER.
+        // AlumniContact is written with the service-role client (RLS bypassed,
+        // see supabase.ts), so this importedByUserId filter is the ONLY tenant
+        // guard: a same-URL or same-email row owned by another user must read as
+        // not-found, never be overwritten + ownership-reassigned. Matches the
+        // owner-scoping in extension/ingest and import/brain-dump.
         let existing = null;
         if (linkedInUrl) {
           const { data } = await supabase
             .from("AlumniContact")
             .select("id")
             .eq("linkedInUrl", linkedInUrl)
+            .eq("importedByUserId", userId)
             .single();
           existing = data;
         }
@@ -85,6 +91,7 @@ export async function POST(request: NextRequest) {
             .from("AlumniContact")
             .select("id")
             .eq("email", contact.email)
+            .eq("importedByUserId", userId)
             .single();
           existing = data;
         }
@@ -167,11 +174,13 @@ export async function POST(request: NextRequest) {
         const affiliations = detectAffiliations(meta, prefs);
         const { score, tier } = computeWarmthScore(affiliations);
 
-        // Check if contact already exists
+        // Existing-contact lookup, SCOPED TO THE CALLER (see CSV path above): the
+        // importedByUserId filter prevents overwriting another user's pool row.
         const { data: existing } = await supabase
           .from("AlumniContact")
           .select("id")
           .eq("linkedInUrl", url)
+          .eq("importedByUserId", userId)
           .single();
 
         let contactId: string | undefined;
