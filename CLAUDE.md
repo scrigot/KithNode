@@ -91,6 +91,7 @@ Do not deviate without explicit user approval.
 In QA mode, flag any code that doesn't match DESIGN.md.
 
 ## What to do FIRST in any session here
+0. **Read `ops/tasks.md`** (what's next) + the tail of `ops/build-log.md` (recent context). Work from tasks.md Now/Next and update it before you finish. End any substantive session with one line: `OPS_LOG: built ... | learned ... | decided ...` — the Stop hook appends it to `ops/build-log.md`. See `ops/README.md`.
 1. Read `AGENTS.md` for the latest gotchas (Sam updates this as he hits new ones)
 2. Read `scripts/ralph/progress.txt` to see what the autonomous loop most recently learned
 3. If the task touches Next.js 16 / Tailwind v4 / NextAuth v5 / Prisma v7 — Context7 first
