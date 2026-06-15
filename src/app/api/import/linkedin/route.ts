@@ -42,7 +42,7 @@ async function findPoolRow(linkedInUrl: string, email: string): Promise<PoolRow 
       .from("AlumniContact")
       .select(POOL_COLS)
       .eq("linkedInUrl", linkedInUrl)
-      .single();
+      .maybeSingle();
     if (data) return data as PoolRow;
   }
   if (email) {
@@ -50,7 +50,7 @@ async function findPoolRow(linkedInUrl: string, email: string): Promise<PoolRow 
       .from("AlumniContact")
       .select(POOL_COLS)
       .eq("email", email)
-      .single();
+      .maybeSingle();
     if (data) return data as PoolRow;
   }
   return null;

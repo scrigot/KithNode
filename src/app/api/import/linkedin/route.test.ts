@@ -79,29 +79,33 @@ function mockSupabase(opts: {
       return {
         select: () => {
           const filters: Record<string, unknown> = {};
+          // findPoolRow now resolves with .maybeSingle(); the other AlumniContact
+          // lookups still use .single(). Both go through the same matcher.
+          const lookup = () => {
+            captured.lookups.push({ ...filters });
+            const matchesRow =
+              filters.linkedInUrl === TARGET_URL || filters.email === TARGET_EMAIL;
+            if (!matchesRow) {
+              return Promise.resolve({ data: null, error: { message: "no rows" } });
+            }
+            // Owner-scoped lookup: hits only for the row's true owner.
+            if (filters.importedByUserId !== undefined) {
+              return Promise.resolve(
+                filters.importedByUserId === opts.ownerEmail
+                  ? { data: POOL_ROW, error: null }
+                  : { data: null, error: { message: "no rows" } },
+              );
+            }
+            // Unscoped pool lookup: the row exists in the pool regardless of owner.
+            return Promise.resolve({ data: POOL_ROW, error: null });
+          };
           const builder: Record<string, unknown> = {
             eq: (col: string, val: unknown) => {
               filters[col] = val;
               return builder;
             },
-            single: () => {
-              captured.lookups.push({ ...filters });
-              const matchesRow =
-                filters.linkedInUrl === TARGET_URL || filters.email === TARGET_EMAIL;
-              if (!matchesRow) {
-                return Promise.resolve({ data: null, error: { message: "no rows" } });
-              }
-              // Owner-scoped lookup: hits only for the row's true owner.
-              if (filters.importedByUserId !== undefined) {
-                return Promise.resolve(
-                  filters.importedByUserId === opts.ownerEmail
-                    ? { data: POOL_ROW, error: null }
-                    : { data: null, error: { message: "no rows" } },
-                );
-              }
-              // Unscoped pool lookup: the row exists in the pool regardless of owner.
-              return Promise.resolve({ data: POOL_ROW, error: null });
-            },
+            single: lookup,
+            maybeSingle: lookup,
           };
           return builder;
         },
