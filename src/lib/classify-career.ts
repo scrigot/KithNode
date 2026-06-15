@@ -59,6 +59,23 @@ const TITLE_RULES: { re: RegExp; track: string; role: string }[] = [
   { re: /\b(?:sales|solutions?)\s*engineer\b|\btechnical\s*specialist\b/i, track: "CS/Tech", role: "Solutions Engineering" },
   { re: /\bsoftware\s*(?:engineer|developer)\b|\bsoftware\s*dev\b|\bswe\b/i, track: "CS/Tech", role: "Software Engineering" },
   { re: /\bproduct\s*manager\b|\bproduct\s*management\b/i, track: "CS/Tech", role: "Product Management" },
+  // Healthcare
+  { re: /\b(?:registered\s*nurse|nurse\s*practitioner|\brn\b|\blpn\b)\b/i, track: "Healthcare", role: "Nursing" },
+  // No bare "MD" token: in this finance-heavy contact pool "MD" almost always
+  // means Managing Director, and this Healthcare block runs before Finance.
+  { re: /\b(?:physician|surgeon|medical\s*(?:student|resident|doctor)|pre[\s-]*med|doctor\s*of\s*medicine)\b/i, track: "Healthcare", role: "Medicine" },
+  { re: /\b(?:biotech|biopharma|pharmaceutical|pharma|clinical\s*research|drug\s*development)\b/i, track: "Healthcare", role: "Biotech / Pharma" },
+  { re: /\b(?:public\s*health|epidemiolog|\bmph\b)\b/i, track: "Healthcare", role: "Public Health" },
+  // Law
+  { re: /\blitigation\b|\blitigator\b/i, track: "Law", role: "Litigation" },
+  { re: /\b(?:corporate\s*(?:counsel|attorney|lawyer)|general\s*counsel)\b/i, track: "Law", role: "Corporate Law" },
+  { re: /\b(?:attorney|lawyer|paralegal|legal\s*(?:counsel|associate)|\bjd\b|juris\s*doctor|law\s*(?:student|clerk))\b/i, track: "Law", role: "Legal (JD-track)" },
+  // Marketing & Sales (the CS/Tech "sales/solutions engineer" rule above already claimed sales-engineer)
+  { re: /\b(?:brand\s*manager|brand\s*marketing)\b/i, track: "Marketing & Sales", role: "Brand" },
+  { re: /\b(?:growth\s*marketer|growth\s*marketing|demand\s*gen(?:eration)?)\b/i, track: "Marketing & Sales", role: "Growth" },
+  { re: /\b(?:account\s*executive|\bsdr\b|\bbdr\b|sales\s*(?:rep|representative|development\s*rep|associate|manager)|business\s*development(?:\s*(?:rep|manager|associate))?)\b/i, track: "Marketing & Sales", role: "Sales / Business Development" },
+  { re: /\b(?:account\s*manager|customer\s*success)\b/i, track: "Marketing & Sales", role: "Account Management" },
+  { re: /\b(?:marketing\s*(?:manager|associate|coordinator|specialist|intern)?|digital\s*marketing|content\s*marketing|social\s*media\s*manager)\b/i, track: "Marketing & Sales", role: "Marketing" },
   // Finance
   { re: /\binvestment\s*banking\b|\bib\s*analyst\b/i, track: "Finance", role: "Investment Banking" },
   { re: /\bprivate\s*equity\b/i, track: "Finance", role: "Private Equity" },

@@ -24,6 +24,10 @@ export const CAREER_TRACKS = {
   "Data Science": ["Data Science", "Data Engineering", "Quant", "Analytics"],
   "AI": ["AI Engineer", "ML Engineer", "AI Research", "AI Product", "Applied AI", "ML Infrastructure", "AI Safety"],
   "Startups": ["Founder", "Founding Engineer", "Early Stage", "AI-Native SaaS", "Growth Stage"],
+  "Healthcare": ["Medicine", "Nursing", "Biotech / Pharma", "Public Health", "Healthcare Admin"],
+  "Law": ["Corporate Law", "Litigation", "Compliance / Regulatory", "Policy / Government", "Legal (JD-track)"],
+  "Marketing & Sales": ["Marketing", "Brand", "Growth", "Sales / Business Development", "Account Management"],
+  "Other": [],
 } as const;
 
 export type CareerTrack = keyof typeof CAREER_TRACKS;

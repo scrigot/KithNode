@@ -180,6 +180,49 @@ describe("classifyCareer — new AI + CS/Tech roles (title precision)", () => {
   });
 });
 
+describe("classifyCareer: Healthcare / Law / Marketing & Sales lanes (title precision)", () => {
+  it("Registered Nurse -> Healthcare / Nursing", () => {
+    expect(classifyCareer({ title: "Registered Nurse" })).toEqual({
+      track: "Healthcare",
+      role: "Nursing",
+    });
+  });
+
+  it("Litigation Associate -> Law / Litigation", () => {
+    expect(classifyCareer({ title: "Litigation Associate" })).toEqual({
+      track: "Law",
+      role: "Litigation",
+    });
+  });
+
+  it("Brand Manager -> Marketing & Sales / Brand", () => {
+    expect(classifyCareer({ title: "Brand Manager" })).toEqual({
+      track: "Marketing & Sales",
+      role: "Brand",
+    });
+  });
+
+  it("Account Executive -> Marketing & Sales / Sales / Business Development", () => {
+    expect(classifyCareer({ title: "Account Executive" })).toEqual({
+      track: "Marketing & Sales",
+      role: "Sales / Business Development",
+    });
+  });
+
+  it("REGRESSION: 'Sales Engineer' stays CS/Tech / Solutions Engineering (not stolen by Marketing rules)", () => {
+    expect(classifyCareer({ title: "Sales Engineer" })).toEqual({
+      track: "CS/Tech",
+      role: "Solutions Engineering",
+    });
+  });
+
+  it("REGRESSION: a finance 'MD' (Managing Director) is NOT classified as Healthcare", () => {
+    const result = classifyCareer({ title: "MD", firmName: "Goldman Sachs" });
+    expect(result.track).not.toBe("Healthcare");
+    expect(result).toEqual({ track: "Finance", role: "Investment Banking" });
+  });
+});
+
 describe("classifyCareer — big-tech firm fallback (only when title is silent)", () => {
   it("untitled person @ SpaceX -> CS/Tech track, empty role", () => {
     expect(classifyCareer({ title: "Member of Technical Staff", firmName: "SpaceX" })).toEqual({

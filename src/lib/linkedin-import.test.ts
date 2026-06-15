@@ -3,6 +3,7 @@ import {
   isValidLinkedInUrl,
   scrapeLinkedInMeta,
   detectAffiliations,
+  resolveAutoPersonType,
   type ContactMeta,
 } from "./linkedin-import";
 
@@ -13,6 +14,38 @@ const baseMeta = (overrides: Partial<ContactMeta> = {}): ContactMeta => ({
   experience: "",
   title: "",
   ...overrides,
+});
+
+describe("resolveAutoPersonType", () => {
+  const thisYear = new Date().getFullYear();
+
+  it("future grad year => student", () => {
+    expect(resolveAutoPersonType({ graduationYear: thisYear + 2 })).toBe("student");
+  });
+
+  it("current-year grad year => student", () => {
+    expect(resolveAutoPersonType({ graduationYear: thisYear })).toBe("student");
+  });
+
+  it("past grad year => alum", () => {
+    expect(resolveAutoPersonType({ graduationYear: thisYear - 3 })).toBe("alum");
+  });
+
+  it("no grad year + a 'Software Engineer Intern' title => student (title fallback)", () => {
+    expect(resolveAutoPersonType({ title: "Software Engineer Intern" })).toBe("student");
+  });
+
+  it("no grad year + a senior pro title at a firm => '' (no signal)", () => {
+    expect(
+      resolveAutoPersonType({ title: "Managing Director", experience: "Goldman Sachs" }),
+    ).toBe("");
+  });
+
+  it("a PAST grad year wins over an intern-sounding title (returns alum, not student)", () => {
+    expect(
+      resolveAutoPersonType({ graduationYear: thisYear - 5, title: "Summer Intern" }),
+    ).toBe("alum");
+  });
 });
 
 describe("isValidLinkedInUrl", () => {
@@ -1071,6 +1104,44 @@ describe("detectAffiliations: manual personType override", () => {
       prefsWith(),
     );
     expect(explicitEmpty).toEqual(auto);
+  });
+});
+
+describe("detectAffiliations: AUTO grad-year student/alum inference", () => {
+  const thisYear = new Date().getFullYear();
+
+  it("a FUTURE grad year under AUTO is treated as a current student (halved firm boost + Incoming label)", () => {
+    // Title "Analyst" has no incoming/student marker, so the ONLY student signal
+    // is the future grad year. Mirrors the manual-'student' assertion pattern:
+    // halved Bulge Bracket + "(Incoming)" + no seniority chip.
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Goldman Sachs",
+        title: "Analyst",
+        graduationYear: thisYear + 2,
+      }),
+    );
+    const tier = affs.find((a) => a.name === "Bulge Bracket (Incoming)");
+    expect(tier).toBeDefined();
+    expect(tier?.boost).toBe(9); // round(18 / 2)
+    expect(affs.some((a) => a.name === "Bulge Bracket" && !a.name.includes("Incoming"))).toBe(false);
+    expect(affs.some((a) => a.name === "Analyst")).toBe(false);
+  });
+
+  it("a PAST grad year under AUTO is an alum even when the title says 'intern' (full firm boost, no Incoming)", () => {
+    // grad year wins: resolveAutoPersonType short-circuits to "alum", so the
+    // "intern" title must NOT flag a current student. Full +18, no "(Incoming)".
+    const affs = detectAffiliations(
+      baseMeta({
+        experience: "Goldman Sachs",
+        title: "Summer Intern",
+        graduationYear: thisYear - 4,
+      }),
+    );
+    const tier = affs.find((a) => a.name === "Bulge Bracket");
+    expect(tier).toBeDefined();
+    expect(tier?.boost).toBe(18);
+    expect(affs.some((a) => a.name.includes("(Incoming)"))).toBe(false);
   });
 });
 

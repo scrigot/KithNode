@@ -16,6 +16,7 @@ import { FieldEditor } from "./field-editor";
 import { EditProfileModal } from "./edit-profile-modal";
 import { trackEvent } from "@/lib/posthog";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
+import { resolveAutoPersonType } from "@/lib/linkedin-import";
 import type { ContactDetail } from "@/lib/api";
 import { CreditCost } from "@/components/credit-cost";
 
@@ -218,10 +219,18 @@ const PERSON_TYPES: { value: string; label: string }[] = [
 function TypeToggle({
   contactId,
   value,
+  graduationYear,
+  title,
+  experience,
+  education,
   onSaved,
 }: {
   contactId: string;
   value: string;
+  graduationYear?: number;
+  title?: string;
+  experience?: string;
+  education?: string;
   onSaved: () => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -237,6 +246,15 @@ function TypeToggle({
     setSaving(false);
     if (res.ok) onSaved();
   }
+
+  // Only when the stored type is AUTO ('') do we surface what the grad-year-aware
+  // heuristic resolved this contact to, so the user sees why they score as a
+  // student or alum without having to set the toggle manually.
+  const autoResolved =
+    value === ""
+      ? resolveAutoPersonType({ graduationYear, title, experience, education })
+      : "";
+  const gradYear = graduationYear || 0;
 
   return (
     <div className="mb-3">
@@ -264,6 +282,16 @@ function TypeToggle({
           );
         })}
       </div>
+      {autoResolved === "student" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Student{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
+      {autoResolved === "alum" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Alum{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
     </div>
   );
 }
@@ -286,6 +314,13 @@ function TrackRoleEditor({
   onSaved: () => void;
 }) {
   const [saving, setSaving] = useState(false);
+  // Local buffer for the "Other" free-text role so typing doesn't fire a PATCH
+  // on every keystroke; we commit on blur. Kept in sync when the stored role
+  // changes (e.g. after a refetch or a track switch).
+  const [otherRole, setOtherRole] = useState(role);
+  useEffect(() => {
+    setOtherRole(role);
+  }, [role]);
 
   async function patch(body: { track: string; role: string }) {
     setSaving(true);
@@ -309,6 +344,15 @@ function TrackRoleEditor({
     if (nextRole === role) return;
     // Setting a role implies its track (handles the role-without-track case).
     void patch({ track: nextRole ? roleToTrack(nextRole) : track, role: nextRole });
+  }
+
+  // Commit the free-text "Other" role. Sends track + role TOGETHER because the
+  // server only accepts a free-text role when track === "Other" is in the same
+  // patch. No-op when unchanged.
+  function commitOtherRole() {
+    const next = otherRole.trim();
+    if (next === role) return;
+    void patch({ track: "Other", role: next });
   }
 
   const roleOptions = track && track in CAREER_TRACKS
@@ -335,20 +379,36 @@ function TrackRoleEditor({
             </option>
           ))}
         </select>
-        <select
-          aria-label="Career role"
-          disabled={saving || !track}
-          value={role}
-          onChange={(e) => onRoleChange(e.target.value)}
-          className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
-        >
-          <option value="">Role —</option>
-          {roleOptions.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        {track === "Other" ? (
+          <input
+            type="text"
+            aria-label="Career role"
+            disabled={saving}
+            value={otherRole}
+            placeholder="Custom role (e.g. Nursing)"
+            onChange={(e) => setOtherRole(e.target.value)}
+            onBlur={commitOtherRole}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          />
+        ) : (
+          <select
+            aria-label="Career role"
+            disabled={saving || !track}
+            value={role}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          >
+            <option value="">Role —</option>
+            {roleOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   );
@@ -802,6 +862,10 @@ export default function ContactDetailPage() {
           <TypeToggle
             contactId={contact.id}
             value={contact.person_type || ""}
+            graduationYear={contactExt.graduationYear ?? undefined}
+            title={contact.title}
+            experience={contact.company.name}
+            education={contact.education}
             onSaved={loadContact}
           />
 

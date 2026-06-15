@@ -144,6 +144,35 @@ describe("pickEditableFields", () => {
     expect(invalid).toBe(false);
   });
 
+  it("accepts the 'Other' track (it is part of the taxonomy)", () => {
+    const { fields, invalid } = pickEditableFields({ track: "Other", role: "" });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ track: "Other", role: "" });
+  });
+
+  it("accepts a free-text role when the SAME patch sets track 'Other'", () => {
+    const { fields, invalid } = pickEditableFields({
+      track: "Other",
+      role: "Veterinary Surgeon",
+    });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ track: "Other", role: "Veterinary Surgeon" });
+  });
+
+  it("normalizes (collapses whitespace, caps length) the free-text 'Other' role", () => {
+    const { fields, invalid } = pickEditableFields({
+      track: "Other",
+      role: "  Pastry   Chef  ",
+    });
+    expect(invalid).toBe(false);
+    expect(fields).toEqual({ track: "Other", role: "Pastry Chef" });
+  });
+
+  it("REJECTS a non-taxonomy role when the track is NOT 'Other' (closed set preserved)", () => {
+    const { invalid } = pickEditableFields({ track: "Finance", role: "Degen Trader" });
+    expect(invalid).toBe(true);
+  });
+
   it("keeps canonical degrees, rewrites casing, and drops junk tokens (no 400)", () => {
     const { fields, invalid } = pickEditableFields({
       degrees: "bs, mba, finance club, wizard",
