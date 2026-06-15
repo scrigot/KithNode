@@ -60,10 +60,6 @@ export default function WaitlistPage() {
               choose to share, like your own LinkedIn export.
             </TrustRow>
             <TrustRow>
-              No browser extension to install. Nothing ever runs on your
-              network.
-            </TrustRow>
-            <TrustRow>
               Every match is scored on signals you can check yourself (same
               school, club, Greek org, hometown, mutual connections), never a
               black box.

@@ -109,7 +109,6 @@ export default async function Home({
               <ul className="mt-4 flex flex-col gap-3 text-sm text-white/80">
                 <li>Permitted public sources and the LinkedIn data export you choose to share.</li>
                 <li>Never your LinkedIn password. We never log into your account.</li>
-                <li>No browser extension. Nothing ever runs on your network.</li>
               </ul>
             </div>
           </div>
