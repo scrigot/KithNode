@@ -115,13 +115,17 @@ export function WaitlistForm() {
         </Field>
       </div>
 
-      <Field label="LinkedIn URL">
+      <Field label="LinkedIn URL (optional)">
         <input
           type="url"
           name="linkedin_url"
           placeholder="linkedin.com/in/yourname"
           className="input"
         />
+        <p className="mt-1.5 text-xs leading-snug text-slate-500">
+          Just so Sam can recognize you when picking the cohort. We never log
+          into or touch your account. Paste the public link only.
+        </p>
       </Field>
 
       <Field label="What's broken in your recruiting right now?">

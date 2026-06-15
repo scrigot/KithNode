@@ -32,6 +32,31 @@ export default function WaitlistPage() {
           </p>
         </div>
 
+        {/* Trust panel: answers "where does the data come from + is my account safe"
+            before any personal field is asked. This is the bounce point testers named. */}
+        <div className="mb-6 rounded-2xl border border-[#0EA5E9]/20 bg-[#0EA5E9]/[0.05] p-6 sm:p-7">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheckIcon />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900">
+              Your LinkedIn account stays untouched
+            </h2>
+          </div>
+          <ul className="mt-4 flex flex-col gap-2.5">
+            <TrustRow>
+              We never ask for your LinkedIn password and never log into your
+              account.
+            </TrustRow>
+            <TrustRow>
+              Warm paths are built from permitted public sources and data you
+              choose to share, like your own LinkedIn export.
+            </TrustRow>
+            <TrustRow>
+              No browser extension to install. Nothing ever runs on your
+              network.
+            </TrustRow>
+          </ul>
+        </div>
+
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_20px_50px_rgba(15,23,42,0.06)] sm:p-10">
           <Suspense>
             <WaitlistForm />
@@ -39,5 +64,43 @@ export default function WaitlistPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+function TrustRow({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5 text-sm leading-snug text-slate-600">
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="#0369A1"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="mt-0.5 h-4 w-4 shrink-0"
+        aria-hidden
+      >
+        <path d="m4 10 4 4 8-8" />
+      </svg>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function ShieldCheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#0369A1"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5 shrink-0"
+      aria-hidden
+    >
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
   );
 }

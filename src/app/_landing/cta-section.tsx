@@ -351,6 +351,14 @@ export function CTASection() {
           </Link>
         </motion.div>
 
+        {/* Data-sourcing reassurance: the trust line skeptical users said would
+            flip them. Intentionally NOT scroll-animated so a trust-critical
+            message can never be hidden by an observer that fails to fire. */}
+        <p className="mx-auto mt-5 max-w-md text-[13px] leading-snug text-white/55">
+          Built on permitted public data. No LinkedIn login, password, or
+          extension required.
+        </p>
+
         {/* Trust ticker */}
         <motion.div
           className="mt-8 flex w-full flex-col items-center gap-3"
