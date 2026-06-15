@@ -90,6 +90,10 @@ export function IntroModal({
         throw new Error(data.error || `Request failed (${res.status})`);
       }
 
+      // Beta: KithNode does not send for you. Hand the user the message to send.
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(message.trim()).catch(() => undefined);
+      }
       setState("success");
       trackEvent("intro_request_sent", {
         target_contact_id: contact.id,
@@ -167,7 +171,7 @@ export function IntroModal({
               <Check className="h-6 w-6 text-green-400" />
             </div>
             <p className="text-sm font-bold text-foreground">
-              Intro request sent to {warmPath.intermediaryName}
+              Copied. Now send it to {warmPath.intermediaryName} yourself.
             </p>
           </div>
         )}
@@ -204,8 +208,8 @@ export function IntroModal({
               {!intermediaryIsContact && (
                 <div className="border border-amber-500/20 bg-amber-500/5 px-3 py-2">
                   <p className="text-[10px] text-amber-400">
-                    {warmPath.intermediaryName} isn't on KithNode yet. We'll send
-                    them an email with your intro request and an invite to join.
+                    {warmPath.intermediaryName} isn't on KithNode yet. Copy your
+                    message below and send it to them yourself.
                   </p>
                 </div>
               )}
@@ -227,8 +231,7 @@ export function IntroModal({
               {/* Preview */}
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                  PREVIEW - WHAT {warmPath.intermediaryName.toUpperCase()} WILL
-                  RECEIVE
+                  PREVIEW
                 </span>
                 <div className="mt-1 border border-white/[0.06] bg-black/20 px-3 py-2">
                   <p className="text-[10px] font-bold text-muted-foreground">
@@ -284,7 +287,7 @@ export function IntroModal({
                       SENDING...
                     </>
                   ) : (
-                    "SEND REQUEST"
+                    "COPY MESSAGE"
                   )}
                 </button>
               )}
