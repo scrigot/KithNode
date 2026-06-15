@@ -791,12 +791,13 @@ export default function ContactDetailPage() {
       {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
           rows, mutual/LinkedIn links, and the tags editor. ─── */}
       {tab === "profile" && (
-      <div className="space-y-4">
-        {/* Career history timeline — full-width, above the detail grid. Renders
-            null for contacts with no experience. */}
+      <div className="space-y-3">
+        {/* Dense 3-pane grid — career | classification | details. Fills the
+            width (Bloomberg density, no half-empty cards). */}
+        <div className="grid items-start grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1.25fr]">
+        {/* PANE 1 — Career timeline */}
         <CareerTimeline experiences={contactExt.experiences ?? []} />
-        <div className="grid items-start grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* LEFT — Classification & signals */}
+        {/* PANE 2 — Classification & signals */}
         <div className="border border-border bg-card p-4">
           <TypeToggle
             contactId={contact.id}
@@ -869,15 +870,15 @@ export default function ContactDetailPage() {
             {contactExt.educations && contactExt.educations.length > 0 ? (
               <div className="space-y-0.5">
                 <dt className="text-muted-foreground">Degrees / Programs</dt>
-                {contactExt.educations.map((edu, i) => {
-                  const parts = [edu.degree, edu.major, edu.concentration].filter(Boolean);
-                  if (!parts.length) return null;
-                  return (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  );
-                })}
+                {[...new Set(
+                  contactExt.educations
+                    .map((edu) => [edu.degree, edu.major, edu.concentration].filter(Boolean).join(" · "))
+                    .filter(Boolean),
+                )].map((line, i) => (
+                  <dd key={i} className="text-right text-foreground">
+                    {line}
+                  </dd>
+                ))}
               </div>
             ) : (
               <>
@@ -902,22 +903,35 @@ export default function ContactDetailPage() {
             <DetailRow label="Hometown" value={contact.hometown} />
             <DetailRow label="High School" value={contact.high_school} />
             <DetailRow label="Greek Life" value={contact.greek_org} />
-            {/* Club membership rows when present; fall back to flat clubs. */}
-            {contactExt.clubMemberships && contactExt.clubMemberships.length > 0 ? (
-              <div className="space-y-0.5">
-                <dt className="text-muted-foreground">Clubs</dt>
-                {contactExt.clubMemberships.map((m, i) => {
-                  const parts = [m.role, m.club].filter(Boolean);
-                  return parts.length ? (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  ) : null;
-                })}
-              </div>
-            ) : (
-              <DetailRow label="Clubs" value={contact.clubs} />
-            )}
+            {/* Club rows; the Greek org has its own row, so drop it from Clubs
+                (avoids the Zeta-Psi-in-both duplication). */}
+            {(() => {
+              const greek = (contact.greek_org || "").trim().toLowerCase();
+              const rows = (contactExt.clubMemberships ?? []).filter(
+                (m) => (m.club || "").trim().toLowerCase() !== greek,
+              );
+              if (rows.length > 0) {
+                return (
+                  <div className="space-y-0.5">
+                    <dt className="text-muted-foreground">Clubs</dt>
+                    {rows.map((m, i) => {
+                      const parts = [m.role, m.club].filter(Boolean);
+                      return parts.length ? (
+                        <dd key={i} className="text-right text-foreground">
+                          {parts.join(" · ")}
+                        </dd>
+                      ) : null;
+                    })}
+                  </div>
+                );
+              }
+              const flat = (contact.clubs || "")
+                .split(",")
+                .map((c) => c.trim())
+                .filter((c) => c && c.toLowerCase() !== greek)
+                .join(", ");
+              return <DetailRow label="Clubs" value={flat} />;
+            })()}
             {contactExt.graduationYear != null && (
               <DetailRow label="Graduation Year" value={String(contactExt.graduationYear)} />
             )}
