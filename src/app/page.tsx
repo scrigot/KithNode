@@ -10,6 +10,9 @@ import { ValueProps } from "./_landing/value-props";
 import { Showcase } from "./_landing/showcase";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
+import { PanelScoring } from "@/app/demo/_components/panel-scoring";
+import { PanelOutreach } from "@/app/demo/_components/panel-outreach";
+import Link from "next/link";
 
 export default async function Home({
   searchParams,
@@ -37,6 +40,39 @@ export default async function Home({
         <SignInButton />
       </HeroSection>
       <ProductCards />
+
+      {/* Real product output: the actual demo panels (not a mockup), so visitors
+          see the algorithm's real scoring + drafted outreach inline before being
+          asked for anything. Addresses the "no real output anywhere" finding. */}
+      <section className="relative bg-black px-4 py-20 sm:py-28">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
+              Real output, not a mockup
+            </span>
+            <h2 className="mt-5 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              See exactly what you get
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base text-white/60">
+              A scored warm path and the outreach it drafts, straight from the
+              live demo with sample data. No signup to look.
+            </p>
+          </div>
+          <div className="flex flex-col gap-8">
+            <PanelScoring />
+            <PanelOutreach />
+          </div>
+          <div className="mt-10 text-center">
+            <Link
+              href="/demo"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-base font-semibold text-white/90 backdrop-blur-sm transition-all hover:border-[#0EA5E9]/50 hover:bg-[#0EA5E9]/10 hover:text-white"
+            >
+              Explore the full live demo &rarr;
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <SolutionsSection />
       <ValueProps />
       <Showcase />

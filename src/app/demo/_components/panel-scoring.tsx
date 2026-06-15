@@ -104,8 +104,8 @@ export function PanelScoring() {
               <span className="font-mono text-sm text-white/50">/ 100</span>
             </div>
             <p className="mt-2 text-xs text-white/70">
-              Weighted average across five signal categories, calibrated
-              against 4,200 historical alumni outreach outcomes.
+              Weighted across five signal categories, by how strongly each one
+              predicts a warm reply.
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export function PanelScoring() {
                   Expected response rate
                 </p>
                 <p className="mt-1 text-sm font-semibold text-white">
-                  8x higher vs. cold outreach
+                  Much warmer than a cold email
                 </p>
               </div>
             </div>
