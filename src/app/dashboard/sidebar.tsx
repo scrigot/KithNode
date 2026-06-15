@@ -10,6 +10,7 @@ import {
   GitBranch,
   Compass,
   Share2,
+  Target,
   Upload,
   Settings,
   CreditCard,
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
       { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, tour: "pipeline" },
       { href: "/dashboard/discover", label: "Discover", icon: Compass, tour: "discover" },
       { href: "/dashboard/network", label: "Network", icon: Share2, tour: "network" },
+      { href: "/dashboard/edge", label: "The Edge", icon: Target, tour: undefined },
     ],
   },
   {
