@@ -7,7 +7,6 @@ import { HeroSection } from "./_landing/hero-section";
 import { ProductCards } from "./_landing/product-cards";
 import { SolutionsSection } from "./_landing/solutions-section";
 import { ValueProps } from "./_landing/value-props";
-import { Showcase } from "./_landing/showcase";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
 import { PanelScoring } from "@/app/demo/_components/panel-scoring";
@@ -73,9 +72,52 @@ export default async function Home({
         </div>
       </section>
 
+      {/* Transparency: plain-English how-the-score-works + data sourcing. Kills the
+          black-box trust finding and establishes data origin before the request flow. */}
+      <section className="relative bg-black px-4 py-20 sm:py-24">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-10 text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
+              No black box
+            </span>
+            <h2 className="mt-5 font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              How the score works, in plain English
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7">
+              <h3 className="font-heading text-lg font-bold text-white">
+                What the score is built from
+              </h3>
+              <p className="mt-2 text-sm text-white/60">
+                Every warm path is ranked on shared signals you can verify
+                yourself, not a mystery algorithm:
+              </p>
+              <ul className="mt-4 grid grid-cols-2 gap-2.5 text-sm text-white/80">
+                <li>Same school</li>
+                <li>Same club or Greek org</li>
+                <li>Same hometown</li>
+                <li>Same major</li>
+                <li>Mutual connections</li>
+                <li>Firms on your target list</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-7">
+              <h3 className="font-heading text-lg font-bold text-white">
+                Where the data comes from
+              </h3>
+              <ul className="mt-4 flex flex-col gap-3 text-sm text-white/80">
+                <li>Permitted public sources and the LinkedIn data export you choose to share.</li>
+                <li>Never your LinkedIn password. We never log into your account.</li>
+                <li>No browser extension. Nothing ever runs on your network.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <SolutionsSection />
       <ValueProps />
-      <Showcase />
       <Testimonials />
       <CTASection />
 

@@ -735,10 +735,10 @@ function SignalsPreview() {
 
 function ScoringPreview() {
   const components = [
-    { label: "Shared Affiliations", value: 92 },
-    { label: "Activity Signals", value: 78 },
-    { label: "Reachability", value: 74 },
-    { label: "Industry Fit", value: 85 },
+    { label: "Same school", value: 92 },
+    { label: "Same Greek / club", value: 78 },
+    { label: "Mutual connections", value: 74 },
+    { label: "Target firm", value: 85 },
   ];
 
   return (

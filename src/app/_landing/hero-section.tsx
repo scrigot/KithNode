@@ -120,13 +120,13 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
               Find a warm path
             </motion.span>
             <motion.span className="block text-white/80" variants={LV}>
-              into every firm
+              into every bank, fund,
             </motion.span>
             <motion.span
               className="block bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-500 bg-clip-text text-transparent"
               variants={LV}
             >
-              on your target list.
+              and firm on your list.
             </motion.span>
           </h1>
 
