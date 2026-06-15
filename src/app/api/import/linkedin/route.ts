@@ -19,6 +19,55 @@ interface CsvContact {
   linkedInUrl?: string;
 }
 
+interface PoolRow {
+  id: string;
+  name: string;
+  title: string;
+  firmName: string;
+  affiliations: string;
+  warmthScore: number;
+  tier: string;
+}
+
+// Columns safe to surface for a pooled (foreign-owned) contact — never the
+// owner's private relationship fields. Mirrors POOL_SAFE_FIELDS in lib/redact.
+const POOL_COLS = "id, name, title, firmName, affiliations, warmthScore, tier";
+
+// Find a shared-pool row by URL (then email) WITHOUT owner-scoping. Used ONLY to
+// grant the caller a read-link to an already-enriched row — never to mutate it,
+// so the cross-tenant takeover stays closed.
+async function findPoolRow(linkedInUrl: string, email: string): Promise<PoolRow | null> {
+  if (linkedInUrl) {
+    const { data } = await supabase
+      .from("AlumniContact")
+      .select(POOL_COLS)
+      .eq("linkedInUrl", linkedInUrl)
+      .single();
+    if (data) return data as PoolRow;
+  }
+  if (email) {
+    const { data } = await supabase
+      .from("AlumniContact")
+      .select(POOL_COLS)
+      .eq("email", email)
+      .single();
+    if (data) return data as PoolRow;
+  }
+  return null;
+}
+
+// Grant the caller read access to an existing pool row via a high_value Discover
+// link (idempotent; mirrors discover/rate). It then appears, unlocked, in their
+// contacts list — reusing the existing enrichment instead of re-scraping.
+async function linkToPool(userId: string, contactId: string): Promise<void> {
+  await supabase
+    .from("UserDiscover")
+    .upsert(
+      { userId, contactId, rating: "high_value" },
+      { onConflict: "userId,contactId" },
+    );
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
@@ -53,6 +102,7 @@ export async function POST(request: NextRequest) {
 
   let imported = 0;
   let failed = 0;
+  let linked = 0;
 
   // ── CSV contacts (direct upsert, no scraping) ────────────────────────
   if (hasContacts) {
@@ -69,6 +119,25 @@ export async function POST(request: NextRequest) {
         const affiliations = detectAffiliations(meta, prefs);
         const { score, tier } = computeWarmthScore(affiliations);
         const linkedInUrl = contact.linkedInUrl || "";
+
+        // Reject a malformed URL instead of storing it (the URL path already
+        // gates on this). A non-LinkedIn / javascript: string would otherwise be
+        // persisted and later rendered as an href on the contact page. Blank is
+        // allowed — those contacts match by email or insert URL-less.
+        if (linkedInUrl && !isValidLinkedInUrl(linkedInUrl)) {
+          results.push({
+            name: meta.name,
+            title: meta.title,
+            linkedin_url: linkedInUrl,
+            company_name: meta.experience,
+            affiliations: [],
+            total_score: 0,
+            tier: "cold",
+            error: "Invalid LinkedIn URL format",
+          });
+          failed++;
+          continue;
+        }
 
         // Look up an existing contact to merge onto — SCOPED TO THE CALLER.
         // AlumniContact is written with the service-role client (RLS bypassed,
@@ -118,11 +187,45 @@ export async function POST(request: NextRequest) {
             .update(record)
             .eq("id", existing.id);
         } else {
+          // Not my row. Is this person already in the shared pool (enriched by
+          // another user)? If so, LINK me to it instead of inserting — I reuse
+          // the existing enrichment and never touch their row.
+          const pooled = await findPoolRow(linkedInUrl, contact.email || "");
+          if (pooled) {
+            await linkToPool(userId, pooled.id);
+            results.push({
+              id: pooled.id,
+              name: pooled.name,
+              title: pooled.title,
+              linkedin_url: linkedInUrl,
+              company_name: pooled.firmName,
+              affiliations: pooled.affiliations
+                ? pooled.affiliations.split(",").filter(Boolean)
+                : [],
+              total_score: pooled.warmthScore,
+              tier: pooled.tier,
+            });
+            imported++;
+            linked++;
+            continue;
+          }
+
           const { error: insertError } = await supabase
             .from("AlumniContact")
             .insert({ ...record, graduationYear: 0 });
 
-          if (insertError) throw new Error(insertError.message);
+          if (insertError) {
+            // A unique-constraint hit (SQLSTATE 23505) means this person is
+            // already in the shared pool — possibly owned by another user. Don't
+            // echo the raw DB error: it leaks the constraint name and confirms
+            // the value. Return a generic message instead. (Existence stays
+            // distinguishable until the data model goes per-user — parked.)
+            throw new Error(
+              insertError.code === "23505"
+                ? "This contact is already in the network"
+                : "Import failed",
+            );
+          }
         }
 
         results.push({
@@ -204,6 +307,28 @@ export async function POST(request: NextRequest) {
             })
             .eq("id", existing.id);
         } else {
+          // Already in the shared pool (another user's)? Link, don't overwrite —
+          // see the CSV path. Read-only access via a high_value Discover link.
+          const pooled = await findPoolRow(url, "");
+          if (pooled) {
+            await linkToPool(userId, pooled.id);
+            results.push({
+              id: pooled.id,
+              name: pooled.name,
+              title: pooled.title,
+              linkedin_url: url,
+              company_name: pooled.firmName,
+              affiliations: pooled.affiliations
+                ? pooled.affiliations.split(",").filter(Boolean)
+                : [],
+              total_score: pooled.warmthScore,
+              tier: pooled.tier,
+            });
+            imported++;
+            linked++;
+            continue;
+          }
+
           const { data: inserted, error: insertError } = await supabase
             .from("AlumniContact")
             .insert({
@@ -224,7 +349,18 @@ export async function POST(request: NextRequest) {
             .select("id")
             .single();
 
-          if (insertError) throw new Error(insertError.message);
+          if (insertError) {
+            // A unique-constraint hit (SQLSTATE 23505) means this person is
+            // already in the shared pool — possibly owned by another user. Don't
+            // echo the raw DB error: it leaks the constraint name and confirms
+            // the value. Return a generic message instead. (Existence stays
+            // distinguishable until the data model goes per-user — parked.)
+            throw new Error(
+              insertError.code === "23505"
+                ? "This contact is already in the network"
+                : "Import failed",
+            );
+          }
           contactId = inserted?.id;
         }
 
@@ -255,5 +391,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ imported, failed, contacts: results });
+  return NextResponse.json({ imported, failed, linked, contacts: results });
 }

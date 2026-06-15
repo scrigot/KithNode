@@ -70,7 +70,10 @@ const VALID_PERSON_TYPES = ["", "alum", "student", "professor"] as const;
 // track/role are closed sets over the taxonomy, validated like personType. ""
 // clears the field. A role must belong to the track being set in the SAME patch
 // (or, if track isn't in the patch, to the role's own track) — a track/role
-// mismatch is a 400, never a silent persist.
+// mismatch is a 400, never a silent persist. The one exception is the "Other"
+// track, whose role is free text: when this same patch sets track === "Other"
+// the role is accepted as a normalized free-text string instead of a closed-set
+// value, and the cross-field guard is skipped for it.
 const VALID_TRACKS = ["", ...ALL_TRACKS] as const;
 const ALL_ROLE_VALUES = ALL_TRACKS.flatMap((t) => [...CAREER_TRACKS[t]]);
 const VALID_ROLES = ["", ...ALL_ROLE_VALUES] as const;
@@ -116,10 +119,16 @@ export function pickEditableFields(
       }
       out[key] = val;
     } else if (key === "role") {
-      if (!VALID_ROLES.includes(val as (typeof VALID_ROLES)[number])) {
+      // The "Other" lane has no preset roles, so when the SAME patch sets
+      // track === "Other" the role is free text (normalized + length-capped).
+      // Otherwise it must be a closed-set taxonomy value.
+      if (body.track === "Other") {
+        out[key] = normalizeField(val);
+      } else if (!VALID_ROLES.includes(val as (typeof VALID_ROLES)[number])) {
         return { fields: {}, invalid: true };
+      } else {
+        out[key] = val;
       }
-      out[key] = val;
     } else if (key === "degrees") {
       // Closed-set validation (canonical casing, dedupe, junk dropped). Like
       // clubs/skills it is forgiving — never a 400.
@@ -200,8 +209,10 @@ export function pickEditableFields(
 
   // Cross-field guard: a non-empty role must belong to its track. The effective
   // track is the one being set in this patch if present, else the role's own
-  // owning track (the role-only edit case). A mismatch is invalid.
-  if (out.role) {
+  // owning track (the role-only edit case). A mismatch is invalid. The "Other"
+  // track is exempt: its role is free text with no owning track, so the closed-
+  // set containment check does not apply.
+  if (out.role && out.track !== "Other") {
     const role = out.role as string;
     const effectiveTrack = "track" in out ? (out.track as string) : roleToTrack(role);
     if (roleToTrack(role) !== effectiveTrack) {
@@ -337,21 +348,33 @@ export async function GET(
     .eq("userId", userId)
     .maybeSingle();
   const fit = (contact.warmthScore as number) || 0;
+  // Private relationship/personal columns belong to the importer. A non-owner
+  // viewing this row via a high_value pool link must not see them (mirrors
+  // POOL_SAFE_FIELDS / poolSafeContact). The viewer's own pipeline stage still
+  // promotes via pipelineEntry (per-user).
+  const owns = !contact.importedByUserId || contact.importedByUserId === userId;
+  const ownIsFriend = owns ? (contact.isFriend as boolean | null | undefined) : false;
+  const ownLastSpokenAt = owns
+    ? (contact.lastSpokenAt as string | null | undefined)
+    : null;
+  const ownSpeakFrequency = owns
+    ? (contact.speakFrequency as string | null | undefined)
+    : "";
   const klass = relationshipClass({
-    isFriend: contact.isFriend as boolean | undefined,
+    isFriend: ownIsFriend,
     pipelineStage: pipelineEntry?.stage as string | undefined,
-    lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
+    lastSpokenAt: ownLastSpokenAt,
     now: Date.now(),
   });
   const engagement = engagementScore({
-    lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
-    speakFrequency: contact.speakFrequency as string | null | undefined,
+    lastSpokenAt: ownLastSpokenAt,
+    speakFrequency: ownSpeakFrequency,
     now: Date.now(),
   });
   const dormant =
     klass === "kith" &&
     isDormantKith({
-      lastSpokenAt: contact.lastSpokenAt as string | null | undefined,
+      lastSpokenAt: ownLastSpokenAt,
       now: Date.now(),
     });
   const tier = displayTier(contact.tier as string | undefined, klass);
@@ -364,12 +387,12 @@ export async function GET(
     linkedin_url: contact.linkedInUrl,
     education: contact.education,
     linkedin_location: contact.location,
-    hometown: contact.hometown || "",
-    high_school: contact.highSchool,
+    hometown: owns ? (contact.hometown || "") : "",
+    high_school: owns ? contact.highSchool : "",
     greek_org: contact.greekOrg,
     clubs: contact.clubs,
-    passions: contact.passions,
-    notes: contact.notes || "",
+    passions: owns ? contact.passions : "",
+    notes: owns ? (contact.notes || "") : "",
     major: contact.major || "",
     minor: contact.minor || "",
     concentration: contact.concentration || "",
@@ -382,9 +405,9 @@ export async function GET(
     clubMemberships: contactClubMemberships,
     experiences: contactExperiences,
     graduationYear: (contact.graduationYear as number | null) ?? null,
-    isFriend: !!(contact.isFriend as boolean | null),
-    speakFrequency: (contact.speakFrequency as string | null) || "",
-    lastSpokenAt: (contact.lastSpokenAt as string | null) || "",
+    isFriend: !!ownIsFriend,
+    speakFrequency: ownSpeakFrequency || "",
+    lastSpokenAt: ownLastSpokenAt || "",
     person_type: contact.personType || "",
     track: contact.track || "",
     role: contact.role || "",
