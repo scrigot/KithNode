@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { WaitlistForm } from "./waitlist-form";
-import { PanelOutreach } from "@/app/demo/_components/panel-outreach";
 
 export const metadata = {
   title: "Request Access",
@@ -39,25 +38,6 @@ export default function WaitlistPage() {
             </a>
             , a UNC student building KithNode. Tell me where you&apos;re
             recruiting and I&apos;ll set up your account and reach out myself.
-          </p>
-        </div>
-
-        {/* Product proof: the real demo outreach panel, so visitors see actual
-            output (a drafted message grounded in shared signals) before handing
-            over personal details. The flip trigger the testers named. */}
-        <div className="mb-6">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
-            What it actually produces
-          </p>
-          <PanelOutreach />
-          <p className="mt-3 text-sm text-slate-500">
-            Live demo with sample data.{" "}
-            <Link
-              href="/demo"
-              className="font-semibold text-[#0369A1] hover:underline"
-            >
-              Explore the full demo &rarr;
-            </Link>
           </p>
         </div>
 
