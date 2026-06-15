@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
+import { contactNeedsInfo } from "@/lib/needs-info";
 import {
   engagementScore,
   relationshipClass,
@@ -92,6 +93,7 @@ export async function GET() {
           now,
         });
         const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: c.lastSpokenAt, now });
+        const displayedTier = displayTier(c.tier, klass);
         return {
           id: c.id,
           name: unlocked ? (c.name || "") : redactName(c.name || ""),
@@ -120,10 +122,11 @@ export async function GET() {
             signal_score: 0,
             engagement_score: engagement,
             total_score: fit,
-            tier: displayTier(c.tier, klass),
+            tier: displayedTier,
           },
           relationship_class: klass,
           dormant,
+          needs_info: contactNeedsInfo(c, displayedTier),
           is_friend: !!c.isFriend,
           speak_frequency: c.speakFrequency || "",
           last_spoken_at: c.lastSpokenAt || "",

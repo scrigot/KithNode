@@ -78,6 +78,7 @@ export function WarmSignalCard({
   const tier = contact.score.tier;
   const tierStyle = TIER_STYLES[tier] || TIER_STYLES.cold;
   const isRedacted = !!contact.isRedacted;
+  const needsInfo = !!(contact as unknown as { needs_info?: boolean }).needs_info;
 
   // Defensive casts for relationship fields that may not yet be in RankedContact type.
   const contactRel = contact as unknown as Record<string, unknown>;
@@ -221,21 +222,33 @@ export function WarmSignalCard({
         {/* Right: Score + Tier badge + Friend indicator */}
         <div className="flex flex-col items-end gap-1">
           <div className="text-right">
-            <span className="text-lg font-bold tabular-nums text-foreground">
-              {Math.round(contact.score.total_score)}
-            </span>
-            <span className="text-xs text-muted-foreground">/100</span>
+            {needsInfo ? (
+              <span className="text-lg font-bold tabular-nums text-muted-foreground/50">—</span>
+            ) : (
+              <>
+                <span className="text-lg font-bold tabular-nums text-foreground">
+                  {Math.round(contact.score.total_score)}
+                </span>
+                <span className="text-xs text-muted-foreground">/100</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {isFriend && (
               <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
             )}
-            <Badge
-              variant="outline"
-              className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
-            >
-              {TIER_LABELS[tier] || "COLD"}
-            </Badge>
+            {needsInfo ? (
+              <span className="border border-dashed border-slate-500/40 bg-transparent text-slate-400 text-[10px] font-bold tracking-wider px-1.5 py-0.5">
+                NEEDS INFO
+              </span>
+            ) : (
+              <Badge
+                variant="outline"
+                className={`text-[10px] font-bold tracking-wider ${tierStyle}`}
+              >
+                {TIER_LABELS[tier] || "COLD"}
+              </Badge>
+            )}
           </div>
         </div>
       </div>

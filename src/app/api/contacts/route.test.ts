@@ -131,6 +131,23 @@ describe("GET /api/contacts", () => {
     expect(body[1].score.total_score).toBe(100);
   });
 
+  it("flags a bare cold stub as needs_info but not an enriched/warm contact", async () => {
+    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockListQueries([
+      // Bare LinkedIn stub: cold tier, no enrichable personal data → needs_info.
+      { ...baseContact, id: "stub", name: "Bare Stub", warmthScore: 0, tier: "cold" },
+      // Enriched + warm: not cold, has personal data → needs_info falsy.
+      { ...baseContact, id: "warm", name: "Warm Alum", warmthScore: 65, tier: "warm", education: "UNC" },
+    ]);
+
+    const response = await GET();
+    const body = await response.json();
+    const stub = body.find((c: { id: string }) => c.id === "stub");
+    const warm = body.find((c: { id: string }) => c.id === "warm");
+    expect(stub.needs_info).toBe(true);
+    expect(warm.needs_info).toBeFalsy();
+  });
+
   it("a responded pipeline stage promotes to kith", async () => {
     mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
     mockListQueries(
