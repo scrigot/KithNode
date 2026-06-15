@@ -152,9 +152,9 @@ export function WaitlistForm() {
         {pending ? "Submitting..." : "Request Access"}
       </button>
 
-      <p className="text-center text-xs text-slate-500">
-        We only use this to pick the first cohort. By submitting, you agree to
-        the{" "}
+      <p className="text-center text-xs text-slate-600">
+        Your details are only used to pick the founding cohort. We never sell or
+        share them. By requesting access you agree to the{" "}
         <Link
           href="/terms"
           className="font-medium text-[#0369A1] hover:underline"
