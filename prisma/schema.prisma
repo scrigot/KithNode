@@ -153,6 +153,8 @@ model WaitlistSignup {
   current_prep      String?
   referred_by       String?
   ref_code          String?
+  email_status      String   @default("pending") // pending | sent | failed | skipped | unknown
+  email_sent_at     DateTime? @db.Timestamptz(6)
 
   @@map("waitlist_signups")
 }

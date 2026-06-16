@@ -47,16 +47,31 @@ type ConfirmArgs = {
   referralLink: string;
 };
 
-export async function sendWaitlistConfirmation({ email, fullName, referralLink }: ConfirmArgs) {
+/** Delivery outcome so the caller can record it. "skipped" = no API key
+ * configured (local/preview); "failed" = Resend returned an error or threw. */
+export type EmailResult = {
+  status: "sent" | "failed" | "skipped";
+  id?: string;
+  error?: string;
+};
+
+export async function sendWaitlistConfirmation({
+  email,
+  fullName,
+  referralLink,
+}: ConfirmArgs): Promise<EmailResult> {
   if (!client) {
     console.warn("[resend] RESEND_API_KEY missing — skipping confirmation email");
-    return;
+    return { status: "skipped" };
   }
 
   const firstName = fullName.trim().split(" ")[0] || "there";
 
   try {
-    await client.emails.send({
+    // Resend returns { data, error }: an API-level error (bad domain, rate
+    // limit, suppressed address) does NOT throw, so check `error` explicitly.
+    // Only network/transport faults throw, hence the surrounding try/catch.
+    const { data, error } = await client.emails.send({
       from: `Sam from KithNode <${FROM}>`,
       to: email,
       replyTo: "samrigot31@gmail.com",
@@ -79,7 +94,16 @@ export async function sendWaitlistConfirmation({ email, fullName, referralLink }
         `UNC '29 · building KithNode`,
       ].join("\n"),
     });
+    if (error) {
+      console.error("[resend] send failed", error);
+      return { status: "failed", error: error.message ?? String(error) };
+    }
+    return { status: "sent", id: data?.id };
   } catch (err) {
-    console.error("[resend] send failed", err);
+    console.error("[resend] send threw", err);
+    return {
+      status: "failed",
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
