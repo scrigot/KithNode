@@ -1525,6 +1525,7 @@ function OnboardingFunnel() {
                     loadOptions={loadHighSchools}
                     placeholder="East Chapel Hill High School"
                     ariaLabel="High School"
+                    commitOnBlur
                   />
                 </div>
                 <div>
