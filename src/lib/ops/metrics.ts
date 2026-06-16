@@ -11,7 +11,7 @@
 
 // ─── Health (good/bad color state) ──────────────────────────────────────────
 // Every number the cockpit renders carries a Health so there are no naked
-// figures. healthColor maps it to a DESIGN.md token class (teal-only accent,
+// figures. healthColor maps it to a brand/dashboard.md token class (teal-only accent,
 // semantic green/amber/red, muted for neutral).
 export type Health = "good" | "warn" | "bad" | "neutral";
 

@@ -7,7 +7,7 @@ import { CreditCost } from "@/components/credit-cost";
 import { composeWhyNow } from "@/lib/why-now";
 
 // ─── Tier helpers ───────────────────────────────────────────────────────
-// Tier colors per DESIGN.md: HOT/red WARM/blue MONITOR/amber COLD/zinc.
+// Tier colors per brand/dashboard.md: HOT/red WARM/blue MONITOR/amber COLD/zinc.
 export type Tier = "kith" | "hot" | "warm" | "monitor" | "cold";
 
 export function normalizeTier(t: string | undefined | null): Tier {

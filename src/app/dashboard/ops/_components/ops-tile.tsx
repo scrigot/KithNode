@@ -3,7 +3,7 @@ import { healthChip, type Health } from "./state";
 
 /**
  * Reusable tile wrapper for the ops cockpit. Sharp corners, bg-bg-card,
- * border-white/[0.06] (DESIGN.md). Header = teal uppercase label + optional
+ * border-white/[0.06] (brand/dashboard.md). Header = teal uppercase label + optional
  * micro-subtitle + optional right-aligned status badge carrying a Health.
  */
 export function OpsTile({
@@ -49,7 +49,7 @@ export function OpsTile({
 }
 
 /**
- * Centered empty/single-user state for a tile (DESIGN.md: icon + heading +
+ * Centered empty/single-user state for a tile (brand/dashboard.md: icon + heading +
  * muted description). Used pre-launch when a table is near-empty.
  */
 export function OpsEmpty({

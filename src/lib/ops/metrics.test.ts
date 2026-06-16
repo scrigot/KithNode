@@ -52,7 +52,7 @@ describe("isFounder (simulation — no NextAuth runtime import)", () => {
 });
 
 describe("healthColor", () => {
-  it("maps each Health to its DESIGN.md token class", () => {
+  it("maps each Health to its brand/dashboard.md token class", () => {
     expect(healthColor("good")).toBe("text-accent-green");
     expect(healthColor("warn")).toBe("text-accent-amber");
     expect(healthColor("bad")).toBe("text-accent-red");
