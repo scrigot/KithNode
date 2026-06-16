@@ -59,6 +59,13 @@ export interface UserPrefs {
   onboardingTimeline?: string;
   /** ISO timestamp set when the dashboard tour completes; null until then. */
   tutorialDoneAt?: string | null;
+  /** Outreach-draft style settings. Feed buildDraftStyle() in the draft prompt;
+   * the scorer never reads them. Optional so existing UserPrefs literals (tests,
+   * scoring fixtures) stay valid — getUserPrefs always populates them. */
+  draftTone?: string;
+  draftLength?: string;
+  draftSignature?: string;
+  draftSubjectStyle?: string;
 }
 
 export type { EducationEntry, ExperienceEntry, ClubEntry };
@@ -88,6 +95,10 @@ const EMPTY_PREFS: UserPrefs = {
   onboardingPain: [],
   onboardingTimeline: "",
   tutorialDoneAt: null,
+  draftTone: "warm",
+  draftLength: "medium",
+  draftSignature: "",
+  draftSubjectStyle: "casual",
 };
 
 function parseList(val: string | null | undefined): string[] {
@@ -117,7 +128,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, graduationYear, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, graduationYear, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt, draftTone, draftLength, draftSignature, draftSubjectStyle"
     )
     .eq("email", email)
     .single();
@@ -149,5 +160,9 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     onboardingPain: parseList(data.onboardingPain),
     onboardingTimeline: data.onboardingTimeline || "",
     tutorialDoneAt: data.tutorialDoneAt ?? null,
+    draftTone: data.draftTone || "warm",
+    draftLength: data.draftLength || "medium",
+    draftSignature: data.draftSignature || "",
+    draftSubjectStyle: data.draftSubjectStyle || "casual",
   };
 }

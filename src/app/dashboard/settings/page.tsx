@@ -43,6 +43,7 @@ import {
   FileText,
   Upload,
   Loader2,
+  Mail,
 } from "lucide-react";
 import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
@@ -73,6 +74,10 @@ interface Preferences {
   customFirms: string[];
   recruitingDate: string;
   weeklyGoalTarget: number;
+  draftTone: string;
+  draftLength: string;
+  draftSignature: string;
+  draftSubjectStyle: string;
 }
 
 const STORAGE_KEY = "kithnode_preferences";
@@ -96,6 +101,10 @@ function getDefaults(): Preferences {
     customFirms: [],
     recruitingDate: "",
     weeklyGoalTarget: 3,
+    draftTone: "warm",
+    draftLength: "medium",
+    draftSignature: "",
+    draftSubjectStyle: "casual",
   };
 }
 
@@ -156,6 +165,10 @@ async function syncToAPI(prefs: Preferences) {
         skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
+        draft_tone: prefs.draftTone || "warm",
+        draft_length: prefs.draftLength || "medium",
+        draft_signature: prefs.draftSignature || "",
+        draft_subject_style: prefs.draftSubjectStyle || "casual",
       }),
     });
   } catch (err) {
@@ -822,6 +835,116 @@ function EditPanel({
               />
               <p className="mt-1 text-[10px] text-text-muted">
                 Appears as the target in the weekly progress bar.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Outreach drafting */}
+        <section className="border border-white/[0.06] bg-bg-card p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Mail size={15} className="text-accent-teal" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+              Outreach drafting
+            </h3>
+          </div>
+          <p className="mb-4 text-[11px] text-text-muted">
+            Controls how Draft Outreach writes your emails. Applies to every new draft.
+          </p>
+          <div className="space-y-4">
+            {/* Tone */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Tone
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["warm", "Warm"],
+                  ["professional", "Professional"],
+                  ["concise", "Concise"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftTone: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftTone === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Length */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Length
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["short", "Short", "~80 words"],
+                  ["medium", "Medium", "~150 words"],
+                  ["long", "Long", "~220 words"],
+                ] as const).map(([val, labelText, hint]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftLength: val })}
+                    className={`flex flex-col items-start border px-4 py-2 transition-colors ${
+                      local.draftLength === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{labelText}</span>
+                    <span className="text-[10px] opacity-70">{hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Subject line */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Subject line
+              </label>
+              <div className="flex gap-2">
+                {([
+                  ["casual", "Casual"],
+                  ["formal", "Formal"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftSubjectStyle: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftSubjectStyle === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Signature */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Signature <span className="opacity-60">(optional)</span>
+              </label>
+              <textarea
+                value={local.draftSignature}
+                onChange={(e) =>
+                  setLocal({ ...local, draftSignature: e.target.value.slice(0, 200) })
+                }
+                rows={3}
+                maxLength={200}
+                placeholder={"Best,\nSam Rigot\nUNC '29"}
+                className="w-full resize-none border border-white/[0.06] bg-muted px-3 py-2 text-sm text-white placeholder:text-text-muted focus:border-accent-teal focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-text-muted">
+                When set, used verbatim as the sign-off instead of just your first name.{" "}
+                {local.draftSignature.length}/200
               </p>
             </div>
           </div>
@@ -1636,6 +1759,10 @@ export default function SettingsPage() {
                 typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0
                   ? data.weeklyGoalTarget
                   : 3,
+              draftTone: data.draftTone || "warm",
+              draftLength: data.draftLength || "medium",
+              draftSignature: data.draftSignature || "",
+              draftSubjectStyle: data.draftSubjectStyle || "casual",
             };
             setPrefs(merged);
             savePreferences(merged);
