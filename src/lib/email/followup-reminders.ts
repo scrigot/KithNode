@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 import { getOverdueLeads } from "@/lib/leads/overdue";
 import { isAddressSuppressed } from "@/lib/resend";
+import { logEmail } from "@/lib/email/log";
 
 // Follow-up reminder email: nudges the USER about leads that have gone cold
 // (overdue for follow-up). KithNode never emails the lead — this respects
@@ -193,17 +194,31 @@ export async function sendFollowupReminders(
   const subject = `KithNode: ${rows.length} lead${rows.length === 1 ? "" : "s"} need a follow-up`;
 
   try {
-    await client.emails.send({
+    const { data } = await client.emails.send({
       from: `KithNode <${FROM}>`,
       to: email,
       replyTo: "samrigot31@gmail.com",
       subject,
       html: buildEmailHtml(userName, rows.slice(0, MAX_ROWS), rows.length),
     });
+    await logEmail({
+      toEmail: email,
+      type: "followup",
+      result: { status: "sent", id: data?.id },
+      userId,
+      subject,
+    });
     return { success: true, sent: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[followups] send failed", err);
+    await logEmail({
+      toEmail: email,
+      type: "followup",
+      result: { status: "failed", error: message },
+      userId,
+      subject,
+    });
     return { success: false, sent: false, error: message };
   }
 }

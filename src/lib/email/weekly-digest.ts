@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 import { normalizeFirmName } from "@/lib/normalize-firm";
 import { isAddressSuppressed } from "@/lib/resend";
+import { logEmail } from "@/lib/email/log";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -221,7 +222,7 @@ export async function sendWeeklyDigest(
       : "KithNode: Your weekly digest";
 
   try {
-    await client.emails.send({
+    const { data } = await client.emails.send({
       from: `KithNode <${FROM}>`,
       to: email,
       replyTo: "samrigot31@gmail.com",
@@ -229,10 +230,24 @@ export async function sendWeeklyDigest(
       html: buildEmailHtml(userName, firms, newContacts.length),
     });
 
+    await logEmail({
+      toEmail: email,
+      type: "weekly_digest",
+      result: { status: "sent", id: data?.id },
+      userId,
+      subject,
+    });
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[digest] send failed", err);
+    await logEmail({
+      toEmail: email,
+      type: "weekly_digest",
+      result: { status: "failed", error: message },
+      userId,
+      subject,
+    });
     return { success: false, error: message };
   }
 }

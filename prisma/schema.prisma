@@ -308,3 +308,22 @@ model OpsEvent {
 
   @@map("ops_events")
 }
+
+// Append-only record of every outbound email (setup, weekly_digest, followup,
+// waitlist, feedback). Server-only: written via the service-role/prisma client,
+// read from the terminal (`npm run email:log`). RLS is enabled with no client
+// policies, so anon/authenticated are denied; the service role bypasses RLS.
+model EmailLog {
+  id         String   @id @default(cuid())
+  userId     String   @default("") // email-as-id; "" for non-user sends (waitlist/feedback)
+  toEmail    String
+  type       String // "setup" | "weekly_digest" | "followup" | "waitlist" | "feedback"
+  subject    String   @default("")
+  status     String // "sent" | "failed" | "skipped"
+  providerId String   @default("") // Resend message id
+  error      String   @default("")
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([toEmail])
+  @@index([type, createdAt])
+}

@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { FOUNDER_EMAIL } from "./founder";
 import { prisma } from "./db";
+import { logEmail } from "@/lib/email/log";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -30,17 +31,19 @@ type FeedbackAlertArgs = {
  * email so a plain Gmail reply answers them directly — that IS the support
  * loop for beta. Never throws: the message is already stored in DB. */
 export async function sendFounderFeedbackAlert({ fromEmail, page, message }: FeedbackAlertArgs) {
+  const subject = `[KithNode] Feedback from ${fromEmail}`;
   if (!client) {
     console.warn("[resend] RESEND_API_KEY missing — skipping feedback alert");
+    await logEmail({ toEmail: FOUNDER_EMAIL, type: "feedback", result: { status: "skipped" }, subject });
     return;
   }
 
   try {
-    await client.emails.send({
+    const { data, error } = await client.emails.send({
       from: `KithNode Feedback <${FROM}>`,
       to: FOUNDER_EMAIL,
       replyTo: fromEmail,
-      subject: `[KithNode] Feedback from ${fromEmail}`,
+      subject,
       text: [
         `From: ${fromEmail}`,
         `Page: ${page || "unknown"}`,
@@ -50,8 +53,22 @@ export async function sendFounderFeedbackAlert({ fromEmail, page, message }: Fee
         `— Reply to this email to answer them directly.`,
       ].join("\n"),
     });
+    await logEmail({
+      toEmail: FOUNDER_EMAIL,
+      type: "feedback",
+      result: error
+        ? { status: "failed", error: error.message ?? String(error) }
+        : { status: "sent", id: data?.id },
+      subject,
+    });
   } catch (err) {
     console.error("[resend] feedback alert failed", err);
+    await logEmail({
+      toEmail: FOUNDER_EMAIL,
+      type: "feedback",
+      result: { status: "failed", error: err instanceof Error ? err.message : String(err) },
+      subject,
+    });
   }
 }
 
@@ -76,7 +93,9 @@ export async function sendWaitlistConfirmation({
 }: ConfirmArgs): Promise<EmailResult> {
   if (!client) {
     console.warn("[resend] RESEND_API_KEY missing — skipping confirmation email");
-    return { status: "skipped" };
+    const result: EmailResult = { status: "skipped" };
+    await logEmail({ toEmail: email, type: "waitlist", result, subject: "You're on the KithNode list" });
+    return result;
   }
 
   if (await isAddressSuppressed(email)) {
@@ -113,16 +132,19 @@ export async function sendWaitlistConfirmation({
         `UNC '29 · building KithNode`,
       ].join("\n"),
     });
-    if (error) {
-      console.error("[resend] send failed", error);
-      return { status: "failed", error: error.message ?? String(error) };
-    }
-    return { status: "sent", id: data?.id };
+    const result: EmailResult = error
+      ? { status: "failed", error: error.message ?? String(error) }
+      : { status: "sent", id: data?.id };
+    if (error) console.error("[resend] send failed", error);
+    await logEmail({ toEmail: email, type: "waitlist", result, subject: "You're on the KithNode list" });
+    return result;
   } catch (err) {
     console.error("[resend] send threw", err);
-    return {
+    const result: EmailResult = {
       status: "failed",
       error: err instanceof Error ? err.message : String(err),
     };
+    await logEmail({ toEmail: email, type: "waitlist", result, subject: "You're on the KithNode list" });
+    return result;
   }
 }
