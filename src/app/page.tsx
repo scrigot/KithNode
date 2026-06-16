@@ -6,7 +6,6 @@ import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { SectionImportRank } from "./_landing/section-import-rank";
 import { SectionOutpace } from "./_landing/section-outpace";
-import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
 import { FAQ } from "./_landing/faq";
 import { MeshBg } from "./_landing/mesh-bg";
@@ -68,7 +67,6 @@ export default async function Home({
 
       <SectionOutpace />
 
-      <Testimonials />
       <FAQ />
       <CTASection />
 
