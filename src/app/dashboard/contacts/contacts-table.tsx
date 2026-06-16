@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { OutreachSlideOver } from "./outreach-slide-over";
+import { OutreachModal } from "./outreach-modal";
 import { AddContactSlideOver } from "./add-contact-slide-over";
 import { trackEvent } from "@/lib/posthog";
 
@@ -188,7 +188,7 @@ export function ContactsTable() {
 
   return (
     <div>
-      <OutreachSlideOver
+      <OutreachModal
         connectionId={slideOver?.connectionId ?? ""}
         contactName={slideOver?.contactName ?? ""}
         open={slideOver !== null}
