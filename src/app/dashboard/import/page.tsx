@@ -12,10 +12,10 @@ import {
   parseLinkedInCSV,
   type CsvContact,
 } from "@/lib/linkedin-csv";
-import { Upload, Link2, AlertTriangle, Sparkles, X } from "lucide-react";
+import { Upload, Link2, AlertTriangle, Sparkles, X, UserPlus } from "lucide-react";
 import BrainDumpPanel from "./brain-dump-panel";
 
-type ImportMode = "csv" | "ai";
+type ImportMode = "manual" | "ai" | "bulk";
 
 const TIER_STYLES: Record<string, string> = {
   kith: "text-amber-300",
@@ -31,7 +31,7 @@ const IMPORT_BATCH_SIZE = 50;
 
 export default function ImportPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<ImportMode>("csv");
+  const [mode, setMode] = useState<ImportMode>("manual");
   const [urls, setUrls] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -48,6 +48,17 @@ export default function ImportPage() {
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // "Add by hand" form state (reuses the existing /api/contacts contract).
+  const [manualName, setManualName] = useState("");
+  const [manualFirmName, setManualFirmName] = useState("");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualUniversity, setManualUniversity] = useState("");
+  const [manualGraduationYear, setManualGraduationYear] = useState("");
+  const [manualLinkedInUrl, setManualLinkedInUrl] = useState("");
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualSuccess, setManualSuccess] = useState<{ name: string; id?: string } | null>(null);
 
   const urlCount = urls.split("\n").filter((u) => u.trim()).length;
 
@@ -104,6 +115,50 @@ export default function ImportPage() {
     } finally {
       setLoading(false);
       setEnrichingId(null);
+    }
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualLoading(true);
+    setManualError(null);
+    setManualSuccess(null);
+
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: manualName,
+          firmName: manualFirmName,
+          title: manualTitle,
+          university: manualUniversity,
+          graduationYear: Number(manualGraduationYear),
+          linkedInUrl: manualLinkedInUrl,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to add contact");
+      }
+
+      const created = await res.json().catch(() => null);
+      trackEvent("contact_added", { name: manualName, firmName: manualFirmName });
+      setManualSuccess({
+        name: manualName,
+        id: created?.id ?? created?.contact?.id,
+      });
+      setManualName("");
+      setManualFirmName("");
+      setManualTitle("");
+      setManualUniversity("");
+      setManualGraduationYear("");
+      setManualLinkedInUrl("");
+    } catch (err) {
+      setManualError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setManualLoading(false);
     }
   };
 
@@ -200,320 +255,449 @@ export default function ImportPage() {
       .slice(0, 8);
   })();
 
+  const TABS: Array<{ id: ImportMode; label: string }> = [
+    { id: "manual", label: "Manual" },
+    { id: "ai", label: "Enrich with AI" },
+    { id: "bulk", label: "Bulk" },
+  ];
+
+  const manualInputClass =
+    "w-full border border-white/[0.06] bg-bg-secondary px-3 py-2.5 text-[14px] text-white placeholder:text-text-muted focus:border-primary focus:outline-none";
+  const manualLabelClass =
+    "mb-1.5 block text-[12px] font-medium uppercase tracking-wider text-text-secondary";
+
   return (
-    <div className="flex min-h-full flex-col p-5">
-      {/* Header */}
-      <div className="flex items-end justify-between">
+    <div className="flex min-h-full flex-col px-5 py-8">
+      <div className="mx-auto w-full max-w-3xl">
+        {/* Header */}
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-            IMPORT
-          </h2>
-          <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            {mode === "csv"
-              ? "Paste LinkedIn URLs or upload a CSV"
-              : "Brain-dump your network with your own AI, then import"}
+          <h1 className="text-[22px] font-bold tracking-tight text-white">
+            Import contacts
+          </h1>
+          <p className="mt-1.5 text-[14px] text-text-secondary">
+            Add people one at a time, brain-dump with your own AI, or bulk-import a LinkedIn export.
           </p>
         </div>
-        <div className="flex border border-white/[0.06]">
-          <button
-            onClick={() => setMode("csv")}
-            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              mode === "csv"
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            CSV / URLs
-          </button>
-          <button
-            onClick={() => setMode("ai")}
-            className={`flex items-center gap-1 border-l border-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              mode === "ai"
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Sparkles className="h-3 w-3" />
-            Enrich with AI
-          </button>
-        </div>
-      </div>
 
-      <div className="mt-3 h-px bg-border" />
-
-      {mode === "ai" && <BrainDumpPanel />}
-
-      {mode === "csv" && (
-        <>
-      {/* Two-column inputs: CSV + URL paste */}
-      <div className="mt-3 grid flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
-        {/* CSV Upload */}
-        <div className="flex flex-col border border-white/[0.06] bg-card">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              <Upload className="h-3 w-3" />
-              LinkedIn CSV Export
-            </span>
-            {csvContacts.length > 0 && (
-              <span className="text-[9px] tabular-nums text-muted-foreground">
-                {csvContacts.length} parsed
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2 p-3">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-6 transition-colors ${
-                dragging
-                  ? "border-primary bg-primary/10"
-                  : csvFileName
-                    ? "border-primary/40 bg-primary/5"
-                    : "border-white/[0.1] bg-muted hover:border-white/[0.25]"
+        {/* Underlined text-tab bar */}
+        <div className="mt-6 flex gap-6 border-b border-white/[0.06]">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setMode(tab.id)}
+              className={`-mb-px border-b-2 pb-3 text-[13px] font-medium transition-colors ${
+                mode === tab.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-text-muted hover:text-text-secondary"
               }`}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileInput}
-                className="hidden"
-              />
-              {csvFileName ? (
-                <div className="text-center">
-                  <p className="text-[12px] font-bold text-foreground">
-                    {csvFileName}
-                  </p>
-                  <p className="mt-1 text-[10px] text-primary">
-                    {csvContacts.length} contacts found
-                  </p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearCSV();
-                    }}
-                    className="mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground underline hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <Upload className="mx-auto h-5 w-5 text-muted-foreground" />
-                  <p className="mt-2 text-[12px] text-muted-foreground">
-                    Drop CSV here or click to browse
-                  </p>
-                  <p className="mt-1 text-[9px] uppercase tracking-wider text-muted-foreground/60">
-                    LinkedIn &gt; Settings &gt; Get a copy of your data
-                  </p>
-                </div>
-              )}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* MANUAL tab */}
+        {mode === "manual" && (
+          <div className="mt-8 flex flex-col gap-8">
+            {/* Paste LinkedIn URLs */}
+            <div className="border border-white/[0.06] bg-bg-card">
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
+                  <Link2 className="h-4 w-4 text-primary" />
+                  Paste LinkedIn URLs
+                </span>
+                <span className="text-[12px] tabular-nums text-text-secondary">
+                  {urlCount} {urlCount === 1 ? "URL" : "URLs"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-4 p-6">
+                <textarea
+                  value={urls}
+                  onChange={(e) => setUrls(e.target.value)}
+                  rows={6}
+                  placeholder={`https://linkedin.com/in/jane-doe\nhttps://linkedin.com/in/john-smith\nhttps://linkedin.com/in/...`}
+                  className="w-full resize-y border border-white/[0.06] bg-bg-secondary px-3 py-2.5 font-mono text-[13px] text-white placeholder:text-text-muted focus:border-primary focus:outline-none"
+                />
+                <Button
+                  onClick={handleImport}
+                  disabled={loading || !urls.trim()}
+                  className="w-full bg-primary py-2.5 text-[13px] font-semibold text-white hover:bg-primary/80"
+                >
+                  {loading
+                    ? "Importing..."
+                    : urlCount > 0
+                      ? `Import ${urlCount} URLs`
+                      : "Import"}
+                </Button>
+              </div>
             </div>
 
-            {csvContacts.length > 0 && (
-              <>
-                {/* Preview: top firms by frequency */}
-                <div>
-                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                    Top Firms in Export
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {csvFirmCounts.map(([firm, n]) => (
-                      <span
-                        key={firm}
-                        className="border border-white/[0.06] bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                      >
-                        {firm}{" "}
-                        <span className="font-mono tabular-nums text-primary">
-                          {n}
-                        </span>
-                      </span>
-                    ))}
+            {/* Add by hand */}
+            <div className="border border-white/[0.06] bg-bg-card">
+              <div className="flex items-center gap-2 border-b border-white/[0.06] px-6 py-4">
+                <UserPlus className="h-4 w-4 text-primary" />
+                <span className="text-[13px] font-semibold text-white">Add by hand</span>
+              </div>
+              <form onSubmit={handleManualSubmit} className="flex flex-col gap-5 p-6">
+                {manualError && (
+                  <div className="flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                    <p className="text-[13px] text-amber-400">{manualError}</p>
                   </div>
-                </div>
-
-                {loading && importTotal > 0 && (
-                  <div className="mt-1">
-                    <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-primary">
-                      <span>Importing</span>
-                      <span className="font-mono tabular-nums">
-                        {importDone}/{importTotal}
-                      </span>
-                    </div>
-                    <div className="h-1 w-full bg-white/[0.08]">
-                      <div
-                        className="h-full bg-primary transition-all duration-200"
-                        style={{
-                          width: `${Math.round((importDone / importTotal) * 100)}%`,
-                        }}
-                      />
-                    </div>
+                )}
+                {manualSuccess && (
+                  <div className="flex items-center gap-2 border border-primary/30 bg-primary/5 px-3 py-2.5">
+                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                    {manualSuccess.id ? (
+                      <p className="text-[13px] text-primary">
+                        Added {manualSuccess.name}.{" "}
+                        <Link
+                          href={`/contact/${manualSuccess.id}`}
+                          className="underline underline-offset-2"
+                        >
+                          View contact
+                        </Link>
+                      </p>
+                    ) : (
+                      <p className="text-[13px] text-primary">Added {manualSuccess.name}</p>
+                    )}
                   </div>
                 )}
 
-                <Button
-                  onClick={handleCSVImport}
-                  disabled={loading}
-                  className="mt-1 w-full bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-primary/80"
-                >
-                  {loading
-                    ? `Importing ${importDone}/${importTotal}...`
-                    : `Import ${csvContacts.length} Contacts`}
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* URL paste */}
-        <div className="flex flex-col border border-white/[0.06] bg-card">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-              <Link2 className="h-3 w-3" />
-              Paste LinkedIn URLs
-            </span>
-            <span className="text-[9px] tabular-nums text-muted-foreground">
-              {urlCount} {urlCount === 1 ? "URL" : "URLs"}
-            </span>
-          </div>
-          <div className="flex flex-1 flex-col gap-2 p-3">
-            <textarea
-              value={urls}
-              onChange={(e) => setUrls(e.target.value)}
-              rows={12}
-              placeholder={`https://linkedin.com/in/jane-doe\nhttps://linkedin.com/in/john-smith\nhttps://linkedin.com/in/...`}
-              className="w-full flex-1 resize-y border border-input bg-muted px-3 py-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-            />
-            <Button
-              onClick={handleImport}
-              disabled={loading || !urls.trim()}
-              className="w-full bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-primary/80"
-            >
-              {loading
-                ? "Importing..."
-                : urlCount > 0
-                  ? `Import ${urlCount} URLs`
-                  : "Import"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mt-3 flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
-          <p className="text-[11px] text-amber-400">{error}</p>
-        </div>
-      )}
-
-      {/* Enrich tip — hidden for single-URL imports (we enrich + navigate automatically) */}
-      {result && result.imported > 0 && lastUrlImportCount !== 1 && (
-        <div className="mt-3 flex items-center gap-2 border border-primary/30 bg-primary/5 px-3 py-2">
-          <Sparkles className="h-3 w-3 shrink-0 text-primary" />
-          <p className="text-[11px] text-primary">
-            Tip: run &ldquo;Enrich All&rdquo; in Warm Signals to fill education +
-            location and improve scores.
-          </p>
-        </div>
-      )}
-
-      {/* Results */}
-      {result && (
-        <div className="mt-3 border border-white/[0.06] bg-card">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-            <span className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
-              <span className="text-green-400">{result.imported} imported</span>
-              {result.failed > 0 && (
-                <span className="text-red-400">{result.failed} failed</span>
-              )}
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-              Results
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3">
-            {result.contacts.map((c, i) => {
-              const isEnriching = enrichingId === c.id;
-              const inner = (
-                <div
-                  className={`flex items-start justify-between gap-2 border px-2 py-1.5 text-[11px] ${
-                    c.error
-                      ? "border-destructive/30 bg-destructive/5"
-                      : "border-white/[0.06] bg-background"
-                  }${!c.error && c.id ? " hover:border-primary/40 transition-colors" : ""}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    {c.error ? (
-                      <div>
-                        <p className="truncate text-muted-foreground">
-                          {c.linkedin_url}
-                        </p>
-                        <p className="text-[9px] text-destructive">{c.error}</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="truncate font-bold text-foreground">
-                          {c.name}
-                        </p>
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {c.title}
-                          {c.company_name ? ` @ ${c.company_name}` : ""}
-                        </p>
-                        {isEnriching && (
-                          <p className="mt-0.5 text-[9px] text-primary">Enriching...</p>
-                        )}
-                        {c.affiliations.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-0.5">
-                            {c.affiliations.slice(0, 3).map((a) => (
-                              <Badge
-                                key={a}
-                                variant="outline"
-                                className="text-[8px] bg-blue-500/20 text-blue-400 border-blue-500/30"
-                              >
-                                {a}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div>
+                    <label className={manualLabelClass}>Name</label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="Jane Smith"
+                      required
+                      className={manualInputClass}
+                    />
                   </div>
-                  {!c.error && (
-                    <div className="text-right">
-                      <span
-                        className={`font-mono text-[13px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
-                      >
-                        {Math.round(c.total_score)}
-                      </span>
-                      <p className="text-[8px] uppercase text-muted-foreground">
-                        {c.tier}
+                  <div>
+                    <label className={manualLabelClass}>Firm</label>
+                    <input
+                      type="text"
+                      value={manualFirmName}
+                      onChange={(e) => setManualFirmName(e.target.value)}
+                      placeholder="Goldman Sachs"
+                      required
+                      className={manualInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={manualLabelClass}>Title</label>
+                    <input
+                      type="text"
+                      value={manualTitle}
+                      onChange={(e) => setManualTitle(e.target.value)}
+                      placeholder="Vice President"
+                      required
+                      className={manualInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={manualLabelClass}>University</label>
+                    <input
+                      type="text"
+                      value={manualUniversity}
+                      onChange={(e) => setManualUniversity(e.target.value)}
+                      placeholder="Wharton"
+                      required
+                      className={manualInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={manualLabelClass}>Graduation Year</label>
+                    <input
+                      type="number"
+                      value={manualGraduationYear}
+                      onChange={(e) => setManualGraduationYear(e.target.value)}
+                      placeholder="2020"
+                      min={1950}
+                      max={2030}
+                      required
+                      className={manualInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={manualLabelClass}>LinkedIn URL (optional)</label>
+                    <input
+                      type="url"
+                      value={manualLinkedInUrl}
+                      onChange={(e) => setManualLinkedInUrl(e.target.value)}
+                      placeholder="https://linkedin.com/in/janesmith"
+                      className={manualInputClass}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={manualLoading}
+                  className="w-full bg-primary py-2.5 text-[13px] font-semibold text-white hover:bg-primary/80"
+                >
+                  {manualLoading ? "Adding..." : "Add Contact"}
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ENRICH WITH AI tab */}
+        {mode === "ai" && (
+          <div className="mt-8">
+            <BrainDumpPanel />
+          </div>
+        )}
+
+        {/* BULK tab */}
+        {mode === "bulk" && (
+          <div className="mt-8 flex flex-col gap-8">
+            <div className="border border-white/[0.06] bg-bg-card">
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
+                  <Upload className="h-4 w-4 text-primary" />
+                  LinkedIn CSV Export
+                </span>
+                {csvContacts.length > 0 && (
+                  <span className="text-[12px] tabular-nums text-text-secondary">
+                    {csvContacts.length} parsed
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-5 p-6">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-12 transition-colors ${
+                    dragging
+                      ? "border-primary bg-primary/10"
+                      : csvFileName
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-white/[0.1] bg-bg-secondary hover:border-white/[0.25]"
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileInput}
+                    className="hidden"
+                  />
+                  {csvFileName ? (
+                    <div className="text-center">
+                      <p className="text-[15px] font-semibold text-white">
+                        {csvFileName}
                       </p>
+                      <p className="mt-1.5 text-[13px] text-primary">
+                        {csvContacts.length} contacts found
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearCSV();
+                        }}
+                        className="mt-3 inline-flex items-center gap-1 text-[12px] text-text-secondary underline hover:text-white"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <Upload className="mx-auto h-8 w-8 text-text-muted" />
+                      <p className="mt-4 text-[15px] font-semibold text-white">
+                        Upload a LinkedIn CSV export
+                      </p>
+                      <p className="mt-1.5 text-[13px] text-text-secondary">
+                        Drop your file here or click to browse.
+                      </p>
+                      <p className="mt-2 text-[12px] text-text-muted">
+                        LinkedIn &gt; Settings &gt; Get a copy of your data
+                      </p>
+                      <span className="mt-5 inline-flex bg-primary px-4 py-2.5 text-[13px] font-semibold text-white">
+                        Choose CSV file
+                      </span>
                     </div>
                   )}
                 </div>
-              );
 
-              return !c.error && c.id ? (
-                <Link key={i} href={`/contact/${c.id}`} className="block underline-offset-2 hover:underline">
-                  {inner}
-                </Link>
-              ) : (
-                <div key={i}>{inner}</div>
-              );
-            })}
+                {csvContacts.length > 0 && (
+                  <>
+                    {/* Preview: top firms by frequency */}
+                    <div>
+                      <p className="mb-2 text-[12px] font-medium uppercase tracking-wider text-text-secondary">
+                        Top Firms in Export
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {csvFirmCounts.map(([firm, n]) => (
+                          <span
+                            key={firm}
+                            className="border border-white/[0.06] bg-bg-secondary px-2 py-1 text-[12px] text-text-secondary"
+                          >
+                            {firm}{" "}
+                            <span className="font-mono tabular-nums text-primary">
+                              {n}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {loading && importTotal > 0 && (
+                      <div>
+                        <div className="mb-1.5 flex items-center justify-between text-[12px] font-medium uppercase tracking-wider text-primary">
+                          <span>Importing</span>
+                          <span className="font-mono tabular-nums">
+                            {importDone}/{importTotal}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/[0.08]">
+                          <div
+                            className="h-full bg-primary transition-all duration-200"
+                            style={{
+                              width: `${Math.round((importDone / importTotal) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleCSVImport}
+                      disabled={loading}
+                      className="w-full bg-primary py-2.5 text-[13px] font-semibold text-white hover:bg-primary/80"
+                    >
+                      {loading
+                        ? `Importing ${importDone}/${importTotal}...`
+                        : `Import ${csvContacts.length} Contacts`}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-        </>
-      )}
+        )}
+
+        {/* Error (URL / CSV imports) */}
+        {(mode === "manual" || mode === "bulk") && error && (
+          <div className="mt-8 flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <p className="text-[13px] text-amber-400">{error}</p>
+          </div>
+        )}
+
+        {/* Enrich tip — hidden for single-URL imports (we enrich + navigate automatically) */}
+        {(mode === "manual" || mode === "bulk") &&
+          result &&
+          result.imported > 0 &&
+          lastUrlImportCount !== 1 && (
+            <div className="mt-6 flex items-center gap-2 border border-primary/30 bg-primary/5 px-4 py-3">
+              <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+              <p className="text-[13px] text-primary">
+                Tip: run &ldquo;Enrich All&rdquo; in Warm Signals to fill education +
+                location and improve scores.
+              </p>
+            </div>
+          )}
+
+        {/* Results (URL / CSV imports) */}
+        {(mode === "manual" || mode === "bulk") && result && (
+          <div className="mt-6 border border-white/[0.06] bg-bg-card">
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">
+              <span className="flex items-center gap-4 text-[13px] font-semibold">
+                <span className="text-green-400">{result.imported} imported</span>
+                {result.failed > 0 && (
+                  <span className="text-red-400">{result.failed} failed</span>
+                )}
+              </span>
+              <span className="text-[12px] uppercase tracking-wider text-text-secondary">
+                Results
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2">
+              {result.contacts.map((c, i) => {
+                const isEnriching = enrichingId === c.id;
+                const inner = (
+                  <div
+                    className={`flex items-start justify-between gap-2 border px-3 py-2.5 text-[13px] ${
+                      c.error
+                        ? "border-destructive/30 bg-destructive/5"
+                        : "border-white/[0.06] bg-bg-secondary"
+                    }${!c.error && c.id ? " hover:border-primary/40 transition-colors" : ""}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      {c.error ? (
+                        <div>
+                          <p className="truncate text-text-secondary">
+                            {c.linkedin_url}
+                          </p>
+                          <p className="text-[11px] text-destructive">{c.error}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="truncate font-semibold text-white">
+                            {c.name}
+                          </p>
+                          <p className="truncate text-[12px] text-text-secondary">
+                            {c.title}
+                            {c.company_name ? ` @ ${c.company_name}` : ""}
+                          </p>
+                          {isEnriching && (
+                            <p className="mt-0.5 text-[11px] text-primary">Enriching...</p>
+                          )}
+                          {c.affiliations.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {c.affiliations.slice(0, 3).map((a) => (
+                                <Badge
+                                  key={a}
+                                  variant="outline"
+                                  className="text-[10px] bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                >
+                                  {a}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {!c.error && (
+                      <div className="text-right">
+                        <span
+                          className={`font-mono text-[15px] font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
+                        >
+                          {Math.round(c.total_score)}
+                        </span>
+                        <p className="text-[10px] uppercase text-text-secondary">
+                          {c.tier}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+
+                return !c.error && c.id ? (
+                  <Link key={i} href={`/contact/${c.id}`} className="block underline-offset-2 hover:underline">
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={i}>{inner}</div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
