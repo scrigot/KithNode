@@ -5,7 +5,6 @@ import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
 import { SectionImportRank } from "./_landing/section-import-rank";
-import { SectionEmailMac } from "./_landing/section-email-mac";
 import { SectionOutpace } from "./_landing/section-outpace";
 import { Testimonials } from "./_landing/testimonials";
 import { CTASection } from "./_landing/cta-section";
@@ -67,7 +66,6 @@ export default async function Home({
         </div>
       </section>
 
-      <SectionEmailMac />
       <SectionOutpace />
 
       <Testimonials />

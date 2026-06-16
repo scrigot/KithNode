@@ -1,15 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { Suspense, useRef } from "react";
+import { useRef } from "react";
 import {
   motion,
   useReducedMotion,
   useScroll,
   useTransform,
 } from "framer-motion";
-import { HeroNetwork } from "./hero-network";
 import { Starfield } from "./starfield";
+import { EmailMacDemo } from "./section-email-mac";
 
 const lineVariants = {
   hidden: { opacity: 0, y: 14, filter: "blur(8px)" },
@@ -48,129 +47,92 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
   const LV = reduce ? reducedLineVariants : lineVariants;
 
   return (
-    <section
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-black"
-    >
+    <section ref={ref} className="relative overflow-hidden bg-black">
       {/* Twinkling starfield */}
       <Starfield />
 
-      {/* Soft cyan glow behind the network column */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 lg:block"
-        style={{
-          background:
-            "radial-gradient(ellipse 55% 55% at 60% 50%, rgba(34,211,238,0.18), rgba(34,211,238,0) 70%)",
-        }}
-      />
-
-      {/* Two-column hero */}
+      {/* Centered copy column */}
       <motion.div
-        className="relative z-10 mx-auto flex min-h-[640px] w-full max-w-[1400px] flex-col items-center gap-10 px-6 pt-24 pb-12 lg:min-h-screen lg:flex-row lg:items-center lg:gap-16 lg:px-12 lg:pt-32 lg:pb-12"
+        className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pt-28 text-center sm:pt-36"
         style={{ y: reduce ? 0 : contentY }}
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: {},
+          visible: {
+            transition: { staggerChildren: 0.14, delayChildren: 0.05 },
+          },
+        }}
       >
-        {/* LEFT: copy column */}
+        {/* Pill badge */}
         <motion.div
-          initial="hidden"
-          animate="visible"
           variants={{
-            hidden: {},
+            hidden: { opacity: 0, y: -10 },
             visible: {
-              transition: { staggerChildren: 0.14, delayChildren: 0.05 },
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.5, ease: "easeOut" as const },
             },
           }}
-          className="flex w-full flex-col text-left lg:flex-1"
         >
-          {/* Pill badge */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: -10 },
-              visible: {
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.5, ease: "easeOut" as const },
-              },
-            }}
-          >
-            <span className="mb-6 inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
-              <motion.span
-                className="h-1.5 w-1.5 rounded-full bg-cyan-300"
-                animate={
-                  reduce
-                    ? undefined
-                    : {
-                        opacity: [0.4, 1, 0.4],
-                        scale: [1, 1.25, 1],
-                      }
-                }
-                transition={
-                  reduce
-                    ? undefined
-                    : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
-                }
-              />
-              Private alpha &middot; free for early users
-            </span>
-          </motion.div>
-
-          {/* Headline with gradient on the third line */}
-          <h1 className="font-heading text-[clamp(2.75rem,7vw,80px)] font-medium leading-[0.98] tracking-[-0.0125em] text-white">
-            <motion.span className="block" variants={LV}>
-              Find a warm path
-            </motion.span>
-            <motion.span className="block text-white/80" variants={LV}>
-              into every bank, fund,
-            </motion.span>
+          <span className="mb-6 inline-flex w-fit items-center gap-2 whitespace-nowrap rounded-full border border-cyan-400/30 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 backdrop-blur-sm">
             <motion.span
-              className="block bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-500 bg-clip-text text-transparent"
-              variants={LV}
-            >
-              and firm on your list.
-            </motion.span>
-          </h1>
-
-          {/* Subhead */}
-          <motion.p
-            className="mt-6 max-w-xl text-[19px] leading-relaxed tracking-[-0.02em] text-white/60 lg:mt-8"
-            variants={fadeUp}
-          >
-            KithNode finds the alumni who can actually introduce you, scores
-            each warm path by real shared signals, and drafts the message. You
-            send it yourself, no automation, no bots, nothing that ever touches
-            your LinkedIn account.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div
-            className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center"
-            variants={fadeUp}
-          >
-            {children}
-            <Link
-              href="/demo"
-              className="rounded-[12px] border border-white/20 bg-white/5 px-10 py-4 text-center text-base font-medium text-white backdrop-blur-sm transition-all hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-100"
-            >
-              Watch a warm path get found
-            </Link>
-          </motion.div>
-
-          {/* Footer credit */}
-          <motion.p
-            className="mt-10 max-w-xl text-sm text-white/50"
-            variants={fadeUp}
-          >
-            Built solo by a UNC student who got tired of cold outreach going
-            nowhere. Try the live demo above, no signup required.
-          </motion.p>
+              className="h-1.5 w-1.5 rounded-full bg-cyan-300"
+              animate={
+                reduce
+                  ? undefined
+                  : {
+                      opacity: [0.4, 1, 0.4],
+                      scale: [1, 1.25, 1],
+                    }
+              }
+              transition={
+                reduce
+                  ? undefined
+                  : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
+              }
+            />
+            Private alpha &middot; free for early users
+          </span>
         </motion.div>
 
-        {/* RIGHT: spinning 3D node network */}
-        <div className="relative h-[320px] w-full sm:h-[380px] lg:h-[600px] lg:flex-1">
-          <Suspense fallback={<div className="h-full w-full" />}>
-            <HeroNetwork />
-          </Suspense>
-        </div>
+        {/* Headline */}
+        <h1 className="font-heading text-[clamp(2.75rem,7vw,80px)] font-medium leading-[1.05] tracking-[-0.0125em] text-white">
+          <motion.span className="block" variants={LV}>
+            #1 CRM for
+          </motion.span>
+          <motion.span
+            className="block bg-gradient-to-r from-cyan-300 via-cyan-400 to-sky-500 bg-clip-text text-transparent"
+            variants={LV}
+          >
+            Finance Recruiting
+          </motion.span>
+        </h1>
+
+        {/* Subhead */}
+        <motion.p
+          className="mx-auto mt-6 max-w-2xl text-[19px] leading-relaxed tracking-[-0.02em] text-white/60"
+          variants={fadeUp}
+        >
+          KithNode maps warm connections you already have and drafts personalized
+          outreach emails.
+        </motion.p>
+
+        {/* Single CTA */}
+        <motion.div className="mt-10 flex justify-center" variants={fadeUp}>
+          {children}
+        </motion.div>
+      </motion.div>
+
+      {/* Bare product demo -- the email being drafted on the warmest path */}
+      <motion.div
+        className="relative z-10 mx-auto mt-14 w-full max-w-6xl px-6 pb-24 sm:mt-20"
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.7, ease: "easeOut" }}
+      >
+        <EmailMacDemo />
       </motion.div>
     </section>
   );

@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { motion } from "framer-motion";
+import { HeroNetwork } from "./hero-network";
 
 // ---------------------------------------------------------------------------
 // Dense mesh -- more nodes + edges than solutions-section (this is the climax)
@@ -91,49 +93,6 @@ function ConvergenceLine({ d, delay }: { d: string; delay: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// WarmPathCluster -- floating glassy "warm path" chain (decorative CTA visual).
-// Echoes Cluely's floating element; on-brand (a real warm path: you -> mutual
-// -> target). CSS-keyframe drift (rAF is throttled in the preview).
-// ---------------------------------------------------------------------------
-
-const WARM_PATH = [
-  { initials: "Y", name: "You", role: "UNC · Chi Phi", tag: null, delay: "0s" },
-  { initials: "JB", name: "Jake Bennett", role: "Chi Phi brother", tag: "MUTUAL", delay: "0.6s" },
-  { initials: "RC", name: "Riley Chen", role: "Analyst @ Goldman Sachs", tag: "WARM PATH", delay: "1.2s" },
-];
-
-function WarmPathCluster() {
-  return (
-    <div className="relative mx-auto w-full max-w-sm">
-      {/* connecting teal spine through the avatar centers */}
-      <div className="absolute left-[28px] bottom-7 top-7 w-px bg-gradient-to-b from-[#0EA5E9]/0 via-[#0EA5E9]/40 to-[#0EA5E9]/0" />
-      <div className="relative flex flex-col gap-5">
-        {WARM_PATH.map((p) => (
-          <div
-            key={p.name}
-            className="cta-float flex items-center gap-3 rounded-[16px] border border-white/10 bg-white/[0.06] p-3 backdrop-blur-md"
-            style={{ animationDelay: p.delay }}
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#0EA5E9]/30 bg-[#0EA5E9]/10 text-[11px] font-bold text-[#0EA5E9]">
-              {p.initials}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">{p.name}</p>
-              <p className="truncate text-[11px] text-white/50">{p.role}</p>
-            </div>
-            {p.tag && (
-              <span className="shrink-0 rounded-full border border-[#0EA5E9]/30 bg-[#0EA5E9]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-[#0EA5E9]">
-                {p.tag}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // CTASection
 // ---------------------------------------------------------------------------
 
@@ -174,12 +133,6 @@ export function CTASection() {
           animation: none;
           box-shadow: 0 0 80px rgba(14,165,233,0.7), 0 0 140px rgba(14,165,233,0.3);
         }
-
-        @keyframes cta-float {
-          0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(-10px); }
-        }
-        .cta-float { animation: cta-float 5s ease-in-out infinite; }
       `}</style>
 
       {/* ------------------------------------------------------------------ */}
@@ -311,7 +264,7 @@ export function CTASection() {
           </p>
         </div>
 
-        {/* RIGHT -- floating warm-path cluster (decorative, desktop only) */}
+        {/* RIGHT -- spinning 3D node network (the warm-path orb, moved from the hero) */}
         <motion.div
           className="relative hidden lg:block"
           initial={{ opacity: 0, x: 24 }}
@@ -320,7 +273,11 @@ export function CTASection() {
           transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
           aria-hidden
         >
-          <WarmPathCluster />
+          <div className="relative h-[340px] w-full lg:h-[440px]">
+            <Suspense fallback={<div className="h-full w-full" />}>
+              <HeroNetwork />
+            </Suspense>
+          </div>
         </motion.div>
       </motion.div>
     </section>
