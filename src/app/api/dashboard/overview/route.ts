@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
+import { selectOverdueLeads } from "@/lib/leads/overdue";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -93,28 +94,13 @@ export async function GET() {
     const responseRate =
       pipelineTotal > 0 ? Math.round((respondedCount / pipelineTotal) * 100) : 0;
 
-    // Overdue list: pipeline entries >=7 days not in responded/meeting_set
-    const overdueEntries = (pipelineEntries || []).filter((e) => {
-      const stage = (e.stage || "researched").toLowerCase();
-      if (stage === "responded" || stage === "meeting_set") return false;
-      const days =
-        (Date.now() - new Date(e.addedAt || Date.now()).getTime()) / 86_400_000;
-      return days >= 7;
-    });
-
-    const remindersCount = overdueEntries.length;
-
-    const topOverdueIds = overdueEntries
-      .map((e) => ({
-        id: e.contactId,
-        stage: (e.stage || "researched").toLowerCase(),
-        days: Math.floor(
-          (Date.now() - new Date(e.addedAt || Date.now()).getTime()) /
-            86_400_000,
-        ),
-      }))
-      .sort((a, b) => b.days - a.days)
-      .slice(0, 5);
+    // Overdue leads: >=7 days, not responded/meeting_set. Shared with the
+    // follow-up reminder email via selectOverdueLeads so they never disagree.
+    const overdueLeads = selectOverdueLeads(pipelineEntries || [], Date.now());
+    const remindersCount = overdueLeads.length;
+    const topOverdueIds = overdueLeads
+      .slice(0, 5)
+      .map((e) => ({ id: e.contactId, stage: e.stage, days: e.days }));
 
     let topOverdue: OverdueContact[] = [];
     if (topOverdueIds.length > 0) {

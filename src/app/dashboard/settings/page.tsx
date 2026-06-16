@@ -46,6 +46,10 @@ import {
 } from "lucide-react";
 import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
+import {
+  calculateProfileCompleteness,
+  type CompletenessInput,
+} from "@/lib/profile-completeness";
 
 const TOTAL_STEPS = 5;
 
@@ -449,6 +453,72 @@ function ExperienceRowsEditor({
   );
 }
 
+// Map the settings-page Preferences shape onto the completeness calc's minimal
+// input (merge preset + custom firms/locations; collapse Greek toggle + minors).
+function toCompletenessInput(p: Preferences): CompletenessInput {
+  return {
+    university: p.university,
+    highSchool: p.highSchool,
+    hometown: p.hometown,
+    greekOrg: p.greekLifeEnabled ? p.greekOrganization : "",
+    educations: p.educations,
+    targetIndustries: p.targetIndustries,
+    targetFirms: [...p.targetFirms, ...p.customFirms],
+    targetLocations: [...p.targetLocations, ...p.customLocations],
+    recruitingDate: p.recruitingDate,
+    skills: p.skills,
+    minor: p.minors.join(", "),
+    experiences: p.experiences,
+    clubMemberships: p.clubMemberships,
+  };
+}
+
+// Live profile-completeness meter (Identity / Targets / Depth). Recomputes from
+// the in-progress edit state, so it ticks up as the user fills fields.
+function CompletenessMeter({ prefs }: { prefs: Preferences }) {
+  const { percent, categories, missing } = calculateProfileCompleteness(
+    toCompletenessInput(prefs),
+  );
+  return (
+    <div className="mb-6 border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+          Profile completeness
+        </span>
+        <span className="text-[13px] font-bold tabular-nums text-accent-teal">{percent}%</span>
+      </div>
+      <div className="h-1 w-full bg-white/[0.06]">
+        <div
+          className="h-1 bg-accent-teal transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        {categories.map((c) => (
+          <div key={c.key}>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-text-muted">
+                {c.label}
+              </span>
+              <span className="text-[9px] tabular-nums text-text-secondary">
+                {c.filled}/{c.total}
+              </span>
+            </div>
+            <div className="mt-1 h-px w-full bg-white/[0.06]">
+              <div className="h-px bg-accent-teal/60" style={{ width: `${c.percent}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {missing.length > 0 && (
+        <p className="mt-2.5 text-[10px] text-text-muted">
+          Next: add your {missing.slice(0, 3).join(", ")}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Edit Panel ────────────────────────────────────────────────────────────────
 
 function EditPanel({
@@ -656,6 +726,8 @@ function EditPanel({
           Restart Setup
         </button>
       </div>
+
+      <CompletenessMeter prefs={local} />
 
       {/* Resume autofill — prefills empty fields only, never stored. */}
       <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
