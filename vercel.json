@@ -13,6 +13,7 @@
     }
   },
   "crons": [
-    { "path": "/api/digest", "schedule": "0 13 * * 1" }
+    { "path": "/api/digest", "schedule": "0 13 * * 1" },
+    { "path": "/api/cron/followups", "schedule": "0 13 * * 1,4" }
   ]
 }

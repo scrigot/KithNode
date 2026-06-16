@@ -66,6 +66,10 @@ export interface UserPrefs {
   draftLength?: string;
   draftSignature?: string;
   draftSubjectStyle?: string;
+  /** Notification opt-outs. Both default true; the cron routes skip users with
+   * the relevant flag false. Optional so existing UserPrefs literals stay valid. */
+  digestEmailEnabled?: boolean;
+  followupEmailEnabled?: boolean;
 }
 
 export type { EducationEntry, ExperienceEntry, ClubEntry };
@@ -99,6 +103,8 @@ const EMPTY_PREFS: UserPrefs = {
   draftLength: "medium",
   draftSignature: "",
   draftSubjectStyle: "casual",
+  digestEmailEnabled: true,
+  followupEmailEnabled: true,
 };
 
 function parseList(val: string | null | undefined): string[] {
@@ -128,7 +134,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, graduationYear, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt, draftTone, draftLength, draftSignature, draftSubjectStyle"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, graduationYear, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt, draftTone, draftLength, draftSignature, draftSubjectStyle, digestEmailEnabled, followupEmailEnabled"
     )
     .eq("email", email)
     .single();
@@ -164,5 +170,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     draftLength: data.draftLength || "medium",
     draftSignature: data.draftSignature || "",
     draftSubjectStyle: data.draftSubjectStyle || "casual",
+    digestEmailEnabled: data.digestEmailEnabled ?? true,
+    followupEmailEnabled: data.followupEmailEnabled ?? true,
   };
 }

@@ -78,6 +78,8 @@ interface Preferences {
   draftLength: string;
   draftSignature: string;
   draftSubjectStyle: string;
+  digestEmailEnabled: boolean;
+  followupEmailEnabled: boolean;
 }
 
 const STORAGE_KEY = "kithnode_preferences";
@@ -105,6 +107,8 @@ function getDefaults(): Preferences {
     draftLength: "medium",
     draftSignature: "",
     draftSubjectStyle: "casual",
+    digestEmailEnabled: true,
+    followupEmailEnabled: true,
   };
 }
 
@@ -169,6 +173,8 @@ async function syncToAPI(prefs: Preferences) {
         draft_length: prefs.draftLength || "medium",
         draft_signature: prefs.draftSignature || "",
         draft_subject_style: prefs.draftSubjectStyle || "casual",
+        digest_email_enabled: prefs.digestEmailEnabled,
+        followup_email_enabled: prefs.followupEmailEnabled,
       }),
     });
   } catch (err) {
@@ -947,6 +953,55 @@ function EditPanel({
                 {local.draftSignature.length}/200
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* Notifications */}
+        <section className="border border-white/[0.06] bg-bg-card p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Mail size={15} className="text-accent-teal" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+              Notifications
+            </h3>
+          </div>
+          <div className="space-y-4">
+            {([
+              [
+                "digestEmailEnabled",
+                "Weekly digest",
+                "New warm paths in your network, every Monday morning.",
+              ],
+              [
+                "followupEmailEnabled",
+                "Follow-up reminders",
+                "A nudge when leads go cold (7+ days, no movement). Twice a week.",
+              ],
+            ] as const).map(([key, labelText, desc]) => {
+              const on = local[key];
+              return (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-white">{labelText}</div>
+                    <p className="mt-0.5 text-[10px] text-text-muted">{desc}</p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={labelText}
+                    onClick={() => setLocal({ ...local, [key]: !on })}
+                    className={`relative h-5 w-9 shrink-0 border transition-colors ${
+                      on ? "border-accent-teal bg-accent-teal/30" : "border-white/[0.06] bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3.5 w-3.5 transition-all ${
+                        on ? "left-[18px] bg-accent-teal" : "left-0.5 bg-text-muted"
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -1763,6 +1818,8 @@ export default function SettingsPage() {
               draftLength: data.draftLength || "medium",
               draftSignature: data.draftSignature || "",
               draftSubjectStyle: data.draftSubjectStyle || "casual",
+              digestEmailEnabled: data.digestEmailEnabled ?? true,
+              followupEmailEnabled: data.followupEmailEnabled ?? true,
             };
             setPrefs(merged);
             savePreferences(merged);

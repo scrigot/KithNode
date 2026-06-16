@@ -49,6 +49,8 @@ model User {
   draftLength             String    @default("medium")
   draftSignature          String    @default("")
   draftSubjectStyle       String    @default("casual")
+  digestEmailEnabled      Boolean   @default(true)
+  followupEmailEnabled    Boolean   @default(true)
   createdAt          DateTime     @default(now())
   connections        Connection[]
 }

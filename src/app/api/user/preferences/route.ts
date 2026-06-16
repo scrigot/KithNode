@@ -236,6 +236,12 @@ export async function POST(request: NextRequest) {
     patch.draftSignature =
       typeof body.draft_signature === "string" ? body.draft_signature.trim().slice(0, 200) : "";
 
+  // Notification opt-outs: coerce to real booleans so a missing/garbage value
+  // can't write null into a NOT NULL column.
+  if ("digest_email_enabled" in body) patch.digestEmailEnabled = body.digest_email_enabled === true;
+  if ("followup_email_enabled" in body)
+    patch.followupEmailEnabled = body.followup_email_enabled === true;
+
   // Empty body → nothing to write; succeed without a no-op update.
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ ok: true });
