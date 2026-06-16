@@ -13,6 +13,7 @@ interface TierCounts {
   warm: number;
   monitor: number;
   cold: number;
+  needs_info: number;
   total: number;
 }
 
@@ -35,10 +36,11 @@ export default function ContactsPage() {
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
-        const counts: TierCounts = { kith: 0, hot: 0, warm: 0, monitor: 0, cold: 0, total: 0 };
+        const counts: TierCounts = { kith: 0, hot: 0, warm: 0, monitor: 0, cold: 0, needs_info: 0, total: 0 };
         for (const c of data || []) {
           const t = (c?.score?.tier || "cold").toLowerCase();
           if (t in counts) counts[t as keyof Omit<TierCounts, "total">]++;
+          if ((c as { needs_info?: boolean }).needs_info) counts.needs_info++;
           counts.total++;
         }
         setTierCounts(counts);
@@ -182,9 +184,27 @@ export default function ContactsPage() {
         </div>
       </div>
 
+      {/* Needs-info banner — cold-wall perception fix for fresh CSV imports */}
+      {tierCounts && tierCounts.needs_info > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] text-muted-foreground">
+          <span>
+            <span className="font-bold text-foreground">{tierCounts.needs_info}</span> of{" "}
+            <span className="font-bold text-foreground">{tierCounts.total}</span> contacts need
+            info to score. LinkedIn&apos;s export only includes name, company and title — enrich to
+            surface warm paths.
+          </span>
+          <a
+            href="/dashboard/import"
+            className="font-bold uppercase tracking-wider text-primary hover:underline"
+          >
+            Enrich with AI →
+          </a>
+        </div>
+      )}
+
       {/* Tier counts strip */}
       {tierCounts && tierCounts.total > 0 && (
-        <div className="mt-3 grid grid-cols-6 gap-2">
+        <div className="mt-3 grid grid-cols-7 gap-2">
           <div className="border border-amber-400/40 bg-amber-400/5 px-3 py-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-amber-300">
               KITH
@@ -226,12 +246,20 @@ export default function ContactsPage() {
               {tierCounts.monitor}
             </p>
           </div>
+          <div className="border border-dashed border-slate-500/40 bg-slate-500/5 px-3 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+              NEEDS INFO
+            </p>
+            <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-slate-400">
+              {tierCounts.needs_info}
+            </p>
+          </div>
           <div className="border border-zinc-500/20 bg-zinc-500/5 px-3 py-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400">
               COLD
             </p>
             <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-zinc-400">
-              {tierCounts.cold}
+              {tierCounts.cold - tierCounts.needs_info}
             </p>
           </div>
         </div>

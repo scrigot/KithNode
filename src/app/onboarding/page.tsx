@@ -340,6 +340,7 @@ function OnboardingFunnel() {
   const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [recruitingDate, setRecruitingDate] = useState("");
+  const [gradYear, setGradYear] = useState("");
   const [weeklyGoalTarget, setWeeklyGoalTarget] = useState(3);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
@@ -369,7 +370,24 @@ function OnboardingFunnel() {
 
   // Reveal — reuses the ranked network the pipeline step already computed.
   const [ranked, setRanked] = useState<RankedLite[]>([]);
+  // Full match count for the reveal headline; `ranked` itself is sliced for the
+  // blurred preview, so its length would understate the real total.
+  const [rankedTotal, setRankedTotal] = useState(0);
   const [loadingRanked, setLoadingRanked] = useState(false);
+
+  // Persist the current step within the tab session so a refresh mid-flow
+  // resumes where the user was instead of resetting to step 0 (field values are
+  // re-hydrated separately from /api/user/preferences).
+  useEffect(() => {
+    if (activateDirect) return;
+    const saved = Number(window.sessionStorage.getItem("kn:onb-step"));
+    if (Number.isInteger(saved) && saved > 0 && saved < ACTIVATION_STEP) {
+      setStep(saved);
+    }
+  }, [activateDirect, ACTIVATION_STEP]);
+  useEffect(() => {
+    window.sessionStorage.setItem("kn:onb-step", String(step));
+  }, [step]);
 
   // Abort the enrich loop if the wizard unmounts mid-flight.
   useEffect(() => {
@@ -419,6 +437,8 @@ function OnboardingFunnel() {
           setLocations(data.targetLocations);
         if (data.recruitingDate)
           setRecruitingDate(String(data.recruitingDate).slice(0, 10));
+        if (typeof data.graduationYear === "number" && data.graduationYear > 0)
+          setGradYear(String(data.graduationYear));
         if (typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0)
           setWeeklyGoalTarget(data.weeklyGoalTarget);
         // Diagnose answers — resume the funnel where they left off.
@@ -664,6 +684,7 @@ function OnboardingFunnel() {
           target_companies: firms,
           target_locations: locations,
           recruiting_date: recruitingDate || null,
+          graduation_year: gradYear ? Number(gradYear) : null,
           weekly_goal_target: weeklyGoalTarget || 3,
           onboarding_goal: onboardingGoal,
           onboarding_pain: onboardingPain,
@@ -839,8 +860,10 @@ function OnboardingFunnel() {
       const res = await apiFetch("/api/contacts");
       const data: RankedLite[] = res.ok ? await res.json() : [];
       setRanked(data.slice(0, 15));
+      setRankedTotal(data.length);
     } catch {
       setRanked([]);
+      setRankedTotal(0);
     } finally {
       setLoadingRanked(false);
     }
@@ -849,14 +872,14 @@ function OnboardingFunnel() {
   // ── Reveal → Activation ──────────────────────────────────────────────────
   const goToActivation = () => {
     trackEvent("onboarding_reveal_unlock_clicked", {
-      matches: ranked.length || importedCount,
+      matches: rankedTotal || importedCount,
     });
     setStep(ACTIVATION_STEP);
   };
 
   // Warm-path match count for the reveal headline. Prefer the ranked network;
   // fall back to the raw imported count when ranking is still empty.
-  const matchCount = ranked.length || importedCount;
+  const matchCount = rankedTotal || importedCount;
   // Echo copy keyed off the first matched pain point the user selected.
   const painEcho =
     onboardingPain.map((p) => PAIN_ECHO[p]).find(Boolean) ??
@@ -1108,6 +1131,7 @@ function OnboardingFunnel() {
                     placeholder="University of North Carolina at Chapel Hill"
                     ariaLabel="University"
                     matchAcronyms
+                    commitOnBlur
                   />
                 </div>
 
@@ -1171,15 +1195,9 @@ function OnboardingFunnel() {
                     min={2000}
                     max={2100}
                     placeholder="2029"
-                    value={
-                      recruitingDate ? recruitingDate.slice(0, 4) : ""
-                    }
+                    value={gradYear}
                     onChange={(e) => {
-                      // Store the grad year as a May-15 ISO date in recruitingDate
-                      // (the existing target-date field) so it persists through
-                      // the same column — no schema change.
-                      const y = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setRecruitingDate(y.length === 4 ? `${y}-05-15` : "");
+                      setGradYear(e.target.value.replace(/\D/g, "").slice(0, 4));
                     }}
                     aria-label="Graduation year"
                     className="bg-muted text-sm"

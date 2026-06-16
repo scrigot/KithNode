@@ -77,9 +77,9 @@ function FounderCard() {
 
   return (
     /* Gradient border wrapper -- same conic pattern as solutions-section */
-    <div className="card-border-wrapper-founder group relative rounded-xl p-px">
+    <div className="card-border-wrapper-founder group relative rounded-[24px] p-px">
       <div
-        className="card-border-ring-founder pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        className="card-border-ring-founder pointer-events-none absolute inset-0 rounded-[24px] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         aria-hidden
       />
       {/* Inner glass card */}
@@ -87,34 +87,21 @@ function FounderCard() {
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.04] p-8 backdrop-blur-sm md:p-10"
+        className="relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.04] p-8 backdrop-blur-sm md:p-10"
       >
         {/* Body copy */}
         <div className="space-y-5 text-base leading-relaxed text-white/80">
           <p>
-            Every finance hire traces back to the same pattern. A{" "}
-            <span className="font-bold text-[#0EA5E9]">
-              warm connection
-            </span>{" "}
-            two or three degrees away that surfaced at the right moment. The
-            pattern is well documented. The execution, finding those
-            connections, scoring them, and drafting outreach that
-            doesn&apos;t feel robotic, is what kills candidates.
+            I&apos;m Sam, a UNC freshman. I&apos;m not in the business school
+            yet, I don&apos;t have a target-school resume or a high GPA. But
+            I&apos;m interning at a Fortune 500 building enterprise-scale RAG
+            systems and at a PE firm. I got my PE internship through a friend
+            in my pledge class who introduced me. Not a cold app. A warm path.
           </p>
           <p>
-            KithNode was built by an operator who ran this exact playbook
-            manually. That playbook landed a{" "}
-            <span className="font-bold text-[#0EA5E9]">
-              Fortune 500 internship
-            </span>{" "}
-            freshman year. Every feature in the product exists because a
-            student tried it at 2am and found the friction. We&apos;re not
-            shipping theories. We&apos;re shipping the method that already
-            works.
-          </p>
-          <p>
-            Founding access is open now. If you&apos;re serious about 2026
-            recruiting, request access below.
+            That&apos;s the whole thesis: the intro beats the resume. KithNode
+            is the method I used, automated. If it worked for me with none of
+            the pedigree, it&apos;ll work for you.
           </p>
         </div>
 
@@ -129,8 +116,7 @@ function FounderCard() {
           <div>
             <p className="text-sm font-bold text-white">Sam Rigot</p>
             <p className="text-xs text-white/60">
-              Founder &middot; UNC Chapel Hill &apos;29 &middot; Fortune 500
-              Intern, Summer 2026
+              Founder &middot; UNC Chapel Hill &apos;29
             </p>
           </div>
         </div>
@@ -156,7 +142,7 @@ export function Testimonials() {
     <section
       id="founder"
       ref={sectionRef}
-      className="relative bg-black py-24 px-4"
+      className="relative bg-black py-24 sm:py-32 px-4"
     >
       {/* ------------------------------------------------------------------ */}
       {/* Keyframes */}
@@ -195,7 +181,7 @@ export function Testimonials() {
           content: "";
           position: absolute;
           inset: 1px;
-          border-radius: calc(0.75rem - 1px);
+          border-radius: calc(24px - 1px);
           background: #050d1a;
         }
       `}</style>
@@ -255,7 +241,7 @@ export function Testimonials() {
           <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-widest text-[#0EA5E9]">
             From the Founder
           </p>
-          <h2 className="text-center font-heading text-4xl font-bold text-white md:text-5xl">
+          <h2 className="text-center font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
             Why KithNode exists
           </h2>
         </motion.div>

@@ -68,6 +68,12 @@ export interface ContactMeta extends LinkedInMeta {
    */
   personType?: string;
   /**
+   * The contact's graduation year (0/undefined = unknown). In AUTO mode it is
+   * the authoritative student-vs-alum signal (see detectAffiliations +
+   * resolveAutoPersonType).
+   */
+  graduationYear?: number;
+  /**
    * The school this contact is associated with. For professors this is
    * where-they-teach (drives the "Teaches at Your School" chip); it is NOT
    * where-they-studied, so it never feeds the education-based Same School match.
@@ -327,6 +333,37 @@ function inferIndustryFromAffiliations(affiliations: Affiliation[]): string {
   return "";
 }
 
+/**
+ * Resolve what a contact IS when personType is AUTO (''), used for both scoring
+ * and the contact-page "Auto-detected" hint. Graduation year wins: a grad year
+ * in the future (or this year) means a current student; a past grad year means
+ * an alum. With no grad year we fall back to title/education text, which can
+ * only confidently say "student" (you cannot infer alum from a title alone).
+ * Returns "" when there is no signal either way.
+ */
+export function resolveAutoPersonType(meta: {
+  graduationYear?: number;
+  title?: string;
+  experience?: string;
+  education?: string;
+}): "" | "student" | "alum" {
+  const gradYear = meta.graduationYear || 0;
+  const currentYear = new Date().getFullYear();
+  if (gradYear > 0) return gradYear >= currentYear ? "student" : "alum";
+  const titleText = (meta.title || "").toLowerCase();
+  const companyText = (meta.experience || "").toLowerCase();
+  if (
+    /\bstudent\b/i.test(titleText) ||
+    /\bincoming\b/i.test(titleText) ||
+    /\bintern\b/i.test(titleText) ||
+    /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText) ||
+    /\buniversity\b/i.test(companyText)
+  ) {
+    return "student";
+  }
+  return "";
+}
+
 // ── Main scoring entry point ──────────────────────────────────────────────────
 
 /**
@@ -384,16 +421,21 @@ export function detectAffiliations(meta: ContactMeta, prefs?: UserPrefs): Affili
   // Detect "current student / incoming" so we don't credit them as full-time.
   // 'student' forces this true (keeps the halved firm boost + "(Incoming)"
   // label + seniority suppression); 'alum' forces it false (full firm-tier +
-  // seniority credit even if the title says "Incoming Summer Analyst").
+  // seniority credit even if the title says "Incoming Summer Analyst"). In AUTO
+  // ('') we defer to resolveAutoPersonType, which is grad-year-authoritative: a
+  // PAST grad year resolves "alum" and short-circuits the title text, so a
+  // past-grad whose title still reads "intern" is NOT flagged a current student.
+  // isPreCollege still feeds in independently (K-12 always counts as current).
   const isCurrentStudent =
     personType === "student" ||
     (personType !== "alum" &&
       (isPreCollege ||
-        /\buniversity\b/i.test(companyText) ||
-        /\bstudent\b/i.test(titleText) ||
-        /\bincoming\b/i.test(titleText) ||
-        /\bintern\b/i.test(titleText) ||
-        /\b20\d{2}\s*(summer|winter|spring)\b/i.test(titleText)));
+        resolveAutoPersonType({
+          graduationYear: meta.graduationYear,
+          title: titleText,
+          experience: companyText,
+          education: educationText,
+        }) === "student"));
 
   // Surface the pre-college signal so the user sees it instead of guessing
   // why a fancy-sounding founder-titled contact is rated low.

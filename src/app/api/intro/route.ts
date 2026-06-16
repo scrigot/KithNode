@@ -216,9 +216,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Send email if intermediary has an email.
+  // Intro auto-send is gated OFF for beta: the landing promises KithNode never
+  // sends on your behalf, so the user copies the message and sends it themselves.
+  // Flip INTRO_AUTOSEND=true to re-enable later.
+  const introAutoSend = process.env.INTRO_AUTOSEND === "true";
   let emailSent = false;
-  if (intermediaryEmail && resend) {
+  if (introAutoSend && intermediaryEmail && resend) {
     try {
       await resend.emails.send({
         from: `KithNode <${FROM}>`,

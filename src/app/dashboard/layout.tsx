@@ -40,11 +40,16 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-bg-primary">
-      <Sidebar userName={userName} isFounderUser={founder} />
-      <div className="flex flex-1 flex-col overflow-hidden pt-[49px] lg:pt-0">
-        <TopBar userName={userName} />
-        <main className="flex-1 overflow-auto">{children}</main>
+    <div className="flex min-h-screen flex-col bg-bg-primary">
+      {/* Full-width top bar (logo + search left, avatar dropdown right). */}
+      <TopBar userName={userName} userEmail={email ?? ""} />
+      {/* Row below the bar. `min-h-0` (not overflow-hidden) keeps `main` the scroll
+          container AND lets the sidebar's hover-overlay / control popover escape the
+          56px rail without being clipped. `pt-[49px]` clears the sidebar-owned mobile
+          fixed bar; it lives on this non-scrolling wrapper, NOT on `main`. */}
+      <div className="flex flex-1 min-h-0 pt-[49px] lg:pt-0">
+        <Sidebar isFounderUser={founder} userName={userName} />
+        <main className="flex-1 min-w-0 overflow-auto">{children}</main>
       </div>
       <UpgradeToast />
       <DashboardTour />

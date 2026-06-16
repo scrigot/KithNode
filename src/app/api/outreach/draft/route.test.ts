@@ -163,6 +163,10 @@ describe("POST /api/outreach/draft", () => {
     expect(response.status).toBe(200);
     expect(body.subject).toBe("Test Subject");
     expect(body.draft).toBe("Test body");
+    // Popup fields: highlight signals (from prefs/contact) + recipient email.
+    expect(Array.isArray(body.signals)).toBe(true);
+    expect(body.signals).toContain("Chi Phi");
+    expect(body.recipientEmail).toBe("");
   });
 
   it("returns 404 when the contact is owned by another user and unrated", async () => {

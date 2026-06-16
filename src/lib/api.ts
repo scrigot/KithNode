@@ -79,6 +79,8 @@ export interface RankedContact {
   relationship_class: "kith" | "";
   /** Kith whose last logged contact is >90 days old — reconnect nudge. */
   dormant: boolean;
+  /** True when cold ONLY for lack of data (un-enriched stub) — UI shows "Needs info". */
+  needs_info?: boolean;
   /** Whether this contact is marked as a personal friend. */
   is_friend: boolean;
   /** How often the user speaks with this contact ("daily" | "weekly" | etc, or ""). */
@@ -100,6 +102,8 @@ export interface ContactDetail extends RankedContact {
   greek_org: string;
   clubs: string;
   passions: string;
+  // Free-text relationship memory + outreach personalization. Never feeds scoring.
+  notes?: string;
   major: string;
   minor: string;
   // Comma-joined skills list (PDL-enriched or manually edited).
@@ -112,6 +116,7 @@ export interface ContactDetail extends RankedContact {
   university: string;
   source: string;
   tags?: string[];
+  mutuals?: { name: string; slug: string; contactId: string | null }[];
   affiliations: { id: number; name: string; boost: number }[];
   outreach_history: {
     id: number;

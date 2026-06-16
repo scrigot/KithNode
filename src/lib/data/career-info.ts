@@ -828,4 +828,355 @@ export const CAREER_INFO: Record<string, CareerInfo> = {
     outlook:
       "A strong balance of upside and stability: you get real equity and scaling experience with far lower failure risk than seed-stage bets.",
   },
+
+  // ---- Healthcare ----
+  "Medicine": {
+    summary:
+      "Physicians diagnose and treat patients, the clinical core of healthcare, across primary care and dozens of specialties. The path is long and structured: four years of medical school, then a residency of three to seven years before independent practice, with the reward of high autonomy, durable demand, and strong pay.",
+    alsoKnownAs: ["Physician", "Doctor", "Medical Resident", "Attending Physician", "Surgeon"],
+    majors: ["Biology", "Chemistry", "Neuroscience", "Public Health", "Biochemistry"],
+    skills: ["Biology", "Chemistry", "Communication", "Data Analysis", "Research", "Statistics"],
+    experience: [
+      "Complete the pre-med prerequisites and keep a high GPA; medical school admission is GPA- and MCAT-driven",
+      "Score well on the MCAT and build clinical hours: shadowing, scribing, or an EMT/CNA role",
+      "Do research and volunteer clinically; both matter for a competitive application",
+      "Apply broadly through AMCAS, then match into residency in your chosen specialty",
+    ],
+    timeline:
+      "A multi-year pipeline: pre-med coursework and the MCAT in undergrad, a one-cycle medical school application, then the residency Match. There is no shortcut to the credential.",
+    pay: [
+      { stage: "Medical Student", range: "No salary; tuition-funded, often debt-financed" },
+      { stage: "Resident", range: "$60-75K during 3-7 years of training" },
+      { stage: "Attending (primary care)", range: "$220-300K" },
+      { stage: "Attending (specialist/surgeon)", range: "$400K-$1M+ in high-paying specialties" },
+    ],
+    outlook:
+      "Durable, recession-resistant demand driven by an aging population, though the training is long and the debt load real; AI is augmenting diagnostics rather than replacing clinicians.",
+  },
+  "Nursing": {
+    summary:
+      "Nurses deliver and coordinate patient care, from bedside assessment and medication to patient education and advocacy, across hospitals, clinics, and specialties. It is hands-on, high-responsibility clinical work with a faster route to practice than medicine and a clear ladder toward advanced and specialized roles.",
+    alsoKnownAs: ["Registered Nurse", "RN", "Nurse Practitioner", "Clinical Nurse", "Charge Nurse"],
+    majors: ["Nursing", "Biology", "Public Health", "Health Sciences", "Chemistry"],
+    skills: ["Biology", "Communication", "Data Analysis", "Project Management", "Statistics", "Research"],
+    experience: [
+      "Earn a BSN and pass the NCLEX-RN to practice as a registered nurse",
+      "Build clinical hours through rotations and a hospital internship or externship",
+      "Pick a specialty (ICU, ER, oncology) and pursue the relevant certification",
+      "For higher scope and pay, pursue an MSN to become a Nurse Practitioner",
+    ],
+    timeline:
+      "A BSN plus the NCLEX is the entry credential; hospitals hire new grads year-round, and specialization or an NP track follows once you have bedside experience.",
+    pay: [
+      { stage: "New Grad RN", range: "$60-80K" },
+      { stage: "RN (experienced)", range: "$80-110K, higher in high-cost metros" },
+      { stage: "Specialized / Charge RN", range: "$100-130K" },
+      { stage: "Nurse Practitioner", range: "$120-170K with prescriptive authority" },
+    ],
+    outlook:
+      "One of the most in-demand healthcare roles with a persistent national shortage, strong job security, and an accessible path into clinical work.",
+  },
+  "Biotech / Pharma": {
+    summary:
+      "Biotech and pharma professionals research, develop, and bring drugs and therapies to market, spanning lab research, clinical trials, regulatory work, and commercialization. It blends science with industry: turning biological discovery into approved, manufacturable products under heavy regulation.",
+    alsoKnownAs: ["Research Associate", "Clinical Research Associate", "Scientist", "Regulatory Affairs Associate", "Bioprocess Engineer"],
+    majors: ["Biology", "Biochemistry", "Chemical Engineering", "Bioengineering", "Chemistry"],
+    skills: ["Biology", "Chemistry", "Data Analysis", "Statistics", "Research", "Python"],
+    experience: [
+      "Do undergraduate lab research and learn core wet-lab or computational techniques",
+      "Intern at a biotech, pharma, or CRO to see how regulated drug development works",
+      "Pick a lane: bench research, clinical operations, or regulatory and quality",
+      "An advanced degree (MS or PhD) unlocks senior scientist and research-lead roles",
+    ],
+    timeline:
+      "Entry research and clinical-operations roles hire year-round off a BS; scientist and research-lead tracks generally expect a graduate degree, so plan the credential early.",
+    pay: [
+      { stage: "Research Associate / Entry", range: "$55-80K" },
+      { stage: "Scientist / CRA (mid)", range: "$85-130K" },
+      { stage: "Senior Scientist / Manager", range: "$130-190K" },
+      { stage: "Director / Principal Scientist", range: "$200K-$350K+ with equity at biotechs" },
+    ],
+    outlook:
+      "Strong long-term demand as biotech innovation accelerates, with AI-driven drug discovery and cell/gene therapy expanding the highest-value roles.",
+  },
+  "Public Health": {
+    summary:
+      "Public health professionals protect and improve population health through epidemiology, health policy, program management, and community intervention rather than one-on-one clinical care. The work runs from tracking disease and analyzing health data to designing and running programs at agencies, nonprofits, and global organizations.",
+    alsoKnownAs: ["Epidemiologist", "Public Health Analyst", "Health Program Manager", "Biostatistician", "Community Health Specialist"],
+    majors: ["Public Health", "Biology", "Statistics", "Sociology", "Health Sciences"],
+    skills: ["Statistics", "Data Analysis", "Research", "Communication", "Python", "SQL"],
+    experience: [
+      "Build data skills: statistics, epidemiology methods, and a tool like R or Python",
+      "Intern at a health department, nonprofit, or research center on a real program",
+      "Pursue an MPH for analyst, epidemiologist, and program-lead roles",
+      "Develop clear communication; public health lives on translating data into policy",
+    ],
+    timeline:
+      "Entry analyst and coordinator roles hire off a BS year-round; an MPH is the common credential for epidemiologist and program-management tracks.",
+    pay: [
+      { stage: "Analyst / Coordinator", range: "$45-65K" },
+      { stage: "Epidemiologist / Program Manager", range: "$70-100K" },
+      { stage: "Senior Epidemiologist / Lead", range: "$100-135K" },
+      { stage: "Director of Public Health", range: "$130-200K+ at large agencies" },
+    ],
+    outlook:
+      "Steady public-sector and nonprofit demand with growing investment in data-driven and global health; pay trails the clinical and industry sides of healthcare.",
+  },
+  "Healthcare Admin": {
+    summary:
+      "Healthcare administrators run the business of care: operations, finance, staffing, and strategy at hospitals, clinics, and health systems. The job keeps complex, heavily regulated organizations running efficiently so clinicians can focus on patients, blending management with deep healthcare-domain knowledge.",
+    alsoKnownAs: ["Healthcare Administrator", "Hospital Administrator", "Practice Manager", "Health Operations Manager", "Healthcare Consultant"],
+    majors: ["Health Administration", "Business Administration", "Public Health", "Economics", "Health Sciences"],
+    skills: ["Project Management", "Data Analysis", "Communication", "Excel", "Financial Modeling", "Public Speaking"],
+    experience: [
+      "Target a hospital or health-system administrative fellowship or rotational program",
+      "Intern in healthcare operations, finance, or a practice-management role",
+      "Learn the domain: reimbursement, compliance, and how health systems actually run",
+      "An MHA or MBA accelerates the path into management and executive roles",
+    ],
+    timeline:
+      "Administrative fellowships and rotational programs recruit junior-year and post-grad; many leaders pair the role with an MHA or MBA to move into management.",
+    pay: [
+      { stage: "Coordinator / Analyst", range: "$55-75K" },
+      { stage: "Manager", range: "$80-120K" },
+      { stage: "Director", range: "$120-180K" },
+      { stage: "VP / Hospital Executive", range: "$200K-$500K+ at large systems" },
+    ],
+    outlook:
+      "Stable and growing as healthcare expands and consolidates; the highest-paid track in the field outside clinical specialties, with a durable executive ceiling.",
+  },
+
+  // ---- Law ----
+  "Corporate Law": {
+    summary:
+      "Corporate lawyers advise companies on transactions and governance: mergers and acquisitions, financings, securities, and contracts. At big firms, junior associates draft and review documents and run diligence on deals; the hours are demanding and the work is the legal engine behind the business deals other professionals originate.",
+    alsoKnownAs: ["Corporate Associate", "M&A Attorney", "Securities Lawyer", "Transactional Attorney", "Corporate Counsel"],
+    majors: ["Political Science", "Economics", "Business Administration", "History", "English"],
+    skills: ["Communication", "Research", "Data Analysis", "Public Speaking", "Project Management", "Financial Modeling"],
+    experience: [
+      "Build a strong GPA and score well on the LSAT; law school admission is numbers-driven",
+      "Target a top law school, then a 2L summer associate program at a corporate firm",
+      "Join law review or a transactional clinic and learn deal documents cold",
+      "Network into BigLaw; the 2L summer is the primary path to a full-time offer",
+    ],
+    timeline:
+      "The pipeline is LSAT and law school applications, then on-campus interviewing for the 2L summer associate role that converts to a full-time offer after the bar exam.",
+    pay: [
+      { stage: "Summer Associate", range: "$215K annualized at top firms (pro-rated)" },
+      { stage: "First-Year Associate", range: "$225K base + bonus on the BigLaw scale" },
+      { stage: "Senior Associate", range: "$300-435K base + bonus" },
+      { stage: "Partner", range: "$500K-$5M+ depending on equity and book" },
+    ],
+    outlook:
+      "Steady demand tied to deal flow, with the BigLaw salary scale among the highest entry-level pay anywhere; AI is automating routine document review and raising the bar on higher-value work.",
+  },
+  "Litigation": {
+    summary:
+      "Litigators represent clients in disputes: they investigate facts, draft motions and briefs, take depositions, and argue in court or arbitration. Junior associates do heavy research, writing, and discovery work; the path is intellectually demanding and adversarial, building toward trying and winning cases.",
+    alsoKnownAs: ["Litigation Associate", "Trial Attorney", "Litigator", "Disputes Lawyer", "Trial Lawyer"],
+    majors: ["Political Science", "English", "History", "Philosophy", "Economics"],
+    skills: ["Communication", "Research", "Public Speaking", "Data Analysis", "Project Management", "Statistics"],
+    experience: [
+      "Build a strong GPA and LSAT, then target a top law school",
+      "Compete in moot court and join law review to sharpen writing and oral advocacy",
+      "Do a 2L summer at a litigation firm or a judicial internship",
+      "A post-graduate judicial clerkship is a powerful credential for litigators",
+    ],
+    timeline:
+      "Same legal pipeline as corporate: LSAT, law school, 2L summer associate, and the bar. A clerkship after graduation is a common and prestigious launch into litigation.",
+    pay: [
+      { stage: "Summer Associate", range: "$215K annualized at top firms (pro-rated)" },
+      { stage: "First-Year Associate", range: "$225K base + bonus on the BigLaw scale" },
+      { stage: "Senior Associate", range: "$300-435K base + bonus" },
+      { stage: "Partner", range: "$500K-$3M+ depending on equity and book" },
+    ],
+    outlook:
+      "Resilient demand since disputes never stop; large-firm litigation pays on the BigLaw scale, while AI is reshaping discovery and legal research toward higher-value advocacy.",
+  },
+  "Compliance / Regulatory": {
+    summary:
+      "Compliance and regulatory professionals keep organizations on the right side of the law and regulators: they build policies, monitor risk, run audits, and handle filings in regulated industries like finance, healthcare, and tech. It is a stable, increasingly important function that blends legal and regulatory knowledge with operational rigor.",
+    alsoKnownAs: ["Compliance Analyst", "Regulatory Affairs Specialist", "Compliance Officer", "Risk and Compliance Associate", "AML Analyst"],
+    majors: ["Political Science", "Economics", "Business Administration", "Finance", "Public Health"],
+    skills: ["Data Analysis", "Communication", "Research", "Excel", "Project Management", "SQL"],
+    experience: [
+      "Intern in a compliance, risk, or regulatory-affairs team in a regulated industry",
+      "Learn the relevant rulebook (SEC/FINRA in finance, FDA in healthcare, etc.)",
+      "Build attention to detail and process discipline; compliance is documentation-heavy",
+      "Certifications (CAMS, CRCM) and sometimes a JD accelerate the senior track",
+    ],
+    timeline:
+      "Analyst roles hire off a bachelor's year-round; certifications and domain knowledge, and sometimes a JD, move you into officer and lead positions.",
+    pay: [
+      { stage: "Compliance Analyst", range: "$60-85K" },
+      { stage: "Compliance Manager", range: "$90-140K" },
+      { stage: "Senior Compliance / Lead", range: "$140-200K" },
+      { stage: "Chief Compliance Officer", range: "$200K-$400K+ at large firms" },
+    ],
+    outlook:
+      "Growing steadily as regulation expands across finance, healthcare, and AI; a stable, defensible career with a clear path to a senior officer role.",
+  },
+  "Policy / Government": {
+    summary:
+      "Policy and government professionals shape and implement public policy: they research issues, draft legislation and regulation, and advise officials at agencies, legislatures, think tanks, and advocacy groups. The work connects analysis to decisions that affect large populations, trading private-sector pay for mission and impact.",
+    alsoKnownAs: ["Policy Analyst", "Legislative Aide", "Government Affairs Associate", "Policy Advisor", "Regulatory Analyst"],
+    majors: ["Political Science", "Economics", "Public Policy", "International Relations", "History"],
+    skills: ["Research", "Communication", "Data Analysis", "Public Speaking", "Statistics", "Project Management"],
+    experience: [
+      "Intern on Capitol Hill, at an agency, or with a think tank or campaign",
+      "Build research and writing skills plus quantitative analysis for evidence-based policy",
+      "Specialize in an issue area (tech, health, energy) and follow it closely",
+      "An MPP, MPA, or JD strengthens the path into senior policy and advisory roles",
+    ],
+    timeline:
+      "Entry roles (legislative aide, junior analyst) hire off a bachelor's, often through internships and networks; graduate degrees open senior policy and advisory positions.",
+    pay: [
+      { stage: "Aide / Junior Analyst", range: "$40-60K, lower on Capitol Hill" },
+      { stage: "Policy Analyst", range: "$65-95K" },
+      { stage: "Senior Analyst / Advisor", range: "$95-140K" },
+      { stage: "Director / Senior Official", range: "$140-200K+; higher in private government affairs" },
+    ],
+    outlook:
+      "Steady demand across agencies, advocacy, and corporate government affairs; pay trails the private sector but the impact and exit options into lobbying and consulting are strong.",
+  },
+  "Legal (JD-track)": {
+    summary:
+      "The JD track is the general path through law school and the bar into a legal career, before specializing into corporate, litigation, or another practice. It covers law students, judicial clerks, and early attorneys finding their lane: a rigorous credential that opens roles across firms, companies, government, and beyond.",
+    alsoKnownAs: ["Law Student", "Judicial Clerk", "Associate Attorney", "Legal Associate", "JD Candidate"],
+    majors: ["Political Science", "English", "History", "Economics", "Philosophy"],
+    skills: ["Research", "Communication", "Public Speaking", "Data Analysis", "Project Management", "Statistics"],
+    experience: [
+      "Build a strong GPA and LSAT score; law school admission is heavily numbers-driven",
+      "Target the best law school you can, then explore practice areas through 1L and 2L internships",
+      "Join law review, moot court, or a clinic to sharpen research and advocacy",
+      "Use the 2L summer and post-grad clerkships to land your first full-time legal role",
+    ],
+    timeline:
+      "Three years of law school after the LSAT, the 2L summer associate cycle, the bar exam, and often a clerkship; specialization into a practice area follows.",
+    pay: [
+      { stage: "Law Student / Clerk", range: "Clerkships ~$70-110K; summer roles pro-rate the associate scale" },
+      { stage: "First-Year Associate", range: "$225K at top firms; far less in public-interest or small firms" },
+      { stage: "Mid-Level Associate", range: "$260-350K at BigLaw" },
+      { stage: "Partner / In-House Counsel", range: "$300K-$2M+ depending on path" },
+    ],
+    outlook:
+      "A flexible, durable credential with wide exit options; BigLaw pays at the top while the broader legal market is more varied, and AI is reshaping routine legal work.",
+  },
+
+  // ---- Marketing & Sales ----
+  "Marketing": {
+    summary:
+      "Marketers build demand and shape how a product is positioned and perceived: campaigns, content, digital channels, and analytics that drive awareness and conversion. The work spans creative and quantitative, from messaging and brand voice to performance marketing and the metrics behind every channel.",
+    alsoKnownAs: ["Marketing Manager", "Marketing Associate", "Digital Marketer", "Content Marketer", "Marketing Coordinator"],
+    majors: ["Marketing", "Business Administration", "Communications", "Economics", "Psychology"],
+    skills: ["Communication", "Data Analysis", "Excel", "Public Speaking", "SQL", "Project Management"],
+    experience: [
+      "Intern in marketing and run a real channel: content, social, email, or paid",
+      "Build analytics chops: campaign metrics, A/B testing, and a tool like Google Analytics",
+      "Create a portfolio of campaigns or content you actually shipped",
+      "Learn one specialty deeply (SEO, paid acquisition, lifecycle) to stand out",
+    ],
+    timeline:
+      "Entry marketing roles and rotational programs recruit junior-summer and full-time on a normal campus calendar; smaller companies and agencies hire year-round.",
+    pay: [
+      { stage: "Coordinator / Associate", range: "$50-70K" },
+      { stage: "Marketing Manager", range: "$80-120K" },
+      { stage: "Senior Manager / Director", range: "$120-180K" },
+      { stage: "VP / CMO", range: "$200K-$500K+ with equity at the top" },
+    ],
+    outlook:
+      "Steady demand with the field shifting toward data, performance, and AI-assisted content; quantitative and growth-oriented marketers command the strongest pay.",
+  },
+  "Brand": {
+    summary:
+      "Brand managers own how a product or company is perceived: positioning, identity, messaging, and the long-term equity of the brand. Classic at consumer-goods companies, the role blends strategy, creative direction, and cross-functional ownership of a product line's marketing and, often, its P&L.",
+    alsoKnownAs: ["Brand Manager", "Assistant Brand Manager", "Brand Marketing Manager", "Product Marketing Manager", "Brand Strategist"],
+    majors: ["Marketing", "Business Administration", "Communications", "Economics", "Psychology"],
+    skills: ["Communication", "Data Analysis", "Public Speaking", "Excel", "Project Management", "Product Management"],
+    experience: [
+      "Target an Assistant Brand Manager program at a major consumer-goods company",
+      "Build a mix of analytical and creative skills; brand work is strategy plus storytelling",
+      "Do a marketing internship and own a project end to end",
+      "Learn consumer insights and how to read market and sales data",
+    ],
+    timeline:
+      "Assistant Brand Manager programs at CPG firms recruit junior-summer and full-time on the campus calendar; an MBA is a common accelerator into senior brand roles.",
+    pay: [
+      { stage: "Assistant Brand Manager", range: "$70-95K + bonus" },
+      { stage: "Brand Manager", range: "$110-150K + bonus" },
+      { stage: "Senior Brand Manager", range: "$150-200K + bonus" },
+      { stage: "Director / VP Brand", range: "$200-350K+ with equity" },
+    ],
+    outlook:
+      "A durable, prestigious marketing track at consumer companies; the discipline is evolving toward data and digital, but brand strategy remains a sought-after leadership path.",
+  },
+  "Growth": {
+    summary:
+      "Growth professionals drive measurable user and revenue growth through experimentation: acquisition, activation, retention, and monetization, owned with rigorous data and rapid testing. It is the quantitative, engineering-adjacent edge of marketing, common at startups and tech companies where growth is a core function rather than a campaign.",
+    alsoKnownAs: ["Growth Marketer", "Growth Manager", "Demand Generation Manager", "Performance Marketer", "Growth Lead"],
+    majors: ["Marketing", "Business Administration", "Economics", "Statistics", "Computer Science"],
+    skills: ["Data Analysis", "SQL", "Excel", "Communication", "Statistics", "Product Management"],
+    experience: [
+      "Run real growth experiments: paid channels, funnels, A/B tests with clear metrics",
+      "Build strong analytics: SQL, experimentation, and funnel math",
+      "Intern at a startup or tech company on a growth or performance-marketing team",
+      "Show a track record of moving a metric, not just running campaigns",
+    ],
+    timeline:
+      "Startups and tech companies hire growth roles year-round and prize demonstrated results; a portfolio of experiments and metrics often matters more than the recruiting season.",
+    pay: [
+      { stage: "Growth Associate", range: "$60-90K" },
+      { stage: "Growth Manager", range: "$100-150K + equity at startups" },
+      { stage: "Senior Growth / Lead", range: "$150-220K + equity" },
+      { stage: "Head of Growth / VP", range: "$220-400K+ with equity" },
+    ],
+    outlook:
+      "Hot and well-paid in tech and startups, where data-driven growth is a core function; the most quantitative, experiment-driven marketers are in high demand.",
+  },
+  "Sales / Business Development": {
+    summary:
+      "Sales and business development professionals win and grow revenue: they prospect, qualify, run the sales process, and close deals, from outbound SDRs to quota-carrying account executives. It is a performance- and relationship-driven path where comp scales directly with results and the ceiling on top closers is high.",
+    alsoKnownAs: ["Account Executive", "Sales Development Rep", "Business Development Rep", "BDR", "SDR"],
+    majors: ["Business Administration", "Communications", "Economics", "Marketing", "Psychology"],
+    skills: ["Communication", "Public Speaking", "Data Analysis", "Project Management", "Excel", "Sales"],
+    experience: [
+      "Start in an SDR/BDR role to learn outbound prospecting and the sales process",
+      "Build communication, resilience, and discipline; sales rewards consistent activity",
+      "Learn a CRM (Salesforce) and the metrics that drive a pipeline",
+      "Earn promotion to Account Executive by hitting quota and owning deals end to end",
+    ],
+    timeline:
+      "SDR/BDR roles hire year-round and are an accessible entry point; strong performers are promoted to closing roles within one to two years rather than on a campus calendar.",
+    pay: [
+      { stage: "SDR / BDR", range: "OTE $55-80K (base + commission)" },
+      { stage: "Account Executive", range: "OTE $100-180K, uncapped commission" },
+      { stage: "Senior AE / Enterprise", range: "OTE $200-350K on large deals" },
+      { stage: "Sales Leadership / VP", range: "OTE $300K-$700K+ tied to team quota" },
+    ],
+    outlook:
+      "Always in demand and highly meritocratic; top closers earn near-uncapped comp, and tech sales in particular rewards strong performers quickly.",
+  },
+  "Account Management": {
+    summary:
+      "Account managers and customer success professionals own the relationship after the sale: they onboard customers, drive adoption and renewals, and grow accounts over time. It is relationship- and outcome-driven work that protects and expands revenue, central to the recurring-revenue model of modern software companies.",
+    alsoKnownAs: ["Account Manager", "Customer Success Manager", "Client Partner", "Relationship Manager", "CSM"],
+    majors: ["Business Administration", "Communications", "Marketing", "Economics", "Psychology"],
+    skills: ["Communication", "Public Speaking", "Data Analysis", "Project Management", "Excel", "Sales"],
+    experience: [
+      "Intern or start in a customer-facing role: support, success, or sales",
+      "Build relationship and problem-solving skills plus the product knowledge to advise clients",
+      "Learn the metrics that matter: retention, churn, NPS, and account expansion",
+      "Show you can manage a book of accounts and drive renewals and upsells",
+    ],
+    timeline:
+      "Customer success and account-management roles hire year-round; many people enter from support, sales, or a related customer-facing role rather than a fixed campus season.",
+    pay: [
+      { stage: "Associate CSM / AM", range: "$55-80K" },
+      { stage: "Account Manager / CSM", range: "OTE $90-140K (base + variable)" },
+      { stage: "Senior / Enterprise AM", range: "OTE $140-220K on large accounts" },
+      { stage: "Director of Customer Success", range: "$200-350K+ with equity" },
+    ],
+    outlook:
+      "Growing fast with the recurring-revenue software model, where retention and expansion are core; a stable, relationship-driven path with a clear leadership ladder.",
+  },
 };

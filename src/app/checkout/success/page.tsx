@@ -67,5 +67,8 @@ export default async function CheckoutSuccessPage({
   const activated =
     email && sessionId ? await activatePaidSession(sessionId, email) : false;
 
-  redirect(activated ? "/dashboard" : "/onboarding?activate=1");
+  // ?activated=1 lets the client fire the activation-success analytics event
+  // (the paid path's completion signal). The PostHogProvider reads it, fires
+  // onboarding_activated{method:plan}, then strips it.
+  redirect(activated ? "/dashboard?activated=1" : "/onboarding?activate=1");
 }

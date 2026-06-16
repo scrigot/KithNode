@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
+import { contactNeedsInfo } from "@/lib/needs-info";
 import {
   engagementScore,
   relationshipClass,
@@ -80,18 +81,28 @@ export async function GET() {
         // relationship promotes into the KITH class above the fit tiers.
         // Engagement only orders contacts within a class + flags dormancy.
         const fit = c.warmthScore || 0;
+        // isFriend / lastSpokenAt / speakFrequency are the OWNER's private data on
+        // the shared pool row. For a contact the viewer doesn't own (a high_value
+        // pool link), never surface them — they'd imply a relationship that's the
+        // importer's, not the viewer's. The viewer's own pipeline stage still
+        // promotes via stageByContact (per-user). Mirrors POOL_SAFE_FIELDS in redact.
+        const owns = !c.importedByUserId || c.importedByUserId === userId;
+        const ownIsFriend = owns ? c.isFriend : false;
+        const ownLastSpokenAt = owns ? c.lastSpokenAt : null;
+        const ownSpeakFrequency = owns ? c.speakFrequency : "";
         const klass = relationshipClass({
-          isFriend: c.isFriend,
+          isFriend: ownIsFriend,
           pipelineStage: stageByContact.get(c.id),
-          lastSpokenAt: c.lastSpokenAt,
+          lastSpokenAt: ownLastSpokenAt,
           now,
         });
         const engagement = engagementScore({
-          lastSpokenAt: c.lastSpokenAt,
-          speakFrequency: c.speakFrequency,
+          lastSpokenAt: ownLastSpokenAt,
+          speakFrequency: ownSpeakFrequency,
           now,
         });
-        const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: c.lastSpokenAt, now });
+        const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: ownLastSpokenAt, now });
+        const displayedTier = displayTier(c.tier, klass);
         return {
           id: c.id,
           name: unlocked ? (c.name || "") : redactName(c.name || ""),
@@ -120,13 +131,14 @@ export async function GET() {
             signal_score: 0,
             engagement_score: engagement,
             total_score: fit,
-            tier: displayTier(c.tier, klass),
+            tier: displayedTier,
           },
           relationship_class: klass,
           dormant,
-          is_friend: !!c.isFriend,
-          speak_frequency: c.speakFrequency || "",
-          last_spoken_at: c.lastSpokenAt || "",
+          needs_info: contactNeedsInfo(c, displayedTier),
+          is_friend: !!ownIsFriend,
+          speak_frequency: ownSpeakFrequency || "",
+          last_spoken_at: ownLastSpokenAt || "",
           graduation_year: c.graduationYear ?? null,
           created_at: c.createdAt || "",
           ...(unlocked ? {} : { isRedacted: true }),

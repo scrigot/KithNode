@@ -4,17 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Star, Trash2 } from "lucide-react";
-import { formatExperiencePeriod } from "@/lib/educations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
+import { IntroModal } from "@/app/dashboard/discover/intro-modal";
+import { CareerTimeline } from "@/components/career-timeline";
 import { TagEditor } from "./tag-editor";
 import { FieldEditor } from "./field-editor";
 import { EditProfileModal } from "./edit-profile-modal";
 import { trackEvent } from "@/lib/posthog";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
+import { resolveAutoPersonType } from "@/lib/linkedin-import";
 import type { ContactDetail } from "@/lib/api";
 import { CreditCost } from "@/components/credit-cost";
 
@@ -62,6 +64,7 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
 
 function ScoreSection({
   score,
+  needsInfo,
   isFriend,
   speakFrequency,
   lastSpokenAt,
@@ -70,6 +73,7 @@ function ScoreSection({
   dormant,
 }: {
   score: ContactDetail["score"];
+  needsInfo?: boolean;
   isFriend?: boolean;
   speakFrequency?: string;
   lastSpokenAt?: string;
@@ -90,17 +94,37 @@ function ScoreSection({
         SCORE BREAKDOWN
       </h3>
       <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tabular-nums text-foreground">
-          {Math.round(score.total_score)}
-        </span>
-        <span className="text-sm text-muted-foreground">/100</span>
-        <Badge
-          variant="outline"
-          className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
-        >
-          {score.tier.toUpperCase()}
-        </Badge>
+        {needsInfo ? (
+          <span className="text-3xl font-bold tabular-nums text-muted-foreground/50">—</span>
+        ) : (
+          <>
+            <span className="text-3xl font-bold tabular-nums text-foreground">
+              {Math.round(score.total_score)}
+            </span>
+            <span className="text-sm text-muted-foreground">/100</span>
+          </>
+        )}
+        {needsInfo ? (
+          <span className="ml-2 border border-dashed border-slate-500/40 bg-transparent text-slate-400 text-[10px] font-bold tracking-wider px-1.5 py-0.5">
+            NEEDS INFO
+          </span>
+        ) : (
+          <Badge
+            variant="outline"
+            className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
+          >
+            {score.tier.toUpperCase()}
+          </Badge>
+        )}
       </div>
+      {needsInfo && (
+        <p className="mb-3 text-[10px] text-muted-foreground">
+          Add their school, clubs, or hometown to score them{" "}
+          <Link href="/dashboard/import" className="text-accent-blue hover:underline text-[10px]">
+            Enrich with AI →
+          </Link>
+        </p>
+      )}
 
       <div className="space-y-2">
         <div>
@@ -195,10 +219,18 @@ const PERSON_TYPES: { value: string; label: string }[] = [
 function TypeToggle({
   contactId,
   value,
+  graduationYear,
+  title,
+  experience,
+  education,
   onSaved,
 }: {
   contactId: string;
   value: string;
+  graduationYear?: number;
+  title?: string;
+  experience?: string;
+  education?: string;
   onSaved: () => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -214,6 +246,15 @@ function TypeToggle({
     setSaving(false);
     if (res.ok) onSaved();
   }
+
+  // Only when the stored type is AUTO ('') do we surface what the grad-year-aware
+  // heuristic resolved this contact to, so the user sees why they score as a
+  // student or alum without having to set the toggle manually.
+  const autoResolved =
+    value === ""
+      ? resolveAutoPersonType({ graduationYear, title, experience, education })
+      : "";
+  const gradYear = graduationYear || 0;
 
   return (
     <div className="mb-3">
@@ -241,6 +282,16 @@ function TypeToggle({
           );
         })}
       </div>
+      {autoResolved === "student" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Student{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
+      {autoResolved === "alum" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Alum{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
     </div>
   );
 }
@@ -263,6 +314,13 @@ function TrackRoleEditor({
   onSaved: () => void;
 }) {
   const [saving, setSaving] = useState(false);
+  // Local buffer for the "Other" free-text role so typing doesn't fire a PATCH
+  // on every keystroke; we commit on blur. Kept in sync when the stored role
+  // changes (e.g. after a refetch or a track switch).
+  const [otherRole, setOtherRole] = useState(role);
+  useEffect(() => {
+    setOtherRole(role);
+  }, [role]);
 
   async function patch(body: { track: string; role: string }) {
     setSaving(true);
@@ -286,6 +344,15 @@ function TrackRoleEditor({
     if (nextRole === role) return;
     // Setting a role implies its track (handles the role-without-track case).
     void patch({ track: nextRole ? roleToTrack(nextRole) : track, role: nextRole });
+  }
+
+  // Commit the free-text "Other" role. Sends track + role TOGETHER because the
+  // server only accepts a free-text role when track === "Other" is in the same
+  // patch. No-op when unchanged.
+  function commitOtherRole() {
+    const next = otherRole.trim();
+    if (next === role) return;
+    void patch({ track: "Other", role: next });
   }
 
   const roleOptions = track && track in CAREER_TRACKS
@@ -312,20 +379,36 @@ function TrackRoleEditor({
             </option>
           ))}
         </select>
-        <select
-          aria-label="Career role"
-          disabled={saving || !track}
-          value={role}
-          onChange={(e) => onRoleChange(e.target.value)}
-          className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
-        >
-          <option value="">Role —</option>
-          {roleOptions.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        {track === "Other" ? (
+          <input
+            type="text"
+            aria-label="Career role"
+            disabled={saving}
+            value={otherRole}
+            placeholder="Custom role (e.g. Nursing)"
+            onChange={(e) => setOtherRole(e.target.value)}
+            onBlur={commitOtherRole}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          />
+        ) : (
+          <select
+            aria-label="Career role"
+            disabled={saving || !track}
+            value={role}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          >
+            <option value="">Role —</option>
+            {roleOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   );
@@ -379,9 +462,22 @@ export default function ContactDetailPage() {
     searchParams.get("edit") === "1",
   );
   const [tab, setTab] = useState<"signals" | "profile">("signals");
+  const [introMutual, setIntroMutual] = useState<{ name: string } | null>(null);
+  const [userName, setUserName] = useState("");
   // Two-click delete for the contact page header.
   const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch user name for the intro modal warm-path preview.
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.name) setUserName(data.user.name);
+        else if (data?.user?.email) setUserName(data.user.email.split("@")[0]);
+      })
+      .catch(() => {});
+  }, []);
 
   // Reset the armed delete state after 3s or on outside interaction.
   useEffect(() => {
@@ -467,7 +563,11 @@ export default function ContactDetailPage() {
     relationship_class?: string;
     dormant?: boolean;
     pipeline_stage?: string;
+    notes?: string;
   };
+
+  // Mutual-connection edges, resolved server-side in GET /api/contacts/[id].
+  const mutuals = contact.mutuals ?? [];
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -616,6 +716,7 @@ export default function ContactDetailPage() {
           {/* Score */}
           <ScoreSection
             score={contact.score}
+            needsInfo={(contact as unknown as { needs_info?: boolean }).needs_info}
             isFriend={contactExt.isFriend}
             speakFrequency={contactExt.speakFrequency}
             lastSpokenAt={contactExt.lastSpokenAt}
@@ -750,12 +851,21 @@ export default function ContactDetailPage() {
       {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
           rows, mutual/LinkedIn links, and the tags editor. ─── */}
       {tab === "profile" && (
-      <div className="grid items-start grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* LEFT — Classification & signals */}
+      <div className="space-y-3">
+        {/* Dense 3-pane grid — career | classification | details. Fills the
+            width (Bloomberg density, no half-empty cards). */}
+        <div className="grid items-start grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1.25fr]">
+        {/* PANE 1 — Career timeline */}
+        <CareerTimeline experiences={contactExt.experiences ?? []} />
+        {/* PANE 2 — Classification & signals */}
         <div className="border border-border bg-card p-4">
           <TypeToggle
             contactId={contact.id}
             value={contact.person_type || ""}
+            graduationYear={contactExt.graduationYear ?? undefined}
+            title={contact.title}
+            experience={contact.company.name}
+            education={contact.education}
             onSaved={loadContact}
           />
 
@@ -824,15 +934,15 @@ export default function ContactDetailPage() {
             {contactExt.educations && contactExt.educations.length > 0 ? (
               <div className="space-y-0.5">
                 <dt className="text-muted-foreground">Degrees / Programs</dt>
-                {contactExt.educations.map((edu, i) => {
-                  const parts = [edu.degree, edu.major, edu.concentration].filter(Boolean);
-                  if (!parts.length) return null;
-                  return (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  );
-                })}
+                {[...new Set(
+                  contactExt.educations
+                    .map((edu) => [edu.degree, edu.major, edu.concentration].filter(Boolean).join(" · "))
+                    .filter(Boolean),
+                )].map((line, i) => (
+                  <dd key={i} className="text-right text-foreground">
+                    {line}
+                  </dd>
+                ))}
               </div>
             ) : (
               <>
@@ -848,42 +958,44 @@ export default function ContactDetailPage() {
             {/* Minor is not part of education rows — always render it. */}
             <DetailRow label="Minor" value={contact.minor} />
             <DetailRow label="Skills" value={contact.skills} />
-            {/* Experience rows when present; fall back to flat past_firms. */}
-            {contactExt.experiences && contactExt.experiences.length > 0 ? (
-              <div className="space-y-0.5">
-                <dt className="text-muted-foreground">Experience</dt>
-                {contactExt.experiences.map((exp, i) => {
-                  const parts = [exp.title, exp.firm, formatExperiencePeriod(exp)].filter(Boolean);
-                  return parts.length ? (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  ) : null;
-                })}
-              </div>
-            ) : (
+            {/* Career history now lives in the timeline card above; only fall
+                back to flat past_firms when there are no structured experiences. */}
+            {!(contactExt.experiences && contactExt.experiences.length > 0) && (
               <DetailRow label="Past employers" value={contact.past_firms} />
             )}
             <DetailRow label="Location (current)" value={contact.linkedin_location} />
             <DetailRow label="Hometown" value={contact.hometown} />
             <DetailRow label="High School" value={contact.high_school} />
             <DetailRow label="Greek Life" value={contact.greek_org} />
-            {/* Club membership rows when present; fall back to flat clubs. */}
-            {contactExt.clubMemberships && contactExt.clubMemberships.length > 0 ? (
-              <div className="space-y-0.5">
-                <dt className="text-muted-foreground">Clubs</dt>
-                {contactExt.clubMemberships.map((m, i) => {
-                  const parts = [m.role, m.club].filter(Boolean);
-                  return parts.length ? (
-                    <dd key={i} className="text-right text-foreground">
-                      {parts.join(" · ")}
-                    </dd>
-                  ) : null;
-                })}
-              </div>
-            ) : (
-              <DetailRow label="Clubs" value={contact.clubs} />
-            )}
+            {/* Club rows; the Greek org has its own row, so drop it from Clubs
+                (avoids the Zeta-Psi-in-both duplication). */}
+            {(() => {
+              const greek = (contact.greek_org || "").trim().toLowerCase();
+              const rows = (contactExt.clubMemberships ?? []).filter(
+                (m) => (m.club || "").trim().toLowerCase() !== greek,
+              );
+              if (rows.length > 0) {
+                return (
+                  <div className="space-y-0.5">
+                    <dt className="text-muted-foreground">Clubs</dt>
+                    {rows.map((m, i) => {
+                      const parts = [m.role, m.club].filter(Boolean);
+                      return parts.length ? (
+                        <dd key={i} className="text-right text-foreground">
+                          {parts.join(" · ")}
+                        </dd>
+                      ) : null;
+                    })}
+                  </div>
+                );
+              }
+              const flat = (contact.clubs || "")
+                .split(",")
+                .map((c) => c.trim())
+                .filter((c) => c && c.toLowerCase() !== greek)
+                .join(", ");
+              return <DetailRow label="Clubs" value={flat} />;
+            })()}
             {contactExt.graduationYear != null && (
               <DetailRow label="Graduation Year" value={String(contactExt.graduationYear)} />
             )}
@@ -904,6 +1016,21 @@ export default function ContactDetailPage() {
             })()}
             <DetailRow label="Passions" value={contact.passions} />
           </dl>
+          {/* NOTES — relationship memory + outreach personalization. Read
+              defensively; render only when the user has set something. */}
+          {contactExt.notes?.trim() && (
+            <>
+              <Separator className="my-3" />
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  NOTES
+                </h4>
+                <p className="whitespace-pre-wrap text-xs text-foreground">
+                  {contactExt.notes.trim()}
+                </p>
+              </div>
+            </>
+          )}
           <Separator className="my-3" />
           <div className="space-y-1.5 text-xs">
             <p>
@@ -918,7 +1045,7 @@ export default function ContactDetailPage() {
             </p>
             <p>
               <span className="text-muted-foreground">LinkedIn: </span>
-              {contact.linkedin_url ? (
+              {/^https?:\/\//i.test(contact.linkedin_url) ? (
                 <a
                   href={contact.linkedin_url}
                   target="_blank"
@@ -946,7 +1073,82 @@ export default function ContactDetailPage() {
             )}
           </div>
         </div>
+        </div>
+
+        {/* MUTUAL CONNECTIONS — full-width, bottom of the Profile tab. Captured
+            from enriched profile data; the LinkedIn search link is the fallback
+            for contacts with none yet. */}
+        <div className="border border-border bg-card p-4">
+          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            MUTUAL CONNECTIONS
+          </h3>
+          {mutuals.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {mutuals.map((m, i) =>
+                m.contactId ? (
+                  <span key={i} className="inline-flex items-center gap-1">
+                    <Link
+                      href={`/contact/${m.contactId}`}
+                      className="border border-white/[0.12] px-2 py-0.5 text-xs text-foreground transition-colors hover:text-primary"
+                    >
+                      {m.name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setIntroMutual({ name: m.name })}
+                      className="border border-white/[0.12] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      ASK FOR INTRO
+                    </button>
+                  </span>
+                ) : (
+                  <span
+                    key={i}
+                    className="border border-white/[0.12] px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {m.name}
+                  </span>
+                ),
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No mutual connections captured yet. Enrich their profile to surface
+              shared paths.
+            </p>
+          )}
+          <p className="mt-3 text-xs">
+            <a
+              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-blue hover:underline"
+            >
+              Check Mutual Connections
+            </a>
+          </p>
+        </div>
       </div>
+      )}
+
+      {introMutual && (
+        <IntroModal
+          contact={{
+            id: contact.id,
+            name: contact.name,
+            title: contact.title,
+            firmName: contact.company.name,
+          }}
+          warmPath={{
+            intermediaryName: introMutual.name,
+            intermediaryRelation: "mutual connection",
+            firmName: "",
+            title: "",
+          }}
+          intermediaryIsContact
+          userName={userName || "a KithNode user"}
+          onClose={() => setIntroMutual(null)}
+        />
       )}
     </div>
   );

@@ -31,6 +31,7 @@ model User {
   experiences        String       @default("")
   clubMemberships    String       @default("")
   recruitingDate     DateTime?
+  graduationYear     Int?
   weeklyGoalTarget   Int          @default(3)
   stripeCustomerId   String?      @default("")
   subscriptionStatus String?      @default("trial")
@@ -61,6 +62,7 @@ model AlumniContact {
   highSchool       String          @default("")
   clubs            String          @default("")
   passions         String          @default("")
+  notes            String          @default("")
   affiliations     String          @default("")
   warmthScore      Float           @default(0)
   tier             String          @default("cold")
@@ -152,6 +154,8 @@ model WaitlistSignup {
   current_prep      String?
   referred_by       String?
   ref_code          String?
+  email_status      String   @default("pending") // pending | sent | failed | skipped | unknown
+  email_sent_at     DateTime? @db.Timestamptz(6)
 
   @@map("waitlist_signups")
 }
@@ -198,4 +202,76 @@ model Feedback {
   message   String
   status    String   @default("new")
   createdAt DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model ContactConnection {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId     String
+  contactId       String
+  mutualName      String
+  mutualSlug      String   @default("")
+  mutualKey       String
+  mutualContactId String?
+  source          String   @default("linkedin_extension")
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([ownerUserId, contactId, mutualKey])
+  @@index([ownerUserId, contactId])
+  @@index([ownerUserId, mutualContactId])
+}
+
+// ─── Founder Cockpit v2 — phased timeline + per-lane roadmap (read-mirror) ────
+// These three tables are the cockpit's derived read-mirror of ops/roadmap.md +
+// ops/build-log.md. Markdown is canonical; the /kithnode-roadmap sync upserts
+// these (one-way). The cockpit is read-only; agents are the only writers.
+// No enums (Prisma convention here) — gate/status/lane/kind are validated
+// String fields. RLS + a founder-only policy on each table is a MANUAL
+// Supabase-dashboard step after `db push` (the Iron Law; service-role bypasses
+// RLS so isFounder at the route is the real guard, RLS is defense-in-depth).
+
+// A named timeline phase (e.g. "Beta with 5 users"). Exactly one row should be
+// status="active"; it drives the timeline highlight + the next-10 task list.
+model Phase {
+  id        String      @id @default(cuid())
+  name      String
+  gate      String // "G0".."G4"
+  order     Int         @default(0)
+  status    String      @default("planned") // planned | active | done
+  startedAt DateTime?   @db.Timestamptz(6)
+  doneAt    DateTime?   @db.Timestamptz(6)
+  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  milestones Milestone[]
+
+  @@map("phases")
+}
+
+// A roadmap task under a phase + lane. Next-10 = next incomplete by order under
+// the active phase. Per-lane roadmap = filter by lane.
+model Milestone {
+  id        String   @id @default(cuid())
+  title     String
+  lane      String // one of the 8 lane keys (see lane-config.ts)
+  phaseId   String?
+  gate      String // "G0".."G4"
+  status    String   @default("planned") // planned | in_progress | done | at_risk
+  order     Int      @default(0)
+  note      String?
+  evidence  String? // commit / build-log ref
+  doneAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  phase     Phase?   @relation(fields: [phaseId], references: [id])
+
+  @@map("milestones")
+}
+
+// A per-lane "recent change" (derived from lane-tagged build-log entries).
+model OpsEvent {
+  id        String   @id @default(cuid())
+  lane      String // one of the 8 lane keys
+  kind      String // shipped | learned | decided
+  summary   String
+  ref       String? // commit / file
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("ops_events")
 }

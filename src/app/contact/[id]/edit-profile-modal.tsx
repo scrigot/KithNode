@@ -62,6 +62,8 @@ interface FormState {
   greekOrg: string;
   skills: string[];
   passions: string;
+  // Free-text relationship memory + outreach personalization. Never scored.
+  notes: string;
   // Identity
   graduationYear: string; // stored as string in the input; sent as number on patch
   // Relationship
@@ -144,7 +146,8 @@ function initialForm(contact: ContactDetail): FormState {
     greekOrg: contact.greek_org || "",
     skills: parseChips(contact.skills || "", 12),
     passions: contact.passions || "",
-    graduationYear: c.graduationYear != null ? String(c.graduationYear) : "",
+    notes: typeof c.notes === "string" ? c.notes : "",
+    graduationYear: c.graduationYear ? String(c.graduationYear) : "",
     isFriend: typeof c.isFriend === "boolean" ? c.isFriend : false,
     speakFrequency: typeof c.speakFrequency === "string" ? c.speakFrequency : "",
     lastSpokenAt:
@@ -402,6 +405,10 @@ export function EditProfileModal({
       const next = (form[key] as string).trim();
       if (next !== (initial[key] as string).trim()) patch[key] = next;
     }
+
+    // Notes — free text (multiline). Diffed like the single text fields; sent
+    // only when changed. normalizeField on the route trims/collapses for storage.
+    if (form.notes.trim() !== initial.notes.trim()) patch.notes = form.notes.trim();
 
     const chips: (keyof FormState)[] = ["minor", "skills"];
     for (const key of chips) {
@@ -690,6 +697,24 @@ export function EditProfileModal({
                 value={form.lastSpokenAt}
                 onChange={(e) => set("lastSpokenAt", e.target.value)}
                 className="h-9 border border-input bg-muted px-2.5 text-sm text-foreground focus:border-accent-teal focus:outline-none"
+              />
+            </div>
+          </section>
+
+          {/* NOTES — relationship memory + outreach personalization. Never scored. */}
+          <section className="space-y-3">
+            <SectionLabel>Notes</SectionLabel>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Notes — for your reference + outreach
+              </label>
+              <textarea
+                value={form.notes}
+                rows={4}
+                maxLength={160}
+                placeholder="e.g. Met at the Chi Phi alumni mixer; passionate about sailing; introduced by Jane."
+                onChange={(e) => set("notes", e.target.value)}
+                className="w-full resize-y border border-input bg-muted px-2.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent-teal focus:outline-none"
               />
             </div>
           </section>

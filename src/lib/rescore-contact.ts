@@ -75,6 +75,7 @@ export function rescoreContact(
     skills: (contact.skills as string) || "",
     pastFirms: (contact.pastFirms as string) || "",
     personType: (contact.personType as string) || "",
+    graduationYear: (contact.graduationYear as number) || 0,
     university: (contact.university as string) || "",
     track: (contact.track as string) || "",
     role: (contact.role as string) || "",
