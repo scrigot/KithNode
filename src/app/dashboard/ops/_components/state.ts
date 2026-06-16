@@ -32,3 +32,12 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
+
+/**
+ * "synced Nh ago" label for the cockpit freshness badge so a stale DB never
+ * looks live. null timestamp -> "never synced".
+ */
+export function syncedAgo(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return "never synced";
+  return `synced ${relativeTime(iso, now)}`;
+}

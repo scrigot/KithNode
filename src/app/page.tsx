@@ -12,7 +12,6 @@ import { CTASection } from "./_landing/cta-section";
 import { FAQ } from "./_landing/faq";
 import { MeshBg } from "./_landing/mesh-bg";
 import { PanelScoring } from "@/app/demo/_components/panel-scoring";
-import Link from "next/link";
 
 export default async function Home({
   searchParams,
@@ -44,22 +43,26 @@ export default async function Home({
       <section className="relative bg-black px-4 py-24 sm:py-32">
         <MeshBg />
         <div className="relative mx-auto max-w-7xl">
-          <div className="mb-12 text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
-              The math, not magic
-            </span>
-            <h2 className="mt-5 font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
+          <div className="text-center">
+            <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
               Every path, scored so you know who to talk to first.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/60">
               Same school, same club, mutual connections, a firm on your list. You see every signal behind the number, no black box.
             </p>
           </div>
-          <PanelScoring />
-          <div className="mt-10 text-center">
-            <Link href="/demo" className="inline-flex items-center gap-2 rounded-[12px] border border-white/20 bg-white/[0.04] px-8 py-4 text-base font-semibold text-white/90 backdrop-blur-sm transition-all hover:border-[#0EA5E9]/50 hover:bg-[#0EA5E9]/10 hover:text-white">
-              Explore the full live demo &rarr;
-            </Link>
+          <div className="relative mt-14 sm:mt-16">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[min(90%,56rem)] -translate-x-1/2 -translate-y-1/2"
+              style={{
+                background:
+                  "radial-gradient(ellipse at center, rgba(14,165,233,0.16), transparent 70%)",
+              }}
+            />
+            <div className="relative mx-auto max-w-5xl">
+              <PanelScoring />
+            </div>
           </div>
         </div>
       </section>
