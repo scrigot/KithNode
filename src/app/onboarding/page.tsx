@@ -340,6 +340,7 @@ function OnboardingFunnel() {
   const [experiences, setExperiences] = useState<ExperienceEntry[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [recruitingDate, setRecruitingDate] = useState("");
+  const [gradYear, setGradYear] = useState("");
   const [weeklyGoalTarget, setWeeklyGoalTarget] = useState(3);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
@@ -436,6 +437,8 @@ function OnboardingFunnel() {
           setLocations(data.targetLocations);
         if (data.recruitingDate)
           setRecruitingDate(String(data.recruitingDate).slice(0, 10));
+        if (typeof data.graduationYear === "number" && data.graduationYear > 0)
+          setGradYear(String(data.graduationYear));
         if (typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0)
           setWeeklyGoalTarget(data.weeklyGoalTarget);
         // Diagnose answers — resume the funnel where they left off.
@@ -681,6 +684,7 @@ function OnboardingFunnel() {
           target_companies: firms,
           target_locations: locations,
           recruiting_date: recruitingDate || null,
+          graduation_year: gradYear ? Number(gradYear) : null,
           weekly_goal_target: weeklyGoalTarget || 3,
           onboarding_goal: onboardingGoal,
           onboarding_pain: onboardingPain,
@@ -1191,15 +1195,9 @@ function OnboardingFunnel() {
                     min={2000}
                     max={2100}
                     placeholder="2029"
-                    value={
-                      recruitingDate ? recruitingDate.slice(0, 4) : ""
-                    }
+                    value={gradYear}
                     onChange={(e) => {
-                      // Store the grad year as a May-15 ISO date in recruitingDate
-                      // (the existing target-date field) so it persists through
-                      // the same column — no schema change.
-                      const y = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setRecruitingDate(y.length === 4 ? `${y}-05-15` : "");
+                      setGradYear(e.target.value.replace(/\D/g, "").slice(0, 4));
                     }}
                     aria-label="Graduation year"
                     className="bg-muted text-sm"

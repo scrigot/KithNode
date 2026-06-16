@@ -31,6 +31,7 @@ model User {
   experiences        String       @default("")
   clubMemberships    String       @default("")
   recruitingDate     DateTime?
+  graduationYear     Int?
   weeklyGoalTarget   Int          @default(3)
   stripeCustomerId   String?      @default("")
   subscriptionStatus String?      @default("trial")

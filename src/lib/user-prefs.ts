@@ -41,6 +41,10 @@ export interface UserPrefs {
   /** Structured club/role rows. UI truth; flat clubs is derived from these. */
   clubMemberships: ClubEntry[];
   recruitingDate: string | null;
+  /** Graduation year (e.g. 2029), separate from recruitingDate (the target
+   *  recruiting date) so the two no longer share one column. Optional so the
+   *  existing UserPrefs literals (tests/fixtures) stay valid. */
+  graduationYear?: number | null;
   weeklyGoalTarget: number;
   /** Conversion-funnel diagnose answers. Single-select goal (e.g. "Investment
    * Banking"). Drives the reveal copy + seeds targetIndustries. Optional so the
@@ -78,6 +82,7 @@ const EMPTY_PREFS: UserPrefs = {
   experiences: [],
   clubMemberships: [],
   recruitingDate: null,
+  graduationYear: null,
   weeklyGoalTarget: 3,
   onboardingGoal: "",
   onboardingPain: [],
@@ -112,7 +117,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
   const { data, error } = await supabase
     .from("User")
     .select(
-      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt"
+      "university, highSchool, hometown, greekOrg, major, minor, concentration, degrees, targetIndustries, targetFirms, targetLocations, clubs, skills, pastFirms, educations, experiences, clubMemberships, recruitingDate, graduationYear, weeklyGoalTarget, onboardingGoal, onboardingPain, onboardingTimeline, tutorialDoneAt"
     )
     .eq("email", email)
     .single();
@@ -138,6 +143,7 @@ export async function getUserPrefs(email: string): Promise<UserPrefs> {
     experiences: parseExperiences(data.experiences),
     clubMemberships: parseClubMemberships(data.clubMemberships),
     recruitingDate: data.recruitingDate ?? null,
+    graduationYear: data.graduationYear ?? null,
     weeklyGoalTarget: data.weeklyGoalTarget ?? 3,
     onboardingGoal: data.onboardingGoal || "",
     onboardingPain: parseList(data.onboardingPain),

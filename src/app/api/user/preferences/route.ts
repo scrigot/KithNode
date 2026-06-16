@@ -86,6 +86,12 @@ export async function POST(request: NextRequest) {
       ? new Date(body.recruiting_date).toISOString()
       : null;
 
+  const gradYearRaw = Number(body.graduation_year);
+  const graduationYear =
+    Number.isInteger(gradYearRaw) && gradYearRaw >= 2000 && gradYearRaw <= 2100
+      ? gradYearRaw
+      : null;
+
   const weeklyGoalRaw = Number(body.weekly_goal_target);
   const weeklyGoalTarget =
     Number.isFinite(weeklyGoalRaw) && weeklyGoalRaw > 0
@@ -189,6 +195,7 @@ export async function POST(request: NextRequest) {
   if ("target_locations" in body) patch.targetLocations = serializeList(body.target_locations);
   if ("skills" in body) patch.skills = JSON.stringify(rawSkills);
   if ("recruiting_date" in body) patch.recruitingDate = recruitingDate;
+  if ("graduation_year" in body) patch.graduationYear = graduationYear;
   if ("weekly_goal_target" in body) patch.weeklyGoalTarget = weeklyGoalTarget;
 
   // Education trio: written from structured rows when present, else from any
