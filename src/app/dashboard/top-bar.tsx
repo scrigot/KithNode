@@ -3,9 +3,21 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, Mail, ChevronRight, LogOut, User, CreditCard, BarChart2 } from "lucide-react";
+import {
+  Search,
+  Bell,
+  Mail,
+  ChevronRight,
+  LogOut,
+  User,
+  CreditCard,
+  BarChart2,
+  HelpCircle,
+  MessageSquare,
+} from "lucide-react";
 import { signOut } from "next-auth/react";
 import { apiFetch } from "@/lib/api-client";
+import { LogoWordmark } from "@/components/logo";
 import type { SearchResult } from "@/app/api/search/route";
 
 interface OverdueLite {
@@ -44,15 +56,43 @@ function tierColor(tier: string) {
   return TIER_COLORS[tier] ?? TIER_COLORS.cold;
 }
 
+// Plan-tier badge (relocated from the sidebar). Returns null for active subscribers.
+function SubBadge({
+  status,
+  trialDaysLeft,
+  onClick,
+}: {
+  status: string | null;
+  trialDaysLeft: number | null;
+  onClick?: () => void;
+}) {
+  if (!status || status === "active") return null;
+  const isTrial = status === "trial" && trialDaysLeft != null && trialDaysLeft > 0;
+  const label = isTrial ? `TRIAL · ${trialDaysLeft}d` : "FREE TIER";
+  const className = isTrial
+    ? "border-accent-teal/30 bg-accent-teal/10 text-accent-teal"
+    : "border-amber-500/30 bg-amber-500/10 text-amber-400";
+  return (
+    <Link
+      href="/dashboard/billing"
+      onClick={onClick}
+      className={`mt-1 inline-flex w-fit items-center border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider transition-colors hover:opacity-80 ${className}`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 type Panel = "bell" | "mail" | "profile" | null;
 
-export function TopBar({ userName }: { userName: string }) {
+export function TopBar({ userName, userEmail }: { userName: string; userEmail: string }) {
   const router = useRouter();
   const [overdue, setOverdue] = useState(0);
   const [unread, setUnread] = useState(0);
   const [overdueList, setOverdueList] = useState<OverdueLite[]>([]);
   const [unratedList, setUnratedList] = useState<UnratedLite[]>([]);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
 
   // Search state
   const [query, setQuery] = useState("");
@@ -117,7 +157,7 @@ export function TopBar({ userName }: { userName: string }) {
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [activePanel]);
 
-  // Dashboard overview counts + lists
+  // Dashboard overview counts + lists + subscription tier
   useEffect(() => {
     let cancelled = false;
     apiFetch("/api/dashboard/overview")
@@ -128,23 +168,14 @@ export function TopBar({ userName }: { userName: string }) {
         setUnread(d.ratings?.high_value || (d.top_unrated || []).length);
         setOverdueList(d.top_overdue || []);
         setUnratedList(d.top_unrated || []);
+        setSubscriptionStatus(d.subscription_status ?? null);
+        setTrialDaysLeft(d.trial_days_left ?? null);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
-
-  // Fetch credits when profile panel opens
-  useEffect(() => {
-    if (activePanel !== "profile" || credits !== null) return;
-    apiFetch("/api/user/credits")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { balance: number } | null) => {
-        if (d?.balance !== undefined) setCredits(d.balance);
-      })
-      .catch(() => {});
-  }, [activePanel, credits]);
 
   // Debounced search fetch
   const doSearch = useCallback((q: string) => {
@@ -214,9 +245,14 @@ export function TopBar({ userName }: { userName: string }) {
       .slice(0, 2) || "U";
 
   return (
-    <header className="hidden lg:flex items-center justify-between gap-4 border-b border-white/[0.06] bg-bg-secondary px-5 h-[49px]">
+    <header className="hidden lg:flex items-center gap-4 border-b border-white/[0.06] bg-bg-secondary px-5 h-[49px]">
+      {/* Logo */}
+      <Link href="/dashboard" className="shrink-0" aria-label="KithNode home">
+        <LogoWordmark iconClassName="h-6 w-6" textClassName="text-base" />
+      </Link>
+
       {/* Search */}
-      <div className="flex-1 max-w-md relative" ref={containerRef}>
+      <div className="relative flex-1 max-w-md" ref={containerRef}>
         <div className="flex items-center gap-2 border border-white/[0.06] bg-card px-3 py-1.5">
           <Search size={13} className="text-text-muted" />
           <input
@@ -285,13 +321,15 @@ export function TopBar({ userName }: { userName: string }) {
       </div>
 
       {/* Right cluster */}
-      <div className="flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-3">
         {/* Bell — overdue follow-ups */}
         <div className="relative" ref={bellRef}>
           <button
             type="button"
             onClick={() => togglePanel("bell")}
             aria-label="Overdue follow-ups"
+            aria-haspopup="dialog"
+            aria-expanded={activePanel === "bell"}
             className={[
               "relative border bg-card p-1.5 transition-colors",
               activePanel === "bell"
@@ -367,6 +405,8 @@ export function TopBar({ userName }: { userName: string }) {
             type="button"
             onClick={() => togglePanel("mail")}
             aria-label="Warm signals"
+            aria-haspopup="dialog"
+            aria-expanded={activePanel === "mail"}
             className={[
               "relative border bg-card p-1.5 transition-colors",
               activePanel === "mail"
@@ -446,6 +486,9 @@ export function TopBar({ userName }: { userName: string }) {
           <button
             type="button"
             onClick={() => togglePanel("profile")}
+            aria-label="Account menu"
+            aria-haspopup="menu"
+            aria-expanded={activePanel === "profile"}
             className={[
               "flex items-center gap-2 border bg-card px-2 py-1 transition-colors",
               activePanel === "profile"
@@ -463,18 +506,21 @@ export function TopBar({ userName }: { userName: string }) {
           </button>
 
           {activePanel === "profile" && (
-            <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-[220px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
+            <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-[230px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
               {/* Header */}
-              <div className="border-b border-white/[0.06] px-3 py-2.5">
-                <div className="text-[12px] font-bold text-foreground truncate">{userName}</div>
-                {credits !== null && (
-                  <div className="mt-0.5 font-mono text-[10px] text-text-muted">
-                    <span className="text-accent-teal font-bold">{credits}</span> cr
-                  </div>
+              <div className="flex flex-col border-b border-white/[0.06] px-3 py-2.5">
+                <div className="truncate text-[12px] font-bold text-foreground">{userName}</div>
+                {userEmail && (
+                  <div className="truncate font-mono text-[10px] text-text-muted">{userEmail}</div>
                 )}
+                <SubBadge
+                  status={subscriptionStatus}
+                  trialDaysLeft={trialDaysLeft}
+                  onClick={() => setActivePanel(null)}
+                />
               </div>
 
-              {/* Menu items */}
+              {/* Account links */}
               <div className="py-1">
                 <Link
                   href="/dashboard/settings"
@@ -500,6 +546,31 @@ export function TopBar({ userName }: { userName: string }) {
                   <BarChart2 size={12} className="shrink-0" />
                   Usage
                 </Link>
+              </div>
+
+              {/* Utility */}
+              <div className="border-t border-white/[0.06] py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("kn:start-tour"));
+                    setActivePanel(null);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
+                >
+                  <HelpCircle size={12} className="shrink-0" />
+                  Take the tour
+                </button>
+                <a
+                  href="https://kithnode.canny.io"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
+                >
+                  <MessageSquare size={12} className="shrink-0" />
+                  Send Feedback
+                </a>
               </div>
 
               <div className="border-t border-white/[0.06] py-1">

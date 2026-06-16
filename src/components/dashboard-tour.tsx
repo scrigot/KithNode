@@ -40,19 +40,9 @@ const STEPS: TourStep[] = [
     description: "Upload your LinkedIn connections CSV to seed warm-path scoring and the contact graph.",
   },
   {
-    target: "settings",
-    title: "Settings",
-    description: "Set your target firms, industries, and recruiting timeline so scores reflect your actual goals.",
-  },
-  {
-    target: "credits-meter",
-    title: "Credits",
-    description: "Each enrich, discover, or draft action costs credits. Click here to see your usage history.",
-  },
-  {
     target: "sidebar-collapse",
     title: "Sidebar",
-    description: "Collapse the sidebar with Ctrl+B (or Cmd+B) to reclaim screen space when reviewing contacts.",
+    description: "Use the control at the bottom to keep the sidebar expanded, collapsed, or expand-on-hover. Ctrl+B (or Cmd+B) toggles it too.",
   },
 ];
 
