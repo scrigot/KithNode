@@ -22,9 +22,9 @@ export function FAQ() {
       className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-4 py-20"
     >
       <MeshBg />
-      <div className="relative w-full max-w-3xl lg:w-[60%]">
+      <div className="relative w-full max-w-6xl lg:w-[90%]">
         <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
-          Questions, answered
+          Frequently asked questions
         </h2>
         <div className="mt-12 border-t border-white/10 sm:mt-16">
           {FAQS.map((item, i) => {
