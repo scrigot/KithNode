@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
-import { maybeRedact } from "@/lib/redact";
+import { poolSafeContact } from "@/lib/redact";
 import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
 import { normalizeFirmName } from "@/lib/normalize-firm";
 
@@ -105,6 +105,20 @@ export async function GET(request: NextRequest) {
     .select("linkedInUrl, name, firmName")
     .eq("importedByUserId", userId);
 
+  // Contacts the user already added to their pipeline. A piped contact must
+  // never reappear in the deck — re-showing one let the user add it again
+  // (e.g. Jacob Goldstein twice). The PipelineEntry(contactId,userId) unique
+  // index stops a literal duplicate ROW, but this is the upstream fix: keep the
+  // already-handled contact out of the feed entirely. Match on the pool row's
+  // id, which is exactly what PipelineEntry.contactId stores.
+  const { data: pipelineRows } = await supabase
+    .from("PipelineEntry")
+    .select("contactId")
+    .eq("userId", userId);
+  const pipedContactIds = new Set<string>(
+    (pipelineRows || []).map((p) => p.contactId).filter(Boolean),
+  );
+
   const ownLinkedInUrls = new Set<string>();
   const ownNameFirms = new Set<string>();
   const ownNames = new Set<string>();
@@ -118,6 +132,7 @@ export async function GET(request: NextRequest) {
   }
 
   contacts = contacts.filter((c) => {
+    if (pipedContactIds.has(c.id)) return false;
     const url = normalizeLinkedInUrl(c.linkedInUrl);
     if (url && ownLinkedInUrls.has(url)) return false;
     const nameFirm = normalizeNameFirm(c.name, c.firmName);
@@ -158,16 +173,18 @@ export async function GET(request: NextRequest) {
     }),
   );
 
-  // Project each pool contact down to the safe field allowlist and redact PII
-  // for contacts not imported by the current user. maybeRedact drops the
-  // owner's private columns (importedByUserId, email, isFriend, lastSpokenAt,
-  // speakFrequency, hometown, highSchool, passions) entirely — the service-role
-  // client returns them via select(*), so this projection is the only guard.
-  // warmPaths / deferred are route-computed UI metadata (warm paths reference
-  // the user's OWN imports, see src/lib/warm-paths.ts), so re-attach them after
-  // redaction strips everything off-allowlist.
-  const redacted = enriched.map(({ warmPaths, deferred, ...c }) => {
-    const safe = maybeRedact(c, userId);
+  // Project each pool contact down to the safe field allowlist. poolSafeContact
+  // drops the owner's private columns (importedByUserId, email, isFriend,
+  // lastSpokenAt, speakFrequency, hometown, highSchool, passions) entirely — the
+  // service-role client returns them via select(*), so this projection is the
+  // only guard. Identity (name / firm / title / linkedInUrl) stays CLEAR: the
+  // old "blur until High Value unlock" gate is gone — ranked results show
+  // directly (isRedacted is always false). The user's own imports pass through
+  // untouched. warmPaths / deferred are route-computed UI metadata (warm paths
+  // reference the user's OWN imports, see src/lib/warm-paths.ts), so re-attach
+  // them after projection strips everything off-allowlist.
+  const projected = enriched.map(({ warmPaths, deferred, ...c }) => {
+    const safe = c.importedByUserId === userId ? c : poolSafeContact(c);
     return { ...safe, warmPaths, ...(deferred ? { deferred: true } : {}) };
   });
 
@@ -180,8 +197,8 @@ export async function GET(request: NextRequest) {
     .eq("importedByUserId", userId);
 
   return NextResponse.json({
-    contacts: redacted,
-    total: redacted.length,
+    contacts: projected,
+    total: projected.length,
     networkSize: networkSize ?? 0,
   });
 }
