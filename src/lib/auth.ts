@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 import { isEmailAllowed } from "./auth-allowlist";
+import { TRIAL_CREDITS } from "./credit-costs";
 
 export { isEmailAllowed };
 
@@ -25,7 +26,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name ?? "",
           image: user.image ?? "",
           subscriptionStatus: "trial",
-          credits: 50,
+          credits: TRIAL_CREDITS,
         },
         { onConflict: "email", ignoreDuplicates: true }
       );
