@@ -1,12 +1,13 @@
 # KithNode Tasks (canonical)
 
 > Agents: read at session start, update before you finish. This is the source of truth for "what's next." Full shipped history is in build-log.md.
+> Gate backbone (lanes x gates, the Founder OS): `ops/roadmap.md`. KithNode is at **G0**. Tag new tasks `[Lane][Gn]`.
 
 ## Now (active)
-- [ ] Beta launch prep (one real user today; beta this week)
+- [ ] [Product/Eng][G0] Beta launch prep (one real user today; beta this week)
 
 ## Next
-- [ ] Marketing Phase 0 wiring: source-tag the /waitlist (`?source=` capture) + add lead-magnet download to /waitlist/thanks. See `marketing/strategy.md`.
+- [ ] [Growth][G0] Marketing Phase 0 wiring: source-tag the /waitlist (`?source=` capture) + add lead-magnet download to /waitlist/thanks. See `marketing/strategy.md`.
 
 ## Blocked
 - (none)

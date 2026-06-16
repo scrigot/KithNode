@@ -85,10 +85,11 @@ npm run db:seed      # Seed test data
 - **Ralph autonomous loop:** `scripts/ralph/` — PRD at `prd.json`, prompt at `CLAUDE.md`, log at `progress.txt`.
 
 ## Design System
-Always read DESIGN.md before making any visual or UI decisions.
+Landing/marketing UI -> read brand/landing.md (dark, Cluely-derived).
+Dashboard/app UI -> read brand/dashboard.md (Bloomberg-dense, 0px sharp, teal).
 All font choices, colors, spacing, and aesthetic direction are defined there.
 Do not deviate without explicit user approval.
-In QA mode, flag any code that doesn't match DESIGN.md.
+In QA mode, flag landing code against brand/landing.md and dashboard code against brand/dashboard.md.
 
 ## What to do FIRST in any session here
 0. **Read `ops/tasks.md`** (what's next) + the tail of `ops/build-log.md` (recent context). Work from tasks.md Now/Next and update it before you finish. End any substantive session with one line: `OPS_LOG: built ... | learned ... | decided ...` — the Stop hook appends it to `ops/build-log.md`. See `ops/README.md`.
@@ -98,3 +99,12 @@ In QA mode, flag any code that doesn't match DESIGN.md.
 4. If the task touches DB schema — read `prisma/schema.prisma` AND remember to set RLS in Supabase dashboard separately
 5. If the task touches the backend — that's `cd backend/`, FastAPI, Python, Railway. Different deploy, different env vars, different dependencies.
 6. Run `npm run typecheck && npm run lint` BEFORE committing — both must pass clean
+
+## Skill routing (KithNode toolkit stack)
+Four toolkits are wired: **gstack**, **superpowers**, **pm-skills** (phuryn), **ECC** (affaan-m, optional). The full task -> skill-chain map, by Founder-OS lane, is in `ops/playbook.md`. When a request matches a task, invoke the skill chain as the FIRST action. Quick routes:
+- Plan a feature -> `brainstorming` (superpowers) -> `/write-prd` (pm) -> `/red-team-prd` + `/pre-mortem` (pm) -> `/plan-eng-review` (gstack)
+- Ship -> `/ship` · Bug -> `/investigate` · QA -> `/qa` · Review a diff -> `/review` (gstack)
+- Roadmap/OKRs -> `/transform-roadmap` `/plan-okrs` `/north-star` · Metrics -> `/setup-metrics` `/analyze-cohorts` · Research -> `/competitive-analysis` `/research-users` (pm)
+- Pricing -> `/pricing` · Legal -> `/privacy-policy` `/draft-nda` (pm)
+- Big strategy / scope -> `/office-hours` or `/plan-ceo-review` (gstack)
+Full chains, lane mapping, and install status: `ops/playbook.md`.
