@@ -46,7 +46,7 @@ export function Navbar() {
             <motion.a
               key={label}
               href={href}
-              className="text-sm font-medium transition-colors"
+              className="text-sm font-medium transition-colors duration-200 ease-in-out"
               style={{
                 color: useTransform(scrolled, (v) =>
                   v > 0.5 ? "#475569" : "rgba(255,255,255,0.8)"
@@ -61,7 +61,7 @@ export function Navbar() {
       <div className="flex items-center gap-4">
         <Link
           href="/waitlist"
-          className="rounded-lg bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"
+          className="rounded-[12px] bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:bg-white/30"
         >
           Request Access
         </Link>

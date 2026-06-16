@@ -18,9 +18,9 @@ export function ScrollReveal({
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.4, ease: "easeOut", delay }}
+      transition={{ duration: 0.55, ease: "easeOut", delay }}
       className={className}
     >
       {children}

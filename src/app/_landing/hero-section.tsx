@@ -115,7 +115,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
           </motion.div>
 
           {/* Headline with gradient on the third line */}
-          <h1 className="font-heading text-[2rem] font-bold leading-[1.05] tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl">
+          <h1 className="font-heading text-[clamp(2.75rem,7vw,80px)] font-medium leading-[0.98] tracking-[-0.0125em] text-white">
             <motion.span className="block" variants={LV}>
               Find a warm path
             </motion.span>
@@ -132,7 +132,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
 
           {/* Subhead */}
           <motion.p
-            className="mt-6 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg lg:mt-8 lg:text-xl"
+            className="mt-6 max-w-xl text-[19px] leading-relaxed tracking-[-0.02em] text-white/60 lg:mt-8"
             variants={fadeUp}
           >
             KithNode finds the alumni who can actually introduce you, scores
@@ -149,7 +149,7 @@ export function HeroSection({ children }: { children: React.ReactNode }) {
             {children}
             <Link
               href="/demo"
-              className="rounded-lg border border-white/20 bg-white/5 px-10 py-4 text-center text-base font-medium text-white backdrop-blur-sm transition-all hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-100"
+              className="rounded-[12px] border border-white/20 bg-white/5 px-10 py-4 text-center text-base font-medium text-white backdrop-blur-sm transition-all hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-100"
             >
               Watch a warm path get found
             </Link>

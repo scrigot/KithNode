@@ -130,7 +130,6 @@ export function CTASection() {
         .cta-btn-primary:hover {
           animation: none;
           box-shadow: 0 0 80px rgba(14,165,233,0.7), 0 0 140px rgba(14,165,233,0.3);
-          transform: translateY(-2px);
         }
       `}</style>
 
@@ -247,7 +246,7 @@ export function CTASection() {
 
         {/* Headline */}
         <motion.h2
-          className="font-heading text-4xl font-bold leading-tight tracking-tight text-white md:text-6xl"
+          className="font-heading text-5xl font-medium leading-[1.25] tracking-[-0.027em] text-white"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -281,7 +280,7 @@ export function CTASection() {
           {/* Primary */}
           <Link
             href="/waitlist"
-            className="cta-btn-primary relative rounded-xl bg-[#0EA5E9] px-8 py-4 text-lg font-semibold text-white transition-all duration-300"
+            className="cta-btn-primary relative rounded-[12px] bg-[#0EA5E9] px-8 py-4 text-lg font-medium text-white transition-transform duration-150 ease-out hover:-translate-y-0.5"
           >
             Request Access
           </Link>
@@ -289,7 +288,7 @@ export function CTASection() {
           {/* Secondary -- ghost border matching hero */}
           <Link
             href="/demo"
-            className="rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-lg font-semibold text-white/80 backdrop-blur-sm transition-all duration-300 hover:border-white/40 hover:bg-white/[0.08] hover:text-white"
+            className="rounded-[12px] border border-white/20 bg-white/[0.04] px-8 py-4 text-lg font-medium text-white/80 backdrop-blur-sm transition duration-200 ease-in-out hover:border-white/40 hover:bg-white/[0.08] hover:text-white"
           >
             See How It Works
           </Link>

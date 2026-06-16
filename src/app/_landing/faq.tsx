@@ -14,15 +14,15 @@ export function FAQ() {
     <section id="faq" className="relative bg-black px-4 py-20 sm:py-24">
       <MeshBg />
       <div className="relative mx-auto max-w-3xl">
-        <h2 className="text-center font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h2 className="text-center font-heading text-4xl font-medium tracking-[-0.027em] text-white sm:text-5xl">
           Questions, answered
         </h2>
         <div className="mt-10 flex flex-col gap-3">
           {FAQS.map((item) => (
-            <details key={item.q} className="group rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-4">
+            <details key={item.q} className="group rounded-[16px] border border-white/[0.08] bg-white/[0.03] px-5 py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white">
                 {item.q}
-                <span className="text-[#0EA5E9] transition-transform group-open:rotate-45">+</span>
+                <span className="text-[#0EA5E9] transition-transform duration-200 ease-out group-open:rotate-45">+</span>
               </summary>
               <p className="mt-3 text-sm leading-relaxed text-white/70">{item.a}</p>
             </details>

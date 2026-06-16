@@ -77,9 +77,9 @@ function FounderCard() {
 
   return (
     /* Gradient border wrapper -- same conic pattern as solutions-section */
-    <div className="card-border-wrapper-founder group relative rounded-xl p-px">
+    <div className="card-border-wrapper-founder group relative rounded-[24px] p-px">
       <div
-        className="card-border-ring-founder pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        className="card-border-ring-founder pointer-events-none absolute inset-0 rounded-[24px] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         aria-hidden
       />
       {/* Inner glass card */}
@@ -87,7 +87,7 @@ function FounderCard() {
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className="relative overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.04] p-8 backdrop-blur-sm md:p-10"
+        className="relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.04] p-8 backdrop-blur-sm md:p-10"
       >
         {/* Body copy */}
         <div className="space-y-5 text-base leading-relaxed text-white/80">
@@ -95,9 +95,8 @@ function FounderCard() {
             I&apos;m Sam, a UNC freshman. I&apos;m not in the business school
             yet, I don&apos;t have a target-school resume or a high GPA. But
             I&apos;m interning at a Fortune 500 building enterprise-scale RAG
-            systems and at a PE firm building AI automations like deal
-            sourcing, and I got the PE one through a friend in my pledge class
-            who introduced me. Not a cold app. A warm path.
+            systems and at a PE firm. I got my PE internship through a friend
+            in my pledge class who introduced me. Not a cold app. A warm path.
           </p>
           <p>
             That&apos;s the whole thesis: the intro beats the resume. KithNode
@@ -182,7 +181,7 @@ export function Testimonials() {
           content: "";
           position: absolute;
           inset: 1px;
-          border-radius: calc(0.75rem - 1px);
+          border-radius: calc(24px - 1px);
           background: #050d1a;
         }
       `}</style>
@@ -242,7 +241,7 @@ export function Testimonials() {
           <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-widest text-[#0EA5E9]">
             From the Founder
           </p>
-          <h2 className="text-center font-heading text-4xl font-bold text-white md:text-5xl">
+          <h2 className="text-center font-heading text-5xl font-medium leading-[1.25] tracking-[-0.027em] text-white">
             Why KithNode exists
           </h2>
         </motion.div>
