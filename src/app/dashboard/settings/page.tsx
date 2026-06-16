@@ -559,6 +559,18 @@ function EditPanel({
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeFilled, setResumeFilled] = useState<Set<string>>(new Set());
+  const [activeSection, setActiveSection] = useState<
+    "profile" | "outreach" | "notifications"
+  >("profile");
+
+  // Optional deep-link: ?section=outreach|notifications selects that pane on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const param = new URLSearchParams(window.location.search).get("section");
+    if (param === "outreach" || param === "notifications" || param === "profile") {
+      setActiveSection(param);
+    }
+  }, []);
 
   const toggleIndustry = (ind: string) =>
     setLocal((p) => ({
@@ -730,23 +742,68 @@ function EditPanel({
   const allFirms = [...local.targetFirms, ...local.customFirms];
   const allLocations = [...local.targetLocations, ...local.customLocations];
 
+  const saveButton = (
+    <Button
+      className="w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+      onClick={handleSave}
+      disabled={saving}
+    >
+      {saving ? "Saving..." : saved ? "Saved!" : (
+        <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
+      )}
+    </Button>
+  );
+
+  const navItems = [
+    { id: "profile", label: "Profile" },
+    { id: "outreach", label: "Outreach drafting" },
+    { id: "notifications", label: "Notifications" },
+  ] as const;
+
   return (
-    <div className="mx-auto max-w-xl p-5">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-xl font-bold text-white">Settings</h2>
-          <p className="mt-0.5 text-[12px] text-text-secondary">Edit your recruiting preferences</p>
+          <h2 className="font-heading text-2xl font-bold text-white">Settings</h2>
+          <p className="mt-1 text-sm text-text-secondary">Edit your recruiting preferences</p>
         </div>
         <button
           onClick={onRestartWizard}
-          className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-white transition-colors duration-150"
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={13} />
           Restart Setup
         </button>
       </div>
 
-      <CompletenessMeter prefs={local} />
+      <div className="flex flex-col gap-8 md:flex-row">
+        {/* Settings sub-nav */}
+        <nav className="md:w-48 md:shrink-0">
+          <div className="flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5">
+            {navItems.map((item) => {
+              const active = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`shrink-0 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[13px] font-medium transition-colors ${
+                    active
+                      ? "border-accent-teal text-accent-teal"
+                      : "border-transparent text-text-muted hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Content column */}
+        <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
+          {activeSection === "profile" && (
+            <>
+              <CompletenessMeter prefs={local} />
 
       {/* Resume autofill — prefills empty fields only, never stored. */}
       <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
@@ -795,16 +852,15 @@ function EditPanel({
         )}
       </div>
 
-      <div className="space-y-6">
-        {/* Recruiting timeline + weekly goal */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+      {/* Recruiting timeline + weekly goal */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <CalendarDays size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <CalendarDays size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Recruiting
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Target recruiting date
@@ -845,16 +901,20 @@ function EditPanel({
             </div>
           </div>
         </section>
+            </>
+          )}
 
+          {activeSection === "outreach" && (
+            <>
         {/* Outreach drafting */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-3 flex items-center gap-2">
-            <Mail size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Outreach drafting
             </h3>
           </div>
-          <p className="mb-4 text-[11px] text-text-muted">
+          <p className="mb-4 text-[13px] text-text-muted">
             Controls how Draft Outreach writes your emails. Applies to every new draft.
           </p>
           <div className="space-y-4">
@@ -955,12 +1015,17 @@ function EditPanel({
             </div>
           </div>
         </section>
+              {saveButton}
+            </>
+          )}
 
+          {activeSection === "notifications" && (
+            <>
         {/* Notifications */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Mail size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Notifications
             </h3>
           </div>
@@ -1004,12 +1069,17 @@ function EditPanel({
             })}
           </div>
         </section>
+              {saveButton}
+            </>
+          )}
 
+          {activeSection === "profile" && (
+            <>
         {/* School */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <GraduationCap size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">School</h3>
+            <GraduationCap size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">School</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -1185,10 +1255,10 @@ function EditPanel({
         </section>
 
         {/* Location */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
+            <MapPin size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
           </div>
           <div className="space-y-4">
             <div>
@@ -1262,10 +1332,10 @@ function EditPanel({
 
         {/* Target roles — track-grouped. Selected ROLE names persist into
             targetIndustries (storage shape unchanged). */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Target size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
+            <Target size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
           </div>
           <TrackRolePicker selected={local.targetIndustries} onToggle={toggleIndustry} />
           {local.targetIndustries.length > 0 && (
@@ -1274,10 +1344,10 @@ function EditPanel({
         </section>
 
         {/* Firms + Experience */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Building2 size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
+            <Building2 size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {FIRM_OPTIONS.map((firm) => {
@@ -1353,6 +1423,9 @@ function EditPanel({
             <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
           )}
         </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
