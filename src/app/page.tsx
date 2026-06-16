@@ -9,7 +9,7 @@ import { SectionOutpace } from "./_landing/section-outpace";
 import { CTASection } from "./_landing/cta-section";
 import { FAQ } from "./_landing/faq";
 import { MeshBg } from "./_landing/mesh-bg";
-import { PanelScoring } from "@/app/demo/_components/panel-scoring";
+import { ScoringMacDemo } from "./_landing/scoring-mac-demo";
 
 export default async function Home({
   searchParams,
@@ -50,17 +50,7 @@ export default async function Home({
             </p>
           </div>
           <div className="relative mt-14 sm:mt-16">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[min(90%,56rem)] -translate-x-1/2 -translate-y-1/2"
-              style={{
-                background:
-                  "radial-gradient(ellipse at center, rgba(14,165,233,0.16), transparent 70%)",
-              }}
-            />
-            <div className="relative mx-auto max-w-5xl">
-              <PanelScoring />
-            </div>
+            <ScoringMacDemo />
           </div>
         </div>
       </section>
@@ -90,25 +80,25 @@ export default async function Home({
           <div className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold text-white">Product</h4>
             <a
-              href="/demo"
+              href="/waitlist"
               className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Signal Detection
             </a>
             <a
-              href="/demo"
+              href="/waitlist"
               className="text-sm text-white/55 transition-colors hover:text-white"
             >
               AI Scoring
             </a>
             <a
-              href="/demo"
+              href="/waitlist"
               className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Smart Outreach
             </a>
             <a
-              href="/demo"
+              href="/waitlist"
               className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Discover
