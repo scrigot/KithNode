@@ -91,6 +91,49 @@ function ConvergenceLine({ d, delay }: { d: string; delay: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// WarmPathCluster -- floating glassy "warm path" chain (decorative CTA visual).
+// Echoes Cluely's floating element; on-brand (a real warm path: you -> mutual
+// -> target). CSS-keyframe drift (rAF is throttled in the preview).
+// ---------------------------------------------------------------------------
+
+const WARM_PATH = [
+  { initials: "Y", name: "You", role: "UNC · Chi Phi", tag: null, delay: "0s" },
+  { initials: "JB", name: "Jake Bennett", role: "Chi Phi brother", tag: "MUTUAL", delay: "0.6s" },
+  { initials: "RC", name: "Riley Chen", role: "Analyst @ Goldman Sachs", tag: "WARM PATH", delay: "1.2s" },
+];
+
+function WarmPathCluster() {
+  return (
+    <div className="relative mx-auto w-full max-w-sm">
+      {/* connecting teal spine through the avatar centers */}
+      <div className="absolute left-[28px] bottom-7 top-7 w-px bg-gradient-to-b from-[#0EA5E9]/0 via-[#0EA5E9]/40 to-[#0EA5E9]/0" />
+      <div className="relative flex flex-col gap-5">
+        {WARM_PATH.map((p) => (
+          <div
+            key={p.name}
+            className="cta-float flex items-center gap-3 rounded-[16px] border border-white/10 bg-white/[0.06] p-3 backdrop-blur-md"
+            style={{ animationDelay: p.delay }}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#0EA5E9]/30 bg-[#0EA5E9]/10 text-[11px] font-bold text-[#0EA5E9]">
+              {p.initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white">{p.name}</p>
+              <p className="truncate text-[11px] text-white/50">{p.role}</p>
+            </div>
+            {p.tag && (
+              <span className="shrink-0 rounded-full border border-[#0EA5E9]/30 bg-[#0EA5E9]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-[#0EA5E9]">
+                {p.tag}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // CTASection
 // ---------------------------------------------------------------------------
 
@@ -131,6 +174,12 @@ export function CTASection() {
           animation: none;
           box-shadow: 0 0 80px rgba(14,165,233,0.7), 0 0 140px rgba(14,165,233,0.3);
         }
+
+        @keyframes cta-float {
+          0%, 100% { transform: translateY(0); }
+          50%       { transform: translateY(-10px); }
+        }
+        .cta-float { animation: cta-float 5s ease-in-out infinite; }
       `}</style>
 
       {/* ------------------------------------------------------------------ */}
@@ -197,26 +246,6 @@ export function CTASection() {
               delay={i * 0.5}
             />
           ))}
-
-          {/* Center node -- the destination of all convergence lines */}
-          <motion.circle
-            cx="50%"
-            cy="50%"
-            r="1.2"
-            fill="#0EA5E9"
-            animate={{ r: [1.2, 2.0, 1.2], opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.circle
-            cx="50%"
-            cy="50%"
-            r="2.5"
-            fill="none"
-            stroke="#0EA5E9"
-            strokeWidth="0.3"
-            animate={{ r: [2.5, 4.5], opacity: [0.4, 0] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
-          />
         </svg>
       </div>
 
@@ -224,85 +253,75 @@ export function CTASection() {
       {/* Content -- scroll-reveal wrapper */}
       {/* ------------------------------------------------------------------ */}
       <motion.div
-        className="relative mx-auto max-w-3xl text-center"
-        initial={{ opacity: 0, scale: 0.95 }}
+        className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2"
+        initial={{ opacity: 0, scale: 0.97 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
       >
-        {/* Eyebrow label */}
-        <motion.div
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 backdrop-blur-sm"
-          initial={{ opacity: 0, y: -10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-        >
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0EA5E9]" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
-            Private Alpha Open
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h2
-          className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
-        >
-          Stop cold-emailing strangers.{" "}
-          <br className="hidden md:block" />
-          Walk in <span className="text-[#0EA5E9]">warm</span>.
-        </motion.h2>
-
-        {/* Subhead */}
-        <motion.p
-          className="mx-auto mt-6 max-w-xl text-lg text-white/70"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.22, ease: "easeOut" }}
-        >
-          KithNode maps every alumni connection between you and your target firms,
-          scores them, and drafts the outreach that actually gets a response.
-        </motion.p>
-
-        {/* CTA buttons */}
-        <motion.div
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.30, ease: "easeOut" }}
-        >
-          {/* Primary */}
-          <Link
-            href="/waitlist"
-            className="cta-btn-primary relative rounded-[12px] bg-[#0EA5E9] px-8 py-4 text-lg font-medium text-white transition-transform duration-150 ease-out hover:-translate-y-0.5"
+        {/* LEFT -- headline + subhead + single CTA */}
+        <div className="text-center lg:text-left">
+          {/* Headline */}
+          <motion.h2
+            className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
           >
-            Request Access
-          </Link>
+            Stop cold-emailing strangers.{" "}
+            <br className="hidden md:block" />
+            Walk in <span className="text-[#0EA5E9]">warm</span>.
+          </motion.h2>
 
-          {/* Secondary -- ghost border matching hero */}
-          <Link
-            href="/demo"
-            className="rounded-[12px] border border-white/20 bg-white/[0.04] px-8 py-4 text-lg font-medium text-white/80 backdrop-blur-sm transition duration-200 ease-in-out hover:border-white/40 hover:bg-white/[0.08] hover:text-white"
+          {/* Subhead */}
+          <motion.p
+            className="mx-auto mt-6 max-w-xl text-lg text-white/70 lg:mx-0"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.18, ease: "easeOut" }}
           >
-            See How It Works
-          </Link>
+            KithNode maps every alumni connection between you and your target firms,
+            scores them, and drafts the outreach that actually gets a response.
+          </motion.p>
+
+          {/* Single primary CTA */}
+          <motion.div
+            className="mt-10 flex justify-center lg:justify-start"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.26, ease: "easeOut" }}
+          >
+            <Link
+              href="/waitlist"
+              className="cta-btn-primary relative rounded-[12px] bg-[#0EA5E9] px-8 py-4 text-lg font-medium text-white transition-transform duration-150 ease-out hover:-translate-y-0.5"
+            >
+              Request Access
+            </Link>
+          </motion.div>
+
+          {/* Data-sourcing reassurance: the trust line skeptical users said would
+              flip them. Intentionally NOT scroll-animated so a trust-critical
+              message can never be hidden by an observer that fails to fire. */}
+          <p className="mx-auto mt-5 max-w-md text-[13px] leading-snug text-white/55 lg:mx-0">
+            Built on permitted public data. No LinkedIn login, password, or
+            extension required.
+          </p>
+        </div>
+
+        {/* RIGHT -- floating warm-path cluster (decorative, desktop only) */}
+        <motion.div
+          className="relative hidden lg:block"
+          initial={{ opacity: 0, x: 24 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+          aria-hidden
+        >
+          <WarmPathCluster />
         </motion.div>
-
-        {/* Data-sourcing reassurance: the trust line skeptical users said would
-            flip them. Intentionally NOT scroll-animated so a trust-critical
-            message can never be hidden by an observer that fails to fire. */}
-        <p className="mx-auto mt-5 max-w-md text-[13px] leading-snug text-white/55">
-          Built on permitted public data. No LinkedIn login, password, or
-          extension required.
-        </p>
-
-
       </motion.div>
     </section>
   );

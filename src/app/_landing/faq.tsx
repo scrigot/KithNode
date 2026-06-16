@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { MeshBg } from "./mesh-bg";
 
 const FAQS: { q: string; a: string }[] = [
@@ -13,18 +14,18 @@ export function FAQ() {
   return (
     <section id="faq" className="relative bg-black px-4 py-24 sm:py-32">
       <MeshBg />
-      <div className="relative mx-auto max-w-3xl">
-        <h2 className="text-center font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
+      <div className="relative mx-auto max-w-4xl">
+        <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
           Questions, answered
         </h2>
-        <div className="mt-10 flex flex-col gap-3">
+        <div className="mt-12 border-t border-white/10 sm:mt-16">
           {FAQS.map((item) => (
-            <details key={item.q} className="group rounded-[16px] border border-white/[0.08] bg-white/[0.03] px-5 py-4">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white">
+            <details key={item.q} className="group border-b border-white/10">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-lg font-medium text-white sm:py-6">
                 {item.q}
-                <span className="text-[#0EA5E9] transition-transform duration-200 ease-out group-open:rotate-45">+</span>
+                <ChevronDown className="h-5 w-5 shrink-0 text-white/40 transition-transform duration-200 ease-out group-open:rotate-180 group-open:text-[#0EA5E9]" />
               </summary>
-              <p className="mt-3 text-sm leading-relaxed text-white/70">{item.a}</p>
+              <p className="max-w-3xl pb-6 text-[15px] leading-relaxed text-white/65">{item.a}</p>
             </details>
           ))}
         </div>
