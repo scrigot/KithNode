@@ -52,7 +52,8 @@ export async function GET(req: Request) {
 
   const { data: users, error } = await supabase
     .from("User")
-    .select("id, email, name");
+    .select("id, email, name")
+    .eq("digestEmailEnabled", true);
 
   if (error || !users) {
     console.error("[digest] failed to fetch users", error);

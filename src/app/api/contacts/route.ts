@@ -1,6 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { getUserPrefs } from "@/lib/user-prefs";
+import {
+  detectAffiliations,
+  computeWarmthScore,
+  isValidLinkedInUrl,
+} from "@/lib/linkedin-import";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
 import { contactNeedsInfo } from "@/lib/needs-info";
@@ -160,5 +166,100 @@ export async function GET() {
   } catch {
     return NextResponse.json([]);
   }
+}
+
+/**
+ * POST - manually create a single contact from typed fields (Import → Manual →
+ * "Add by hand", and the legacy add-contact slide-over). Scopes to the caller
+ * via importedByUserId (the only tenant guard, since AlumniContact is written
+ * with the service-role client) and scores it with the same affiliation logic as
+ * the CSV/LinkedIn import so it lands tiered, not blank.
+ */
+export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.email;
+
+  const body = await request.json().catch(() => ({}));
+
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  const firmName = typeof body.firmName === "string" ? body.firmName.trim() : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const university = typeof body.university === "string" ? body.university.trim() : "";
+  const linkedInUrl = typeof body.linkedInUrl === "string" ? body.linkedInUrl.trim() : "";
+
+  const gradRaw = Number(body.graduationYear);
+  const graduationYear =
+    Number.isInteger(gradRaw) && gradRaw >= 1950 && gradRaw <= 2100 ? gradRaw : 0;
+
+  // Reject a malformed URL instead of persisting it (it would later render as an
+  // href on the contact page). Blank is allowed — manual contacts are URL-less.
+  if (linkedInUrl && !isValidLinkedInUrl(linkedInUrl)) {
+    return NextResponse.json({ error: "Invalid LinkedIn URL format" }, { status: 400 });
+  }
+
+  const prefs = await getUserPrefs(userId);
+  const affiliations = detectAffiliations(
+    { name, education: university, location: "", experience: firmName, title },
+    prefs,
+  );
+  const { score, tier } = computeWarmthScore(affiliations);
+
+  const record = {
+    name,
+    title,
+    firmName,
+    email: "",
+    linkedInUrl,
+    university,
+    education: university,
+    location: "",
+    affiliations: affiliations.map((a) => a.name).join(","),
+    warmthScore: score,
+    tier,
+    graduationYear,
+    source: "manual",
+    importedByUserId: userId,
+  };
+
+  // Owner-scoped dedup: if I already have this person by LinkedIn URL, refresh
+  // the row instead of inserting a duplicate. The importedByUserId filter keeps
+  // another user's same-URL row not-found (never overwritten).
+  if (linkedInUrl) {
+    const { data: mine } = await supabase
+      .from("AlumniContact")
+      .select("id")
+      .eq("linkedInUrl", linkedInUrl)
+      .eq("importedByUserId", userId)
+      .maybeSingle();
+    if (mine?.id) {
+      await supabase.from("AlumniContact").update(record).eq("id", mine.id);
+      return NextResponse.json({ id: mine.id, name, firmName, title, tier, warmthScore: score });
+    }
+  }
+
+  const { data: inserted, error } = await supabase
+    .from("AlumniContact")
+    .insert(record)
+    .select("id")
+    .single();
+
+  if (error) {
+    // 23505 = the LinkedIn URL is already in the shared pool (possibly another
+    // user's). Don't echo the raw DB error; return a clean message.
+    const conflict = error.code === "23505";
+    return NextResponse.json(
+      { error: conflict ? "This contact is already in the network" : "Failed to add contact" },
+      { status: conflict ? 409 : 500 },
+    );
+  }
+
+  return NextResponse.json({ id: inserted?.id, name, firmName, title, tier, warmthScore: score });
 }
 

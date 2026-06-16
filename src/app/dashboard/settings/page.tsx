@@ -43,9 +43,14 @@ import {
   FileText,
   Upload,
   Loader2,
+  Mail,
 } from "lucide-react";
 import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
+import {
+  calculateProfileCompleteness,
+  type CompletenessInput,
+} from "@/lib/profile-completeness";
 
 const TOTAL_STEPS = 5;
 
@@ -69,6 +74,12 @@ interface Preferences {
   customFirms: string[];
   recruitingDate: string;
   weeklyGoalTarget: number;
+  draftTone: string;
+  draftLength: string;
+  draftSignature: string;
+  draftSubjectStyle: string;
+  digestEmailEnabled: boolean;
+  followupEmailEnabled: boolean;
 }
 
 const STORAGE_KEY = "kithnode_preferences";
@@ -92,6 +103,12 @@ function getDefaults(): Preferences {
     customFirms: [],
     recruitingDate: "",
     weeklyGoalTarget: 3,
+    draftTone: "warm",
+    draftLength: "medium",
+    draftSignature: "",
+    draftSubjectStyle: "casual",
+    digestEmailEnabled: true,
+    followupEmailEnabled: true,
   };
 }
 
@@ -152,6 +169,12 @@ async function syncToAPI(prefs: Preferences) {
         skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
+        draft_tone: prefs.draftTone || "warm",
+        draft_length: prefs.draftLength || "medium",
+        draft_signature: prefs.draftSignature || "",
+        draft_subject_style: prefs.draftSubjectStyle || "casual",
+        digest_email_enabled: prefs.digestEmailEnabled,
+        followup_email_enabled: prefs.followupEmailEnabled,
       }),
     });
   } catch (err) {
@@ -449,6 +472,72 @@ function ExperienceRowsEditor({
   );
 }
 
+// Map the settings-page Preferences shape onto the completeness calc's minimal
+// input (merge preset + custom firms/locations; collapse Greek toggle + minors).
+function toCompletenessInput(p: Preferences): CompletenessInput {
+  return {
+    university: p.university,
+    highSchool: p.highSchool,
+    hometown: p.hometown,
+    greekOrg: p.greekLifeEnabled ? p.greekOrganization : "",
+    educations: p.educations,
+    targetIndustries: p.targetIndustries,
+    targetFirms: [...p.targetFirms, ...p.customFirms],
+    targetLocations: [...p.targetLocations, ...p.customLocations],
+    recruitingDate: p.recruitingDate,
+    skills: p.skills,
+    minor: p.minors.join(", "),
+    experiences: p.experiences,
+    clubMemberships: p.clubMemberships,
+  };
+}
+
+// Live profile-completeness meter (Identity / Targets / Depth). Recomputes from
+// the in-progress edit state, so it ticks up as the user fills fields.
+function CompletenessMeter({ prefs }: { prefs: Preferences }) {
+  const { percent, categories, missing } = calculateProfileCompleteness(
+    toCompletenessInput(prefs),
+  );
+  return (
+    <div className="mb-6 border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+          Profile completeness
+        </span>
+        <span className="text-[13px] font-bold tabular-nums text-accent-teal">{percent}%</span>
+      </div>
+      <div className="h-1 w-full bg-white/[0.06]">
+        <div
+          className="h-1 bg-accent-teal transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        {categories.map((c) => (
+          <div key={c.key}>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-text-muted">
+                {c.label}
+              </span>
+              <span className="text-[9px] tabular-nums text-text-secondary">
+                {c.filled}/{c.total}
+              </span>
+            </div>
+            <div className="mt-1 h-px w-full bg-white/[0.06]">
+              <div className="h-px bg-accent-teal/60" style={{ width: `${c.percent}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {missing.length > 0 && (
+        <p className="mt-2.5 text-[10px] text-text-muted">
+          Next: add your {missing.slice(0, 3).join(", ")}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Edit Panel ────────────────────────────────────────────────────────────────
 
 function EditPanel({
@@ -470,6 +559,18 @@ function EditPanel({
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeFilled, setResumeFilled] = useState<Set<string>>(new Set());
+  const [activeSection, setActiveSection] = useState<
+    "profile" | "outreach" | "notifications"
+  >("profile");
+
+  // Optional deep-link: ?section=outreach|notifications selects that pane on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const param = new URLSearchParams(window.location.search).get("section");
+    if (param === "outreach" || param === "notifications" || param === "profile") {
+      setActiveSection(param);
+    }
+  }, []);
 
   const toggleIndustry = (ind: string) =>
     setLocal((p) => ({
@@ -641,21 +742,68 @@ function EditPanel({
   const allFirms = [...local.targetFirms, ...local.customFirms];
   const allLocations = [...local.targetLocations, ...local.customLocations];
 
+  const saveButton = (
+    <Button
+      className="w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+      onClick={handleSave}
+      disabled={saving}
+    >
+      {saving ? "Saving..." : saved ? "Saved!" : (
+        <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
+      )}
+    </Button>
+  );
+
+  const navItems = [
+    { id: "profile", label: "Profile" },
+    { id: "outreach", label: "Outreach drafting" },
+    { id: "notifications", label: "Notifications" },
+  ] as const;
+
   return (
-    <div className="mx-auto max-w-xl p-5">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-xl font-bold text-white">Settings</h2>
-          <p className="mt-0.5 text-[12px] text-text-secondary">Edit your recruiting preferences</p>
+          <h2 className="font-heading text-2xl font-bold text-white">Settings</h2>
+          <p className="mt-1 text-sm text-text-secondary">Edit your recruiting preferences</p>
         </div>
         <button
           onClick={onRestartWizard}
-          className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-white transition-colors duration-150"
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={13} />
           Restart Setup
         </button>
       </div>
+
+      <div className="flex flex-col gap-8 md:flex-row">
+        {/* Settings sub-nav */}
+        <nav className="md:w-48 md:shrink-0">
+          <div className="flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5">
+            {navItems.map((item) => {
+              const active = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`shrink-0 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[13px] font-medium transition-colors ${
+                    active
+                      ? "border-accent-teal text-accent-teal"
+                      : "border-transparent text-text-muted hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Content column */}
+        <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
+          {activeSection === "profile" && (
+            <>
+              <CompletenessMeter prefs={local} />
 
       {/* Resume autofill — prefills empty fields only, never stored. */}
       <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
@@ -704,16 +852,15 @@ function EditPanel({
         )}
       </div>
 
-      <div className="space-y-6">
-        {/* Recruiting timeline + weekly goal */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+      {/* Recruiting timeline + weekly goal */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <CalendarDays size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <CalendarDays size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Recruiting
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Target recruiting date
@@ -754,12 +901,185 @@ function EditPanel({
             </div>
           </div>
         </section>
+            </>
+          )}
 
-        {/* School */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+          {activeSection === "outreach" && (
+            <>
+        {/* Outreach drafting */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
+              Outreach drafting
+            </h3>
+          </div>
+          <p className="mb-4 text-[13px] text-text-muted">
+            Controls how Draft Outreach writes your emails. Applies to every new draft.
+          </p>
+          <div className="space-y-4">
+            {/* Tone */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Tone
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["warm", "Warm"],
+                  ["professional", "Professional"],
+                  ["concise", "Concise"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftTone: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftTone === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Length */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Length
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["short", "Short", "~80 words"],
+                  ["medium", "Medium", "~150 words"],
+                  ["long", "Long", "~220 words"],
+                ] as const).map(([val, labelText, hint]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftLength: val })}
+                    className={`flex flex-col items-start border px-4 py-2 transition-colors ${
+                      local.draftLength === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{labelText}</span>
+                    <span className="text-[10px] opacity-70">{hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Subject line */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Subject line
+              </label>
+              <div className="flex gap-2">
+                {([
+                  ["casual", "Casual"],
+                  ["formal", "Formal"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftSubjectStyle: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftSubjectStyle === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Signature */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Signature <span className="opacity-60">(optional)</span>
+              </label>
+              <textarea
+                value={local.draftSignature}
+                onChange={(e) =>
+                  setLocal({ ...local, draftSignature: e.target.value.slice(0, 200) })
+                }
+                rows={3}
+                maxLength={200}
+                placeholder={"Best,\nSam Rigot\nUNC '29"}
+                className="w-full resize-none border border-white/[0.06] bg-muted px-3 py-2 text-sm text-white placeholder:text-text-muted focus:border-accent-teal focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-text-muted">
+                When set, used verbatim as the sign-off instead of just your first name.{" "}
+                {local.draftSignature.length}/200
+              </p>
+            </div>
+          </div>
+        </section>
+              {saveButton}
+            </>
+          )}
+
+          {activeSection === "notifications" && (
+            <>
+        {/* Notifications */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <GraduationCap size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">School</h3>
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
+              Notifications
+            </h3>
+          </div>
+          <div className="space-y-4">
+            {([
+              [
+                "digestEmailEnabled",
+                "Weekly digest",
+                "New warm paths in your network, every Monday morning.",
+              ],
+              [
+                "followupEmailEnabled",
+                "Follow-up reminders",
+                "A nudge when leads go cold (7+ days, no movement). Twice a week.",
+              ],
+            ] as const).map(([key, labelText, desc]) => {
+              const on = local[key];
+              return (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-white">{labelText}</div>
+                    <p className="mt-0.5 text-[10px] text-text-muted">{desc}</p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={labelText}
+                    onClick={() => setLocal({ ...local, [key]: !on })}
+                    className={`relative h-5 w-9 shrink-0 border transition-colors ${
+                      on ? "border-accent-teal bg-accent-teal/30" : "border-white/[0.06] bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3.5 w-3.5 transition-all ${
+                        on ? "left-[18px] bg-accent-teal" : "left-0.5 bg-text-muted"
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+              {saveButton}
+            </>
+          )}
+
+          {activeSection === "profile" && (
+            <>
+        {/* School */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <GraduationCap size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">School</h3>
           </div>
           <div className="space-y-3">
             <div>
@@ -935,10 +1255,10 @@ function EditPanel({
         </section>
 
         {/* Location */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
+            <MapPin size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
           </div>
           <div className="space-y-4">
             <div>
@@ -1012,10 +1332,10 @@ function EditPanel({
 
         {/* Target roles — track-grouped. Selected ROLE names persist into
             targetIndustries (storage shape unchanged). */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Target size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
+            <Target size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
           </div>
           <TrackRolePicker selected={local.targetIndustries} onToggle={toggleIndustry} />
           {local.targetIndustries.length > 0 && (
@@ -1024,10 +1344,10 @@ function EditPanel({
         </section>
 
         {/* Firms + Experience */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Building2 size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
+            <Building2 size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {FIRM_OPTIONS.map((firm) => {
@@ -1103,6 +1423,9 @@ function EditPanel({
             <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
           )}
         </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1564,6 +1887,12 @@ export default function SettingsPage() {
                 typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0
                   ? data.weeklyGoalTarget
                   : 3,
+              draftTone: data.draftTone || "warm",
+              draftLength: data.draftLength || "medium",
+              draftSignature: data.draftSignature || "",
+              draftSubjectStyle: data.draftSubjectStyle || "casual",
+              digestEmailEnabled: data.digestEmailEnabled ?? true,
+              followupEmailEnabled: data.followupEmailEnabled ?? true,
             };
             setPrefs(merged);
             savePreferences(merged);

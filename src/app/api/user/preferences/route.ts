@@ -16,6 +16,12 @@ import {
   membershipsFromFlat,
 } from "@/lib/club-memberships";
 
+// Closed sets for outreach-drafting presets. Anything outside falls back to the
+// warm defaults on save (see POST), matching buildDraftStyle()'s coercion.
+const DRAFT_TONES = new Set(["warm", "professional", "concise"]);
+const DRAFT_LENGTHS = new Set(["short", "medium", "long"]);
+const DRAFT_SUBJECTS = new Set(["casual", "formal"]);
+
 export async function GET() {
   const session = await auth();
   const email = session?.user?.email;
@@ -215,6 +221,26 @@ export async function POST(request: NextRequest) {
   if (onboardingPain !== undefined) patch.onboardingPain = onboardingPain;
   if (onboardingTimeline !== undefined) patch.onboardingTimeline = onboardingTimeline;
   if (tutorialDoneAt !== undefined) patch.tutorialDoneAt = tutorialDoneAt;
+
+  // Outreach-drafting style. Presets are closed sets (unknown → safe default);
+  // signature is free text, trimmed and capped to match DRAFT_SIGNATURE_MAX.
+  if ("draft_tone" in body)
+    patch.draftTone = DRAFT_TONES.has(body.draft_tone) ? body.draft_tone : "warm";
+  if ("draft_length" in body)
+    patch.draftLength = DRAFT_LENGTHS.has(body.draft_length) ? body.draft_length : "medium";
+  if ("draft_subject_style" in body)
+    patch.draftSubjectStyle = DRAFT_SUBJECTS.has(body.draft_subject_style)
+      ? body.draft_subject_style
+      : "casual";
+  if ("draft_signature" in body)
+    patch.draftSignature =
+      typeof body.draft_signature === "string" ? body.draft_signature.trim().slice(0, 200) : "";
+
+  // Notification opt-outs: coerce to real booleans so a missing/garbage value
+  // can't write null into a NOT NULL column.
+  if ("digest_email_enabled" in body) patch.digestEmailEnabled = body.digest_email_enabled === true;
+  if ("followup_email_enabled" in body)
+    patch.followupEmailEnabled = body.followup_email_enabled === true;
 
   // Empty body → nothing to write; succeed without a no-op update.
   if (Object.keys(patch).length === 0) {

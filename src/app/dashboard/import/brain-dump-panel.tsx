@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type DragEvent, type ChangeEvent } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/posthog";
@@ -10,9 +10,9 @@ import {
   Copy,
   Check,
   AlertTriangle,
-  Download,
-  MessageSquare,
+  Upload,
   ArrowRight,
+  X,
 } from "lucide-react";
 
 const TIER_STYLES: Record<string, string> = {
@@ -42,9 +42,12 @@ export default function BrainDumpPanel() {
   const [copied, setCopied] = useState(false);
 
   const [csvText, setCsvText] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [result, setResult] = useState<BrainDumpResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -58,9 +61,7 @@ export default function BrainDumpPanel() {
         if (active) setPrompt(data.prompt);
       } catch {
         if (active)
-          setPromptError(
-            "Couldn't load your personalized prompt. Refresh to try again.",
-          );
+          setPromptError("Couldn't load your personalized prompt. Refresh to try again.");
       } finally {
         if (active) setPromptLoading(false);
       }
@@ -76,13 +77,46 @@ export default function BrainDumpPanel() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Clipboard blocked — silently ignore, prompt is still visible to select.
+      // Clipboard blocked — silently ignore.
     }
+  };
+
+  const handleFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setImportError("Only .csv files are accepted.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setCsvText((e.target?.result as string) || "");
+      setFileName(file.name);
+      setImportError(null);
+      setResult(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const handleFileInput = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+  };
+
+  const clearFile = () => {
+    setCsvText("");
+    setFileName(null);
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleImport = async () => {
     if (!csvText.trim()) return;
-
     setImporting(true);
     setImportError(null);
     setResult(null);
@@ -92,13 +126,11 @@ export default function BrainDumpPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csvText }),
       });
-
       const data = await res.json();
       if (!res.ok) {
         setImportError(data.error || "Import failed. Check the CSV and retry.");
         return;
       }
-
       setResult(data as BrainDumpResult);
       trackEvent("brain_dump_import", {
         imported: data.imported,
@@ -113,180 +145,148 @@ export default function BrainDumpPanel() {
     }
   };
 
-  const warmCount =
-    result?.contacts.filter((c) => WARM_TIERS.has(c.tier)).length ?? 0;
+  const warmCount = result?.contacts.filter((c) => WARM_TIERS.has(c.tier)).length ?? 0;
 
   return (
-    <div className="mt-3 grid flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
-      {/* Left: personalized prompt */}
-      <div className="flex flex-col border border-white/[0.06] bg-card">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-            <Sparkles className="h-3 w-3" />
-            Your Brain-Dump Prompt
-          </span>
-          <button
+    <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+      {/* Box 1 — Copy the prompt */}
+      <div className="flex flex-col border border-white/[0.06] bg-card p-5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary">
+            Step 1 · Copy the prompt
+          </h3>
+        </div>
+        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+          Run this in Claude or ChatGPT alongside your LinkedIn{" "}
+          <span className="font-mono text-foreground">Connections.csv</span>. It enriches
+          every contact with school, clubs, Greek org, hometown, and how you know them — then
+          hands you a ready-to-import CSV.
+        </p>
+
+        <div className="mt-auto pt-5">
+          <Button
             onClick={handleCopy}
             disabled={promptLoading || !!promptError || !prompt}
-            className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-muted-foreground hover:text-foreground disabled:opacity-40"
+            className="w-full bg-primary py-2.5 text-[13px] font-bold uppercase tracking-wider text-white hover:bg-primary/80 disabled:opacity-40"
           >
             {copied ? (
-              <>
-                <Check className="h-3 w-3 text-green-400" />
+              <span className="inline-flex items-center gap-1.5">
+                <Check className="h-4 w-4" />
                 Copied
-              </>
+              </span>
             ) : (
-              <>
-                <Copy className="h-3 w-3" />
-                Copy prompt
-              </>
+              <span className="inline-flex items-center gap-1.5">
+                <Copy className="h-4 w-4" />
+                {promptLoading ? "Preparing prompt…" : "Copy prompt"}
+              </span>
             )}
-          </button>
-        </div>
-
-        <div className="flex flex-1 flex-col p-3">
-          {promptLoading ? (
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Loading your prompt...
-            </p>
-          ) : promptError ? (
-            <div className="flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
-              <p className="text-[11px] text-amber-400">{promptError}</p>
-            </div>
-          ) : (
-            <pre className="h-72 flex-1 overflow-auto whitespace-pre-wrap border border-input bg-muted px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground">
-              {prompt}
-            </pre>
+          </Button>
+          {promptError && (
+            <p className="mt-2 text-[12px] text-amber-400">{promptError}</p>
           )}
         </div>
       </div>
 
-      {/* Right: steps + paste-back + import */}
-      <div className="flex flex-col border border-white/[0.06] bg-card">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-            <MessageSquare className="h-3 w-3" />
-            Enrich With AI
-          </span>
-          {csvText.trim() && (
-            <span className="text-[9px] tabular-nums text-muted-foreground">
-              {csvText.trim().split("\n").filter(Boolean).length} lines
-            </span>
-          )}
+      {/* Box 2 — Upload enriched CSV */}
+      <div className="flex flex-col border border-white/[0.06] bg-card p-5">
+        <div className="flex items-center gap-2">
+          <Upload className="h-4 w-4 text-primary" />
+          <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary">
+            Step 2 · Import enriched CSV
+          </h3>
         </div>
+        <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+          Answer the prompt&apos;s questions in your AI, save the CSV it returns, then drop it
+          below.
+        </p>
 
-        <div className="flex flex-1 flex-col gap-2 p-3">
-          {/* Steps */}
-          <ol className="flex flex-col gap-1.5">
-            <li className="flex gap-2 text-[11px] text-muted-foreground">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-primary/15 font-mono text-[9px] font-bold text-primary">
-                1
-              </span>
-              <span className="flex items-center gap-1">
-                <Download className="h-3 w-3 shrink-0 text-muted-foreground/60" />
-                Export your LinkedIn{" "}
-                <span className="font-mono text-foreground">Connections.csv</span>
-                <span className="text-muted-foreground/60">
-                  {" "}
-                  [Settings &gt; Data Privacy &gt; Get a copy of your data &gt;
-                  Connections]
-                </span>
-              </span>
-            </li>
-            <li className="flex gap-2 text-[11px] text-muted-foreground">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-primary/15 font-mono text-[9px] font-bold text-primary">
-                2
-              </span>
-              <span>
-                Paste this prompt + your CSV into your own Claude/ChatGPT and
-                answer its questions{" "}
-                <span className="text-muted-foreground/60">(~15 min)</span>.
-              </span>
-            </li>
-            <li className="flex gap-2 text-[11px] text-muted-foreground">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-primary/15 font-mono text-[9px] font-bold text-primary">
-                3
-              </span>
-              <span>Paste the CSV it gives you back below.</span>
-            </li>
-          </ol>
-
-          <div className="my-0.5 h-px bg-border" />
-
-          <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-            Enriched CSV From Your AI
-          </p>
-          <textarea
-            value={csvText}
-            onChange={(e) => setCsvText(e.target.value)}
-            rows={8}
-            placeholder={`name,company,title,school,major,clubs,greek_org,hometown,high_school,skills,relationship,closeness,notes\nAdler Rice,Mizuho,S&T Summer Analyst,UNC Chapel Hill,,Finance Society,Chi Phi,,,,UNC Chi Phi brother,friend,`}
-            className="w-full flex-1 resize-y border border-input bg-muted px-3 py-2 font-mono text-[11px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`mt-3 flex flex-1 cursor-pointer flex-col items-center justify-center border-2 border-dashed px-4 py-8 text-center transition-colors ${
+            dragging
+              ? "border-primary bg-primary/10"
+              : fileName
+                ? "border-primary/40 bg-primary/5"
+                : "border-white/[0.12] bg-muted hover:border-white/[0.3]"
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileInput}
+            className="hidden"
           />
-
-          {importError && (
-            <div className="flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />
-              <p className="text-[11px] text-amber-400">{importError}</p>
-            </div>
-          )}
-
-          {result && (
-            <div className="border border-primary/30 bg-primary/5 px-3 py-2">
-              <p className="flex items-center gap-1.5 text-[11px] text-primary">
-                <Sparkles className="h-3 w-3 shrink-0" />
-                <span>
-                  Enriched{" "}
-                  <span className="font-mono font-bold tabular-nums">
-                    {result.imported}
-                  </span>{" "}
-                  contacts &mdash;{" "}
-                  <span className="font-mono font-bold tabular-nums">
-                    {warmCount}
-                  </span>{" "}
-                  now warm/kith
-                  {result.failed > 0 && (
-                    <span className="text-amber-400">
-                      {" "}
-                      ({result.failed} failed)
-                    </span>
-                  )}
-                </span>
+          {fileName ? (
+            <>
+              <p className="text-[13px] font-bold text-foreground">{fileName}</p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearFile();
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                <X className="h-3 w-3" />
+                Remove
+              </button>
+            </>
+          ) : (
+            <>
+              <Upload className="h-5 w-5 text-muted-foreground" />
+              <p className="mt-2 text-[13px] text-muted-foreground">
+                Drop enriched CSV here or click to browse
               </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <Link
-                  href="/dashboard/contacts"
-                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary underline-offset-2 hover:underline"
-                >
-                  View contacts
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-                {result.contacts.slice(0, 6).map((c, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 border border-white/[0.06] bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <span
-                      className={`font-mono font-bold tabular-nums ${TIER_STYLES[c.tier] || "text-zinc-400"}`}
-                    >
-                      {Math.round(c.score)}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            </div>
+            </>
           )}
-
-          <Button
-            onClick={handleImport}
-            disabled={importing || !csvText.trim()}
-            className="mt-1 w-full bg-primary py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-primary/80"
-          >
-            {importing ? "Importing..." : "Import enriched data"}
-          </Button>
         </div>
+
+        {importError && (
+          <div className="mt-3 flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+            <p className="text-[12px] text-amber-400">{importError}</p>
+          </div>
+        )}
+
+        {result && (
+          <div className="mt-3 border border-primary/30 bg-primary/5 px-3 py-2.5">
+            <p className="flex items-center gap-1.5 text-[12px] text-primary">
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Enriched{" "}
+                <span className="font-mono font-bold tabular-nums">{result.imported}</span>{" "}
+                contacts —{" "}
+                <span className="font-mono font-bold tabular-nums">{warmCount}</span> now
+                warm/kith
+                {result.failed > 0 && (
+                  <span className="text-amber-400"> ({result.failed} failed)</span>
+                )}
+              </span>
+            </p>
+            <Link
+              href="/dashboard/contacts"
+              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-primary underline-offset-2 hover:underline"
+            >
+              View contacts
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        )}
+
+        <Button
+          onClick={handleImport}
+          disabled={importing || !csvText.trim()}
+          className="mt-3 w-full bg-primary py-2.5 text-[13px] font-bold uppercase tracking-wider text-white hover:bg-primary/80 disabled:opacity-40"
+        >
+          {importing ? "Importing…" : "Import enriched data"}
+        </Button>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { requireSubscription } from "@/lib/subscription";
 import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
 import { formatExperiencePeriod } from "@/lib/educations";
+import { buildDraftStyle } from "@/lib/draft-style";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -36,6 +37,7 @@ function getPlaceholderDraft(
   affiliations: string[],
   prefs: UserPrefs,
   senderFirstName: string,
+  signature: string,
 ) {
   const userMascot = prefs.university ? schoolMascot(prefs.university) : "fellow student";
   const userSchool = prefs.university ? shortSchoolName(prefs.university) : "my school";
@@ -50,9 +52,13 @@ function getPlaceholderDraft(
           ? "shared interest in your firm"
           : "shared connection";
 
+  // Honor the user's signature in the non-AI fallback too, so a draft never
+  // ignores a signature the user clearly set.
+  const signoff = signature || senderFirstName;
+
   return {
     subject: `Quick coffee chat, ${userMascot} reaching out`,
-    body: `Hi ${contactName.split(" ")[0]},\n\nI'm a student at ${userSchool} and came across your profile through our ${warmHook}. Your work really stood out to me, and I'd love to hear about your experience.\n\nWould you have 15 minutes for a quick coffee chat sometime in the next couple weeks? I'd be grateful for any insight you could share.\n\nThanks so much,\n${senderFirstName}`,
+    body: `Hi ${contactName.split(" ")[0]},\n\nI'm a student at ${userSchool} and came across your profile through our ${warmHook}. Your work really stood out to me, and I'd love to hear about your experience.\n\nWould you have 15 minutes for a quick coffee chat sometime in the next couple weeks? I'd be grateful for any insight you could share.\n\nThanks so much,\n${signoff}`,
   };
 }
 
@@ -207,6 +213,10 @@ export async function POST(request: NextRequest) {
       }
     })();
 
+    // User-controlled drafting style (tone, length, subject, sign-off). Pure
+    // mapping → prompt fragments; invalid settings fall back to warm defaults.
+    const style = buildDraftStyle(prefs, senderFirstName);
+
     const prompt = `Generate a personalized warm outreach email requesting a 15-minute coffee chat.
 
 CONTACT INFO:
@@ -225,17 +235,16 @@ ${userGreek ? `- Member of ${userGreek}` : ""}${experienceLines.length > 0 ? `\n
 - Genuine interest in learning from professionals
 
 TONE REQUIREMENTS:
-- Authentic and warm, NOT spammy or templated
-- Concise, max 150 words for the body
+- ${style.tonePhrase}
+- Keep the body under ${style.wordTarget} words
 - Reference the specific warm connection if one exists (e.g., "fellow ${userMascot}"${userGreek ? `, "${userGreek} brother"` : ""})
-- Humble and curious, not presumptuous
 - Clear ask: 15-minute coffee chat / virtual call
-- Sign off with the sender's first name: "${senderFirstName}"
+- ${style.signoffRule}
 
 Return ONLY valid JSON with exactly two keys:
 {"subject": "...", "body": "..."}
 
-The subject should be casual and warm, under 60 characters. The body should feel like a real person wrote it, not AI.`;
+The subject should be ${style.subjectRule}. The body should feel like a real person wrote it, not AI.`;
 
     const { text, usage, response } = await generateText({
       model: gateway("anthropic/claude-sonnet-4.5"),
@@ -280,7 +289,13 @@ The subject should be casual and warm, under 60 characters. The body should feel
     }
 
     if (!subject || !draft) {
-      const placeholder = getPlaceholderDraft(contact.name, affiliationNames, prefs, senderFirstName);
+      const placeholder = getPlaceholderDraft(
+        contact.name,
+        affiliationNames,
+        prefs,
+        senderFirstName,
+        style.signature,
+      );
       subject = placeholder.subject;
       draft = placeholder.body;
     }
@@ -326,6 +341,7 @@ The subject should be casual and warm, under 60 characters. The body should feel
         affiliationNames,
         prefs,
         senderFirstName,
+        buildDraftStyle(prefs, senderFirstName).signature,
       );
       return NextResponse.json({
         draft: placeholder.body,
