@@ -369,7 +369,24 @@ function OnboardingFunnel() {
 
   // Reveal — reuses the ranked network the pipeline step already computed.
   const [ranked, setRanked] = useState<RankedLite[]>([]);
+  // Full match count for the reveal headline; `ranked` itself is sliced for the
+  // blurred preview, so its length would understate the real total.
+  const [rankedTotal, setRankedTotal] = useState(0);
   const [loadingRanked, setLoadingRanked] = useState(false);
+
+  // Persist the current step within the tab session so a refresh mid-flow
+  // resumes where the user was instead of resetting to step 0 (field values are
+  // re-hydrated separately from /api/user/preferences).
+  useEffect(() => {
+    if (activateDirect) return;
+    const saved = Number(window.sessionStorage.getItem("kn:onb-step"));
+    if (Number.isInteger(saved) && saved > 0 && saved < ACTIVATION_STEP) {
+      setStep(saved);
+    }
+  }, [activateDirect, ACTIVATION_STEP]);
+  useEffect(() => {
+    window.sessionStorage.setItem("kn:onb-step", String(step));
+  }, [step]);
 
   // Abort the enrich loop if the wizard unmounts mid-flight.
   useEffect(() => {
@@ -839,8 +856,10 @@ function OnboardingFunnel() {
       const res = await apiFetch("/api/contacts");
       const data: RankedLite[] = res.ok ? await res.json() : [];
       setRanked(data.slice(0, 15));
+      setRankedTotal(data.length);
     } catch {
       setRanked([]);
+      setRankedTotal(0);
     } finally {
       setLoadingRanked(false);
     }
@@ -849,14 +868,14 @@ function OnboardingFunnel() {
   // ── Reveal → Activation ──────────────────────────────────────────────────
   const goToActivation = () => {
     trackEvent("onboarding_reveal_unlock_clicked", {
-      matches: ranked.length || importedCount,
+      matches: rankedTotal || importedCount,
     });
     setStep(ACTIVATION_STEP);
   };
 
   // Warm-path match count for the reveal headline. Prefer the ranked network;
   // fall back to the raw imported count when ranking is still empty.
-  const matchCount = ranked.length || importedCount;
+  const matchCount = rankedTotal || importedCount;
   // Echo copy keyed off the first matched pain point the user selected.
   const painEcho =
     onboardingPain.map((p) => PAIN_ECHO[p]).find(Boolean) ??
@@ -1108,6 +1127,7 @@ function OnboardingFunnel() {
                     placeholder="University of North Carolina at Chapel Hill"
                     ariaLabel="University"
                     matchAcronyms
+                    commitOnBlur
                   />
                 </div>
 

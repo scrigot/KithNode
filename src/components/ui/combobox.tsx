@@ -52,6 +52,7 @@ export function Combobox({
   debounceMs = 150,
   maxResults = 50,
   allowFreeText = true,
+  commitOnBlur = false,
   matchAcronyms = false,
   className,
   inputClassName,
@@ -65,6 +66,9 @@ export function Combobox({
   debounceMs?: number;
   maxResults?: number;
   allowFreeText?: boolean;
+  /** Commit the typed query on blur. For required free-text fields where a
+   *  type-then-click-away must not silently drop the value (e.g. University). */
+  commitOnBlur?: boolean;
   /** Also match word-initials so "UNC" finds "University of North Carolina...". */
   matchAcronyms?: boolean;
   className?: string;
@@ -193,6 +197,15 @@ export function Combobox({
           void ensureLoaded();
         }}
         onKeyDown={handleKeyDown}
+        onBlur={() => {
+          // Commit typed-but-uncommitted text when leaving the field (e.g. the
+          // user types a school then clicks Continue without pressing Enter).
+          // Row-clicks use onMouseDown+preventDefault so they never blur, so this
+          // can't override a dropdown selection.
+          if (commitOnBlur && allowFreeText && query.trim() && query.trim() !== value) {
+            commit(query.trim());
+          }
+        }}
         className={cn(
           "h-8 w-full min-w-0 border border-input bg-muted px-2.5 py-1 text-sm text-foreground transition-colors outline-none placeholder:text-muted-foreground focus:border-accent-teal",
           inputClassName,
