@@ -29,7 +29,7 @@ export default async function Home({
   const signinRequired = params.signin === "required";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white">
+    <main className="relative min-h-screen overflow-hidden bg-black">
       <Navbar />
       {signinRequired && (
         <div className="fixed inset-x-0 top-16 z-30 border-b border-amber-300/40 bg-amber-50/95 px-6 py-2 text-center text-[13px] font-medium text-amber-900 backdrop-blur-sm">
@@ -48,7 +48,7 @@ export default async function Home({
             <span className="inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
               The math, not magic
             </span>
-            <h2 className="mt-5 font-heading text-5xl font-medium leading-[1.25] tracking-[-0.027em] text-white">
+            <h2 className="mt-5 font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
               Every path, scored so you know who to talk to first.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base text-white/60">
@@ -72,55 +72,55 @@ export default async function Home({
       <CTASection />
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 px-6 py-16 bg-slate-50">
+      <footer className="border-t border-white/10 bg-black px-6 py-16">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="flex flex-col gap-3">
-            <span className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight text-slate-900">
+            <span className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight text-white">
               <LogoIcon className="h-7 w-7" />
               <span>
-                Kith<span className="text-[#0369A1]">Node</span>
+                Kith<span className="text-[#0EA5E9]">Node</span>
               </span>
             </span>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-white/55">
               AI-powered networking intelligence for ambitious students breaking
               into finance.
             </p>
           </div>
           {/* Product */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Product</h4>
+            <h4 className="text-sm font-semibold text-white">Product</h4>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/demo"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Signal Detection
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/demo"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               AI Scoring
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/demo"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Smart Outreach
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/demo"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Discover
             </a>
           </div>
           {/* Company */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Company</h4>
+            <h4 className="text-sm font-semibold text-white">Company</h4>
             <a
               href="/manifesto"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Why KithNode
             </a>
@@ -128,7 +128,7 @@ export default async function Home({
               href="https://www.linkedin.com/in/samrigot"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               About
             </a>
@@ -136,30 +136,30 @@ export default async function Home({
               href="https://kithnode.canny.io"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Feedback
             </a>
           </div>
           {/* Legal */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Legal</h4>
+            <h4 className="text-sm font-semibold text-white">Legal</h4>
             <a
               href="/privacy"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Privacy
             </a>
             <a
               href="/terms"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Terms
             </a>
           </div>
         </div>
-        <div className="mx-auto mt-12 max-w-6xl border-t border-slate-200 pt-8">
-          <p className="text-xs text-slate-500">
+        <div className="mx-auto mt-12 max-w-6xl border-t border-white/10 pt-8">
+          <p className="text-xs text-white/40">
             &copy; {new Date().getFullYear()} KithNode &middot; Warm-path
             recruiting intelligence for 2026.
           </p>

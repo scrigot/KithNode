@@ -185,7 +185,7 @@ export function SectionImportRank() {
       <MeshBg />
       <div className="relative mx-auto max-w-7xl">
         <ScrollReveal>
-          <h2 className="font-heading text-4xl font-medium leading-[1.05] tracking-[-0.027em] text-white sm:text-5xl">
+          <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
             Your network, ranked in seconds
           </h2>
 

@@ -98,7 +98,7 @@ export function CTASection() {
   return (
     <section
       id="cta"
-      className="relative overflow-hidden bg-black py-32 px-4"
+      className="relative overflow-hidden bg-black py-24 sm:py-32 px-4"
     >
       {/* ------------------------------------------------------------------ */}
       {/* Keyframes */}
@@ -246,7 +246,7 @@ export function CTASection() {
 
         {/* Headline */}
         <motion.h2
-          className="font-heading text-5xl font-medium leading-[1.25] tracking-[-0.027em] text-white"
+          className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}

@@ -142,7 +142,7 @@ export function Testimonials() {
     <section
       id="founder"
       ref={sectionRef}
-      className="relative bg-black py-24 px-4"
+      className="relative bg-black py-24 sm:py-32 px-4"
     >
       {/* ------------------------------------------------------------------ */}
       {/* Keyframes */}
@@ -241,7 +241,7 @@ export function Testimonials() {
           <p className="mb-3 text-center text-[10px] font-bold uppercase tracking-widest text-[#0EA5E9]">
             From the Founder
           </p>
-          <h2 className="text-center font-heading text-5xl font-medium leading-[1.25] tracking-[-0.027em] text-white">
+          <h2 className="text-center font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
             Why KithNode exists
           </h2>
         </motion.div>

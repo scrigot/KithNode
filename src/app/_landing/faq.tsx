@@ -11,10 +11,10 @@ const FAQS: { q: string; a: string }[] = [
 
 export function FAQ() {
   return (
-    <section id="faq" className="relative bg-black px-4 py-20 sm:py-24">
+    <section id="faq" className="relative bg-black px-4 py-24 sm:py-32">
       <MeshBg />
       <div className="relative mx-auto max-w-3xl">
-        <h2 className="text-center font-heading text-4xl font-medium tracking-[-0.027em] text-white sm:text-5xl">
+        <h2 className="text-center font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
           Questions, answered
         </h2>
         <div className="mt-10 flex flex-col gap-3">

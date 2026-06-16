@@ -42,7 +42,7 @@ export function SectionEmailMac() {
   const drafted = phase >= 5; // body finished generating
 
   return (
-    <section className="relative overflow-hidden bg-black px-4 py-20 sm:py-28">
+    <section className="relative overflow-hidden bg-black px-4 py-24 sm:py-32">
       <MeshBg />
       <style>{`
         @keyframes em-pop { 0%{opacity:0;transform:scale(.94)} 100%{opacity:1;transform:scale(1)} }
@@ -68,7 +68,7 @@ export function SectionEmailMac() {
       <div className="relative mx-auto max-w-7xl">
         <ScrollReveal>
           <div className="text-center">
-            <h2 className="font-heading text-4xl font-medium leading-[1.05] tracking-[-0.027em] text-white sm:text-5xl">
+            <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
               Then reach out, warm
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-[19px] leading-relaxed tracking-[-0.02em] text-white/60">

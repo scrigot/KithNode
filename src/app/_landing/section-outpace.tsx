@@ -274,7 +274,7 @@ export function SectionOutpace() {
       <div className="relative mx-auto max-w-7xl">
         <ScrollReveal>
           <div className="text-center">
-            <h2 className="font-heading text-4xl font-medium leading-[1.05] tracking-[-0.027em] text-white sm:text-5xl lg:text-6xl">
+            <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
               Outpace your peers
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-[19px] leading-relaxed tracking-[-0.02em] text-white/60">
