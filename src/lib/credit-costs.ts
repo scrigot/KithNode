@@ -35,6 +35,10 @@ export const ACTIVATION_PATH_COST =
  */
 export const TRIAL_CREDITS = 150;
 
+/** One-time credit reward for completing the beta feedback form. Granted once
+ * per user by /api/feedback on first submit; edits never re-grant. */
+export const FEEDBACK_CREDITS = 100;
+
 /** Credits granted by each source. Beta code is a one-time bundle (= the trial
  * floor); plans refill monthly to their allotment. Tune freely. */
 export const CREDIT_ALLOTMENTS = {
