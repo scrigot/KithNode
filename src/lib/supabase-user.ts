@@ -24,10 +24,13 @@ const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ||
   "https://jyjpitagxtdzedtooedw.supabase.co";
 
-const ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+// Modern PUBLISHABLE key (sb_publishable_...) — public by design, safe to embed.
+// The project migrated to the new key system, so the legacy JWT anon key is no
+// longer a valid apikey ("Invalid API key"). The publishable key is the apikey;
+// the per-request bearer JWT (mintUserToken) sets the authenticated identity.
+const PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  "";
+  "sb_publishable_g64OolfrbPfZLtVWzDDidA_Him0Uq8S";
 
 export async function mintUserToken(userId: string, email: string): Promise<string> {
   const secret = process.env.SUPABASE_JWT_SECRET;
