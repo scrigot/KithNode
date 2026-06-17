@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff } from "lucide-react";
+import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2 } from "lucide-react";
+import { ChatThread } from "@/app/dashboard/_components/chat-thread";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -26,12 +27,13 @@ interface LbRow {
   email: string; name: string; warmSignals: number; coffeeChats: number;
   intros: number; contactsAdded: number; score: number;
 }
+interface UserProfile { email: string; name: string; image: string }
 
 export function NodeDetailClient({ nodeId, me }: { nodeId: string; me: string }) {
   const router = useRouter();
   const [data, setData] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"pool" | "leaderboard">("pool");
+  const [tab, setTab] = useState<"pool" | "leaderboard" | "invite" | "chat">("pool");
   const [copied, setCopied] = useState(false);
   const [introFor, setIntroFor] = useState<PoolContact | null>(null);
 
@@ -58,6 +60,39 @@ export function NodeDetailClient({ nodeId, me }: { nodeId: string; me: string })
       body: JSON.stringify({ contactId, sharedInNodes: false }),
     });
     await load();
+  }
+
+  // Add a member by email. Optimistically append, then reconcile with the
+  // server's authoritative member list (returned by the route).
+  async function addMember(email: string, name: string) {
+    setData((d) =>
+      d && d.members.some((m) => m.email === email)
+        ? d
+        : d && { ...d, members: [...d.members, { email, name, role: "member" }] },
+    );
+    const res = await apiFetch(`/api/kith/nodes/${nodeId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (res.ok) {
+      const members = (await res.json()) as Member[];
+      setData((d) => d && { ...d, members });
+    } else {
+      await load();
+    }
+  }
+
+  // Open (or reuse) a DM with this person, then jump to the messages thread.
+  async function messageMember(email: string) {
+    const res = await apiFetch("/api/kith/dm/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withEmail: email }),
+    });
+    if (!res.ok) return;
+    const { threadId } = (await res.json()) as { threadId: string };
+    router.push(`/dashboard/messages/${threadId}`);
   }
 
   if (loading) {
@@ -114,12 +149,29 @@ export function NodeDetailClient({ nodeId, me }: { nodeId: string; me: string })
         <Tab active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} icon={<Trophy className="h-3.5 w-3.5" />}>
           Leaderboard
         </Tab>
+        <Tab active={tab === "invite"} onClick={() => setTab("invite")} icon={<UserPlus className="h-3.5 w-3.5" />}>
+          Invite / Members ({data.members.length})
+        </Tab>
+        <Tab active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquare className="h-3.5 w-3.5" />}>
+          Chat
+        </Tab>
       </div>
 
-      {tab === "pool" ? (
-        <PoolView pool={data.pool} me={me} onIntro={setIntroFor} onUnshare={unshare} />
-      ) : (
-        <LeaderboardView nodeId={nodeId} />
+      {tab === "pool" && <PoolView pool={data.pool} me={me} onIntro={setIntroFor} onUnshare={unshare} />}
+      {tab === "leaderboard" && <LeaderboardView nodeId={nodeId} />}
+      {tab === "invite" && (
+        <InviteView
+          inviteCode={data.node.inviteCode}
+          members={data.members}
+          me={me}
+          onAdd={addMember}
+          onMessage={messageMember}
+        />
+      )}
+      {tab === "chat" && (
+        <div className="h-[60vh]">
+          <ChatThread threadType="node" threadId={nodeId} title={data.node.name} />
+        </div>
       )}
 
       {introFor && (
@@ -321,6 +373,193 @@ function LeaderboardView({ nodeId }: { nodeId: string }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function InviteView({
+  inviteCode,
+  members,
+  me,
+  onAdd,
+  onMessage,
+}: {
+  inviteCode: string;
+  members: Member[];
+  me: string;
+  onAdd: (email: string, name: string) => void;
+  onMessage: (email: string) => void;
+}) {
+  const memberEmails = new Set(members.map((m) => m.email));
+  const [friends, setFriends] = useState<UserProfile[]>([]);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<UserProfile[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/api/kith/friends").then(async (res) => {
+      if (res.ok) setFriends(((await res.json()).friends as UserProfile[]) ?? []);
+    });
+  }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      const res = await apiFetch(`/api/kith/users/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) setResults((await res.json()) as UserProfile[]);
+      setSearching(false);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const addableFriends = friends.filter((f) => !memberEmails.has(f.email));
+  const joinLink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/dashboard/nodes?join=${inviteCode}`
+      : `/dashboard/nodes?join=${inviteCode}`;
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {/* Current members */}
+      <div className="border border-white/[0.06] bg-card">
+        <div className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+          Members ({members.length})
+        </div>
+        <div className="divide-y divide-white/[0.06]">
+          {members.map((m) => (
+            <div key={m.email} className="flex items-center gap-2 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-foreground">{m.name}</div>
+                <div className="truncate font-mono text-[11px] text-muted-foreground">{m.email}</div>
+              </div>
+              <span className="shrink-0 border border-white/[0.12] px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                {m.role}
+              </span>
+              {m.email !== me && (
+                <button
+                  onClick={() => onMessage(m.email)}
+                  className="flex shrink-0 items-center gap-1 border border-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06] hover:text-accent-teal"
+                  title="Message"
+                >
+                  <MessageSquare className="h-3 w-3" /> Message
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {/* Shareable invite link */}
+        <div className="border border-white/[0.06] bg-card p-3">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            <Link2 className="h-3.5 w-3.5" /> Shareable invite
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={joinLink}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 border border-white/[0.12] bg-bg-primary px-2 py-1.5 font-mono text-[11px] text-foreground focus:border-accent-teal focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(joinLink);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="flex shrink-0 items-center gap-1 border border-white/[0.12] px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground hover:bg-white/[0.06]"
+            >
+              {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <div className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+            Code: <span className="text-accent-teal">{inviteCode}</span>
+          </div>
+        </div>
+
+        {/* Friends one-tap */}
+        <div className="border border-white/[0.06] bg-card">
+          <div className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Add a friend
+          </div>
+          {addableFriends.length === 0 ? (
+            <div className="px-3 py-4 text-center text-[12px] text-muted-foreground">
+              No friends to add.
+            </div>
+          ) : (
+            <div className="max-h-44 divide-y divide-white/[0.06] overflow-y-auto">
+              {addableFriends.map((f) => (
+                <AddRow key={f.email} profile={f} onAdd={onAdd} memberEmails={memberEmails} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Search anyone */}
+        <div className="border border-white/[0.06] bg-card">
+          <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search anyone by name or email…"
+              className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            />
+            {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          </div>
+          {query.trim().length >= 2 && (
+            <div className="max-h-44 divide-y divide-white/[0.06] overflow-y-auto">
+              {results.length === 0 && !searching ? (
+                <div className="px-3 py-4 text-center text-[12px] text-muted-foreground">No matches.</div>
+              ) : (
+                results.map((r) => (
+                  <AddRow key={r.email} profile={r} onAdd={onAdd} memberEmails={memberEmails} />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddRow({
+  profile,
+  onAdd,
+  memberEmails,
+}: {
+  profile: UserProfile;
+  onAdd: (email: string, name: string) => void;
+  memberEmails: Set<string>;
+}) {
+  const [added, setAdded] = useState(false);
+  const isMember = memberEmails.has(profile.email) || added;
+  return (
+    <div className="flex items-center gap-2 px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-semibold text-foreground">{profile.name}</div>
+        <div className="truncate font-mono text-[11px] text-muted-foreground">{profile.email}</div>
+      </div>
+      <button
+        disabled={isMember}
+        onClick={() => {
+          setAdded(true);
+          onAdd(profile.email, profile.name);
+        }}
+        className="flex shrink-0 items-center gap-1 bg-accent-teal px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/80 disabled:cursor-default disabled:bg-white/[0.06] disabled:text-muted-foreground"
+      >
+        {isMember ? <Check className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
+        {isMember ? "Added" : "Add"}
+      </button>
     </div>
   );
 }
