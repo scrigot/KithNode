@@ -1,32 +1,62 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle, Plus, Pencil } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
+import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api-client";
 import type { PipelineContact, PipelineResponse, PipelineStageMeta } from "@/lib/api";
 
-// Stage colors come from the pipeline record as token names; map to Tailwind classes.
-// Teal-only accent rule holds — these are the DESIGN.md tier/stage colors, not new accents.
-const STAGE_COLOR: Record<string, { top: string; badge: string }> = {
-  zinc: { top: "border-t-zinc-500 bg-zinc-500/10", badge: "bg-zinc-500/20 text-zinc-400" },
-  blue: { top: "border-t-blue-500 bg-blue-500/10", badge: "bg-blue-500/20 text-blue-400" },
-  sky: { top: "border-t-sky-400 bg-sky-500/10", badge: "bg-sky-500/20 text-sky-400" },
-  amber: { top: "border-t-amber-500 bg-amber-500/10", badge: "bg-amber-500/20 text-amber-400" },
-  green: { top: "border-t-green-500 bg-green-500/10", badge: "bg-green-500/20 text-green-400" },
-  teal: { top: "border-t-primary bg-primary/10", badge: "bg-primary/20 text-primary" },
+// Per-stage colors keyed by stage key (main's recruiting palette). Unknown keys
+// fall back to the per-pipeline color token carried on the stage record.
+const STAGE_HEADER_COLORS: Record<string, string> = {
+  researched: "bg-zinc-500/10 border-zinc-500/30 border-t-zinc-500",
+  connected: "bg-blue-500/10 border-blue-500/30 border-t-blue-500",
+  email_sent: "bg-sky-500/10 border-sky-500/30 border-t-sky-400",
+  follow_up: "bg-amber-500/10 border-amber-500/30 border-t-amber-500",
+  responded: "bg-green-500/10 border-green-500/30 border-t-green-500",
+  meeting_set: "bg-purple-500/10 border-purple-500/30 border-t-purple-500",
 };
-const colorFor = (c: string) => STAGE_COLOR[c] || STAGE_COLOR.zinc;
+
+const STAGE_BADGE_COLORS: Record<string, string> = {
+  researched: "bg-zinc-500/20 text-zinc-400",
+  connected: "bg-blue-500/20 text-blue-400",
+  email_sent: "bg-sky-500/20 text-sky-400",
+  follow_up: "bg-amber-500/20 text-amber-400",
+  responded: "bg-green-500/20 text-green-400",
+  meeting_set: "bg-primary/20 text-primary",
+};
+
+// Fallback color tokens for stages whose key isn't in the recruiting palette
+// (custom pipelines carry a `color` token name on each stage record).
+const STAGE_COLOR_TOKEN: Record<string, { header: string; badge: string }> = {
+  zinc: { header: "bg-zinc-500/10 border-zinc-500/30 border-t-zinc-500", badge: "bg-zinc-500/20 text-zinc-400" },
+  blue: { header: "bg-blue-500/10 border-blue-500/30 border-t-blue-500", badge: "bg-blue-500/20 text-blue-400" },
+  sky: { header: "bg-sky-500/10 border-sky-500/30 border-t-sky-400", badge: "bg-sky-500/20 text-sky-400" },
+  amber: { header: "bg-amber-500/10 border-amber-500/30 border-t-amber-500", badge: "bg-amber-500/20 text-amber-400" },
+  green: { header: "bg-green-500/10 border-green-500/30 border-t-green-500", badge: "bg-green-500/20 text-green-400" },
+  teal: { header: "bg-primary/10 border-primary/30 border-t-primary", badge: "bg-primary/20 text-primary" },
+};
+
+function stageHeaderClass(stage: PipelineStageMeta): string {
+  return STAGE_HEADER_COLORS[stage.key] || STAGE_COLOR_TOKEN[stage.color]?.header || STAGE_COLOR_TOKEN.zinc.header;
+}
+function stageBadgeClass(stage: PipelineStageMeta): string {
+  return STAGE_BADGE_COLORS[stage.key] || STAGE_COLOR_TOKEN[stage.color]?.badge || STAGE_COLOR_TOKEN.zinc.badge;
+}
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
 };
+
 const TIER_BADGE_STYLES: Record<string, string> = {
+  kith: "bg-amber-300/20 text-amber-300 border-amber-300/30",
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
   warm: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -201,62 +231,180 @@ function AddContactModal({ pipelineId, pipelineName, onClose, onAdded }: { pipel
   );
 }
 
-function PipelineCard({ contact, isAll, isFirst, isLast, onMove, onDraft }: {
+function PipelineCard({ contact, isAll, isFirst, isLast, onMove, onDraft, onRemove }: {
   contact: PipelineContact;
   isAll: boolean;
   isFirst: boolean;
   isLast: boolean;
   onMove: (c: PipelineContact, direction: "forward" | "backward") => void;
   onDraft: (c: PipelineContact) => void;
+  onRemove: (c: PipelineContact) => void;
 }) {
   const tier = (contact.tier || "cold").toLowerCase();
   const hasScore = (contact.total_score || 0) > 0;
   const days = contact.daysSinceTouch;
 
+  // Two-click remove: idle → armed (3s timeout) → confirmed.
+  const [removeState, setRemoveState] = useState<"idle" | "armed">("idle");
+  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (removeState !== "armed") return;
+    removeTimerRef.current = setTimeout(() => setRemoveState("idle"), 3000);
+    return () => {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+    };
+  }, [removeState]);
+
+  function handleRemoveClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (removeState === "idle") {
+      setRemoveState("armed");
+    } else {
+      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+      setRemoveState("idle");
+      onRemove(contact);
+    }
+  }
+
   return (
-    <div className="border border-white/[0.06] bg-card px-3 py-2.5 transition-colors hover:border-white/[0.18]">
+    <div className="border border-white/[0.06] bg-card px-3 py-3 transition-colors hover:border-white/[0.18]">
       <div className="flex items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshnessClass(days)}`} title={days === null ? "no touch yet" : `${days}d since touch`} />
-        <p className="truncate text-[12px] font-bold text-foreground">{contact.name}</p>
-        {isAll && contact.pipelineKind && (
-          <span className="ml-auto border border-white/[0.12] px-1 text-[8px] font-bold uppercase tracking-wider text-muted-foreground">{contact.pipelineKind.slice(0, 4)}</span>
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${freshnessClass(days)}`}
+          title={days === null ? "no touch yet" : `${days}d since touch`}
+        />
+        <Link
+          href={`/contact/${contact.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="min-w-0 break-words text-[13px] font-bold leading-snug text-foreground hover:underline hover:decoration-white/40"
+        >
+          {contact.name}
+        </Link>
+        {isAll && contact.pipelineKind ? (
+          <span className="ml-auto border border-white/[0.12] px-1 text-[8px] font-bold uppercase tracking-wider text-muted-foreground">
+            {contact.pipelineKind.slice(0, 4)}
+          </span>
+        ) : (
+          days !== null && (
+            <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">{days}d</span>
+          )
         )}
       </div>
-      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
-        {contact.title}{contact.title && contact.company_name ? " @ " : ""}<span className="text-foreground">{contact.company_name}</span>
+
+      <p className="mt-1 break-words text-[11px] leading-snug text-muted-foreground">
+        {contact.title}
+        {contact.title && contact.company_name ? " @ " : ""}
+        <span className="text-foreground">{contact.company_name}</span>
       </p>
+
       <div className="mt-1.5 flex items-center gap-1.5">
         {hasScore ? (
           <>
-            <span className={`text-[12px] font-bold tabular-nums ${TIER_STYLES[tier] || "text-zinc-400"}`}>{Math.round(contact.total_score)}</span>
-            <Badge variant="outline" className={`text-[8px] px-1 py-0 uppercase ${TIER_BADGE_STYLES[tier] || TIER_BADGE_STYLES.cold}`}>{contact.tier}</Badge>
+            <span className={`text-[12px] font-bold tabular-nums ${TIER_STYLES[tier] || "text-zinc-400"}`}>
+              {Math.round(contact.total_score)}
+            </span>
+            <Badge
+              variant="outline"
+              className={`text-[8px] px-1 py-0 uppercase ${TIER_BADGE_STYLES[tier] || TIER_BADGE_STYLES.cold}`}
+            >
+              {contact.tier}
+            </Badge>
           </>
         ) : (
           // Score-0 (manual contact): days-since-touch is the primary metric, no 0·COLD chip.
           <span className="font-mono text-[11px] font-semibold text-muted-foreground">↻ {days === null ? "new" : `${days}d since touch`}</span>
         )}
+        {contact.linkedin_url &&
+          !contact.linkedin_url.includes("█") &&
+          contact.linkedin_url.includes("linkedin.com") && (
+            <a
+              href={contact.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="ml-auto text-slate-500 transition-colors hover:text-accent-teal"
+              title="LinkedIn profile"
+            >
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z"/></svg>
+            </a>
+          )}
         {isAll && contact.nativeStageLabel && (
-          <span className="ml-auto text-[8px] uppercase tracking-wider text-muted-foreground/60">{contact.nativeStageLabel}</span>
+          <span className={`text-[8px] uppercase tracking-wider text-muted-foreground/60 ${contact.linkedin_url ? "" : "ml-auto"}`}>
+            {contact.nativeStageLabel}
+          </span>
         )}
       </div>
+
       {contact.warmPaths && contact.warmPaths.length > 0 && (
-        <p className="mt-1.5 truncate border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[9px] text-primary">
-          <span className="text-muted-foreground">via </span>{contact.warmPaths[0].intermediaryName}
-          {contact.warmPaths.length > 1 && <span className="text-muted-foreground"> (+{contact.warmPaths.length - 1})</span>}
+        <p className="mt-1.5 break-words border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[9px] leading-snug text-primary">
+          <span className="text-muted-foreground">via </span>
+          {contact.warmPaths[0].intermediaryName}
+          {contact.warmPaths.length > 1 && (
+            <span className="text-muted-foreground"> (+{contact.warmPaths.length - 1})</span>
+          )}
         </p>
       )}
+
+      {contact.affiliations.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {contact.affiliations.map((a) => (
+            <Badge
+              key={a}
+              variant="outline"
+              className="text-[8px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30"
+            >
+              {a}
+            </Badge>
+          ))}
+        </div>
+      )}
+
       <div className="mt-2 flex items-stretch gap-1">
         {!isFirst && (
-          <button onClick={() => onMove(contact, "backward")} title="Move back" aria-label="Move back" className="min-h-[36px] border border-white/[0.08] px-1.5 py-1 text-[10px] text-muted-foreground transition-colors hover:border-white/[0.24] hover:text-foreground md:min-h-0">
+          <button
+            onClick={() => onMove(contact, "backward")}
+            title="Move back"
+            aria-label="Move back"
+            className="border border-white/[0.08] px-1.5 py-1 text-[10px] text-muted-foreground transition-colors hover:border-white/[0.24] hover:text-foreground"
+          >
             <ArrowLeft className="h-3 w-3" />
           </button>
         )}
-        <button onClick={() => onDraft(contact)} className="flex min-h-[36px] flex-1 items-center justify-center gap-1 border border-primary/30 bg-primary/10 py-1 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 md:min-h-0">
-          <Pencil className="h-3 w-3" /> Draft
+        <button
+          onClick={() => onDraft(contact)}
+          className="flex flex-1 items-center justify-center gap-1 border border-primary/30 bg-primary/10 py-1 text-[10px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+        >
+          <Mail className="h-3 w-3" />
+          Draft
         </button>
         {!isLast && (
-          <button onClick={() => onMove(contact, "forward")} title="Advance" aria-label="Advance" className="min-h-[36px] border border-primary/30 bg-primary px-1.5 py-1 text-white transition-colors hover:bg-primary/80 md:min-h-0">
+          <button
+            onClick={() => onMove(contact, "forward")}
+            title="Advance"
+            aria-label="Advance"
+            className="border border-primary/30 bg-primary px-1.5 py-1 text-white transition-colors hover:bg-primary/80"
+          >
             <ArrowRight className="h-3 w-3" />
+          </button>
+        )}
+        {/* Two-click remove from pipeline */}
+        {removeState === "armed" ? (
+          <button
+            onClick={handleRemoveClick}
+            className="border border-red-500/30 px-1.5 py-1 text-[9px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+          >
+            CONFIRM?
+          </button>
+        ) : (
+          <button
+            onClick={handleRemoveClick}
+            title="Remove from pipeline"
+            aria-label="Remove from pipeline"
+            className="flex items-center px-1 text-muted-foreground/40 transition-colors hover:text-red-400"
+          >
+            <Trash2 className="h-3 w-3" />
           </button>
         )}
       </div>
@@ -306,6 +454,20 @@ export default function PipelinePage() {
             pipelineKind: json.conversion.pipelineKind,
           });
         }
+      }
+      await fetchPipeline(active);
+    },
+    [active, fetchPipeline],
+  );
+
+  const removeContact = useCallback(
+    async (contact: PipelineContact) => {
+      const res = await apiFetch(
+        `/api/pipeline/${contact.id}?pipelineId=${encodeURIComponent(contact.pipelineId)}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        trackEvent("pipeline_removed", { contactId: contact.id, pipelineId: contact.pipelineId });
       }
       await fetchPipeline(active);
     },
@@ -396,14 +558,13 @@ export default function PipelinePage() {
           <div className="flex flex-col gap-2 md:grid md:min-w-[1000px]" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} role="list">
             {columns.map((stage, idx) => {
               const items = data?.contacts[stage.key] || [];
-              const c = colorFor(stage.color);
               return (
                 <div key={stage.key} className="flex flex-col" role="listitem">
-                  <div className={`sticky top-0 z-[1] flex items-center justify-between border border-t-2 px-3 py-2 ${c.top}`}>
+                  <div className={`sticky top-0 z-[1] flex items-center justify-between border border-t-2 px-3 py-2 ${stageHeaderClass(stage)}`}>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stage.label}</span>
-                    <span className={`inline-flex h-4 min-w-[16px] items-center justify-center px-1 text-[9px] font-bold tabular-nums ${c.badge}`}>{counts[stage.key] || 0}</span>
+                    <span className={`inline-flex h-4 min-w-[16px] items-center justify-center px-1 text-[9px] font-bold tabular-nums ${stageBadgeClass(stage)}`}>{counts[stage.key] || 0}</span>
                   </div>
-                  <div className="flex flex-1 flex-col gap-2 border border-t-0 border-white/[0.06] bg-card/30 p-2">
+                  <div className="flex max-h-[calc(100vh-220px)] flex-1 flex-col gap-2 overflow-y-auto border border-t-0 border-white/[0.06] bg-card/30 p-2">
                     {items.length === 0 ? (
                       <div className="hidden flex-1 flex-col items-center justify-center gap-2 border border-dashed border-white/[0.1] py-6 md:flex">
                         <span className="text-[10px] text-muted-foreground/60">empty</span>
@@ -421,6 +582,7 @@ export default function PipelinePage() {
                           isLast={idx === columns.length - 1}
                           onMove={moveStage}
                           onDraft={setDraftTarget}
+                          onRemove={removeContact}
                         />
                       ))
                     )}
