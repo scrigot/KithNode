@@ -20,11 +20,13 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const { email } = await req.json();
+    const { email, source } = await req.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
-    return NextResponse.json(await sendFriendRequest(session.user.email, email));
+    // Only 'suggestion' is an accepted client hint; anything else → 'direct'.
+    const src = source === "suggestion" ? "suggestion" : "direct";
+    return NextResponse.json(await sendFriendRequest(session.user.email, email, src));
   } catch (err) {
     return mapKithError(err);
   }
