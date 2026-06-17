@@ -5,6 +5,9 @@ import { findWarmPaths } from "@/lib/warm-paths";
 import { poolSafeContact } from "@/lib/redact";
 import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
 import { normalizeFirmName } from "@/lib/normalize-firm";
+import { KITH_NODES_ENABLED } from "@/lib/kith/flags";
+import { getCoMemberIds } from "@/lib/kith/authz";
+import { getUserNames } from "@/lib/kith/users";
 
 /** Normalize a LinkedIn URL for identity matching: lowercase, strip trailing
  * slash, ignore empty/whitespace-only values. */
@@ -31,6 +34,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.email;
+
+  // Kith & Nodes (flag-gated): a node co-member's shared contacts are shown in
+  // FULL detail with a "via {friend}" path, instead of the redacted pool card.
+  let coMemberSet = new Set<string>();
+  let coMemberNames = new Map<string, string>();
+  if (KITH_NODES_ENABLED) {
+    const ids = await getCoMemberIds(userId);
+    coMemberSet = new Set(ids);
+    coMemberNames = await getUserNames(ids);
+  }
 
   const raw = request.nextUrl.searchParams.get("q") || "";
   const query = raw.replace(/[^\p{L}\p{N}\s.-]/gu, "").slice(0, 100);
@@ -184,8 +197,16 @@ export async function GET(request: NextRequest) {
   // reference the user's OWN imports, see src/lib/warm-paths.ts), so re-attach
   // them after projection strips everything off-allowlist.
   const projected = enriched.map(({ warmPaths, deferred, ...c }) => {
-    const safe = c.importedByUserId === userId ? c : poolSafeContact(c);
-    return { ...safe, warmPaths, ...(deferred ? { deferred: true } : {}) };
+    // A co-member's shared contact (sharedInNodes !== false) is unredacted and
+    // tagged with the owner's name for the "via {friend}" path.
+    const isCoMember = coMemberSet.has(c.importedByUserId) && c.sharedInNodes !== false;
+    const safe = c.importedByUserId === userId || isCoMember ? c : poolSafeContact(c);
+    return {
+      ...safe,
+      warmPaths,
+      ...(deferred ? { deferred: true } : {}),
+      ...(isCoMember ? { viaFriend: coMemberNames.get(c.importedByUserId) ?? "a friend" } : {}),
+    };
   });
 
   // The user's own import count, so the UI can tell "you have no network"
