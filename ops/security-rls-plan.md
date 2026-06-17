@@ -47,6 +47,7 @@ Reconciling `main` (kith/nodes/messaging/sharing feature line) into the feat lin
   - All ~16 `api/kith/*` routes + the messages page pass `session.user.email` into the kith lib (should be `session.user.id`).
   - kith lib (`friendships.ts`, `nodes.ts`, `messaging.ts`, `authz.ts`, `leaderboard.ts`, `warm-path.ts`) keys `Friendship`/`NodeMember`/`Node.ownerId`/`Message.senderId`/`AlumniContact.importedByUserId` by email.
   - **DM identity is email-encoded:** `dmThreadId` + the Realtime topic `kith:user:{email}` (`messaging.ts`) — flip the thread-key format AND the client subscription topic together.
+  - **[HIGH] Forced-friendship via spoofable cookie** (flagged by automated review, flag-gated so not exploitable in prod today): `auth.ts` signIn reads the attacker-writable `kith_inviter` cookie and calls `createKithFriendship(inviterEmail, user.email)`. Before enabling kith, replace the cookie trust with a server-signed, single-use, expiring invite token (HMAC of `{inviterEmail, nonce, exp}` or an `Invite` table row with a random id), verify server-side + one-shot-consume, and gate on genuinely-new-user.
   - **DECISION (D):** `intro_requests.from_user_id` stays email. But `leaderboard.ts` reads it via `.in("from_user_id", memberIds)` where memberIds come from `NodeMember.userId`. Once NodeMember flips to UUID, resolve memberIds back to emails before that query (or migrate `intro_requests.from_user_id` to UUID too).
 
 ### Phase 2 — User-scoped Supabase client
