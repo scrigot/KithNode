@@ -2,7 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { genId, genInviteCode } from "@/lib/kith/ids";
-import { getUserNames } from "@/lib/kith/users";
+import { getUserNames, userExists } from "@/lib/kith/users";
 import {
   assertNodeMember,
   getUserNodeIds,
@@ -80,6 +80,40 @@ export async function joinNodeByCode(userId: string, codeRaw: string) {
   if (error) throw new NodeError(error.message);
 
   return node;
+}
+
+/**
+ * Add a user to a node by email (the invite-UI add-member path). The requester
+ * must already be a member (assertNodeMember — the trust boundary), and the
+ * invitee must be a real KithNode user. Idempotent via the unique(nodeId,userId)
+ * constraint. Returns the refreshed named member list.
+ */
+export async function addNodeMember(requesterId: string, nodeId: string, inviteeEmailRaw: string) {
+  await assertNodeMember(requesterId, nodeId);
+
+  const inviteeEmail = inviteeEmailRaw.trim().toLowerCase();
+  if (!inviteeEmail) throw new NodeError("Invitee email required");
+  if (!(await userExists(inviteeEmail))) throw new NodeError("No KithNode user with that email");
+
+  const { error } = await supabase
+    .from("NodeMember")
+    .upsert(
+      { id: genId(), nodeId, userId: inviteeEmail, role: "member" },
+      { onConflict: "nodeId,userId", ignoreDuplicates: true },
+    );
+  if (error) throw new NodeError(error.message);
+
+  const memberIds = await getNodeMemberIds(nodeId);
+  const [names, { data: memberRows }] = await Promise.all([
+    getUserNames(memberIds),
+    supabase.from("NodeMember").select("userId, role, joinedAt").eq("nodeId", nodeId),
+  ]);
+  return (memberRows ?? []).map((m) => ({
+    email: m.userId as string,
+    name: names.get(m.userId as string) ?? (m.userId as string),
+    role: m.role as string,
+    joinedAt: m.joinedAt as string,
+  }));
 }
 
 /** Leaving instantly revokes pool visibility (membership is checked live). */
