@@ -103,16 +103,56 @@ export async function getPooledContactsForNode(
   return dedupePooled(rows);
 }
 
-/** Can this user see this contact? Owner, or a co-member's shared contact. */
+/** Friend-shared pooled contacts: contacts owned by the user's accepted friends
+ *  with sharedWithFriends=true. Deduped, each row tagged with the owner email +
+ *  name for the "via {friend}" warm path. Parallels getPooledContactsForNode. */
+export async function getFriendSharedContacts(userId: string): Promise<PoolContact[]> {
+  const friendIds = await getAcceptedFriendIds(userId);
+  if (friendIds.length === 0) return [];
+
+  const [{ data: contacts }, { data: users }] = await Promise.all([
+    supabase
+      .from("AlumniContact")
+      .select(POOL_COLUMNS)
+      .in("importedByUserId", friendIds)
+      .eq("sharedWithFriends", true),
+    supabase.from("User").select("email, name").in("email", friendIds),
+  ]);
+
+  const nameByEmail = new Map((users ?? []).map((u) => [u.email as string, (u.name as string) || (u.email as string)]));
+
+  const rows: PoolContact[] = (contacts ?? []).map((c) => ({
+    ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
+    ownerId: c.importedByUserId as string,
+    ownerName: nameByEmail.get(c.importedByUserId as string) ?? (c.importedByUserId as string),
+  }));
+
+  return dedupePooled(rows);
+}
+
+/** Can this user see this contact? Owner, or — independently — an accepted
+ *  friend's friend-shared contact OR a node co-member's node-shared contact. */
 export async function canUserSeeContact(userId: string, contactId: string): Promise<boolean> {
   const { data: contact } = await supabase
     .from("AlumniContact")
-    .select("importedByUserId, sharedInNodes")
+    .select("importedByUserId, sharedInNodes, sharedWithFriends")
     .eq("id", contactId)
     .maybeSingle();
   if (!contact) return false;
-  if (contact.importedByUserId === userId) return true;
-  if (!contact.sharedInNodes) return false;
-  const coMembers = await getCoMemberIds(userId);
-  return coMembers.includes(contact.importedByUserId as string);
+  const ownerId = contact.importedByUserId as string;
+  if (ownerId === userId) return true;
+
+  // Friend-shared: owner is an accepted friend and the contact is friend-shared.
+  if (contact.sharedWithFriends) {
+    const friends = await getAcceptedFriendIds(userId);
+    if (friends.includes(ownerId)) return true;
+  }
+
+  // Node-shared: owner is a co-member and the contact is node-shared.
+  if (contact.sharedInNodes) {
+    const coMembers = await getCoMemberIds(userId);
+    if (coMembers.includes(ownerId)) return true;
+  }
+
+  return false;
 }
