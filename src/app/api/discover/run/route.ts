@@ -103,18 +103,19 @@ function makeEmitter(controller: ReadableStreamDefaultController<Uint8Array>) {
 export async function POST(request: NextRequest) {
   // ── Pre-stream validation (still plain JSON) ────────────────────────
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
-  const gate = await requireSubscription(userId);
+  const gate = await requireSubscription(userEmail);
   if (gate) return gate;
 
   const body = (await request.json().catch(() => ({}))) as DiscoverRunBody;
   const mode: "quick" | "deep" = body.mode === "deep" ? "deep" : "quick";
 
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const schoolSeeds = prefs.university ? seedsForSchool(prefs.university) : [];
   const industrySeeds = seedsForIndustries(prefs.targetIndustries);
   // Prefer school-specific seeds, dedup against industry seeds, then append.
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
 
   // Charge once per run, up front — after no_seeds validation so an empty run
   // never burns credits. 402 returns as plain JSON before the stream opens.
-  const creditGate = await requireCredits(userId, CREDIT_COSTS.discover, "discover");
+  const creditGate = await requireCredits(userEmail, CREDIT_COSTS.discover, "discover");
   if (creditGate) return creditGate;
 
   // ── Streaming pipeline ──────────────────────────────────────────────
@@ -373,7 +374,7 @@ export async function POST(request: NextRequest) {
         // `done` summary — i.e. the user hit the kill switch (abort) or the
         // pipeline threw. A completed run keeps the charge.
         if (!completed) {
-          await grantCredits(userId, CREDIT_COSTS.discover);
+          await grantCredits(userEmail, CREDIT_COSTS.discover);
         }
         request.signal.removeEventListener("abort", onAbort);
         try {

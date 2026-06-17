@@ -19,10 +19,10 @@ import {
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
 
   try {
     // Get user's own imports
@@ -177,10 +177,11 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   const body = await request.json().catch(() => ({}));
 
@@ -204,7 +205,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid LinkedIn URL format" }, { status: 400 });
   }
 
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const affiliations = detectAffiliations(
     { name, education: university, location: "", experience: firmName, title },
     prefs,

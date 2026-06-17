@@ -37,9 +37,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token }) {
-      // Use email as the user identifier (no DB lookup needed for alpha)
-      if (token.email) {
-        token.userId = token.email;
+      // Resolve the stable User.id (UUID) from email. Keyed on the immutable id,
+      // not the mutable email. Re-resolves legacy email-based tokens (those that
+      // still contain "@"), then caches the id on the token so we only hit the DB
+      // once per session, not on every request.
+      if (token.email && (!token.userId || String(token.userId).includes("@"))) {
+        const { supabase } = await import("./supabase");
+        const { data } = await supabase
+          .from("User")
+          .select("id")
+          .eq("email", token.email)
+          .maybeSingle();
+        if (data?.id) token.userId = data.id;
       }
       return token;
     },

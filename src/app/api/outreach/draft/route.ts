@@ -64,10 +64,11 @@ function getPlaceholderDraft(
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userEmail = session.user.email;
+  const userId = session.user.id;
   const senderFullName = session?.user?.name || "";
   const senderFirstName = senderFullName.split(" ")[0] || "Me";
 
@@ -96,11 +97,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
-    if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+    if (contact.importedByUserId && contact.importedByUserId !== userId) {
       const { data: rating } = await supabase
         .from("UserDiscover")
         .select("rating")
-        .eq("userId", userEmail)
+        .eq("userId", userId)
         .eq("contactId", contactId)
         .maybeSingle();
       if (!rating || rating.rating !== "high_value") {
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
     const { data: mutualRows } = await supabase
       .from("ContactConnection")
       .select("mutualName, mutualContactId")
-      .eq("ownerUserId", userEmail)
+      .eq("ownerUserId", userId)
       .eq("contactId", contactId)
       .order("mutualContactId", { ascending: false });
     const topMutuals: string[] = (mutualRows ?? [])

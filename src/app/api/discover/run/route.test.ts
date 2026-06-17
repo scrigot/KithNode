@@ -207,7 +207,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("returns 402 when the subscription gate denies", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockRequireSubscription.mockResolvedValue(
       NextResponse.json({ error: "Payment required", reason: "no_sub" }, { status: 402 }),
     );
@@ -216,7 +216,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("returns 402 (plain JSON, no stream) when out of credits", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -233,7 +233,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("refunds the 5-credit charge when the pipeline errors mid-run", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -252,7 +252,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("returns 400 with friendly message when no industries are set", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue({ ...PREFS, targetIndustries: [] });
     mockSeedsForIndustries.mockReturnValue([]);
 
@@ -264,7 +264,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("runs the full pipeline and inserts new contacts", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -331,7 +331,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("updates instead of inserting when LinkedIn URL is already in DB", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },
@@ -361,7 +361,7 @@ describe("POST /api/discover/run", () => {
 
   it("flips skipHunter to true once the budget is exhausted", async () => {
     process.env.HUNTER_API_KEY = "test-key";
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "X", domain: "x.com", website: "https://x.com" },
@@ -408,7 +408,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("counts insert failures without throwing", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "X", domain: "x.com", website: "https://x.com" },
@@ -438,7 +438,7 @@ describe("POST /api/discover/run", () => {
   });
 
   it("emits stage events for prefs, seeds, scanning, enriching, saving, then done", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockGetUserPrefs.mockResolvedValue(PREFS);
     mockSeedsForIndustries.mockReturnValue([
       { name: "Goldman Sachs", domain: "goldmansachs.com", website: "https://goldmansachs.com" },

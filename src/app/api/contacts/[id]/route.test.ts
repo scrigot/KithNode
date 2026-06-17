@@ -315,7 +315,7 @@ describe("DELETE /api/contacts/[id]", () => {
   });
 
   it("returns 404 when contact does not exist", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const mock = {
       from: vi.fn().mockReturnValue({
@@ -337,7 +337,7 @@ describe("DELETE /api/contacts/[id]", () => {
   });
 
   it("hard-deletes owned contact: removes children then the contact row, returns deleted", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const deletedTables: string[] = [];
 
@@ -384,7 +384,7 @@ describe("DELETE /api/contacts/[id]", () => {
   });
 
   it("unlinks discovered contact: deletes only this user's rows, contact NOT deleted, returns unlinked", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const deletedTables: string[] = [];
     const OTHER = "other@example.com";
@@ -425,7 +425,7 @@ describe("DELETE /api/contacts/[id]", () => {
   });
 
   it("returns 404 when the user has no relationship to a shared contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const OTHER = "other@example.com";
 
@@ -481,7 +481,7 @@ describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
   });
 
   it("rejects a non-owner PATCH with 403 and never updates the shared row", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     // A non-owner who holds a high_value rating clears checkAccess but must be
     // blocked by the ownership guard before any write.
@@ -519,7 +519,7 @@ describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
   });
 
   it("lets the owner PATCH their own contact (200, updates the row)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
     (loadContactTags as Mock).mockResolvedValue([]);
     (getUserPrefs as Mock).mockResolvedValue({});
     (rescoreContact as Mock).mockReturnValue({
@@ -588,7 +588,7 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
   });
 
   it("blanks the owner's private fields and does not promote relationship_class for a non-owner viewing a pooled contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "viewer@unc.edu" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "viewer@unc.edu", email: "viewer@unc.edu" } });
     (getUserPrefs as Mock).mockResolvedValue({});
     (rescoreContact as Mock).mockReturnValue({
       affiliations: [],

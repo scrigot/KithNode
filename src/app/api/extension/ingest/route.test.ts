@@ -56,13 +56,13 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("rejects a non-LinkedIn URL", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const res = await POST(makePost({ ...SAMPLE, linkedInUrl: "https://example.com/x" }));
     expect(res.status).toBe(400);
   });
 
   it("inserts a new contact with the rich dimensions filled + rescored", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     let inserted: Record<string, unknown> | null = null;
     (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation((table: string) => {
@@ -122,7 +122,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("writes mutual edges, resolving only the one already in the owner network", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     // Owner already has Alice (by slug) in their network; Bob is unknown.
     const ownerContacts = [
@@ -170,7 +170,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("moves a fraternity experience into clubMemberships, sets greekOrg, drops it from experiences/pastFirms", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     let inserted: Record<string, unknown> | null = null;
     (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation((table: string) => {
@@ -221,7 +221,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("deduces a hometown from highSchool when the contact has none", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     (deduceHometown as Mock).mockResolvedValue("Raleigh, NC");
 
     let inserted: Record<string, unknown> | null = null;
@@ -256,7 +256,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("persists notes, isFriend, and a valid speakFrequency on the written record", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     let inserted: Record<string, unknown> | null = null;
     (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation((table: string) => {
@@ -300,7 +300,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("writes captured tags to contact_tags scoped to the user + contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     let upsertedTags: Record<string, unknown>[] | null = null;
     (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation((table: string) => {
@@ -338,7 +338,7 @@ describe("POST /api/extension/ingest", () => {
   });
 
   it("returns the contact id in the JSON response", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
 
     (supabase as unknown as Record<string, unknown>).from = vi.fn().mockImplementation((table: string) => {
       if (table === "ContactConnection") {

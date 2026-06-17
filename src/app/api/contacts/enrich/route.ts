@@ -124,19 +124,20 @@ async function enrichOne(contact: {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
-  const gate = await requireSubscription(userId);
+  const gate = await requireSubscription(userEmail);
   if (gate) return gate;
 
   try {
     const body = await req.json().catch(() => ({}));
     const contactId: string | undefined = body.contactId;
 
-    const prefs = await getUserPrefs(userId);
+    const prefs = await getUserPrefs(userEmail);
 
     // Fetch candidates: single contact OR the user's batch of unenriched rows
     let query = supabase
@@ -198,7 +199,7 @@ export async function POST(req: NextRequest) {
       // gateway outage (handled above as !fields -> continue) must never burn a
       // credit. Stop the batch the moment a charge fails so a partial run never
       // enriches what it can't pay for; the unpaid contact is left untouched.
-      const sp = await spendCredits(userId, CREDIT_COSTS.enrich, "enrich", { contactId: c.id });
+      const sp = await spendCredits(userEmail, CREDIT_COSTS.enrich, "enrich", { contactId: c.id });
       if (!sp.ok) {
         outOfCredits = true;
         break;
@@ -277,7 +278,7 @@ export async function POST(req: NextRequest) {
       // enriched education/location/industry/seniority on top of the row so
       // populated education lights up Same School / CS Top School, while
       // highSchool/clubs/passions ride along from the existing columns.
-      const tags = await loadContactTags(userId, c.id);
+      const tags = await loadContactTags(userEmail, c.id);
       const { affiliations, score, tier } = rescoreContact(
         { ...c, name, education, location, highSchool, hometown, major, minor, degrees, skills, pastFirms, industry: fields.industry, seniorityLevel: fields.seniorityLevel, track, role },
         prefs,

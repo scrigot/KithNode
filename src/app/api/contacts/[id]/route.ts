@@ -226,7 +226,7 @@ export function pickEditableFields(
 // Access check: own contact OR high_value-rated UserDiscover row.
 // skip-only or no relationship returns 404 — never leak contact existence.
 async function checkAccess(
-  userEmail: string,
+  userId: string,
   contactId: string,
 ): Promise<{ contact: Record<string, unknown> } | NextResponse> {
   const { data: contact, error } = await supabase
@@ -239,11 +239,11 @@ async function checkAccess(
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+  if (contact.importedByUserId && contact.importedByUserId !== userId) {
     const { data: discover } = await supabase
       .from("UserDiscover")
       .select("rating")
-      .eq("userId", userEmail)
+      .eq("userId", userId)
       .eq("contactId", contactId)
       .maybeSingle();
     if (!discover || discover.rating !== "high_value") {
@@ -259,10 +259,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   const { id } = await params;
 
@@ -303,14 +304,14 @@ export async function GET(
   const { data: tagRows } = await supabase
     .from("contact_tags")
     .select("tag")
-    .eq("user_id", userId)
+    .eq("user_id", userEmail)
     .eq("contact_id", id)
     .order("created_at", { ascending: true });
   const tags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
   // Recompute affiliations live so each chip carries its REAL boost — the
   // stored column is names-only and the UI used to fake a uniform +10.
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const { affiliations: liveAffiliations } = rescoreContact(contact, prefs, tags);
 
   // Synthesize structured rows from flat columns when the educations column is
@@ -449,10 +450,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
   const { id: contactId } = await params;
 
   const { data: contact, error: loadError } = await supabase
@@ -523,13 +524,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
   const userEmail = session.user.email;
   const { id: contactId } = await params;
 
-  const accessResult = await checkAccess(userEmail, contactId);
+  const accessResult = await checkAccess(userId, contactId);
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult;
 
@@ -540,7 +542,7 @@ export async function PATCH(
   // lastSpokenAt/speakFrequency) and recompute warmth/tier from B's prefs.
   // An empty importedByUserId is legacy-owned (matches checkAccess/DELETE), so
   // gate only when a non-empty importer is someone else.
-  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+  if (contact.importedByUserId && contact.importedByUserId !== userId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -12,7 +12,7 @@ function normalizeTag(raw: string): string {
 }
 
 async function checkAccess(
-  userEmail: string,
+  userId: string,
   contactId: string,
 ): Promise<{ contact: Record<string, unknown> } | NextResponse> {
   const { data: contact, error } = await supabase
@@ -25,11 +25,11 @@ async function checkAccess(
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  if (contact.importedByUserId && contact.importedByUserId !== userEmail) {
+  if (contact.importedByUserId && contact.importedByUserId !== userId) {
     const { data: discover } = await supabase
       .from("UserDiscover")
       .select("rating")
-      .eq("userId", userEmail)
+      .eq("userId", userId)
       .eq("contactId", contactId)
       .maybeSingle();
     if (!discover || discover.rating !== "high_value") {
@@ -41,6 +41,7 @@ async function checkAccess(
 }
 
 async function recomputeScoring(
+  userId: string,
   userEmail: string,
   contact: Record<string, unknown>,
   contactId: string,
@@ -51,7 +52,7 @@ async function recomputeScoring(
   // already saved by the caller; this guards only the shared-row scoring write.
   // Empty importedByUserId is legacy-owned (matches checkAccess), so persist.
   const importer = contact.importedByUserId as string | undefined;
-  if (importer && importer !== userEmail) return;
+  if (importer && importer !== userId) return;
 
   const [tags, prefs] = await Promise.all([
     loadContactTags(userEmail, contactId),
@@ -75,13 +76,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
   const userEmail = session.user.email;
   const { id: contactId } = await params;
 
-  const accessResult = await checkAccess(userEmail, contactId);
+  const accessResult = await checkAccess(userId, contactId);
   if (accessResult instanceof NextResponse) return accessResult;
 
   const { data: rows } = await supabase
@@ -100,13 +102,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
   const userEmail = session.user.email;
   const { id: contactId } = await params;
 
-  const accessResult = await checkAccess(userEmail, contactId);
+  const accessResult = await checkAccess(userId, contactId);
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult as { contact: Record<string, unknown> };
 
@@ -142,7 +145,7 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  await recomputeScoring(userEmail, contact, contactId);
+  await recomputeScoring(userId, userEmail, contact, contactId);
 
   return NextResponse.json({ ok: true });
 }
@@ -152,13 +155,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
   const userEmail = session.user.email;
   const { id: contactId } = await params;
 
-  const accessResult = await checkAccess(userEmail, contactId);
+  const accessResult = await checkAccess(userId, contactId);
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult as { contact: Record<string, unknown> };
 
@@ -177,7 +181,7 @@ export async function DELETE(
     .eq("contact_id", contactId)
     .eq("tag", tag);
 
-  await recomputeScoring(userEmail, contact, contactId);
+  await recomputeScoring(userId, userEmail, contact, contactId);
 
   return NextResponse.json({ ok: true });
 }

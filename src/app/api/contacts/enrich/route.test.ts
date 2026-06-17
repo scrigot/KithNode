@@ -139,7 +139,7 @@ describe("POST /api/contacts/enrich — per-contact credit metering", () => {
     supabaseState.reset();
     vi.clearAllMocks();
     delete process.env.PDL_API_KEY;
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockRequireSubscription.mockResolvedValue(null);
     mockGetUserPrefs.mockResolvedValue({});
     mockLoadContactTags.mockResolvedValue([]);

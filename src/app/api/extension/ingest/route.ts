@@ -76,10 +76,11 @@ const prefer = (captured: string, existing: unknown): string =>
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   const body = (await request.json().catch(() => ({}))) as CapturedProfile;
   const linkedInUrl = (body.linkedInUrl || "").trim();
@@ -256,8 +257,8 @@ export async function POST(request: NextRequest) {
   };
 
   // ── Re-score with the shared helper (loads tags so we never wipe them) ─────
-  const prefs = await getUserPrefs(userId);
-  const tags = existing?.id ? await loadContactTags(userId, existing.id as string) : [];
+  const prefs = await getUserPrefs(userEmail);
+  const tags = existing?.id ? await loadContactTags(userEmail, existing.id as string) : [];
   const { affiliations, score, tier } = rescoreContact(
     { ...(existing ?? {}), ...merged },
     prefs,
@@ -337,7 +338,7 @@ export async function POST(request: NextRequest) {
         return true;
       })
       .slice(0, 20)
-      .map((tag) => ({ user_id: userId, contact_id: contactId, tag }));
+      .map((tag) => ({ user_id: userEmail, contact_id: contactId, tag }));
     if (tagRows.length) {
       await supabase
         .from("contact_tags")

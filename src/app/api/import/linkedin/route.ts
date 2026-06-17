@@ -70,12 +70,13 @@ async function linkToPool(userId: string, contactId: string): Promise<void> {
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const body = await request.json();
 
   const hasUrls = body.urls && Array.isArray(body.urls) && body.urls.length > 0;
