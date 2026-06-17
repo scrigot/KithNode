@@ -1,0 +1,4 @@
+date,reporter,area,severity,repro_steps,linear_id,status
+2026-06-17,I8,discover-scoring,high,"Run Discover for a UNC IB profile; tier-1 firm contact scores lower than a tier-3; expected tier-1 higher",KIT-101,open
+2026-06-17,design-partner,outreach-draft,medium,"Generate a draft for a contact with no email; draft references a blank name field",KIT-102,triage
+2026-06-16,I8,pipeline-ui,low,"Vertical pipeline column header overlaps card on narrow viewport",KIT-103,open

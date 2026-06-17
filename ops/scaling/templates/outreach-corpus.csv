@@ -1,0 +1,4 @@
+sender,recipient_firm,recipient_seniority,channel,subject,body,got_reply,reply_time_hours,why_it_worked,tags
+Sam Example,Goldman Sachs,junior,email,Quick question from a fellow UNC student,"Hi Jane, I am a junior at Kenan-Flagler recruiting for IB. Saw you went through the same program. Could I ask you one specific question about the SA timeline?",yes,5,"Specific single ask, shared UNC tie, respected their time",warm;single-ask;alumni-tie
+Riya Example,Bain,mid,linkedin,,"Hi, I would love to pick your brain about consulting recruiting, do you have 30 minutes this week?",no,,"Vague ask, asked for too much time, no shared hook",cold;vague;too-large-ask
+Sam Example,Citi,junior,email,Following up on your panel last week,"Thanks for speaking at the finance panel. Your point on coverage groups stuck with me. One question: how did you decide between groups?",yes,12,"Referenced a real shared moment, concrete question",warm;event-followup;single-ask

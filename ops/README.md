@@ -7,6 +7,8 @@ The single home for "what to do, what we did, what we learned, what we decided."
 - `build-log.md` — append-only "what shipped" (auto-appended by the Stop hook).
 - `decisions.md` — product / architecture / business decisions + rationale.
 - `learnings.md` — patterns + gotchas (stable ones graduate into AGENTS.md).
+- `roadmap.md` — the 8-lane x G0-G4 gate backbone.
+- `scaling/` — the intern-ready operating kit (automation map, tooling + shared Claude policy, access boundary, onboarding SOPs, financial model, templates). Start at `scaling/README.md`. The canonical phase plan to $100k MRR is `scaling/roadmap-0-to-100k.md`.
 
 ## The OPS_LOG protocol (auto-capture)
 End a substantive session by emitting ONE line in your final message:
