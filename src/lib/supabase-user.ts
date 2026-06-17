@@ -35,6 +35,7 @@ export async function mintUserToken(userId: string, email: string): Promise<stri
   return new SignJWT({ role: "authenticated", email })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
+    .setAudience("authenticated")
     .setIssuedAt()
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(secret));

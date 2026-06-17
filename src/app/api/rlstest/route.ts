@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserClient } from "@/lib/supabase-user";
+import { getUserClient, mintUserToken } from "@/lib/supabase-user";
 
-// TEMPORARY Phase 4 verification — counts only, 404s in production, REMOVE before promote.
+// TEMPORARY Phase 4 verification — 404s in production, REMOVE before promote.
 export async function GET(req: NextRequest) {
   if (process.env.VERCEL_ENV === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const uid = req.nextUrl.searchParams.get("uid") ?? "";
   const email = req.nextUrl.searchParams.get("email") ?? "";
+
   const db = await getUserClient(uid, email);
   const pe = await db.from("PipelineEntry").select("*", { count: "exact", head: true });
-  const ud = await db.from("UserDiscover").select("*", { count: "exact", head: true });
+
+  // Raw PostgREST fetch to surface the real error body (supabase-js swallows it).
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://jyjpitagxtdzedtooedw.supabase.co";
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const token = await mintUserToken(uid, email);
+  const raw = await fetch(`${url}/rest/v1/PipelineEntry?select=id&limit=1`, {
+    headers: { apikey: anon, Authorization: `Bearer ${token}` },
+  });
+  const rawBody = await raw.text();
+
   return NextResponse.json({
     uid,
     pipelineEntry: pe.count,
-    userDiscover: ud.count,
-    peErr: pe.error ? { message: pe.error.message, code: (pe.error as { code?: string }).code, details: (pe.error as { details?: string }).details, hint: (pe.error as { hint?: string }).hint, status: pe.status } : null,
-    udErr: ud.error ? { message: ud.error.message, code: (ud.error as { code?: string }).code, status: ud.status } : null,
+    peErrStatus: pe.status ?? null,
+    rawStatus: raw.status,
+    rawBody: rawBody.slice(0, 400),
+    tokenHeader: token.split(".")[0],
+    anonPrefix: anon.slice(0, 6),
   });
 }
