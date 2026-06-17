@@ -54,7 +54,7 @@ export async function getUserClient(
   email: string,
 ): Promise<SupabaseClient> {
   const token = await mintUserToken(userId, email);
-  return createClient(SUPABASE_URL, ANON_KEY, {
+  return createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
