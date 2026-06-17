@@ -1,16 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search, Link2 } from "lucide-react";
+import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search, Link2, MessageSquare } from "lucide-react";
 
 interface Person {
   email: string;
   name: string;
   image: string;
 }
+interface FriendProvenance {
+  howConnected: string;
+  referredIn: string | null;
+  mutuals: { sharedNodes: string[]; mutualFriends: number };
+}
+interface Friend extends Person {
+  provenance: FriendProvenance;
+}
 interface FriendsData {
-  friends: Person[];
+  friends: Friend[];
   incoming: Person[];
   outgoing: Person[];
 }
@@ -37,6 +46,7 @@ function Avatar({ person, size = 36 }: { person: { name: string; image?: string 
 }
 
 export function FriendsClient() {
+  const router = useRouter();
   const [data, setData] = useState<FriendsData>({ friends: [], incoming: [], outgoing: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,15 +80,27 @@ export function FriendsClient() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function addByEmail(email: string) {
+  async function addByEmail(email: string, source?: "suggestion") {
     setError("");
     const res = await apiFetch("/api/kith/friends", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, source }),
     });
     if (res.ok) await load();
     else setError((await res.json().catch(() => ({}))).error || "Failed to send request");
+  }
+
+  async function openDM(email: string) {
+    const res = await apiFetch("/api/kith/dm/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withEmail: email }),
+    });
+    if (res.ok) {
+      const { threadId } = await res.json();
+      router.push(`/dashboard/messages/${threadId}`);
+    }
   }
 
   async function respond(requesterId: string, action: "accept" | "block") {
@@ -150,8 +172,13 @@ export function FriendsClient() {
               <Empty>No friends yet — search above.</Empty>
             ) : (
               data.friends.map((p) => (
-                <Row key={p.email} person={p}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent-teal">Mutual</span>
+                <Row key={p.email} person={p} provenance={p.provenance}>
+                  <button
+                    onClick={() => openDM(p.email)}
+                    className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06]"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" /> Message
+                  </button>
                 </Row>
               ))
             )}
@@ -172,7 +199,7 @@ export function FriendsClient() {
               {suggestions.map((p) => (
                 <Row key={p.email} person={p}>
                   <button
-                    onClick={() => addByEmail(p.email).then(() => setSuggestions((prev) => prev.filter((s) => s.email !== p.email)))}
+                    onClick={() => addByEmail(p.email, "suggestion").then(() => setSuggestions((prev) => prev.filter((s) => s.email !== p.email)))}
                     className="flex items-center gap-1 border border-accent-teal/30 bg-accent-teal/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accent-teal hover:bg-accent-teal/20"
                   >
                     <UserPlus className="h-3.5 w-3.5" /> Add
@@ -321,7 +348,15 @@ function Section({ title, count, icon, children }: { title: string; count: numbe
   );
 }
 
-function Row({ person, children }: { person: Person; children: React.ReactNode }) {
+function Row({
+  person,
+  provenance,
+  children,
+}: {
+  person: Person;
+  provenance?: FriendProvenance;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
@@ -329,9 +364,32 @@ function Row({ person, children }: { person: Person; children: React.ReactNode }
         <div className="min-w-0">
           <div className="truncate text-[13px] font-medium text-foreground">{person.name}</div>
           <div className="truncate font-mono text-[11px] text-muted-foreground">{person.email}</div>
+          {provenance && <Provenance provenance={provenance} />}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
+// Dense connection-provenance line: how you connected · referral · mutual chip.
+function Provenance({ provenance }: { provenance: FriendProvenance }) {
+  const { howConnected, referredIn, mutuals } = provenance;
+  const lead = [howConnected, referredIn].filter(Boolean).join(" • ");
+  const chipParts: string[] = [];
+  if (mutuals.mutualFriends > 0) chipParts.push(`${mutuals.mutualFriends} mutual${mutuals.mutualFriends === 1 ? "" : "s"}`);
+  if (mutuals.sharedNodes.length > 0) {
+    const noun = mutuals.sharedNodes.length === 1 ? "shared node" : "shared nodes";
+    chipParts.push(`${mutuals.sharedNodes.length} ${noun}: ${mutuals.sharedNodes.join(", ")}`);
+  }
+  const chip = chipParts.join(" · ");
+  if (!lead && !chip) return null;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground/70">
+      {lead && <span className="uppercase tracking-wider">{lead}</span>}
+      {chip && (
+        <span className="border border-accent-teal/20 bg-accent-teal/10 px-1.5 py-0.5 text-accent-teal/90">{chip}</span>
+      )}
     </div>
   );
 }
