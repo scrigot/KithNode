@@ -21,7 +21,7 @@ const supabaseState = {
 vi.mock("@/lib/supabase", () => {
   // The route does at most two select chains per professor:
   //   1. .eq("email", ...).eq("importedByUserId", ...).maybeSingle()
-  //   2. .eq("name", ...).eq("organization", ...).eq("importedByUserId", ...).maybeSingle()
+  //   2. .eq("name", ...).eq("firmName", ...).eq("importedByUserId", ...).maybeSingle()
   // We detect which lookup is in-flight by inspecting the first field name
   // passed to .eq() on the chain. "email" -> email lookup, "name" -> name lookup.
 
@@ -275,7 +275,7 @@ describe("POST /api/professors/seed", () => {
     expect(supabaseState.insertCalls).toBe(1);
   });
 
-  it("dedup: prof with no email falls back to name+organization lookup -> update", async () => {
+  it("dedup: prof with no email falls back to name+firmName lookup -> update", async () => {
     mockGetUserId.mockResolvedValue("test@unc.edu");
     // Carol Lee has no email
     mockScrapeAllDepartments.mockResolvedValue([MOCK_PROFESSORS[2]]);

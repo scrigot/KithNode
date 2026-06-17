@@ -12,7 +12,7 @@ export interface ScoringUser {
 export interface ScoringAlumni {
   university: string;
   graduationYear: number;
-  organization: string;
+  firmName: string;
 }
 
 const PRESTIGE_TIER_1 = new Set([
@@ -88,15 +88,15 @@ export function scoreConnection(
   }
 
   // Same industry: +15
-  const firmIndustry = FIRM_INDUSTRY[alumni.organization];
+  const firmIndustry = FIRM_INDUSTRY[alumni.firmName];
   if (firmIndustry && user.targetIndustry === firmIndustry) {
     score += 15;
   }
 
   // Firm prestige tier: +25 (tier 1), +18 (tier 2), +10 (tier 3)
-  if (PRESTIGE_TIER_1.has(alumni.organization)) {
+  if (PRESTIGE_TIER_1.has(alumni.firmName)) {
     score += 25;
-  } else if (PRESTIGE_TIER_2.has(alumni.organization)) {
+  } else if (PRESTIGE_TIER_2.has(alumni.firmName)) {
     score += 18;
   } else {
     score += 10;

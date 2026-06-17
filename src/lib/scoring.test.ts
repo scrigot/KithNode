@@ -10,7 +10,7 @@ const baseUser: ScoringUser = {
 const baseAlumni: ScoringAlumni = {
   university: "Duke University",
   graduationYear: 2018,
-  organization: "Some Unknown Firm",
+  firmName: "Some Unknown Firm",
 };
 
 describe("scoreConnection", () => {
@@ -67,7 +67,7 @@ describe("scoreConnection", () => {
   });
 
   it("adds +15 for same industry", () => {
-    const alumni = { ...baseAlumni, organization: "Goldman Sachs" };
+    const alumni = { ...baseAlumni, firmName: "Goldman Sachs" };
     // Goldman is IB + tier 1 (25) + same industry (15) = 40
     const score = scoreConnection(baseUser, alumni);
     expect(score).toBe(40);
@@ -75,7 +75,7 @@ describe("scoreConnection", () => {
 
   it("does not add industry bonus when industries differ", () => {
     const user = { ...baseUser, targetIndustry: "Consulting" };
-    const alumni = { ...baseAlumni, organization: "Goldman Sachs" };
+    const alumni = { ...baseAlumni, firmName: "Goldman Sachs" };
     // Goldman is IB, user targets Consulting -> no industry match
     // tier 1 (25) only
     const score = scoreConnection(user, alumni);
@@ -83,14 +83,14 @@ describe("scoreConnection", () => {
   });
 
   it("adds +25 for tier 1 firm prestige", () => {
-    const alumni = { ...baseAlumni, organization: "McKinsey & Company" };
+    const alumni = { ...baseAlumni, firmName: "McKinsey & Company" };
     // User targets IB, McKinsey is Consulting -> no industry match
     const score = scoreConnection(baseUser, alumni);
     expect(score).toBe(25);
   });
 
   it("adds +18 for tier 2 firm prestige", () => {
-    const alumni = { ...baseAlumni, organization: "Deloitte" };
+    const alumni = { ...baseAlumni, firmName: "Deloitte" };
     const score = scoreConnection(baseUser, alumni);
     expect(score).toBe(18);
   });
@@ -123,7 +123,7 @@ describe("scoreConnection", () => {
     const alumni: ScoringAlumni = {
       university: "UNC Chapel Hill",
       graduationYear: 2020,
-      organization: "Goldman Sachs",
+      firmName: "Goldman Sachs",
     };
     // 20 (uni) + 10 (decade) + 15 (industry) + 25 (tier 1) + 20 (mutual) = 90
     const score = scoreConnection(user, alumni, 4);
@@ -143,7 +143,7 @@ describe("scoreConnection", () => {
     const alumni: ScoringAlumni = {
       university: "UNC Chapel Hill",
       graduationYear: 2021,
-      organization: "KKR",
+      firmName: "KKR",
     };
     // 20 (uni) + 10 (decade: both 202x) + 15 (PE match) + 25 (tier 1) = 70
     const score = scoreConnection(user, alumni, 2);

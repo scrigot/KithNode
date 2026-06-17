@@ -4,8 +4,48 @@ import {
   redactEmail,
   redactLinkedInUrl,
   redactContact,
+  poolSafeContact,
   maybeRedact,
 } from "./redact";
+
+// Private columns that belong to the importing OWNER (or are another user's
+// email) and must NEVER reach a different user via the shared Discover pool —
+// in EITHER the locked or unlocked shape.
+const FORBIDDEN_POOL_FIELDS = [
+  "importedByUserId",
+  "isFriend",
+  "lastSpokenAt",
+  "speakFrequency",
+  "hometown",
+  "highSchool",
+  "passions",
+] as const;
+
+// A representative pool contact carrying every private column an owner row has.
+const POOL_CONTACT = {
+  id: "pool-1",
+  name: "Jacob Goldstein",
+  email: "jacob@goldman.com",
+  firmName: "Goldman Sachs",
+  title: "VP",
+  university: "UNC",
+  linkedInUrl: "https://linkedin.com/in/jacob-goldstein",
+  location: "New York, NY",
+  education: "UNC 2018",
+  affiliations: "Chi Phi,Finance Club",
+  warmthScore: 85,
+  tier: "hot",
+  graduationYear: 2018,
+  industry: "Investment Banking",
+  // Owner's private relationship data — all of this must be stripped.
+  importedByUserId: "owner@example.com",
+  isFriend: true,
+  lastSpokenAt: "2026-01-01",
+  speakFrequency: "monthly",
+  hometown: "Charlotte, NC",
+  highSchool: "Myers Park",
+  passions: "sailing",
+};
 
 const BLOCK = "\u2588";
 
@@ -80,7 +120,7 @@ describe("redactContact", () => {
       name: "Jacob Goldstein",
       email: "jacob@goldman.com",
       linkedInUrl: "https://linkedin.com/in/jacob",
-      organization: "Goldman Sachs",
+      firmName: "Goldman Sachs",
       title: "VP",
       warmthScore: 85,
       tier: "hot",
@@ -89,10 +129,11 @@ describe("redactContact", () => {
     const r = redactContact(c);
     expect(r.isRedacted).toBe(true);
     expect(r.name.includes("acob")).toBe(false);
-    expect(r.email.includes("acob")).toBe(false);
+    // email is always emptied for a pool contact (never the blurred form).
+    expect(r.email).toBe("");
     expect(r.linkedInUrl).toBe(`linkedin.com/in/${BLOCK.repeat(8)}`);
     // Aggregate-signal fields preserved
-    expect(r.organization).toBe("Goldman Sachs");
+    expect(r.firmName).toBe("Goldman Sachs");
     expect(r.title).toBe("VP");
     expect(r.warmthScore).toBe(85);
     expect(r.tier).toBe("hot");
@@ -105,6 +146,47 @@ describe("redactContact", () => {
     expect(r.email).toBe("");
     expect(r.linkedInUrl).toBe("");
     expect(r.isRedacted).toBe(true);
+  });
+
+  it("drops every owner-private field in the LOCKED shape", () => {
+    const r = redactContact(POOL_CONTACT);
+    expect(r.isRedacted).toBe(true);
+    for (const field of FORBIDDEN_POOL_FIELDS) {
+      expect(r[field], `locked card leaked ${field}`).toBeUndefined();
+    }
+    // email present-but-empty, never the real or blurred address.
+    expect(r.email).toBe("");
+    expect(JSON.stringify(r)).not.toContain("jacob@goldman.com");
+    expect(JSON.stringify(r)).not.toContain("owner@example.com");
+    // Allowlisted signal still flows so the locked card stays useful.
+    expect(r.firmName).toBe("Goldman Sachs");
+    expect(r.warmthScore).toBe(85);
+    expect(r.graduationYear).toBe(2018);
+  });
+});
+
+describe("poolSafeContact (high_value unlock shape)", () => {
+  it("drops every owner-private field in the UNLOCKED shape", () => {
+    const r = poolSafeContact(POOL_CONTACT);
+    expect(r.isRedacted).toBe(false);
+    for (const field of FORBIDDEN_POOL_FIELDS) {
+      expect(r[field], `unlocked card leaked ${field}`).toBeUndefined();
+    }
+    expect(r.email).toBe("");
+    expect(JSON.stringify(r)).not.toContain("jacob@goldman.com");
+    expect(JSON.stringify(r)).not.toContain("owner@example.com");
+  });
+
+  it("reveals the real identity fields the unlock is supposed to expose", () => {
+    const r = poolSafeContact(POOL_CONTACT);
+    // The product contract: a high_value unlock reveals name / firm / title /
+    // linkedInUrl / location / education — unredacted, but still no PII columns.
+    expect(r.name).toBe("Jacob Goldstein");
+    expect(r.firmName).toBe("Goldman Sachs");
+    expect(r.title).toBe("VP");
+    expect(r.linkedInUrl).toBe("https://linkedin.com/in/jacob-goldstein");
+    expect(r.location).toBe("New York, NY");
+    expect(r.education).toBe("UNC 2018");
   });
 });
 
@@ -130,6 +212,19 @@ describe("maybeRedact", () => {
     const r = maybeRedact(c, "sam@unc.edu");
     expect("isRedacted" in r && r.isRedacted).toBe(true);
     expect(r.name.includes("acob")).toBe(false);
+  });
+
+  it("strips owner-private fields for a pool contact (the route's actual call)", () => {
+    const r = maybeRedact(POOL_CONTACT, "sam@unc.edu");
+    expect("isRedacted" in r && r.isRedacted).toBe(true);
+    for (const field of FORBIDDEN_POOL_FIELDS) {
+      expect(
+        (r as Record<string, unknown>)[field],
+        `pool card leaked ${field}`,
+      ).toBeUndefined();
+    }
+    expect(JSON.stringify(r)).not.toContain("jacob@goldman.com");
+    expect(JSON.stringify(r)).not.toContain("owner@example.com");
   });
 
   it("redacts when contact has no importedByUserId (defensive)", () => {

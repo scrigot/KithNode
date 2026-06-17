@@ -1,0 +1,4 @@
+name,firmName,title,industry,tier,graduationYear,university,linkedInUrl,email,email_status,seniorityLevel,source,qa_flag,verified_by
+Jane Doe,Goldman Sachs,Analyst,Investment Banking,tier1,2021,UNC Chapel Hill,https://www.linkedin.com/in/jane-doe-example,jane.doe@example.com,verified,junior,linkedin,,I1 2026-06-17
+John Smith,McKinsey & Company,Associate,Consulting,tier1,2019,UNC Chapel Hill,https://www.linkedin.com/in/john-smith-example,,risky,mid,referral,needs-review,I2 2026-06-17
+Alex Lee,Citi,Associate,Investment Banking,tier2,2020,Duke University,https://www.linkedin.com/in/alex-lee-example,alex.lee@example.com,dead,mid,csv,dupe,I2 2026-06-17

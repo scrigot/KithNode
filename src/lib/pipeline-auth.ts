@@ -11,23 +11,23 @@ import { supabase } from "@/lib/supabase";
  * helpers make the filter impossible to forget for the user-owned pipeline tables.
  *
  * SCOPE: use for `Pipeline` and `PipelineEntry` only — tables whose rows belong to
- * exactly one user, keyed by `userId` (which holds the session EMAIL, not a uuid,
- * to stay consistent with the existing PipelineEntry rows). Do NOT use these for
+ * exactly one user, keyed by `userId` (the stable User.id UUID from the session,
+ * matching the rest of the app after the email→UUID cutover). Do NOT use these for
  * `AlumniContact`: contacts are shared/importable and are scoped by contactId +
  * redacted for non-owners (see redact.ts), not filtered by userId.
  */
 
 /** User-owned tables. Restricting the helpers to these prevents accidental misuse. */
-export type UserScopedTable = "Pipeline" | "PipelineEntry";
+export type UserScopedTable = "Pipeline" | "PipelineEntry" | "UserDiscover";
 
 /**
- * Resolve the current user's id (their email). Returns null when unauthenticated;
- * the caller returns 401. Kept as a thin wrapper so every pipeline route resolves
- * identity the same way.
+ * Resolve the current user's stable id (User.id UUID). Returns null when
+ * unauthenticated; the caller returns 401. Kept as a thin wrapper so every
+ * pipeline route resolves identity the same way as the rest of the app.
  */
 export async function requireUser(): Promise<string | null> {
   const session = await auth();
-  return session?.user?.email ?? null;
+  return session?.user?.id ?? null;
 }
 
 /**
@@ -72,8 +72,12 @@ export function scopedUpdate(
 }
 
 /**
- * DELETE scoped to the current user. Always appends `.eq("userId", userId)`.
+ * DELETE scoped to the current user. Always appends `.eq("userId", userId)` and
+ * requests an exact count so callers can report how many rows were removed.
  */
 export function scopedDelete(table: UserScopedTable, userId: string) {
-  return supabase.from(table as string).delete().eq("userId", userId);
+  return supabase
+    .from(table as string)
+    .delete({ count: "exact" })
+    .eq("userId", userId);
 }

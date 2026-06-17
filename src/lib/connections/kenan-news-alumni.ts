@@ -89,7 +89,7 @@ function extractAlumniFromHtml(html: string, storyUrl: string): AlumniSeed[] {
     seeds.push({
       name,
       title: "",
-      organization: "UNC Kenan-Flagler",
+      firmName: "UNC Kenan-Flagler",
       email: "",
       sourceUrl: storyUrl,
       bio: `Mentioned in Kenan-Flagler news (class of ${year}).`,
@@ -161,7 +161,7 @@ export async function scrapeKenanNewsAlumni(
         name: s.name,
         title: s.title,
         bio: s.bio,
-        department: s.organization,
+        department: s.firmName,
         researchAreas: [],
       }));
       const results = await classifyBatch(inputs, { concurrency: 5 });

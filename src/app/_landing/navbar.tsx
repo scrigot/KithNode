@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { signIn } from "next-auth/react";
 import { LogoIcon } from "@/components/logo";
 
 export function Navbar() {
@@ -37,15 +36,16 @@ export function Navbar() {
           </span>
         </motion.span>
         <div className="hidden items-center gap-6 md:flex">
-          {(["Products", "Solutions", "How It Works"] as const).map((label) => (
+          {(
+            [
+              { label: "How it works", href: "#how-it-works" },
+              { label: "Why KithNode", href: "/manifesto" },
+            ] as const
+          ).map(({ label, href }) => (
             <motion.a
               key={label}
-              href={
-                label === "How It Works"
-                  ? "/demo"
-                  : `#${label.toLowerCase().replace(/ /g, "-")}`
-              }
-              className="text-sm font-medium transition-colors"
+              href={href}
+              className="text-sm font-medium transition-colors duration-200 ease-in-out"
               style={{
                 color: useTransform(scrolled, (v) =>
                   v > 0.5 ? "#475569" : "rgba(255,255,255,0.8)"
@@ -58,20 +58,9 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <motion.button
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-          className="cursor-pointer text-sm font-medium transition-colors"
-          style={{
-            color: useTransform(scrolled, (v) =>
-              v > 0.5 ? "#0f172a" : "rgba(255,255,255,0.85)"
-            ),
-          }}
-        >
-          Sign in
-        </motion.button>
         <Link
           href="/waitlist"
-          className="rounded-lg bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"
+          className="rounded-[12px] bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:bg-white/30"
         >
           Request Access
         </Link>

@@ -15,7 +15,7 @@ export function AddContactSlideOver({
   onCreated,
 }: AddContactSlideOverProps) {
   const [name, setName] = useState("");
-  const [organization, setFirmName] = useState("");
+  const [firmName, setFirmName] = useState("");
   const [title, setTitle] = useState("");
   const [university, setUniversity] = useState("");
   const [graduationYear, setGraduationYear] = useState("");
@@ -49,7 +49,7 @@ export function AddContactSlideOver({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          organization,
+          firmName,
           title,
           university,
           graduationYear: Number(graduationYear),
@@ -62,7 +62,7 @@ export function AddContactSlideOver({
         throw new Error(data.error || "Failed to add contact");
       }
 
-      trackEvent("contact_added", { name, organization });
+      trackEvent("contact_added", { name, firmName });
       resetForm();
       onCreated();
     } catch (err) {
@@ -122,7 +122,7 @@ export function AddContactSlideOver({
           </label>
           <input
             type="text"
-            value={organization}
+            value={firmName}
             onChange={(e) => setFirmName(e.target.value)}
             placeholder="Goldman Sachs"
             required

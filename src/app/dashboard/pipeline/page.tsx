@@ -145,7 +145,7 @@ function DraftModal({ contact, onClose }: { contact: PipelineContact; onClose: (
 
 function AddContactModal({ pipelineId, pipelineName, onClose, onAdded }: { pipelineId: string; pipelineName: string; onClose: () => void; onAdded: () => void }) {
   const [name, setName] = useState("");
-  const [organization, setOrganization] = useState("");
+  const [firmName, setOrganization] = useState("");
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +158,7 @@ function AddContactModal({ pipelineId, pipelineName, onClose, onAdded }: { pipel
       const res = await apiFetch("/api/pipeline/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, organization, title, pipelineId }),
+        body: JSON.stringify({ name, firmName, title, pipelineId }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error || `HTTP ${res.status}`); return; }
       onAdded();
@@ -172,7 +172,7 @@ function AddContactModal({ pipelineId, pipelineName, onClose, onAdded }: { pipel
 
   const fields: Array<[string, string, (v: string) => void, string]> = [
     ["Name", name, setName, "Dr. Anil Gupta"],
-    ["Organization", organization, setOrganization, "UNC Robotics Lab"],
+    ["Organization", firmName, setOrganization, "UNC Robotics Lab"],
     ["Title", title, setTitle, "CS Faculty"],
   ];
 

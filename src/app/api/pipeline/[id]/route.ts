@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { requireUser, scopedSelect, scopedInsert } from "@/lib/pipeline-auth";
+import {
+  requireUser,
+  scopedSelect,
+  scopedInsert,
+  scopedDelete,
+} from "@/lib/pipeline-auth";
 
 interface StageMeta {
   key: string;
@@ -180,4 +185,26 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "Failed to update stage" }, { status: 500 });
   }
+}
+
+/** DELETE: remove this user's PipelineEntry for the contact. Optionally scoped
+ *  to a single pipeline via ?pipelineId=; otherwise removes the contact from
+ *  every pipeline the user owns. userId scoping is the only IDOR guard. */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await requireUser();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id: contactId } = await params;
+  const pipelineId = request.nextUrl.searchParams.get("pipelineId");
+
+  let q = scopedDelete("PipelineEntry", userId).eq("contactId", contactId);
+  if (pipelineId) q = q.eq("pipelineId", pipelineId);
+  const { error, count } = await q;
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, removed: count ?? 0 });
 }

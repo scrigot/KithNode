@@ -17,7 +17,7 @@ import type { AlumniSeed } from "./types";
 const baseSeed: AlumniSeed = {
   name: "Christopher Bingham",
   title: "Professor of Strategy and Entrepreneurship",
-  organization: "UNC Kenan-Flagler",
+  firmName: "UNC Kenan-Flagler",
   email: "bingham@kenan-flagler.unc.edu",
   sourceUrl: "https://www.kenan-flagler.unc.edu/faculty/directory/christopher-bingham/",
   bio: "Professor of strategy...",
@@ -96,10 +96,10 @@ describe("upsertAlumniContact", () => {
     expect(result).toBe("updated");
   });
 
-  it("updates when name+organization match found (no email on record)", async () => {
+  it("updates when name+firmName match found (no email on record)", async () => {
     const seedNoEmail = { ...baseSeed, email: "" };
 
-    // When email is empty, the first from() call is the name+organization select.
+    // When email is empty, the first from() call is the name+firmName select.
     // It finds the record, so the second from() call is the update.
     const nameSelectChain = {
       select: vi.fn().mockReturnThis(),

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       .from("AlumniContact")
       .insert({
         name,
-        organization: (body.organization || "").trim(),
+        firmName: (body.firmName || "").trim(),
         title: (body.title || "").trim(),
         university: (body.university || "").trim(),
         graduationYear: 0, // sentinel: manual non-recruiting contacts have no grad year

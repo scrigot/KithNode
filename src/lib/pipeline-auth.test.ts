@@ -26,9 +26,11 @@ import { requireUser, scopedSelect, scopedInsert, scopedUpdate, scopedDelete } f
 describe("pipeline-auth: IDOR guard", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("requireUser returns the session email", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "sam@unc.edu" } });
-    expect(await requireUser()).toBe("sam@unc.edu");
+  it("requireUser returns the stable session user id (UUID)", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "11111111-1111-1111-1111-111111111111", email: "sam@unc.edu" },
+    });
+    expect(await requireUser()).toBe("11111111-1111-1111-1111-111111111111");
   });
 
   it("requireUser returns null when unauthenticated", async () => {

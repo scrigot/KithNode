@@ -1,11 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { searchCities } from "@/lib/us-cities";
+import {
+  loadUniversities,
+  loadCities,
+  loadHighSchools,
+  loadGreekOrgs,
+  loadMajors,
+  loadMinors,
+  loadConcentrations,
+  loadSkills,
+} from "@/lib/data/onboarding-options";
+import {
+  FIRM_OPTIONS,
+  LOCATION_OPTIONS,
+  DEGREE_OPTIONS,
+} from "@/lib/data/preference-options";
+import type { EducationEntry, ExperienceEntry } from "@/lib/educations";
+import type { ClubEntry } from "@/lib/club-memberships";
+import { ClubRowsEditor } from "@/components/club-rows-editor";
+import { ExperiencePeriod } from "@/components/experience-rows-editor";
+import { TrackRolePicker } from "@/components/track-role-picker";
 import {
   GraduationCap,
   MapPin,
@@ -19,74 +40,32 @@ import {
   Pencil,
   RotateCcw,
   CalendarDays,
+  FileText,
+  Upload,
+  Loader2,
+  Mail,
 } from "lucide-react";
+import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
+import {
+  calculateProfileCompleteness,
+  type CompletenessInput,
+} from "@/lib/profile-completeness";
 
 const TOTAL_STEPS = 5;
-
-const INDUSTRY_OPTIONS = [
-  "AI/ML",
-  "Investment Banking",
-  "Private Equity",
-  "Consulting",
-  "Venture Capital",
-  "Corporate Finance",
-  "Asset Management",
-];
-
-const FIRM_OPTIONS = [
-  // AI / ML
-  "Anthropic",
-  "OpenAI",
-  "Google DeepMind",
-  "Mistral AI",
-  "Cohere",
-  "xAI",
-  "Perplexity",
-  "Hugging Face",
-  "Cursor",
-  "Vercel",
-  "Databricks",
-  "Scale AI",
-  "Replit",
-  "NVIDIA",
-  // Finance / Consulting
-  "Goldman Sachs",
-  "JPMorgan",
-  "Morgan Stanley",
-  "Bank of America",
-  "Evercore",
-  "Lazard",
-  "Centerview",
-  "Moelis",
-  "PJT Partners",
-  "Blackstone",
-  "KKR",
-  "Carlyle",
-  "Apollo",
-  "McKinsey",
-  "BCG",
-  "Bain",
-  "Deloitte",
-];
-
-const LOCATION_OPTIONS = [
-  "New York",
-  "San Francisco",
-  "Chicago",
-  "Charlotte",
-  "Boston",
-  "Houston",
-  "Dallas",
-  "London",
-];
 
 const STEP_ICONS = [GraduationCap, MapPin, Target, Building2, CheckCircle2];
 
 interface Preferences {
   university: string;
+  highSchool: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
+  educations: EducationEntry[];
+  minors: string[];
+  experiences: ExperienceEntry[];
+  clubMemberships: ClubEntry[];
+  skills: string[];
   hometown: string;
   targetLocations: string[];
   customLocations: string[];
@@ -95,6 +74,12 @@ interface Preferences {
   customFirms: string[];
   recruitingDate: string;
   weeklyGoalTarget: number;
+  draftTone: string;
+  draftLength: string;
+  draftSignature: string;
+  draftSubjectStyle: string;
+  digestEmailEnabled: boolean;
+  followupEmailEnabled: boolean;
 }
 
 const STORAGE_KEY = "kithnode_preferences";
@@ -102,8 +87,14 @@ const STORAGE_KEY = "kithnode_preferences";
 function getDefaults(): Preferences {
   return {
     university: "",
+    highSchool: "",
     greekLifeEnabled: false,
     greekOrganization: "",
+    educations: [],
+    minors: [],
+    experiences: [],
+    clubMemberships: [],
+    skills: [],
     hometown: "",
     targetLocations: [],
     customLocations: [],
@@ -112,6 +103,12 @@ function getDefaults(): Preferences {
     customFirms: [],
     recruitingDate: "",
     weeklyGoalTarget: 3,
+    draftTone: "warm",
+    draftLength: "medium",
+    draftSignature: "",
+    draftSubjectStyle: "casual",
+    digestEmailEnabled: true,
+    followupEmailEnabled: true,
   };
 }
 
@@ -153,6 +150,7 @@ async function syncToAPI(prefs: Preferences) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         current_university: prefs.university || null,
+        high_school: prefs.highSchool || null,
         hometown: prefs.hometown || null,
         target_locations:
           [...prefs.targetLocations, ...prefs.customLocations].length > 0
@@ -164,8 +162,19 @@ async function syncToAPI(prefs: Preferences) {
             ? [...prefs.targetFirms, ...prefs.customFirms]
             : null,
         greek_life: prefs.greekLifeEnabled ? prefs.greekOrganization : null,
+        minor: prefs.minors.join(", "),
+        educations: prefs.educations,
+        experiences: prefs.experiences,
+        clubMemberships: prefs.clubMemberships,
+        skills: prefs.skills,
         recruiting_date: prefs.recruitingDate || null,
         weekly_goal_target: prefs.weeklyGoalTarget || 3,
+        draft_tone: prefs.draftTone || "warm",
+        draft_length: prefs.draftLength || "medium",
+        draft_signature: prefs.draftSignature || "",
+        draft_subject_style: prefs.draftSubjectStyle || "casual",
+        digest_email_enabled: prefs.digestEmailEnabled,
+        followup_email_enabled: prefs.followupEmailEnabled,
       }),
     });
   } catch (err) {
@@ -270,6 +279,265 @@ function CityAutocomplete({
   );
 }
 
+// ── Education Rows Editor ─────────────────────────────────────────────────────
+// Inline component — used in both EditPanel and Wizard step 0.
+
+function EducationRowsEditor({
+  rows,
+  onChange,
+  resumeFilled,
+}: {
+  rows: EducationEntry[];
+  onChange: (rows: EducationEntry[]) => void;
+  resumeFilled?: boolean;
+}) {
+  const [concentrations, setConcentrations] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    loadConcentrations().then(setConcentrations);
+  }, []);
+
+  function updateRow(i: number, patch: Partial<EducationEntry>) {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next);
+  }
+
+  function removeRow(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+
+  function addRow() {
+    if (rows.length >= 4) return;
+    onChange([...rows, { major: "", degree: "", concentration: "" }]);
+  }
+
+  // Concentration pool for a given major: scoped to that major's entries, fallback union of all.
+  function concPool(major: string): string[] {
+    const scoped = major ? (concentrations[major] ?? []) : [];
+    const pool = scoped.length > 0 ? scoped : Object.values(concentrations).flat();
+    return Array.from(new Set(pool)).sort();
+  }
+
+  return (
+    <div className={resumeFilled ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+      <div className="space-y-1.5">
+        {rows.map((row, i) => {
+          const pool = concPool(row.major);
+          const loadConcPool = async () => pool;
+          return (
+            <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1.5">
+              {/* Major */}
+              <Combobox
+                value={row.major}
+                onSelect={(v) => updateRow(i, { major: v })}
+                loadOptions={loadMajors}
+                placeholder="Major (opt.)"
+                ariaLabel="Major"
+              />
+              {/* Degree */}
+              <select
+                value={row.degree}
+                onChange={(e) => updateRow(i, { degree: e.target.value })}
+                aria-label="Degree"
+                className="h-9 border border-input bg-muted px-1.5 text-xs text-foreground focus:border-accent-teal focus:outline-none"
+              >
+                <option value="">Degree</option>
+                <optgroup label="Undergrad">
+                  {DEGREE_OPTIONS.undergrad.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Grad">
+                  {DEGREE_OPTIONS.grad.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </optgroup>
+              </select>
+              {/* Concentration */}
+              <Combobox
+                key={`conc-${i}-${pool.join("|").slice(0, 40)}`}
+                value={row.concentration}
+                onSelect={(v) => updateRow(i, { concentration: v })}
+                loadOptions={loadConcPool}
+                placeholder="Concentration (opt.)"
+                ariaLabel="Concentration"
+              />
+              {/* Remove */}
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="text-text-muted hover:text-white transition-colors"
+                aria-label="Remove education row"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {rows.length < 4 && (
+        <button
+          type="button"
+          onClick={addRow}
+          className="mt-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-text-muted hover:text-white transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Add education
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Experience Rows Editor ────────────────────────────────────────────────────
+// Inline component — used in EditPanel and Wizard step 1.
+
+function ExperienceRowsEditor({
+  rows,
+  onChange,
+  resumeFilled,
+}: {
+  rows: ExperienceEntry[];
+  onChange: (rows: ExperienceEntry[]) => void;
+  resumeFilled?: boolean;
+}) {
+  function updateRow(i: number, patch: Partial<ExperienceEntry>) {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next);
+  }
+
+  function removeRow(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+
+  function addRow() {
+    if (rows.length >= 8) return;
+    onChange([...rows, { title: "", firm: "", start: "", end: "" }]);
+  }
+
+  const loadFirmOptions = useCallback(async () => FIRM_OPTIONS, []);
+
+  return (
+    <div className={resumeFilled ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+      <div className="space-y-1.5">
+        {rows.map((row, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
+            {/* Position */}
+            <Input
+              value={row.title}
+              onChange={(e) => updateRow(i, { title: e.target.value })}
+              placeholder="Position"
+              className="h-9 bg-muted text-sm"
+            />
+            {/* Firm */}
+            <Combobox
+              value={row.firm}
+              onSelect={(v) => updateRow(i, { firm: v })}
+              loadOptions={loadFirmOptions}
+              placeholder="Firm"
+              ariaLabel="Firm"
+            />
+            {/* Remove */}
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              className="text-text-muted hover:text-white transition-colors"
+              aria-label="Remove experience row"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            {/* Start – End (with "Now" → Present) */}
+            <div className="col-span-3">
+              <ExperiencePeriod
+                start={row.start}
+                end={row.end}
+                onStart={(v) => updateRow(i, { start: v })}
+                onEnd={(v) => updateRow(i, { end: v })}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      {rows.length < 8 && (
+        <button
+          type="button"
+          onClick={addRow}
+          className="mt-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-text-muted hover:text-white transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Add experience
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Map the settings-page Preferences shape onto the completeness calc's minimal
+// input (merge preset + custom firms/locations; collapse Greek toggle + minors).
+function toCompletenessInput(p: Preferences): CompletenessInput {
+  return {
+    university: p.university,
+    highSchool: p.highSchool,
+    hometown: p.hometown,
+    greekOrg: p.greekLifeEnabled ? p.greekOrganization : "",
+    educations: p.educations,
+    targetIndustries: p.targetIndustries,
+    targetFirms: [...p.targetFirms, ...p.customFirms],
+    targetLocations: [...p.targetLocations, ...p.customLocations],
+    recruitingDate: p.recruitingDate,
+    skills: p.skills,
+    minor: p.minors.join(", "),
+    experiences: p.experiences,
+    clubMemberships: p.clubMemberships,
+  };
+}
+
+// Live profile-completeness meter (Identity / Targets / Depth). Recomputes from
+// the in-progress edit state, so it ticks up as the user fills fields.
+function CompletenessMeter({ prefs }: { prefs: Preferences }) {
+  const { percent, categories, missing } = calculateProfileCompleteness(
+    toCompletenessInput(prefs),
+  );
+  return (
+    <div className="mb-6 border border-white/[0.06] bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+          Profile completeness
+        </span>
+        <span className="text-[13px] font-bold tabular-nums text-accent-teal">{percent}%</span>
+      </div>
+      <div className="h-1 w-full bg-white/[0.06]">
+        <div
+          className="h-1 bg-accent-teal transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        {categories.map((c) => (
+          <div key={c.key}>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-text-muted">
+                {c.label}
+              </span>
+              <span className="text-[9px] tabular-nums text-text-secondary">
+                {c.filled}/{c.total}
+              </span>
+            </div>
+            <div className="mt-1 h-px w-full bg-white/[0.06]">
+              <div className="h-px bg-accent-teal/60" style={{ width: `${c.percent}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {missing.length > 0 && (
+        <p className="mt-2.5 text-[10px] text-text-muted">
+          Next: add your {missing.slice(0, 3).join(", ")}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Edit Panel ────────────────────────────────────────────────────────────────
 
 function EditPanel({
@@ -284,8 +552,25 @@ function EditPanel({
   const [local, setLocal] = useState<Preferences>(prefs);
   const [customFirmInput, setCustomFirmInput] = useState("");
   const [customLocationInput, setCustomLocationInput] = useState("");
+  const [minorInput, setMinorInput] = useState("");
+  const [skillKey, setSkillKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeFilled, setResumeFilled] = useState<Set<string>>(new Set());
+  const [activeSection, setActiveSection] = useState<
+    "profile" | "outreach" | "notifications"
+  >("profile");
+
+  // Optional deep-link: ?section=outreach|notifications selects that pane on mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const param = new URLSearchParams(window.location.search).get("section");
+    if (param === "outreach" || param === "notifications" || param === "profile") {
+      setActiveSection(param);
+    }
+  }, []);
 
   const toggleIndustry = (ind: string) =>
     setLocal((p) => ({
@@ -325,6 +610,127 @@ function EditPanel({
     setCustomLocationInput("");
   };
 
+  const addSkill = (raw: string) => {
+    const skill = raw.trim();
+    setSkillKey((k) => k + 1); // remount the Combobox to clear its input
+    if (!skill || local.skills.includes(skill) || local.skills.length >= 10) return;
+    setLocal((p) => ({ ...p, skills: [...p.skills, skill] }));
+  };
+
+  const addMinor = (v: string) => {
+    const m = v.trim();
+    if (m && !local.minors.includes(m) && local.minors.length < 2) {
+      setLocal((p) => ({ ...p, minors: [...p.minors, m] }));
+    }
+    setMinorInput("");
+  };
+
+  // Resume autofill — parse PDF client-side → base64 → POST, then prefill the
+  // local form's EMPTY fields only (never clobber what's already set). User
+  // still hits Save to persist. Functional update re-checks emptiness at apply.
+  const handleResumeFile = async (file: File) => {
+    setResumeError(null);
+    if (file.type !== "application/pdf") {
+      setResumeError("Please upload a PDF.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setResumeError("PDF too large (max 4MB).");
+      return;
+    }
+    setResumeLoading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      let binary = "";
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < view.length; i++) binary += String.fromCharCode(view[i]);
+      const base64 = btoa(binary);
+
+      const res = await fetch("/api/profile/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdf: base64 }),
+      });
+      if (!res.ok) throw new Error("extract failed");
+      const data = await res.json();
+
+      const filled = new Set<string>();
+      setLocal((p) => {
+        const next = { ...p };
+        const fillStr = (key: keyof Preferences, value: unknown) => {
+          if (!String(next[key]).trim() && typeof value === "string" && value.trim()) {
+            (next[key] as string) = value.trim();
+            filled.add(key);
+          }
+        };
+        const fillList = (key: keyof Preferences, value: unknown, cap: number) => {
+          if ((next[key] as string[]).length === 0 && Array.isArray(value)) {
+            const list = value.map((v) => String(v).trim()).filter(Boolean).slice(0, cap);
+            if (list.length) {
+              (next[key] as string[]) = list;
+              filled.add(key);
+            }
+          }
+        };
+
+        fillStr("university", data.university);
+        fillStr("highSchool", data.highSchool);
+        fillStr("hometown", data.hometown);
+        if (!next.greekOrganization.trim() && typeof data.greekOrg === "string" && data.greekOrg.trim()) {
+          next.greekLifeEnabled = true;
+          next.greekOrganization = data.greekOrg.trim();
+          filled.add("greekOrganization");
+        }
+        // Map resume educations array into rows (only when empty).
+        if (next.educations.length === 0 && Array.isArray(data.educations) && data.educations.length > 0) {
+          next.educations = (data.educations as EducationEntry[]).slice(0, 4).map((e) => ({
+            major: String(e?.major ?? "").trim(),
+            degree: String(e?.degree ?? "").trim(),
+            concentration: String(e?.concentration ?? "").trim(),
+          }));
+          filled.add("educations");
+        }
+        // Map resume experiences array into rows (only when empty).
+        if (next.experiences.length === 0 && Array.isArray(data.experiences) && data.experiences.length > 0) {
+          next.experiences = (data.experiences as Record<string, unknown>[]).slice(0, 8).map((e) => ({
+            title: String(e?.title ?? "").trim(),
+            firm: String(e?.firm ?? "").trim(),
+            start: String(e?.start ?? e?.dates ?? "").trim(),
+            end: String(e?.end ?? "").trim(),
+          }));
+          filled.add("experiences");
+        }
+        fillList("minors", data.minors, 2);
+        // Map resume clubMemberships (or legacy clubs) into rows (only when empty).
+        if (next.clubMemberships.length === 0) {
+          if (Array.isArray(data.clubMemberships) && data.clubMemberships.length > 0) {
+            next.clubMemberships = (data.clubMemberships as ClubEntry[]).slice(0, 6).map((e) => ({
+              club: String(e?.club ?? "").trim(),
+              role: String(e?.role ?? "").trim(),
+            })).filter((e) => e.club);
+            if (next.clubMemberships.length) filled.add("clubMemberships");
+          } else if (Array.isArray(data.clubs) && data.clubs.length > 0) {
+            next.clubMemberships = (data.clubs as string[]).slice(0, 6).map((c) => ({
+              club: String(c).trim(),
+              role: "",
+            })).filter((e) => e.club);
+            if (next.clubMemberships.length) filled.add("clubMemberships");
+          }
+        }
+        fillList("skills", data.skills, 10);
+        fillList("targetIndustries", data.targetIndustries, 7);
+        return next;
+      });
+
+      setResumeFilled(filled);
+      setTimeout(() => setResumeFilled(new Set()), 2500);
+    } catch {
+      setResumeError("Couldn't read that resume. Fill the fields manually.");
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     await onSave(local);
@@ -336,32 +742,125 @@ function EditPanel({
   const allFirms = [...local.targetFirms, ...local.customFirms];
   const allLocations = [...local.targetLocations, ...local.customLocations];
 
+  const saveButton = (
+    <Button
+      className="w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+      onClick={handleSave}
+      disabled={saving}
+    >
+      {saving ? "Saving..." : saved ? "Saved!" : (
+        <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
+      )}
+    </Button>
+  );
+
+  const navItems = [
+    { id: "profile", label: "Profile" },
+    { id: "outreach", label: "Outreach drafting" },
+    { id: "notifications", label: "Notifications" },
+  ] as const;
+
   return (
-    <div className="mx-auto max-w-xl p-5">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-xl font-bold text-white">Settings</h2>
-          <p className="mt-0.5 text-[12px] text-text-secondary">Edit your recruiting preferences</p>
+          <h2 className="font-heading text-2xl font-bold text-white">Settings</h2>
+          <p className="mt-1 text-sm text-text-secondary">Edit your recruiting preferences</p>
         </div>
         <button
           onClick={onRestartWizard}
-          className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-white transition-colors duration-150"
+          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-white transition-colors duration-150"
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={13} />
           Restart Setup
         </button>
       </div>
 
-      <div className="space-y-6">
-        {/* Recruiting timeline + weekly goal */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+      <div className="flex flex-col gap-8 md:flex-row">
+        {/* Settings sub-nav */}
+        <nav className="md:w-48 md:shrink-0">
+          <div className="flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5">
+            {navItems.map((item) => {
+              const active = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`shrink-0 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[13px] font-medium transition-colors ${
+                    active
+                      ? "border-accent-teal text-accent-teal"
+                      : "border-transparent text-text-muted hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Content column */}
+        <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
+          {activeSection === "profile" && (
+            <>
+              <CompletenessMeter prefs={local} />
+
+      {/* Resume autofill — prefills empty fields only, never stored. */}
+      <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FileText size={14} className="text-accent-teal" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white">
+              Autofill from resume (PDF)
+            </span>
+          </div>
+          <label
+            className={`flex cursor-pointer items-center gap-1.5 border border-accent-teal/40 bg-accent-teal/10 px-3 py-1.5 text-[11px] font-bold text-accent-teal transition-colors hover:bg-accent-teal/20 ${
+              resumeLoading ? "pointer-events-none opacity-60" : ""
+            }`}
+          >
+            {resumeLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Parsing...
+              </>
+            ) : (
+              <>
+                <Upload className="h-3.5 w-3.5" />
+                Upload PDF
+                <CreditCost action="resume" />
+              </>
+            )}
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              disabled={resumeLoading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleResumeFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-[10px] text-text-muted">
+          Parsed locally, never stored. Only fills empty fields, then hit Save.
+        </p>
+        {resumeError && (
+          <p className="mt-1 text-[10px] text-red-400">{resumeError}</p>
+        )}
+      </div>
+
+      {/* Recruiting timeline + weekly goal */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <CalendarDays size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <CalendarDays size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Recruiting
             </h3>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Target recruiting date
@@ -402,23 +901,264 @@ function EditPanel({
             </div>
           </div>
         </section>
+            </>
+          )}
 
-        {/* School */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+          {activeSection === "outreach" && (
+            <>
+        {/* Outreach drafting */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
+              Outreach drafting
+            </h3>
+          </div>
+          <p className="mb-4 text-[13px] text-text-muted">
+            Controls how Draft Outreach writes your emails. Applies to every new draft.
+          </p>
+          <div className="space-y-4">
+            {/* Tone */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Tone
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["warm", "Warm"],
+                  ["professional", "Professional"],
+                  ["concise", "Concise"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftTone: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftTone === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Length */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Length
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["short", "Short", "~80 words"],
+                  ["medium", "Medium", "~150 words"],
+                  ["long", "Long", "~220 words"],
+                ] as const).map(([val, labelText, hint]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftLength: val })}
+                    className={`flex flex-col items-start border px-4 py-2 transition-colors ${
+                      local.draftLength === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{labelText}</span>
+                    <span className="text-[10px] opacity-70">{hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Subject line */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Subject line
+              </label>
+              <div className="flex gap-2">
+                {([
+                  ["casual", "Casual"],
+                  ["formal", "Formal"],
+                ] as const).map(([val, labelText]) => (
+                  <button
+                    key={val}
+                    onClick={() => setLocal({ ...local, draftSubjectStyle: val })}
+                    className={`border px-4 py-2 text-xs font-bold transition-colors ${
+                      local.draftSubjectStyle === val
+                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        : "border-white/[0.06] text-text-muted hover:text-white"
+                    }`}
+                  >
+                    {labelText}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Signature */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Signature <span className="opacity-60">(optional)</span>
+              </label>
+              <textarea
+                value={local.draftSignature}
+                onChange={(e) =>
+                  setLocal({ ...local, draftSignature: e.target.value.slice(0, 200) })
+                }
+                rows={3}
+                maxLength={200}
+                placeholder={"Best,\nSam Rigot\nUNC '29"}
+                className="w-full resize-none border border-white/[0.06] bg-muted px-3 py-2 text-sm text-white placeholder:text-text-muted focus:border-accent-teal focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-text-muted">
+                When set, used verbatim as the sign-off instead of just your first name.{" "}
+                {local.draftSignature.length}/200
+              </p>
+            </div>
+          </div>
+        </section>
+              {saveButton}
+            </>
+          )}
+
+          {activeSection === "notifications" && (
+            <>
+        {/* Notifications */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <GraduationCap size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">School</h3>
+            <Mail size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
+              Notifications
+            </h3>
+          </div>
+          <div className="space-y-4">
+            {([
+              [
+                "digestEmailEnabled",
+                "Weekly digest",
+                "New warm paths in your network, every Monday morning.",
+              ],
+              [
+                "followupEmailEnabled",
+                "Follow-up reminders",
+                "A nudge when leads go cold (7+ days, no movement). Twice a week.",
+              ],
+            ] as const).map(([key, labelText, desc]) => {
+              const on = local[key];
+              return (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-white">{labelText}</div>
+                    <p className="mt-0.5 text-[10px] text-text-muted">{desc}</p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={labelText}
+                    onClick={() => setLocal({ ...local, [key]: !on })}
+                    className={`relative h-5 w-9 shrink-0 border transition-colors ${
+                      on ? "border-accent-teal bg-accent-teal/30" : "border-white/[0.06] bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-3.5 w-3.5 transition-all ${
+                        on ? "left-[18px] bg-accent-teal" : "left-0.5 bg-text-muted"
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+              {saveButton}
+            </>
+          )}
+
+          {activeSection === "profile" && (
+            <>
+        {/* School */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <GraduationCap size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">School</h3>
           </div>
           <div className="space-y-3">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 University
               </label>
-              <Input
-                placeholder="University of North Carolina at Chapel Hill"
+              <Combobox
                 value={local.university}
-                onChange={(e) => setLocal({ ...local, university: e.target.value })}
-                className="bg-muted text-sm"
+                onSelect={(v) => setLocal({ ...local, university: v })}
+                loadOptions={loadUniversities}
+                placeholder="University of North Carolina at Chapel Hill"
+                ariaLabel="University"
+                matchAcronyms
+              />
+            </div>
+
+            {/* Education rows editor (up to 4) */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Education{" "}
+                <span className="font-mono text-[9px] tabular-nums text-text-muted/60">
+                  {local.educations.length}/4
+                </span>
+              </label>
+              <EducationRowsEditor
+                rows={local.educations}
+                onChange={(rows) => setLocal((p) => ({ ...p, educations: rows }))}
+                resumeFilled={resumeFilled.has("educations")}
+              />
+            </div>
+
+            {/* Minor stays exactly as-is */}
+            <div className={resumeFilled.has("minors") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Minor <span className="font-mono text-[9px] tabular-nums text-text-muted/60">{local.minors.length}/2</span>
+              </label>
+              {local.minors.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-1.5">
+                  {local.minors.map((m) => (
+                    <span
+                      key={m}
+                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                    >
+                      {m}
+                      <button
+                        onClick={() => setLocal((p) => ({ ...p, minors: p.minors.filter((x) => x !== m) }))}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {local.minors.length < 2 && (
+                <Combobox
+                  value={minorInput}
+                  onSelect={addMinor}
+                  loadOptions={loadMinors}
+                  placeholder="Add a minor..."
+                  ariaLabel="Minor"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                High School
+              </label>
+              <Combobox
+                value={local.highSchool}
+                onSelect={(v) => {
+                  // Display label is "Name — City, ST"; store only the school name.
+                  const name = v.includes(" — ") ? v.split(" — ")[0] : v;
+                  setLocal({ ...local, highSchool: name });
+                }}
+                loadOptions={loadHighSchools}
+                placeholder="East Chapel Hill High School"
+                ariaLabel="High School"
               />
             </div>
             <div>
@@ -453,33 +1193,84 @@ function EditPanel({
                 <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                   Organization
                 </label>
-                <Input
-                  placeholder="e.g. Chi Phi"
+                <Combobox
                   value={local.greekOrganization}
-                  onChange={(e) => setLocal({ ...local, greekOrganization: e.target.value })}
-                  className="bg-muted text-sm"
+                  onSelect={(v) => setLocal({ ...local, greekOrganization: v })}
+                  loadOptions={loadGreekOrgs}
+                  placeholder="e.g. Chi Phi"
+                  ariaLabel="Greek Organization"
                 />
               </div>
             )}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Clubs{" "}
+                <span className="font-mono text-[9px] tabular-nums text-text-muted/60">
+                  {local.clubMemberships.length}/6
+                </span>
+              </label>
+              <ClubRowsEditor
+                rows={local.clubMemberships}
+                onChange={(rows) => setLocal((p) => ({ ...p, clubMemberships: rows }))}
+                resumeFilled={resumeFilled.has("clubMemberships")}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Skills (up to 10)
+              </label>
+              {local.skills.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {local.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    >
+                      {skill}
+                      <button
+                        onClick={() => setLocal((p) => ({ ...p, skills: p.skills.filter((s) => s !== skill) }))}
+                        className="text-accent-teal/60 hover:text-accent-teal"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {local.skills.length < 10 && (
+                <Combobox
+                  key={skillKey}
+                  value=""
+                  onSelect={addSkill}
+                  loadOptions={loadSkills}
+                  placeholder="Add a skill, then press Enter..."
+                  ariaLabel="Skills"
+                />
+              )}
+              {local.skills.length > 0 && (
+                <p className="mt-1 text-[10px] text-text-muted">{local.skills.length}/10 selected</p>
+              )}
+            </div>
           </div>
         </section>
 
         {/* Location */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
+            <MapPin size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
           </div>
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
                 Hometown
               </label>
-              <CityAutocomplete
-                placeholder="Charlotte, NC"
+              <Combobox
                 value={local.hometown}
-                onChange={(v) => setLocal({ ...local, hometown: v })}
-                className="bg-muted text-sm"
+                onSelect={(v) => setLocal({ ...local, hometown: v })}
+                loadOptions={loadCities}
+                placeholder="Charlotte, NC"
+                ariaLabel="Hometown"
               />
             </div>
             <div>
@@ -539,40 +1330,24 @@ function EditPanel({
           </div>
         </section>
 
-        {/* Industries */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        {/* Target roles — track-grouped. Selected ROLE names persist into
+            targetIndustries (storage shape unchanged). */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Target size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Industries</h3>
+            <Target size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {INDUSTRY_OPTIONS.map((ind) => {
-              const active = local.targetIndustries.includes(ind);
-              return (
-                <button
-                  key={ind}
-                  onClick={() => toggleIndustry(ind)}
-                  className={`border px-4 py-2.5 text-xs font-bold transition-colors ${
-                    active
-                      ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                      : "border-white/[0.06] text-text-muted hover:text-white"
-                  }`}
-                >
-                  {ind}
-                </button>
-              );
-            })}
-          </div>
+          <TrackRolePicker selected={local.targetIndustries} onToggle={toggleIndustry} />
           {local.targetIndustries.length > 0 && (
             <p className="mt-3 text-[11px] text-text-muted">{local.targetIndustries.length} selected</p>
           )}
         </section>
 
-        {/* Firms */}
-        <section className="border border-white/[0.06] bg-bg-card p-5">
+        {/* Firms + Experience */}
+        <section className="border border-white/[0.06] bg-bg-card p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Building2 size={15} className="text-accent-teal" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
+            <Building2 size={16} className="text-accent-teal" />
+            <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {FIRM_OPTIONS.map((firm) => {
@@ -621,6 +1396,21 @@ function EditPanel({
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Experience rows editor (up to 8) — replaces flat pastFirms */}
+          <div className="mt-6">
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              Experience{" "}
+              <span className="font-mono text-[9px] tabular-nums text-text-muted/60">
+                up to 8
+              </span>
+            </label>
+            <ExperienceRowsEditor
+              rows={local.experiences}
+              onChange={(rows) => setLocal((p) => ({ ...p, experiences: rows }))}
+              resumeFilled={resumeFilled.has("experiences")}
+            />
+          </div>
         </section>
 
         {/* Save */}
@@ -633,6 +1423,9 @@ function EditPanel({
             <span className="flex items-center gap-2"><Pencil size={14} /> Save Changes</span>
           )}
         </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -790,6 +1583,19 @@ function Wizard({
                     className="bg-muted text-sm"
                   />
                 </div>
+                {/* Education rows in wizard step 0 */}
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Education{" "}
+                    <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                      {prefs.educations.length}/4
+                    </span>
+                  </label>
+                  <EducationRowsEditor
+                    rows={prefs.educations}
+                    onChange={(rows) => setPrefs((p) => ({ ...p, educations: rows }))}
+                  />
+                </div>
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Greek Life</label>
                   <div className="flex gap-2">
@@ -873,25 +1679,30 @@ function Wizard({
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Experience rows in wizard step 1 */}
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Experience{" "}
+                    <span className="font-mono text-[9px] tabular-nums text-muted-foreground/60">
+                      up to 8
+                    </span>
+                  </label>
+                  <ExperienceRowsEditor
+                    rows={prefs.experiences}
+                    onChange={(rows) => setPrefs((p) => ({ ...p, experiences: rows }))}
+                  />
+                </div>
               </div>
             </div>
           )}
 
           {step === 2 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Target Industries</p>
-              <h2 className="mt-2 text-xl font-bold text-foreground">What areas of finance are you recruiting for?</h2>
-              <div className="mt-6 flex flex-wrap gap-2">
-                {INDUSTRY_OPTIONS.map((ind) => {
-                  const active = prefs.targetIndustries.includes(ind);
-                  return (
-                    <button
-                      key={ind}
-                      onClick={() => toggleIndustry(ind)}
-                      className={`border px-4 py-2.5 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
-                    >{ind}</button>
-                  );
-                })}
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Target Roles</p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">Which roles are you recruiting for?</h2>
+              <div className="mt-6">
+                <TrackRolePicker selected={prefs.targetIndustries} onToggle={toggleIndustry} />
               </div>
             </div>
           )}
@@ -1040,14 +1851,35 @@ export default function SettingsPage() {
           if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length || data.recruitingDate)) {
             const merged: Preferences = {
               university: data.university || "",
+              highSchool: data.highSchool || "",
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",
+              // Server synthesizes educations from flat fields when the array is absent.
+              educations: Array.isArray(data.educations) ? data.educations : [],
+              minors:
+                typeof data.minor === "string" && data.minor
+                  ? data.minor.split(",").map((m: string) => m.trim()).filter(Boolean).slice(0, 2)
+                  : [],
+              experiences: Array.isArray(data.experiences) ? data.experiences : [],
+              clubMemberships: Array.isArray(data.clubMemberships) ? data.clubMemberships : [],
+              skills: Array.isArray(data.skills) ? data.skills : [],
               hometown: data.hometown || "",
-              targetLocations: Array.isArray(data.targetLocations) ? data.targetLocations : [],
-              customLocations: [],
+              // DB stores presets + customs as one flat list; split against the
+              // preset option arrays or custom entries render nowhere (and the
+              // dupe-guard then silently blocks re-adding them).
+              targetLocations: Array.isArray(data.targetLocations)
+                ? data.targetLocations.filter((l: string) => LOCATION_OPTIONS.includes(l))
+                : [],
+              customLocations: Array.isArray(data.targetLocations)
+                ? data.targetLocations.filter((l: string) => !LOCATION_OPTIONS.includes(l))
+                : [],
               targetIndustries: Array.isArray(data.targetIndustries) ? data.targetIndustries : [],
-              targetFirms: Array.isArray(data.targetFirms) ? data.targetFirms : [],
-              customFirms: [],
+              targetFirms: Array.isArray(data.targetFirms)
+                ? data.targetFirms.filter((f: string) => FIRM_OPTIONS.includes(f))
+                : [],
+              customFirms: Array.isArray(data.targetFirms)
+                ? data.targetFirms.filter((f: string) => !FIRM_OPTIONS.includes(f))
+                : [],
               recruitingDate: data.recruitingDate
                 ? String(data.recruitingDate).slice(0, 10)
                 : "",
@@ -1055,6 +1887,12 @@ export default function SettingsPage() {
                 typeof data.weeklyGoalTarget === "number" && data.weeklyGoalTarget > 0
                   ? data.weeklyGoalTarget
                   : 3,
+              draftTone: data.draftTone || "warm",
+              draftLength: data.draftLength || "medium",
+              draftSignature: data.draftSignature || "",
+              draftSubjectStyle: data.draftSubjectStyle || "casual",
+              digestEmailEnabled: data.digestEmailEnabled ?? true,
+              followupEmailEnabled: data.followupEmailEnabled ?? true,
             };
             setPrefs(merged);
             savePreferences(merged);

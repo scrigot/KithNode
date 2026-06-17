@@ -6,16 +6,17 @@ import { sendWeeklyDigest } from "@/lib/email/weekly-digest";
 /** POST - Send digest to the authenticated user (manual trigger / testing) */
 export async function POST() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   try {
     const { data: user } = await supabase
       .from("User")
       .select("email, name")
-      .eq("email", userId)
+      .eq("email", userEmail)
       .single();
 
     if (!user) {
@@ -52,7 +53,8 @@ export async function GET(req: Request) {
 
   const { data: users, error } = await supabase
     .from("User")
-    .select("id, email, name");
+    .select("id, email, name")
+    .eq("digestEmailEnabled", true);
 
   if (error || !users) {
     console.error("[digest] failed to fetch users", error);
@@ -65,7 +67,7 @@ export async function GET(req: Request) {
   const results: { email: string; success: boolean; error?: string }[] = [];
 
   for (const user of users) {
-    const result = await sendWeeklyDigest(user.email, user.email, user.name);
+    const result = await sendWeeklyDigest(user.id, user.email, user.name);
     results.push({ email: user.email, ...result });
   }
 

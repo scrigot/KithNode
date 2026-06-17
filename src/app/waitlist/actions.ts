@@ -58,11 +58,21 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
   const proto = h.get("x-forwarded-proto") || "https";
   const referralLink = `${proto}://${host}/?ref=${refCode}`;
 
-  void sendWaitlistConfirmation({
+  // Await delivery so a failure is recorded, not silently swallowed. The signup
+  // row is already saved; email tracking is best-effort and never blocks success.
+  const emailResult = await sendWaitlistConfirmation({
     email: payload.email,
     fullName: payload.full_name,
     referralLink,
   });
+
+  await supabase
+    .from("waitlist_signups")
+    .update({
+      email_status: emailResult.status,
+      email_sent_at: emailResult.status === "sent" ? new Date().toISOString() : null,
+    })
+    .eq("email", payload.email);
 
   return { ok: true, ref_code: refCode };
 }

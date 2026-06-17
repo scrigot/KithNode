@@ -4,8 +4,8 @@
 export interface AlumniSeed {
   name: string;
   title: string;
-  /** Maps to AlumniContact.organization */
-  organization: string;
+  /** Maps to AlumniContact.firmName */
+  firmName: string;
   email: string;
   /** Maps to AlumniContact.linkedInUrl (reused as dedup key / source URL) */
   sourceUrl: string;

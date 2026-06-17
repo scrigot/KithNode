@@ -195,6 +195,27 @@ def _draft_with_claude_v2(contact: dict) -> dict:
             messages=[{"role": "user", "content": prompt}],
         )
 
+        # Best-effort cost telemetry (generate pass). Never raises.
+        from cost_log import anthropic_cost, log_cost
+
+        log_cost(
+            "anthropic",
+            "messages.create:generate",
+            tokens_in=response.usage.input_tokens,
+            tokens_out=response.usage.output_tokens,
+            cost_usd=anthropic_cost(
+                "claude-sonnet-4-20250514",
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+            ),
+            meta={
+                "model": "claude-sonnet-4-20250514",
+                "stage": "generate",
+                "contact_id": contact.get("id"),
+                "source": "backend",
+            },
+        )
+
         draft_text = response.content[0].text
 
         # Parse subject and body
@@ -230,6 +251,26 @@ Format: If rewriting, use SUBJECT: and BODY: format. If approving, just say APPR
             model="claude-sonnet-4-20250514",
             max_tokens=600,
             messages=[{"role": "user", "content": critique_prompt}],
+        )
+
+        # Best-effort cost telemetry (critique pass). Both passes = one draft;
+        # aggregate by meta.contact_id.
+        log_cost(
+            "anthropic",
+            "messages.create:critique",
+            tokens_in=critique_response.usage.input_tokens,
+            tokens_out=critique_response.usage.output_tokens,
+            cost_usd=anthropic_cost(
+                "claude-sonnet-4-20250514",
+                critique_response.usage.input_tokens,
+                critique_response.usage.output_tokens,
+            ),
+            meta={
+                "model": "claude-sonnet-4-20250514",
+                "stage": "critique",
+                "contact_id": contact.get("id"),
+                "source": "backend",
+            },
         )
 
         critique_text = critique_response.content[0].text

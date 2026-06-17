@@ -14,7 +14,7 @@ export function PanelScoring() {
     <section
       id="scoring-panel"
       ref={ref}
-      className="scroll-mt-20 rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40"
+      className="scroll-mt-20 rounded-[24px] border border-slate-200 bg-white shadow-xl shadow-slate-200/40"
     >
       {/* Header */}
       <div className="flex flex-col gap-2 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-6 py-5 sm:flex-row sm:items-end sm:justify-between">
@@ -104,22 +104,22 @@ export function PanelScoring() {
               <span className="font-mono text-sm text-white/50">/ 100</span>
             </div>
             <p className="mt-2 text-xs text-white/70">
-              Weighted average across five signal categories, calibrated
-              against 4,200 historical alumni outreach outcomes.
+              Weighted across five signal categories, by how strongly each one
+              predicts a warm reply.
             </p>
           </div>
 
           {/* Radial sparkline-ish divider */}
           <div className="relative">
             <div className="h-px w-full bg-gradient-to-r from-transparent via-[#0EA5E9]/50 to-transparent" />
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#0EA5E9]/20 bg-[#0EA5E9]/5 p-3">
+            <div className="mt-4 flex items-start gap-2 rounded-[12px] border border-[#0EA5E9]/20 bg-[#0EA5E9]/5 p-3">
               <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-[#0EA5E9]" />
               <div>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#0EA5E9]">
                   Expected response rate
                 </p>
                 <p className="mt-1 text-sm font-semibold text-white">
-                  8x higher vs. cold outreach
+                  Much warmer than a cold email
                 </p>
               </div>
             </div>

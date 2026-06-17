@@ -6,13 +6,14 @@ import { detectAffiliations, computeWarmthScore } from "@/lib/linkedin-import";
 
 export async function POST() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   try {
-    const prefs = await getUserPrefs(userId);
+    const prefs = await getUserPrefs(userEmail);
 
     const { data: contacts, error } = await supabase
       .from("AlumniContact")
@@ -31,7 +32,7 @@ export async function POST() {
         name: c.name || "",
         education: c.education || "",
         location: c.location || "",
-        experience: c.organization || "",
+        experience: c.firmName || "",
         title: c.title || "",
         industry: c.industry || "",
         seniorityLevel: c.seniorityLevel || "",

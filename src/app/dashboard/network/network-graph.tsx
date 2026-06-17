@@ -4,14 +4,11 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import ForceGraph2D, {
   type ForceGraphMethods,
   type NodeObject,
-  type LinkObject,
 } from "react-force-graph-2d";
 import type { GraphNode, GraphLink, GraphData } from "./graph-model";
 
-// ─── Palette (mirrors DESIGN.md tokens) ──────────────────────────────────
+// ─── Palette (mirrors brand/dashboard.md tokens) ──────────────────────────────────
 const C = {
-  bg: "#0A1628",
-  panel: "#0E1B2E",
   accent: "#0EA5E9",
   text: "#E5E9F0",
   muted: "#8A94A6",
@@ -22,13 +19,23 @@ const C = {
   you: "#0EA5E9",
 };
 
-// Domain node/link enriched with the runtime x/y the engine assigns.
+// graph-model sizes nodes 8..18; for the Obsidian dot-field we render ~0.4x.
+const RADIUS_SCALE = 0.4;
+
+// Node augmented with the runtime fields the d3 engine assigns + our cluster tag.
+type SimNode = GraphNode & {
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number;
+  fy?: number;
+  __cluster?: string;
+};
 type RGNode = NodeObject<GraphNode>;
-type RGLink = LinkObject<GraphNode, GraphLink>;
 
 function nodeColor(n: GraphNode): string {
   if (n.kind === "you") return C.you;
-  if (n.kind === "intermediary") return C.accent;
   switch (n.tier) {
     case "hot":
       return C.hot;
@@ -39,6 +46,86 @@ function nodeColor(n: GraphNode): string {
     default:
       return C.cold;
   }
+}
+
+// Custom d3 force: pull every node toward the centroid of its cluster so people
+// who share an affiliation visibly group, with NO hub nodes and NO edges. Plain
+// JS (no d3-force dep). Unclustered nodes drift under the charge force.
+function clusterForce(strength: number) {
+  let nodes: SimNode[] = [];
+  const force = (alpha: number) => {
+    const sx = new Map<string, number>();
+    const sy = new Map<string, number>();
+    const cn = new Map<string, number>();
+    for (const n of nodes) {
+      const k = n.__cluster;
+      if (!k || n.x == null || n.y == null) continue;
+      sx.set(k, (sx.get(k) ?? 0) + n.x);
+      sy.set(k, (sy.get(k) ?? 0) + n.y);
+      cn.set(k, (cn.get(k) ?? 0) + 1);
+    }
+    const kk = strength * alpha;
+    for (const n of nodes) {
+      const c = n.__cluster;
+      if (!c || n.x == null || n.y == null) continue;
+      const count = cn.get(c) ?? 1;
+      n.vx = (n.vx ?? 0) + ((sx.get(c) ?? 0) / count - n.x) * kk;
+      n.vy = (n.vy ?? 0) + ((sy.get(c) ?? 0) / count - n.y) * kk;
+    }
+  };
+  (force as unknown as { initialize: (n: SimNode[]) => void }).initialize = (
+    n,
+  ) => {
+    nodes = n;
+  };
+  return force;
+}
+
+// Minimal shape of a tunable d3 force (avoids importing d3-force types).
+type ForceLike = {
+  strength: (s: number) => ForceLike;
+  distanceMax: (d: number) => ForceLike;
+};
+
+// ─── Starfield: pure-CSS twinkling stars (GPU compositor, zero JS per frame) ─
+// Each layer is one div whose background is a list of tiny radial-gradient dots;
+// opacity is animated by CSS so there's no requestAnimationFrame on the main
+// thread competing with the graph.
+function Starfield() {
+  const layers = useMemo(() => {
+    const make = (n: number, size: number) => {
+      const parts: string[] = [];
+      for (let i = 0; i < n; i++) {
+        const x = (Math.random() * 100).toFixed(2);
+        const y = (Math.random() * 100).toFixed(2);
+        const col =
+          Math.random() < 0.22 ? "rgba(56,189,248,0.9)" : "rgba(226,232,240,0.9)";
+        parts.push(`radial-gradient(circle ${size}px at ${x}% ${y}%, ${col}, transparent)`);
+      }
+      return parts.join(",");
+    };
+    return [make(46, 1.4), make(34, 1), make(22, 1.9)];
+  }, []);
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <style>{`
+        @keyframes kn-twinkle { from { opacity: 0.28 } to { opacity: 0.72 } }
+        .kn-star { background-repeat: no-repeat; animation: kn-twinkle ease-in-out infinite alternate; will-change: opacity; }
+      `}</style>
+      {layers.map((bg, i) => (
+        <div
+          key={i}
+          className="kn-star absolute inset-0"
+          style={{
+            backgroundImage: bg,
+            animationDuration: `${3.5 + i * 1.4}s`,
+            animationDelay: `${i * 0.9}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function NetworkGraph({
@@ -55,6 +142,39 @@ export function NetworkGraph({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 800, h: 600 });
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const didFit = useRef(false);
+
+  // ── People-only graph derived from the full model ──────────────────────
+  // Drop affiliation (intermediary) nodes; keep YOU + contacts. Each contact's
+  // cluster = the first affiliation hub that linked to it.
+  const { nodes, peopleById, youNode, clusterOf } = useMemo(() => {
+    const eid = (e: unknown): string =>
+      e !== null && typeof e === "object" ? (e as GraphNode).id : (e as string);
+    const clusterOf = new Map<string, string>();
+    for (const l of data.links) {
+      const s = eid(l.source);
+      const t = eid(l.target);
+      if (s.startsWith("a:") && t.startsWith("c:") && !clusterOf.has(t)) {
+        clusterOf.set(t, s);
+      }
+    }
+    const nodes: SimNode[] = [];
+    const peopleById = new Map<string, SimNode>();
+    let youNode: SimNode | undefined;
+    for (const n of data.nodes) {
+      if (n.kind === "intermediary") continue;
+      const sn = n as SimNode;
+      if (n.kind === "target") sn.__cluster = clusterOf.get(n.id);
+      if (n.kind === "you") {
+        sn.fx = 0;
+        sn.fy = 0;
+        youNode = sn;
+      }
+      nodes.push(sn);
+      peopleById.set(n.id, sn);
+    }
+    return { nodes, peopleById, youNode, clusterOf };
+  }, [data]);
 
   // Size the canvas to its container (force-graph needs explicit px).
   useEffect(() => {
@@ -68,165 +188,163 @@ export function NetworkGraph({
     return () => ro.disconnect();
   }, []);
 
-  // Resolve which nodes/links are "lit" given the active node (selected wins,
-  // else hover). For a target, the warm path is YOU → intermediaries → target.
-  const active = selectedId ?? hoverId;
-  const { litNodes, litLinks } = useMemo(() => {
-    const nodes = new Set<string>();
-    const links = new Set<string>();
-    if (!active) return { litNodes: nodes, litLinks: links };
-    // react-force-graph's d3 engine mutates link.source/target from string ids
-    // into node objects after the sim inits — normalize to an id before compare.
-    const eid = (e: unknown): string =>
-      e !== null && typeof e === "object" ? (e as GraphNode).id : (e as string);
-    nodes.add(active);
-    for (const l of data.links) {
-      const s = eid(l.source);
-      const t = eid(l.target);
-      if (s === active || t === active) {
-        nodes.add(s);
-        nodes.add(t);
-        links.add(l.id);
-      }
-    }
-    // Second hop: from any newly-lit intermediary back to YOU.
-    const interm = [...nodes].filter(
-      (id) => data.nodeMap.get(id)?.kind === "intermediary",
+  // Tune forces: light repulsion + cluster attraction + gentle center, settling
+  // fast so the engine stops (and redraws cease) quickly.
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const charge = fg.d3Force("charge") as unknown as ForceLike | undefined;
+    charge?.strength(-22).distanceMax(170);
+    const center = fg.d3Force("center") as unknown as ForceLike | undefined;
+    center?.strength(0.02);
+    fg.d3Force(
+      "cluster",
+      clusterForce(0.22) as unknown as Parameters<typeof fg.d3Force>[1],
     );
-    for (const l of data.links) {
-      const s = eid(l.source);
-      const t = eid(l.target);
-      if (
-        (s === "you" && interm.includes(t)) ||
-        (t === "you" && interm.includes(s))
-      ) {
-        nodes.add("you");
-        links.add(l.id);
-      }
-    }
-    return { litNodes: nodes, litLinks: links };
-  }, [active, data]);
+    didFit.current = false;
+    fg.d3ReheatSimulation();
+  }, [nodes]);
+
+  // Lit neighborhood for the active node: the person, YOU, and same-cluster peers.
+  const active = selectedId ?? hoverId;
+  const litNodes = useMemo(() => {
+    const s = new Set<string>();
+    if (!active) return s;
+    s.add(active);
+    s.add("you");
+    const ac = clusterOf.get(active);
+    if (ac) for (const [pid, c] of clusterOf) if (c === ac) s.add(pid);
+    return s;
+  }, [active, clusterOf]);
 
   const dimmed = active != null;
 
+  // Warm-path line drawn UNDER the nodes when a contact is active (person → YOU).
+  const paintPre = useCallback(
+    (ctx: CanvasRenderingContext2D, scale: number) => {
+      if (!active || active === "you" || !youNode) return;
+      const a = peopleById.get(active);
+      if (
+        !a ||
+        a.x == null ||
+        a.y == null ||
+        youNode.x == null ||
+        youNode.y == null
+      )
+        return;
+      ctx.strokeStyle = "rgba(14,165,233,0.55)";
+      ctx.lineWidth = 1.3 / scale;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(youNode.x, youNode.y);
+      ctx.stroke();
+    },
+    [active, peopleById, youNode],
+  );
+
+  // Lean node paint: no ctx.save/restore, no shadowBlur (both are per-frame
+  // killers). globalAlpha is reset to 1 at the end of each node.
   const paintNode = useCallback(
     (raw: RGNode, ctx: CanvasRenderingContext2D, scale: number) => {
-      const node = raw as GraphNode & { x?: number; y?: number };
+      const node = raw as SimNode;
       const x = node.x ?? 0;
       const y = node.y ?? 0;
-      const lit = !dimmed || litNodes.has(node.id);
-      ctx.save();
-      ctx.globalAlpha = lit ? 1 : 0.16;
-      const r = node.val;
+      const inLit = litNodes.has(node.id);
+      const lit = !dimmed || inLit;
       const col = nodeColor(node);
+      const r = node.val * RADIUS_SCALE;
+      const isActive = node.id === active;
 
-      // YOU node — concentric teal rings.
-      if (node.kind === "you") {
+      // Cheap halo (translucent ring fill) instead of shadowBlur for the glow.
+      if (isActive) {
+        ctx.globalAlpha = lit ? 0.2 : 0.08;
         ctx.beginPath();
-        ctx.arc(x, y, r + 10, 0, 2 * Math.PI);
-        ctx.fillStyle = "rgba(14,165,233,0.05)";
+        ctx.arc(x, y, r + 3.5, 0, 2 * Math.PI);
+        ctx.fillStyle = col;
         ctx.fill();
-        ctx.beginPath();
-        ctx.arc(x, y, r + 5, 0, 2 * Math.PI);
-        ctx.strokeStyle = "rgba(14,165,233,0.25)";
-        ctx.lineWidth = 0.7;
-        ctx.setLineDash([2, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
       }
 
-      // Selection / hover ring.
-      if (node.id === active) {
-        ctx.beginPath();
-        ctx.arc(x, y, r + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-      }
-
-      // Body.
+      ctx.globalAlpha = lit ? 1 : 0.1;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
-      ctx.fillStyle =
-        node.kind === "target" ? `${col}22` : C.panel;
-      ctx.fill();
-      ctx.lineWidth = node.kind === "you" ? 2 : 1.6;
-      ctx.strokeStyle = col;
-      ctx.stroke();
-
-      // Glyph.
-      const fontSize = Math.max(7, r * 0.7);
-      ctx.font = `500 ${fontSize}px "JetBrains Mono", monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
       ctx.fillStyle = col;
-      ctx.fillText(node.kind === "you" ? "YOU" : node.glyph, x, y);
+      ctx.fill();
 
-      // Label below — when zoomed enough, or for non-target / lit nodes.
-      const showLabel = scale > 0.55 || node.kind !== "target" || lit;
+      if (node.kind === "you") {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 4, 0, 2 * Math.PI);
+        ctx.lineWidth = 1.2 / scale;
+        ctx.strokeStyle = "rgba(14,165,233,0.5)";
+        ctx.stroke();
+      }
+
+      // Labels: YOU always; the hovered/selected person; otherwise only zoomed in.
+      let showLabel = node.kind === "you";
+      if (dimmed) showLabel = showLabel || isActive;
+      else if (scale > 1.7) showLabel = showLabel || node.kind === "target";
+
       if (showLabel) {
-        const lf = Math.min(11, Math.max(8, 9));
-        ctx.font = `400 ${lf}px "JetBrains Mono", monospace`;
-        ctx.fillStyle = node.kind === "target" ? C.text : C.muted;
-        ctx.fillText(node.label, x, y + r + lf);
-        if (node.kind === "target" && node.sub) {
-          ctx.font = `400 ${lf - 1}px "JetBrains Mono", monospace`;
+        const emphatic = isActive || node.kind === "you";
+        const fs = (emphatic ? 11 : 9.5) / scale;
+        ctx.font = `500 ${fs}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = node.kind === "you" ? C.accent : C.text;
+        ctx.fillText(node.label, x, y + r + 2 / scale);
+        if (emphatic && node.kind === "target" && node.sub) {
+          ctx.font = `400 ${fs - 1}px "JetBrains Mono", monospace`;
           ctx.fillStyle = C.muted;
-          ctx.fillText(node.sub, x, y + r + lf * 2.1);
+          ctx.fillText(node.sub, x, y + r + 2 / scale + fs * 1.15);
         }
       }
-      ctx.restore();
+
+      ctx.globalAlpha = 1;
     },
     [active, dimmed, litNodes],
   );
 
-  // Pointer hit area matches the painted body so clicks land on the node.
   const paintPointer = useCallback(
     (raw: RGNode, color: string, ctx: CanvasRenderingContext2D) => {
-      const node = raw as GraphNode & { x?: number; y?: number };
+      const node = raw as SimNode;
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(node.x ?? 0, node.y ?? 0, node.val + 2, 0, 2 * Math.PI);
+      // Generous hit area (+6) so small dots are easy to click/hover.
+      ctx.arc(node.x ?? 0, node.y ?? 0, node.val * RADIUS_SCALE + 6, 0, 2 * Math.PI);
       ctx.fill();
     },
     [],
   );
 
-  const linkLit = useCallback(
-    (raw: RGLink) => !dimmed || litLinks.has((raw as GraphLink).id),
-    [dimmed, litLinks],
-  );
-
   return (
     <div ref={wrapRef} className="absolute inset-0">
+      <Starfield />
       <ForceGraph2D
         ref={fgRef}
         width={dims.w}
         height={dims.h}
-        graphData={{ nodes: data.nodes, links: data.links }}
-        backgroundColor={C.bg}
+        graphData={{ nodes, links: [] }}
+        backgroundColor="rgba(0,0,0,0)"
         nodeRelSize={1}
         nodeVal={(n) => (n as GraphNode).val}
-        cooldownTicks={120}
-        d3VelocityDecay={0.32}
-        warmupTicks={40}
-        autoPauseRedraw={false}
+        warmupTicks={20}
+        cooldownTicks={110}
+        d3VelocityDecay={0.45}
+        d3AlphaDecay={0.045}
+        enableNodeDrag={false}
+        onEngineStop={() => {
+          // Freeze every node where it landed so hovering/clicking doesn't chase
+          // a moving target — the graph goes completely static after it settles.
+          for (const n of nodes) {
+            n.fx = n.x;
+            n.fy = n.y;
+          }
+          if (didFit.current) return;
+          didFit.current = true;
+          fgRef.current?.zoomToFit(600, 80);
+        }}
+        onRenderFramePre={paintPre}
         nodeCanvasObject={paintNode}
         nodePointerAreaPaint={paintPointer}
-        linkColor={(l) => {
-          const strength = (l as GraphLink).strength;
-          return linkLit(l)
-            ? `rgba(14,165,233,${0.25 + strength * 0.6})`
-            : "rgba(14,165,233,0.05)";
-        }}
-        linkWidth={(l) =>
-          (linkLit(l) ? 1 : 0.5) * (0.8 + (l as GraphLink).strength * 1.4)
-        }
-        linkDirectionalParticles={(l) =>
-          dimmed && litLinks.has((l as GraphLink).id) ? 3 : 0
-        }
-        linkDirectionalParticleWidth={2}
-        linkDirectionalParticleColor={() => C.accent}
         onNodeClick={(n) => {
           const id = (n as GraphNode).id;
           onSelect(id === selectedId ? null : id);

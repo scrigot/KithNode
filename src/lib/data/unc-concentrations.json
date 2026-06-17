@@ -1,0 +1,46 @@
+{
+  "Biology": [
+    "Quantitative Biology Track"
+  ],
+  "Business Administration": [
+    "Business of Health",
+    "Consulting",
+    "Entrepreneurship",
+    "Finance",
+    "Managing People and Organizations",
+    "Marketing",
+    "Operations Management",
+    "Real Estate",
+    "Sustainability"
+  ],
+  "Chemistry": [
+    "Biochemistry Track",
+    "Polymer Track"
+  ],
+  "Data Science": [
+    "Advanced Artificial Intelligence and Machine Learning",
+    "Data Science in Politics",
+    "Decision Analytics",
+    "Economic Analysis",
+    "Health Informatics",
+    "Mathematical Foundations",
+    "Operations Research",
+    "Quantitative Language Science",
+    "Sports Analytics",
+    "Statistical Learning and Data Analysis",
+    "Urban Analytics"
+  ],
+  "Exercise and Sport Science": [
+    "Fitness Professional",
+    "General",
+    "Sport Administration"
+  ],
+  "Mathematics": [
+    "Applied Option"
+  ],
+  "Statistics and Analytics": [
+    "Actuarial Science",
+    "Decision Analytics",
+    "Machine Learning"
+  ]
+}

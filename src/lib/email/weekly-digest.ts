@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 import { normalizeFirmName } from "@/lib/normalize-firm";
+import { isAddressSuppressed } from "@/lib/resend";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -10,7 +11,7 @@ const client = API_KEY ? new Resend(API_KEY) : null;
 
 interface DigestContact {
   name: string;
-  organization: string;
+  firmName: string;
   title: string;
   affiliations: string | null;
 }
@@ -24,7 +25,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
   const map = new Map<string, DigestContact[]>();
 
   for (const c of contacts) {
-    const key = normalizeFirmName(c.organization) || c.organization || "Unknown";
+    const key = normalizeFirmName(c.firmName) || c.firmName || "Unknown";
     const list = map.get(key) || [];
     list.push(c);
     map.set(key, list);
@@ -32,7 +33,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
 
   return Array.from(map.entries())
     .map(([firm, contacts]) => ({
-      firm: contacts[0].organization || firm,
+      firm: contacts[0].firmName || firm,
       contacts,
     }))
     .sort((a, b) => b.contacts.length - a.contacts.length);
@@ -40,7 +41,7 @@ function groupByFirm(contacts: DigestContact[]): FirmGroup[] {
 
 function buildChainText(c: DigestContact): string {
   const affiliation = c.affiliations?.split(",")[0]?.trim() || "Connection";
-  return `Via ${c.name} (${affiliation}) - ${c.title} at ${c.organization}`;
+  return `Via ${c.name} (${affiliation}) - ${c.title} at ${c.firmName}`;
 }
 
 function buildEmailHtml(
@@ -190,12 +191,17 @@ export async function sendWeeklyDigest(
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 
+  if (await isAddressSuppressed(email)) {
+    console.warn(`[digest] suppressed address — skipping digest email to ${email}`);
+    return { success: false, error: "Address suppressed" };
+  }
+
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const { data: contacts, error: queryError } = await supabase
     .from("AlumniContact")
-    .select("name, organization, title, affiliations")
+    .select("name, firmName, title, affiliations")
     .eq("importedByUserId", userId)
     .gte("createdAt", sevenDaysAgo.toISOString())
     .order("createdAt", { ascending: false })

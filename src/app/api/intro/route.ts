@@ -2,22 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { requireSubscription } from "@/lib/subscription";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://kithnode.vercel.app";
+const APP_URL = "https://kithnode.ai";
 
 const resend = API_KEY ? new Resend(API_KEY) : null;
+
+/** Escape user-supplied content before embedding in HTML. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Basic single-address email validation. */
+const EMAIL_RE = /^[^\s@]{1,254}@[^\s@]{1,253}\.[^\s@]{1,253}$/;
+function isValidEmail(v: string): boolean {
+  return EMAIL_RE.test(v) && v.length <= 320;
+}
 
 function buildIntroEmailHtml(
   userName: string,
   intermediaryName: string,
   targetName: string,
-  organization: string,
+  firmName: string,
   message: string,
 ): string {
-  const firstName = intermediaryName.trim().split(" ")[0] || "there";
+  const firstName = escapeHtml(intermediaryName.trim().split(" ")[0] || "there");
+  const safeUserName = escapeHtml(userName);
+  const safeTargetName = escapeHtml(targetName);
+  const safeFirmName = escapeHtml(firmName);
+  const safeMessage = escapeHtml(message);
 
   return `
 <!DOCTYPE html>
@@ -41,10 +61,10 @@ function buildIntroEmailHtml(
           <tr>
             <td style="padding: 0 0 24px 0;">
               <div style="font-family: Geist, Arial, sans-serif; font-size: 20px; font-weight: 700; color: #E2E8F0;">
-                ${userName} is asking for an intro
+                ${safeUserName} is asking for an intro
               </div>
               <div style="font-family: Geist, Arial, sans-serif; font-size: 14px; color: #94A3B8; margin-top: 8px;">
-                Hey ${firstName}, ${userName} would like you to introduce them to ${targetName} at ${organization}.
+                Hey ${firstName}, ${safeUserName} would like you to introduce them to ${safeTargetName} at ${safeFirmName}.
               </div>
             </td>
           </tr>
@@ -56,13 +76,13 @@ function buildIntroEmailHtml(
                 <tr>
                   <td style="padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);">
                     <div style="font-family: Geist, Arial, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(148,163,184,0.6);">
-                      MESSAGE FROM ${userName.toUpperCase()}
+                      MESSAGE FROM ${safeUserName.toUpperCase()}
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 16px 20px;">
-                    <div style="font-family: Geist, Arial, sans-serif; font-size: 14px; color: #E2E8F0; line-height: 1.6; white-space: pre-wrap;">${message}</div>
+                    <div style="font-family: Geist, Arial, sans-serif; font-size: 14px; color: #E2E8F0; line-height: 1.6; white-space: pre-wrap;">${safeMessage}</div>
                   </td>
                 </tr>
               </table>
@@ -89,7 +109,7 @@ function buildIntroEmailHtml(
             <td style="padding: 24px 0 0 0; border-top: 1px solid rgba(255,255,255,0.06);">
               <div style="font-family: Geist, Arial, sans-serif; font-size: 11px; color: #475569; line-height: 1.6;">
                 KithNode - Warm-path networking intelligence<br/>
-                You received this because ${userName} identified you as a mutual connection.
+                You received this because ${safeUserName} identified you as a mutual connection.
               </div>
             </td>
           </tr>
@@ -103,11 +123,17 @@ function buildIntroEmailHtml(
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
+
+  // Gate 1: subscription required.
+  const subGate = await requireSubscription(userEmail);
+  if (subGate) return subGate;
+
   const userName = session.user.name || session.user.email.split("@")[0];
 
   const body = await request.json();
@@ -130,10 +156,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Look up target contact for the email subject
+  // Gate 2: intermediaryEmail must be a well-formed single address when supplied.
+  if (intermediaryEmail !== undefined && intermediaryEmail !== "") {
+    if (!isValidEmail(intermediaryEmail)) {
+      return NextResponse.json(
+        { error: "Invalid intermediary email" },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Look up target contact.
   const { data: target } = await supabase
     .from("AlumniContact")
-    .select("name, title, organization, importedByUserId")
+    .select("name, title, firmName, importedByUserId")
     .eq("id", targetContactId)
     .single();
 
@@ -144,6 +180,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Gate 3: pool contacts (imported by another user) require a high_value rating.
   if (target.importedByUserId && target.importedByUserId !== userId) {
     const { data: rating } = await supabase
       .from("UserDiscover")
@@ -151,7 +188,8 @@ export async function POST(request: NextRequest) {
       .eq("userId", userId)
       .eq("contactId", targetContactId)
       .maybeSingle();
-    if (!rating) {
+
+    if (!rating || rating.rating !== "high_value") {
       return NextResponse.json(
         { error: "Target contact not found" },
         { status: 404 },
@@ -159,11 +197,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Insert intro request record
+  // Insert intro request record.
   const { error: insertError } = await supabase
     .from("intro_requests")
     .insert({
-      from_user_id: userId,
+      from_user_id: userEmail,
       intermediary_name: intermediaryName,
       intermediary_email: intermediaryEmail || null,
       target_contact_id: targetContactId,
@@ -179,20 +217,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Send email if intermediary has an email
+  // Intro auto-send is gated OFF for beta: the landing promises KithNode never
+  // sends on your behalf, so the user copies the message and sends it themselves.
+  // Flip INTRO_AUTOSEND=true to re-enable later.
+  const introAutoSend = process.env.INTRO_AUTOSEND === "true";
   let emailSent = false;
-  if (intermediaryEmail && resend) {
+  if (introAutoSend && intermediaryEmail && resend) {
     try {
       await resend.emails.send({
         from: `KithNode <${FROM}>`,
         to: intermediaryEmail,
         replyTo: session.user.email,
-        subject: `KithNode: ${userName} wants an intro to ${target.name} at ${target.organization}`,
+        subject: `KithNode: ${userName} wants an intro to ${target.name} at ${target.firmName}`,
         html: buildIntroEmailHtml(
           userName,
           intermediaryName,
           target.name,
-          target.organization,
+          target.firmName,
           message,
         ),
       });
@@ -206,6 +247,6 @@ export async function POST(request: NextRequest) {
     success: true,
     emailSent,
     targetName: target.name,
-    organization: target.organization,
+    firmName: target.firmName,
   });
 }

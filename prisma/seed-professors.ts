@@ -200,7 +200,7 @@ async function main() {
 
       const data = {
         name: prof.name,
-        organization: prof.department,
+        firmName: prof.department,
         title: prof.title,
         linkedInUrl: prof.linkedInUrl,
         university: "UNC",

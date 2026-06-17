@@ -99,7 +99,7 @@ interface HeelLifeOrg {
 
 interface HeelLifeState {
   preFetchedData?: {
-    organization?: HeelLifeOrg | null;
+    firmName?: HeelLifeOrg | null;
   };
 }
 
@@ -137,7 +137,7 @@ export function extractSeedFromState(
   group: GroupSeed,
   sourceUrl: string,
 ): AlumniSeed | null {
-  const org = state.preFetchedData?.organization;
+  const org = state.preFetchedData?.firmName;
   if (!org) return null;
 
   const contact = org.primaryContact;
@@ -160,7 +160,7 @@ export function extractSeedFromState(
   return {
     name,
     title,
-    organization: orgName,
+    firmName: orgName,
     email: cleanEmail,
     sourceUrl,
     bio: `${group.role} of ${orgName} at UNC Chapel Hill.`,
@@ -183,7 +183,7 @@ export async function scrapeUncGroups(
     if (i > 0 && throttleMs > 0) await wait(throttleMs);
 
     const group = KNOWN_UNC_GROUPS[i];
-    const sourceUrl = `${BASE_URL}/organization/${group.heellifeKey}/about`;
+    const sourceUrl = `${BASE_URL}/firmName/${group.heellifeKey}/about`;
 
     try {
       const html = await fetchText(sourceUrl);

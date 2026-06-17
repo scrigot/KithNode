@@ -1,17 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Pencil, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { OutreachSheet } from "@/app/dashboard/contacts/outreach-sheet";
+import { IntroModal } from "@/app/dashboard/discover/intro-modal";
+import { CareerTimeline } from "@/components/career-timeline";
+import { TagEditor } from "./tag-editor";
+import { FieldEditor } from "./field-editor";
+import { EditProfileModal } from "./edit-profile-modal";
 import { trackEvent } from "@/lib/posthog";
+import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
+import { resolveAutoPersonType } from "@/lib/linkedin-import";
 import type { ContactDetail } from "@/lib/api";
+import { CreditCost } from "@/components/credit-cost";
 
 const TIER_STYLES: Record<string, string> = {
+  kith: "bg-amber-400/15 text-amber-300 border-amber-400/40",
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
   warm: "bg-green-500/20 text-green-400 border-green-500/30",
   monitor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -35,78 +45,465 @@ const SIGNAL_ICONS: Record<string, string> = {
   news: "!!",
 };
 
-function ScoreSection({ score }: { score: ContactDetail["score"] }) {
+// Read-only label/value row for the DETAILS card. Empty values render a muted
+// "Not set" (em-dash-free) so the user can see at a glance what's blank without
+// the row looking broken. Editing happens in the Edit Profile modal.
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  const display = value?.trim();
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd
+        className={`text-right ${display ? "text-foreground" : "text-muted-foreground/50"}`}
+      >
+        {display || "Not set"}
+      </dd>
+    </div>
+  );
+}
+
+function ScoreSection({
+  score,
+  needsInfo,
+  isFriend,
+  speakFrequency,
+  lastSpokenAt,
+  pipelineStage,
+  relationshipClass,
+  dormant,
+}: {
+  score: ContactDetail["score"];
+  needsInfo?: boolean;
+  isFriend?: boolean;
+  speakFrequency?: string;
+  lastSpokenAt?: string;
+  pipelineStage?: string;
+  relationshipClass?: string;
+  dormant?: boolean;
+}) {
   if (!score) return null;
+
+  const spokeDays =
+    lastSpokenAt
+      ? Math.floor((Date.now() - new Date(lastSpokenAt).getTime()) / 86_400_000)
+      : null;
+
   return (
     <div className="border border-border bg-card p-4">
       <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         SCORE BREAKDOWN
       </h3>
       <div className="mb-3 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tabular-nums text-foreground">
-          {Math.round(score.total_score)}
-        </span>
-        <span className="text-sm text-muted-foreground">/100</span>
-        <Badge
-          variant="outline"
-          className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
-        >
-          {score.tier.toUpperCase()}
-        </Badge>
+        {needsInfo ? (
+          <span className="text-3xl font-bold tabular-nums text-muted-foreground/50">—</span>
+        ) : (
+          <>
+            <span className="text-3xl font-bold tabular-nums text-foreground">
+              {Math.round(score.total_score)}
+            </span>
+            <span className="text-sm text-muted-foreground">/100</span>
+          </>
+        )}
+        {needsInfo ? (
+          <span className="ml-2 border border-dashed border-slate-500/40 bg-transparent text-slate-400 text-[10px] font-bold tracking-wider px-1.5 py-0.5">
+            NEEDS INFO
+          </span>
+        ) : (
+          <Badge
+            variant="outline"
+            className={`ml-2 text-[10px] font-bold tracking-wider ${TIER_STYLES[score.tier] || TIER_STYLES.cold}`}
+          >
+            {score.tier.toUpperCase()}
+          </Badge>
+        )}
       </div>
+      {needsInfo && (
+        <p className="mb-3 text-[10px] text-muted-foreground">
+          Add their school, clubs, or hometown to score them{" "}
+          <Link href="/dashboard/import" className="text-accent-blue hover:underline text-[10px]">
+            Enrich with AI →
+          </Link>
+        </p>
+      )}
 
       <div className="space-y-2">
         <div>
           <div className="flex justify-between text-[10px]">
             <span className="text-muted-foreground">FIT</span>
             <span className="tabular-nums text-accent-blue">
-              {Math.round(score.fit_score)}/50
+              {Math.round(score.fit_score)}/100
             </span>
           </div>
           <Progress
-            value={(score.fit_score / 50) * 100}
+            value={score.fit_score}
             className="h-1.5 bg-muted [&>div]:bg-accent-blue"
           />
         </div>
-        <div>
-          <div className="flex justify-between text-[10px]">
-            <span className="text-muted-foreground">SIGNAL</span>
-            <span className="tabular-nums text-accent-amber">
-              {Math.round(score.signal_score)}/30
+      </div>
+
+      {/* Relationship panel */}
+      <div className="mt-3 border border-border bg-background/40 p-3">
+        <h4 className="mb-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+          RELATIONSHIP
+        </h4>
+        <div className="space-y-1 text-[10px]">
+          <div className="flex items-center gap-2">
+            {relationshipClass === "kith" ? (
+              <span className="border border-amber-400/40 bg-amber-400/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                KITH
+              </span>
+            ) : (
+              <span className="border border-zinc-500/30 bg-zinc-500/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                SIGNAL
+              </span>
+            )}
+            {isFriend && (
+              <Star className="h-3 w-3 fill-accent-teal text-accent-teal" aria-label="Friend" />
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span>
+              Friend:{" "}
+              <span className={isFriend ? "text-accent-teal" : "text-foreground"}>
+                {isFriend ? "Yes" : "No"}
+              </span>
+            </span>
+            {speakFrequency && (
+              <span>
+                Frequency: <span className="text-foreground">{speakFrequency}</span>
+              </span>
+            )}
+          </div>
+          <div className="text-muted-foreground">
+            Last spoke:{" "}
+            <span className="text-foreground">
+              {spokeDays !== null && !Number.isNaN(spokeDays) && spokeDays >= 0
+                ? `${spokeDays}d ago`
+                : "Not logged"}
             </span>
           </div>
-          <Progress
-            value={(score.signal_score / 30) * 100}
-            className="h-1.5 bg-muted [&>div]:bg-accent-amber"
-          />
-        </div>
-        <div>
-          <div className="flex justify-between text-[10px]">
-            <span className="text-muted-foreground">ENGAGEMENT</span>
-            <span className="tabular-nums text-accent-green">
-              {Math.round(score.engagement_score)}/20
-            </span>
-          </div>
-          <Progress
-            value={(score.engagement_score / 20) * 100}
-            className="h-1.5 bg-muted [&>div]:bg-accent-green"
-          />
+          {pipelineStage && (
+            <div className="text-muted-foreground">
+              Pipeline: <span className="font-bold uppercase text-foreground">{pipelineStage}</span>
+            </div>
+          )}
+          {dormant && (
+            <div className="mt-1 flex items-center gap-2">
+              <span className="border border-amber-400/40 bg-amber-400/10 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                DORMANT
+              </span>
+              {spokeDays !== null && !Number.isNaN(spokeDays) && (
+                <span className="text-muted-foreground">
+                  Reconnect - {spokeDays}d quiet
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
+// Manual identity override. One click PATCHes personType; the route rescores
+// the contact server-side, then onSaved refetches so the affiliation chips +
+// score reflect the new identity. AUTO ('') hands WHO-detection back to the
+// title/education heuristics.
+const PERSON_TYPES: { value: string; label: string }[] = [
+  { value: "", label: "AUTO" },
+  { value: "alum", label: "ALUM" },
+  { value: "student", label: "STUDENT" },
+  { value: "professor", label: "PROFESSOR" },
+];
+
+function TypeToggle({
+  contactId,
+  value,
+  graduationYear,
+  title,
+  experience,
+  education,
+  onSaved,
+}: {
+  contactId: string;
+  value: string;
+  graduationYear?: number;
+  title?: string;
+  experience?: string;
+  education?: string;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  async function select(next: string) {
+    if (next === value || saving) return;
+    setSaving(true);
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personType: next }),
+    });
+    setSaving(false);
+    if (res.ok) onSaved();
+  }
+
+  // Only when the stored type is AUTO ('') do we surface what the grad-year-aware
+  // heuristic resolved this contact to, so the user sees why they score as a
+  // student or alum without having to set the toggle manually.
+  const autoResolved =
+    value === ""
+      ? resolveAutoPersonType({ graduationYear, title, experience, education })
+      : "";
+  const gradYear = graduationYear || 0;
+
+  return (
+    <div className="mb-3">
+      <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        TYPE
+      </h3>
+      <div className="inline-flex border border-border" role="group" aria-label="Contact type">
+        {PERSON_TYPES.map((t) => {
+          const active = t.value === value;
+          return (
+            <button
+              key={t.value || "auto"}
+              type="button"
+              disabled={saving}
+              onClick={() => select(t.value)}
+              aria-pressed={active}
+              className={`border-r border-border px-2 py-1 text-[10px] font-bold tracking-wider transition-colors last:border-r-0 disabled:opacity-50 ${
+                active
+                  ? "bg-accent-blue/20 text-accent-blue"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {autoResolved === "student" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Student{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
+      {autoResolved === "alum" && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Auto-detected: Alum{gradYear ? ` (class of ${gradYear})` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Track + role editor over the taxonomy. The track <select> gates the role
+// <select> options (roles shown belong to the chosen track); clearing the track
+// clears the role. Both persist via the same PATCH the rest of the page uses;
+// the route validates them as closed sets and rescores server-side. Changing the
+// track to one that doesn't own the current role auto-clears the role in the same
+// PATCH so the two never disagree.
+function TrackRoleEditor({
+  contactId,
+  track,
+  role,
+  onSaved,
+}: {
+  contactId: string;
+  track: string;
+  role: string;
+  onSaved: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  // Local buffer for the "Other" free-text role so typing doesn't fire a PATCH
+  // on every keystroke; we commit on blur. Kept in sync when the stored role
+  // changes (e.g. after a refetch or a track switch).
+  const [otherRole, setOtherRole] = useState(role);
+  useEffect(() => {
+    setOtherRole(role);
+  }, [role]);
+
+  async function patch(body: { track: string; role: string }) {
+    setSaving(true);
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setSaving(false);
+    if (res.ok) onSaved();
+  }
+
+  function onTrackChange(nextTrack: string) {
+    if (nextTrack === track) return;
+    // Keep the role only if it still belongs to the new track; otherwise clear it.
+    const keepRole = nextTrack && roleToTrack(role) === nextTrack ? role : "";
+    void patch({ track: nextTrack, role: keepRole });
+  }
+
+  function onRoleChange(nextRole: string) {
+    if (nextRole === role) return;
+    // Setting a role implies its track (handles the role-without-track case).
+    void patch({ track: nextRole ? roleToTrack(nextRole) : track, role: nextRole });
+  }
+
+  // Commit the free-text "Other" role. Sends track + role TOGETHER because the
+  // server only accepts a free-text role when track === "Other" is in the same
+  // patch. No-op when unchanged.
+  function commitOtherRole() {
+    const next = otherRole.trim();
+    if (next === role) return;
+    void patch({ track: "Other", role: next });
+  }
+
+  const roleOptions = track && track in CAREER_TRACKS
+    ? CAREER_TRACKS[track as keyof typeof CAREER_TRACKS]
+    : [];
+
+  return (
+    <div className="mb-3">
+      <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        CAREER TRACK
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        <select
+          aria-label="Career track"
+          disabled={saving}
+          value={track}
+          onChange={(e) => onTrackChange(e.target.value)}
+          className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+        >
+          <option value="">Track —</option>
+          {ALL_TRACKS.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        {track === "Other" ? (
+          <input
+            type="text"
+            aria-label="Career role"
+            disabled={saving}
+            value={otherRole}
+            placeholder="Custom role (e.g. Nursing)"
+            onChange={(e) => setOtherRole(e.target.value)}
+            onBlur={commitOtherRole}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          />
+        ) : (
+          <select
+            aria-label="Career role"
+            disabled={saving || !track}
+            value={role}
+            onChange={(e) => onRoleChange(e.target.value)}
+            className="h-6 border border-border bg-background px-1.5 text-[10px] text-foreground focus:border-accent-blue focus:outline-none disabled:opacity-50"
+          >
+            <option value="">Role —</option>
+            {roleOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BackLink({
+  backHref,
+  backLabel,
+}: {
+  backHref: string;
+  backLabel: string;
+}) {
+  const router = useRouter();
+  // Use history traversal when the user arrived from within the app — the
+  // browser/App Router will restore scroll position natively. Fall back to a
+  // hard link for direct/deep links (no history entry to go back to).
+  const canGoBack =
+    typeof window !== "undefined" && window.history.length > 1;
+
+  if (canGoBack) {
+    return (
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="text-[10px] text-muted-foreground hover:text-primary"
+      >
+        &lt; {backLabel}
+      </button>
+    );
+  }
+  return (
+    <Link href={backHref} className="text-[10px] text-muted-foreground hover:text-primary">
+      &lt; {backLabel}
+    </Link>
+  );
+}
+
 export default function ContactDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id as string;
+  const fromImport = searchParams.get("from") === "import";
+  const backHref = fromImport ? "/dashboard/import" : "/dashboard/contacts";
+  const backLabel = fromImport ? "BACK TO IMPORT" : "BACK TO SIGNALS";
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOutreach, setShowOutreach] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(
+    searchParams.get("edit") === "1",
+  );
+  const [tab, setTab] = useState<"signals" | "profile">("signals");
+  const [introMutual, setIntroMutual] = useState<{ name: string } | null>(null);
+  const [userName, setUserName] = useState("");
+  // Two-click delete for the contact page header.
+  const [deleteState, setDeleteState] = useState<"idle" | "armed">("idle");
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Fetch user name for the intro modal warm-path preview.
   useEffect(() => {
-    fetch(`/api/contacts/${id}`)
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user?.name) setUserName(data.user.name);
+        else if (data?.user?.email) setUserName(data.user.email.split("@")[0]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reset the armed delete state after 3s or on outside interaction.
+  useEffect(() => {
+    if (deleteState !== "armed") return;
+    deleteTimerRef.current = setTimeout(() => setDeleteState("idle"), 3000);
+    return () => {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+    };
+  }, [deleteState]);
+
+  async function handlePageDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    if (deleteState === "idle") {
+      setDeleteState("armed");
+    } else {
+      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+      setDeleteState("idle");
+      await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+      router.push("/dashboard/contacts");
+    }
+  }
+
+  // Refetch the contact after a field/type edit so the rescored affiliations +
+  // score (computed server-side in the PATCH) replace the stale panel data.
+  const loadContact = useCallback(() => {
+    return fetch(`/api/contacts/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Contact not found");
         return res.json();
@@ -120,6 +517,10 @@ export default function ContactDetailPage() {
         setLoading(false);
       });
   }, [id]);
+
+  useEffect(() => {
+    void loadContact();
+  }, [loadContact]);
 
   if (loading) {
     return (
@@ -139,12 +540,7 @@ export default function ContactDetailPage() {
   if (error || !contact) {
     return (
       <div className="min-h-screen bg-background p-6">
-        <Link
-          href="/dashboard/contacts"
-          className="text-xs text-muted-foreground hover:text-primary"
-        >
-          &lt; BACK TO SIGNALS
-        </Link>
+        <BackLink backHref={backHref} backLabel={backLabel} />
         <div className="mt-8 border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
           {error || "Contact not found"}
         </div>
@@ -152,20 +548,90 @@ export default function ContactDetailPage() {
     );
   }
 
+  // Read structured + flat fields defensively so this compiles regardless of
+  // api.ts version. Relationship fields default defensively when absent.
+  const contactExt = contact as {
+    degrees?: string;
+    concentration?: string;
+    educations?: { major: string; degree: string; concentration: string }[];
+    experiences?: { title: string; firm: string; start: string; end: string }[];
+    clubMemberships?: { club: string; role: string }[];
+    graduationYear?: number | null;
+    isFriend?: boolean;
+    speakFrequency?: string;
+    lastSpokenAt?: string;
+    relationship_class?: string;
+    dormant?: boolean;
+    pipeline_stage?: string;
+    notes?: string;
+  };
+
+  // Mutual-connection edges, resolved server-side in GET /api/contacts/[id].
+  const mutuals = contact.mutuals ?? [];
+
   return (
     <div className="min-h-screen bg-background p-6">
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <Link
-            href="/dashboard/contacts"
-            className="text-[10px] text-muted-foreground hover:text-primary"
-          >
-            &lt; BACK TO SIGNALS
-          </Link>
-          <h1 className="mt-1 text-xl font-bold text-foreground">
-            {contact.name}
-          </h1>
+          <div className="flex items-center gap-3">
+            <BackLink backHref={backHref} backLabel={backLabel} />
+            {/* Two-click-confirm delete */}
+            {deleteState === "armed" ? (
+              <button
+                type="button"
+                onClick={handlePageDelete}
+                className="border border-red-500/30 px-2 py-0.5 text-[10px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
+              >
+                CONFIRM?
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePageDelete}
+                className="flex items-center text-muted-foreground/40 transition-colors hover:text-red-400"
+                title="Delete contact"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {/* Friend star toggle — quick PATCH without opening the full modal */}
+            {(() => {
+              const ext = contact as unknown as Record<string, unknown>;
+              const isFriend = typeof ext.isFriend === "boolean" ? ext.isFriend : false;
+              return (
+                <button
+                  type="button"
+                  title={isFriend ? "Remove friend" : "Mark as friend"}
+                  onClick={async () => {
+                    await fetch(`/api/contacts/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ isFriend: !isFriend }),
+                    });
+                    await loadContact();
+                  }}
+                  className={`flex items-center transition-colors ${
+                    isFriend
+                      ? "text-accent-teal"
+                      : "text-muted-foreground/40 hover:text-accent-teal"
+                  }`}
+                >
+                  <Star className={`h-3.5 w-3.5 ${isFriend ? "fill-current" : ""}`} />
+                </button>
+              );
+            })()}
+          </div>
+          <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
+            <FieldEditor
+              contactId={contact.id}
+              field="name"
+              label=""
+              initialValue={contact.name || ""}
+              placeholder="Add name"
+              onSaved={loadContact}
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             {contact.title}
             {contact.title && contact.company.name ? " @ " : ""}
@@ -187,10 +653,11 @@ export default function ContactDetailPage() {
         ) : (
           <Button
             variant="outline"
-            className="text-xs text-primary hover:bg-primary hover:text-primary-foreground"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
             onClick={() => setShowOutreach(true)}
           >
             DRAFT OUTREACH
+            <CreditCost action="draft" />
           </Button>
         )}
       </div>
@@ -203,15 +670,212 @@ export default function ContactDetailPage() {
         onClose={() => setShowOutreach(false)}
       />
 
+      {showEditProfile && (
+        <EditProfileModal
+          contact={contact}
+          onSaved={loadContact}
+          onClose={() => setShowEditProfile(false)}
+        />
+      )}
+
       <Separator className="mb-4" />
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Score */}
-        <ScoreSection score={contact.score} />
+      {/* Tab bar — matches the discover page segment toggle. Active tab lives in
+          component state only; no URL change. */}
+      <div className="mb-4 flex overflow-hidden border border-white/[0.06]">
+        <button
+          type="button"
+          onClick={() => setTab("signals")}
+          aria-pressed={tab === "signals"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            tab === "signals"
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Score &amp; Signals
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("profile")}
+          aria-pressed={tab === "profile"}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+            tab === "profile"
+              ? "bg-primary text-white"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Profile
+        </button>
+      </div>
 
-        {/* Affiliations */}
+      {/* ─── Tab: SCORE & SIGNALS ─── score breakdown (hugs its content),
+          signal timeline, outreach history stacked dense. ─── */}
+      {tab === "signals" && (
+        <div className="space-y-4">
+          {/* Score */}
+          <ScoreSection
+            score={contact.score}
+            needsInfo={(contact as unknown as { needs_info?: boolean }).needs_info}
+            isFriend={contactExt.isFriend}
+            speakFrequency={contactExt.speakFrequency}
+            lastSpokenAt={contactExt.lastSpokenAt}
+            pipelineStage={contactExt.pipeline_stage}
+            relationshipClass={contactExt.relationship_class}
+            dormant={contactExt.dormant}
+          />
+
+          {/* Signals */}
+          <div className="border border-border bg-card p-4">
+            <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              SIGNAL TIMELINE
+            </h3>
+            {contact.signals.length > 0 ? (
+              <div className="space-y-2">
+                {contact.signals.map((signal) => (
+                  <div
+                    key={signal.id}
+                    className="flex items-start gap-2 text-xs"
+                  >
+                    <span className="w-5 font-bold text-accent-amber">
+                      {SIGNAL_ICONS[signal.signal_type] || "**"}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-foreground">{signal.description}</p>
+                      <div className="flex gap-2 text-[10px] text-muted-foreground">
+                        <span>Strength: {signal.strength}/10</span>
+                        {signal.source_url && (
+                          <a
+                            href={signal.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent-blue hover:underline"
+                          >
+                            source
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No signals detected yet
+              </p>
+            )}
+          </div>
+
+          {/* Outreach History */}
+          <div className="border border-border bg-card p-4">
+            <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              OUTREACH HISTORY
+            </h3>
+            {contact.outreach_history.length > 0 ? (
+              <div className="space-y-3">
+                {contact.outreach_history.map((outreach) => {
+                  const isLocked = outreach.status === "replied";
+                  const isSent = outreach.status === "sent";
+                  return (
+                    <div
+                      key={outreach.id}
+                      className={`border p-2 text-xs ${isLocked ? "border-amber-500/30 bg-amber-500/5" : "border-border"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-foreground">
+                          {outreach.email_subject || "Untitled draft"}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            isLocked
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                              : isSent
+                                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
+                          }`}
+                        >
+                          {isLocked ? "LOCKED" : outreach.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {outreach.created_at}
+                      </p>
+                      {isSent && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-6 text-[10px] text-amber-400 hover:bg-amber-500/20"
+                          onClick={async () => {
+                            await fetch(
+                              `/api/contacts/${outreach.id}/status`,
+                              {
+                                method: "PATCH",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({
+                                  status: "replied",
+                                }),
+                              },
+                            );
+                            trackEvent("autoguard_locked", {
+                              contact_id: contact.id,
+                              contact_name: contact.name,
+                            });
+                            // Reload to show AutoGuard state
+                            window.location.reload();
+                          }}
+                        >
+                          MARK AS RESPONDED
+                        </Button>
+                      )}
+                      {isLocked && (
+                        <p className="mt-1 text-[10px] text-amber-400">
+                          AutoGuard active — AI automation disabled
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No outreach history
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab: PROFILE ─── type toggle, affiliations, all editable field
+          rows, mutual/LinkedIn links, and the tags editor. ─── */}
+      {tab === "profile" && (
+      <div className="space-y-3">
+        {/* Dense 3-pane grid — career | classification | details. Fills the
+            width (Bloomberg density, no half-empty cards). */}
+        <div className="grid items-start grid-cols-1 gap-3 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1.25fr]">
+        {/* PANE 1 — Career timeline */}
+        <CareerTimeline experiences={contactExt.experiences ?? []} />
+        {/* PANE 2 — Classification & signals */}
         <div className="border border-border bg-card p-4">
+          <TypeToggle
+            contactId={contact.id}
+            value={contact.person_type || ""}
+            graduationYear={contactExt.graduationYear ?? undefined}
+            title={contact.title}
+            experience={contact.company.name}
+            education={contact.education}
+            onSaved={loadContact}
+          />
+
+          <TrackRoleEditor
+            contactId={contact.id}
+            track={contact.track || ""}
+            role={contact.role || ""}
+            onSaved={loadContact}
+          />
+
           <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             AFFILIATIONS
           </h3>
@@ -240,15 +904,135 @@ export default function ContactDetailPage() {
             </p>
           )}
 
-          {/* Contact info */}
           <Separator className="my-3" />
-          <div className="space-y-1 text-[10px]">
-            {contact.education && (
-              <p>
-                <span className="text-muted-foreground">Education: </span>
-                <span className="text-foreground">{contact.education}</span>
-              </p>
+          <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
+        </div>
+
+        {/* RIGHT — Details (read-only; edited via the Edit Profile modal) */}
+        <div className="border border-border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              DETAILS
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowEditProfile(true)}
+              className="inline-flex items-center gap-1.5 border border-white/[0.12] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <Pencil className="h-3 w-3" />
+              EDIT PROFILE
+            </button>
+          </div>
+          <dl className="space-y-1.5 text-xs">
+            <DetailRow label="Title" value={contact.title} />
+            <DetailRow label="Company" value={contact.company.name} />
+            {contact.person_type === "professor" && (
+              <DetailRow label="Teaches at" value={contact.university} />
             )}
+            <DetailRow label="Education" value={contact.education} />
+            {/* Render structured education rows when present; fall back to flat fields. */}
+            {contactExt.educations && contactExt.educations.length > 0 ? (
+              <div className="space-y-0.5">
+                <dt className="text-muted-foreground">Degrees / Programs</dt>
+                {[...new Set(
+                  contactExt.educations
+                    .map((edu) => [edu.degree, edu.major, edu.concentration].filter(Boolean).join(" · "))
+                    .filter(Boolean),
+                )].map((line, i) => (
+                  <dd key={i} className="text-right text-foreground">
+                    {line}
+                  </dd>
+                ))}
+              </div>
+            ) : (
+              <>
+                <DetailRow label="Major" value={contact.major} />
+                {contactExt.degrees?.trim() && (
+                  <DetailRow label="Degrees" value={contactExt.degrees} />
+                )}
+                {contactExt.concentration?.trim() && (
+                  <DetailRow label="Concentration" value={contactExt.concentration} />
+                )}
+              </>
+            )}
+            {/* Minor is not part of education rows — always render it. */}
+            <DetailRow label="Minor" value={contact.minor} />
+            <DetailRow label="Skills" value={contact.skills} />
+            {/* Career history now lives in the timeline card above; only fall
+                back to flat past_firms when there are no structured experiences. */}
+            {!(contactExt.experiences && contactExt.experiences.length > 0) && (
+              <DetailRow label="Past employers" value={contact.past_firms} />
+            )}
+            <DetailRow label="Location (current)" value={contact.linkedin_location} />
+            <DetailRow label="Hometown" value={contact.hometown} />
+            <DetailRow label="High School" value={contact.high_school} />
+            <DetailRow label="Greek Life" value={contact.greek_org} />
+            {/* Club rows; the Greek org has its own row, so drop it from Clubs
+                (avoids the Zeta-Psi-in-both duplication). */}
+            {(() => {
+              const greek = (contact.greek_org || "").trim().toLowerCase();
+              const rows = (contactExt.clubMemberships ?? []).filter(
+                (m) => (m.club || "").trim().toLowerCase() !== greek,
+              );
+              if (rows.length > 0) {
+                return (
+                  <div className="space-y-0.5">
+                    <dt className="text-muted-foreground">Clubs</dt>
+                    {rows.map((m, i) => {
+                      const parts = [m.role, m.club].filter(Boolean);
+                      return parts.length ? (
+                        <dd key={i} className="text-right text-foreground">
+                          {parts.join(" · ")}
+                        </dd>
+                      ) : null;
+                    })}
+                  </div>
+                );
+              }
+              const flat = (contact.clubs || "")
+                .split(",")
+                .map((c) => c.trim())
+                .filter((c) => c && c.toLowerCase() !== greek)
+                .join(", ");
+              return <DetailRow label="Clubs" value={flat} />;
+            })()}
+            {contactExt.graduationYear != null && (
+              <DetailRow label="Graduation Year" value={String(contactExt.graduationYear)} />
+            )}
+            {/* Relationship summary line */}
+            {(() => {
+              const parts: string[] = [];
+              if (contactExt.isFriend) parts.push("Friend");
+              if (contactExt.speakFrequency) parts.push(contactExt.speakFrequency);
+              if (contactExt.lastSpokenAt) {
+                const days = Math.floor(
+                  (Date.now() - new Date(contactExt.lastSpokenAt).getTime()) / 86_400_000,
+                );
+                if (!Number.isNaN(days) && days >= 0) parts.push(`spoke ${days}d ago`);
+              }
+              return parts.length > 0 ? (
+                <DetailRow label="Relationship" value={parts.join(" · ")} />
+              ) : null;
+            })()}
+            <DetailRow label="Passions" value={contact.passions} />
+          </dl>
+          {/* NOTES — relationship memory + outreach personalization. Read
+              defensively; render only when the user has set something. */}
+          {contactExt.notes?.trim() && (
+            <>
+              <Separator className="my-3" />
+              <div>
+                <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  NOTES
+                </h4>
+                <p className="whitespace-pre-wrap text-xs text-foreground">
+                  {contactExt.notes.trim()}
+                </p>
+              </div>
+            </>
+          )}
+          <Separator className="my-3" />
+          <div className="space-y-1.5 text-xs">
             <p>
               <a
                 href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
@@ -259,18 +1043,23 @@ export default function ContactDetailPage() {
                 Check Mutual Connections
               </a>
             </p>
-            {contact.linkedin_url && (
-              <p>
+            <p>
+              <span className="text-muted-foreground">LinkedIn: </span>
+              {/^https?:\/\//i.test(contact.linkedin_url) ? (
                 <a
                   href={contact.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent-blue hover:underline"
                 >
-                  LinkedIn Profile
+                  View Profile
                 </a>
-              </p>
-            )}
+              ) : (
+                <span className="text-muted-foreground/60">
+                  No LinkedIn on file
+                </span>
+              )}
+            </p>
             {contact.email && (
               <p>
                 <span className="text-muted-foreground">Email: </span>
@@ -284,128 +1073,83 @@ export default function ContactDetailPage() {
             )}
           </div>
         </div>
-
-        {/* Signals */}
-        <div className="border border-border bg-card p-4">
-          <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            SIGNAL TIMELINE
-          </h3>
-          {contact.signals.length > 0 ? (
-            <div className="space-y-2">
-              {contact.signals.map((signal) => (
-                <div
-                  key={signal.id}
-                  className="flex items-start gap-2 text-xs"
-                >
-                  <span className="w-5 font-bold text-accent-amber">
-                    {SIGNAL_ICONS[signal.signal_type] || "**"}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-foreground">{signal.description}</p>
-                    <div className="flex gap-2 text-[10px] text-muted-foreground">
-                      <span>Strength: {signal.strength}/10</span>
-                      {signal.source_url && (
-                        <a
-                          href={signal.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent-blue hover:underline"
-                        >
-                          source
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No signals detected yet
-            </p>
-          )}
         </div>
 
-        {/* Outreach History */}
+        {/* MUTUAL CONNECTIONS — full-width, bottom of the Profile tab. Captured
+            from enriched profile data; the LinkedIn search link is the fallback
+            for contacts with none yet. */}
         <div className="border border-border bg-card p-4">
           <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            OUTREACH HISTORY
+            MUTUAL CONNECTIONS
           </h3>
-          {contact.outreach_history.length > 0 ? (
-            <div className="space-y-3">
-              {contact.outreach_history.map((outreach) => {
-                const isLocked = outreach.status === "replied";
-                const isSent = outreach.status === "sent";
-                return (
-                  <div
-                    key={outreach.id}
-                    className={`border p-2 text-xs ${isLocked ? "border-amber-500/30 bg-amber-500/5" : "border-border"}`}
+          {mutuals.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {mutuals.map((m, i) =>
+                m.contactId ? (
+                  <span key={i} className="inline-flex items-center gap-1">
+                    <Link
+                      href={`/contact/${m.contactId}`}
+                      className="border border-white/[0.12] px-2 py-0.5 text-xs text-foreground transition-colors hover:text-primary"
+                    >
+                      {m.name}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setIntroMutual({ name: m.name })}
+                      className="border border-white/[0.12] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-primary"
+                    >
+                      ASK FOR INTRO
+                    </button>
+                  </span>
+                ) : (
+                  <span
+                    key={i}
+                    className="border border-white/[0.12] px-2 py-0.5 text-xs text-muted-foreground"
                   >
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-foreground">
-                        {outreach.email_subject || "Untitled draft"}
-                      </p>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] ${
-                          isLocked
-                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                            : isSent
-                              ? "bg-green-500/20 text-green-400 border-green-500/30"
-                              : "bg-zinc-500/20 text-zinc-400 border-zinc-500/30"
-                        }`}
-                      >
-                        {isLocked ? "LOCKED" : outreach.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {outreach.created_at}
-                    </p>
-                    {isSent && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2 h-6 text-[10px] text-amber-400 hover:bg-amber-500/20"
-                        onClick={async () => {
-                          await fetch(
-                            `/api/contacts/${outreach.id}/status`,
-                            {
-                              method: "PATCH",
-                              headers: {
-                                "Content-Type": "application/json",
-                              },
-                              body: JSON.stringify({
-                                status: "replied",
-                              }),
-                            },
-                          );
-                          trackEvent("autoguard_locked", {
-                            contact_id: contact.id,
-                            contact_name: contact.name,
-                          });
-                          // Reload to show AutoGuard state
-                          window.location.reload();
-                        }}
-                      >
-                        MARK AS RESPONDED
-                      </Button>
-                    )}
-                    {isLocked && (
-                      <p className="mt-1 text-[10px] text-amber-400">
-                        AutoGuard active — AI automation disabled
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                    {m.name}
+                  </span>
+                ),
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              No outreach history
+              No mutual connections captured yet. Enrich their profile to surface
+              shared paths.
             </p>
           )}
+          <p className="mt-3 text-xs">
+            <a
+              href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(contact.company.name)}&network=%5B%22F%22%5D`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-blue hover:underline"
+            >
+              Check Mutual Connections
+            </a>
+          </p>
         </div>
       </div>
+      )}
+
+      {introMutual && (
+        <IntroModal
+          contact={{
+            id: contact.id,
+            name: contact.name,
+            title: contact.title,
+            firmName: contact.company.name,
+          }}
+          warmPath={{
+            intermediaryName: introMutual.name,
+            intermediaryRelation: "mutual connection",
+            firmName: "",
+            title: "",
+          }}
+          intermediaryIsContact
+          userName={userName || "a KithNode user"}
+          onClose={() => setIntroMutual(null)}
+        />
+      )}
     </div>
   );
 }

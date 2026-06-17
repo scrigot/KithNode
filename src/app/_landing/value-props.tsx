@@ -299,7 +299,7 @@ const STEPS: Array<{
     step: "02",
     title: "AI scores every path",
     description:
-      "Warmth scoring based on shared school, firm, Greek org, hometown, and activity signals. Know exactly who to reach out to first.",
+      "Each path is scored on signals you can verify yourself: same school, club, Greek org, hometown, and mutual connections. Know who to reach out to first, no guesswork.",
     Icon: Brain,
     Illustration: ScoreBarsVP,
     side: "right",

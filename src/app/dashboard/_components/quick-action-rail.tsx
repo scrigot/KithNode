@@ -7,6 +7,7 @@ import { Zap, Plus, Minus, Filter } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 
 const TIER_FILL: Record<string, string> = {
+  kith: "#fcd34d",
   hot: "#f87171",
   warm: "#60a5fa",
   monitor: "#fbbf24",
@@ -14,21 +15,22 @@ const TIER_FILL: Record<string, string> = {
 };
 
 const TIER_COLOR: Record<string, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",
   cold: "text-zinc-400",
 };
 
-const TIERS = ["hot", "warm", "monitor", "cold"] as const;
+const TIERS = ["kith", "hot", "warm", "monitor", "cold"] as const;
 type Tier = (typeof TIERS)[number];
 
 interface OverviewData {
-  tier_counts: Record<Tier, number>;
+  tier_counts: Partial<Record<Tier, number>>;
   top_unrated: Array<{
     contactId: string;
     contactName: string;
-    organization: string;
+    firmName: string;
     score: number;
     tier: string;
   }>;
@@ -103,7 +105,7 @@ export function QuickActionRail() {
                 {nextBest.contactName}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {nextBest.organization}
+                {nextBest.firmName}
               </p>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60">

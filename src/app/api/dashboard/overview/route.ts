@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { redactName } from "@/lib/redact";
+import { isUnlocked } from "@/lib/contact-access";
+import { selectOverdueLeads } from "@/lib/leads/overdue";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
   contactId: string;
   contactName: string;
-  organization: string;
+  firmName: string;
   detail: string;
   timestamp: string;
 }
@@ -15,7 +17,7 @@ interface RecentActivity {
 interface OverdueContact {
   contactId: string;
   contactName: string;
-  organization: string;
+  firmName: string;
   stage: string;
   days: number;
   isRedacted?: boolean;
@@ -24,7 +26,7 @@ interface OverdueContact {
 interface TopUnrated {
   contactId: string;
   contactName: string;
-  organization: string;
+  firmName: string;
   score: number;
   tier: string;
   hasWarmPath: boolean;
@@ -32,10 +34,11 @@ interface TopUnrated {
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   try {
     const now = new Date();
@@ -92,52 +95,54 @@ export async function GET() {
     const responseRate =
       pipelineTotal > 0 ? Math.round((respondedCount / pipelineTotal) * 100) : 0;
 
-    // Overdue list: pipeline entries >=7 days not in responded/meeting_set
-    const overdueEntries = (pipelineEntries || []).filter((e) => {
-      const stage = (e.stage || "researched").toLowerCase();
-      if (stage === "responded" || stage === "meeting_set") return false;
-      const days =
-        (Date.now() - new Date(e.addedAt || Date.now()).getTime()) / 86_400_000;
-      return days >= 7;
-    });
-
-    const remindersCount = overdueEntries.length;
-
-    const topOverdueIds = overdueEntries
-      .map((e) => ({
-        id: e.contactId,
-        stage: (e.stage || "researched").toLowerCase(),
-        days: Math.floor(
-          (Date.now() - new Date(e.addedAt || Date.now()).getTime()) /
-            86_400_000,
-        ),
-      }))
-      .sort((a, b) => b.days - a.days)
-      .slice(0, 5);
+    // Overdue leads: >=7 days, not responded/meeting_set. Shared with the
+    // follow-up reminder email via selectOverdueLeads so they never disagree.
+    const overdueLeads = selectOverdueLeads(pipelineEntries || [], Date.now());
+    const remindersCount = overdueLeads.length;
+    const topOverdueIds = overdueLeads
+      .slice(0, 5)
+      .map((e) => ({ id: e.contactId, stage: e.stage, days: e.days }));
 
     let topOverdue: OverdueContact[] = [];
     if (topOverdueIds.length > 0) {
-      const { data: overdueContacts } = await supabase
-        .from("AlumniContact")
-        .select("id, name, organization, importedByUserId")
-        .in(
-          "id",
-          topOverdueIds.map((e) => e.id),
-        );
+      const [{ data: overdueContacts }, { data: overdueDiscovers }] =
+        await Promise.all([
+          supabase
+            .from("AlumniContact")
+            .select("id, name, firmName, importedByUserId")
+            .in(
+              "id",
+              topOverdueIds.map((e) => e.id),
+            ),
+          supabase
+            .from("UserDiscover")
+            .select("contactId, rating")
+            .eq("userId", userId)
+            .in(
+              "contactId",
+              topOverdueIds.map((e) => e.id),
+            ),
+        ]);
+
+      const overdueHighValueIds = new Set<string>(
+        (overdueDiscovers || [])
+          .filter((d) => d.rating === "high_value")
+          .map((d) => d.contactId),
+      );
+
       topOverdue = topOverdueIds
         .map((e) => {
           const c = (overdueContacts || []).find((x) => x.id === e.id);
           if (!c) return null;
-          // Pipeline entries can reference contacts another user imported (via Discover).
-          // Redact PII for those.
-          const isOwn = c.importedByUserId === userId;
+          // Redact PII only when not unlocked (own or high_value-rated).
+          const unlocked = isUnlocked(c.importedByUserId, userId, overdueHighValueIds, c.id);
           return {
             contactId: c.id,
-            contactName: isOwn ? (c.name || "") : redactName(c.name || ""),
-            organization: c.organization || "",
+            contactName: unlocked ? (c.name || "") : redactName(c.name || ""),
+            firmName: c.firmName || "",
             stage: e.stage,
             days: e.days,
-            ...(isOwn ? {} : { isRedacted: true }),
+            ...(unlocked ? {} : { isRedacted: true }),
           };
         })
         .filter((x): x is OverdueContact => x !== null);
@@ -146,7 +151,7 @@ export async function GET() {
     // Tier distribution + top firms (single fetch for efficiency)
     const { data: allTieredContacts } = await supabase
       .from("AlumniContact")
-      .select("tier, organization")
+      .select("tier, firmName")
       .eq("importedByUserId", userId);
 
     const tierCounts = { hot: 0, warm: 0, monitor: 0, cold: 0 };
@@ -158,7 +163,7 @@ export async function GET() {
       else if (tier === "monitor") tierCounts.monitor++;
       else tierCounts.cold++;
 
-      const firm = (c.organization || "").trim();
+      const firm = (c.firmName || "").trim();
       if (!firm) continue;
       const cur = firmMap.get(firm) || { count: 0, hotCount: 0 };
       cur.count++;
@@ -166,7 +171,7 @@ export async function GET() {
       firmMap.set(firm, cur);
     }
     const topFirms = Array.from(firmMap.entries())
-      .map(([organization, v]) => ({ organization, count: v.count, hotCount: v.hotCount }))
+      .map(([firmName, v]) => ({ firmName, count: v.count, hotCount: v.hotCount }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
@@ -184,11 +189,11 @@ export async function GET() {
     for (const r of recentRatings || []) activityContactIds.add(r.contactId);
     for (const p of recentPipeline) activityContactIds.add(p.contactId);
 
-    let activityContacts: Array<{ id: string; name: string; organization: string }> = [];
+    let activityContacts: Array<{ id: string; name: string; firmName: string }> = [];
     if (activityContactIds.size > 0) {
       const { data } = await supabase
         .from("AlumniContact")
-        .select("id, name, organization")
+        .select("id, name, firmName")
         .in("id", Array.from(activityContactIds));
       activityContacts = data || [];
     }
@@ -201,7 +206,7 @@ export async function GET() {
         type: "rate",
         contactId: c.id,
         contactName: c.name,
-        organization: c.organization,
+        firmName: c.firmName,
         detail: r.rating === "high_value" ? "rated high value" : "skipped",
         timestamp: r.createdAt || new Date().toISOString(),
       });
@@ -213,7 +218,7 @@ export async function GET() {
         type: "pipeline_add",
         contactId: c.id,
         contactName: c.name,
-        organization: c.organization,
+        firmName: c.firmName,
         detail: `added to ${(p.stage || "researched").toLowerCase()}`,
         timestamp: p.addedAt || new Date().toISOString(),
       });
@@ -233,7 +238,7 @@ export async function GET() {
 
     const { data: unratedTop } = await supabase
       .from("AlumniContact")
-      .select("id, name, organization, warmthScore, tier")
+      .select("id, name, firmName, warmthScore, tier")
       .eq("importedByUserId", userId)
       .order("warmthScore", { ascending: false })
       .limit(30);
@@ -244,7 +249,7 @@ export async function GET() {
       .map((c) => ({
         contactId: c.id,
         contactName: c.name || "",
-        organization: c.organization || "",
+        firmName: c.firmName || "",
         score: c.warmthScore || 0,
         tier: c.tier || "cold",
         hasWarmPath: false,
@@ -253,7 +258,7 @@ export async function GET() {
     const { data: userRow } = await supabase
       .from("User")
       .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
-      .eq("email", userId)
+      .eq("email", userEmail)
       .maybeSingle();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
@@ -271,7 +276,7 @@ export async function GET() {
       await supabase
         .from("User")
         .update({ subscriptionStatus: "trial", trialEndsAt: newTrialEndsAt })
-        .eq("email", userId);
+        .eq("email", userEmail);
       subscriptionStatus = "trial";
       trialEndsAt = newTrialEndsAt;
     }
@@ -299,7 +304,7 @@ export async function GET() {
     const { data: waitlistRow } = await supabase
       .from("waitlist_signups")
       .select("ref_code")
-      .eq("email", userId)
+      .eq("email", userEmail)
       .single();
 
     if (waitlistRow?.ref_code) {

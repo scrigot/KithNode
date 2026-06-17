@@ -33,7 +33,7 @@ function professorToSeed(prof: Professor, cls: ClassifierOutput): AlumniSeed {
   return {
     name: prof.name,
     title: prof.title,
-    organization: prof.department,
+    firmName: prof.department,
     email: prof.email,
     sourceUrl: prof.profileUrl || "",
     bio: prof.bio,

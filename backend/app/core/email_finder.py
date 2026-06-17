@@ -3,6 +3,7 @@
 import re
 import requests
 from config import HUNTER_API_KEY
+from cost_log import log_cost, _HUNTER_COST_PER_CALL
 
 
 def _normalize_name(name: str) -> tuple[str, str]:
@@ -51,6 +52,15 @@ def _hunter_domain_search(domain: str) -> dict:
         if resp.status_code != 200:
             return {}
 
+        # Best-effort cost telemetry — a 200 is a real billed call (free tier $0,
+        # still counted for credit-burn). Never raises.
+        log_cost(
+            "hunter",
+            "domain-search",
+            cost_usd=_HUNTER_COST_PER_CALL,
+            meta={"source": "backend"},
+        )
+
         data = resp.json().get("data", {})
         pattern = data.get("pattern", "")
         emails = [e.get("value", "") for e in data.get("emails", []) if e.get("value")]
@@ -81,6 +91,14 @@ def _hunter_email_finder(domain: str, first: str, last: str) -> dict:
         if resp.status_code != 200:
             return {}
 
+        # Best-effort cost telemetry — billed call on a 200. Never raises.
+        log_cost(
+            "hunter",
+            "email-finder",
+            cost_usd=_HUNTER_COST_PER_CALL,
+            meta={"source": "backend"},
+        )
+
         data = resp.json().get("data", {})
         email = data.get("email", "")
         confidence = data.get("confidence", 0)
@@ -103,6 +121,13 @@ def _hunter_email_verify(email: str) -> str:
             timeout=10,
         )
         if resp.status_code == 200:
+            # Best-effort cost telemetry — billed call on a 200. Never raises.
+            log_cost(
+                "hunter",
+                "email-verifier",
+                cost_usd=_HUNTER_COST_PER_CALL,
+                meta={"source": "backend"},
+            )
             return resp.json().get("data", {}).get("status", "unknown")
     except Exception:
         pass

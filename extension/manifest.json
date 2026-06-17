@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "KithNode LinkedIn Capture",
+  "version": "0.1.0",
+  "description": "Capture the LinkedIn profile you're viewing into your KithNode network (skills, experience, education, clubs).",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://kithnode.ai/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Capture to KithNode"
+  }
+}

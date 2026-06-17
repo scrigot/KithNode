@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { FOUNDER_EMAIL } from "@/lib/founder";
 
 export type SubAccess =
   | { allow: true; tier: "active" | "trial" }
@@ -16,6 +17,9 @@ export type SubAccess =
  */
 export async function checkSubscription(userId: string): Promise<SubAccess> {
   if (!userId) return { allow: false, reason: "no_user" };
+  // Founder is never gated (no default trial means Sam would otherwise lock
+  // himself out of his own app).
+  if (userId.toLowerCase() === FOUNDER_EMAIL) return { allow: true, tier: "active" };
   const { data } = await supabase
     .from("User")
     .select("subscriptionStatus, trialEndsAt, subscriptionEndsAt")

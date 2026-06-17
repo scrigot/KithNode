@@ -4,7 +4,8 @@ import { normalizeFirmName } from "@/lib/normalize-firm";
 export interface WarmPath {
   intermediaryName: string;
   intermediaryRelation: string;
-  organization: string;
+  intermediaryLinkedInUrl: string;
+  firmName: string;
   title: string;
 }
 
@@ -26,7 +27,7 @@ export async function findWarmPaths(
   // These are the user's own connections who can provide a warm intro.
   const { data, error } = await supabase
     .from("AlumniContact")
-    .select("name, title, organization, affiliations, importedByUserId")
+    .select("name, title, firmName, affiliations, linkedInUrl, importedByUserId")
     .eq("importedByUserId", userId)
     .limit(500);
 
@@ -34,13 +35,14 @@ export async function findWarmPaths(
 
   // Filter by normalized firm name match
   const matches = data.filter(
-    (c) => normalizeFirmName(c.organization) === normalizedTarget,
+    (c) => normalizeFirmName(c.firmName) === normalizedTarget,
   );
 
   return matches.map((c) => ({
     intermediaryName: c.name,
     intermediaryRelation: c.affiliations || "Connection",
-    organization: c.organization,
+    intermediaryLinkedInUrl: c.linkedInUrl || "",
+    firmName: c.firmName,
     title: c.title,
   }));
 }

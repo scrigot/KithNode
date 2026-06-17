@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { requireUser, scopedSelect } from "@/lib/pipeline-auth";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
+import { isUnlocked } from "@/lib/contact-access";
 
 // The 4 universal phases every pipeline's native stages roll up to in the "All" view.
 const UNIVERSAL_PHASES = [
@@ -94,6 +95,19 @@ export async function GET(request: NextRequest) {
       count: (entries || []).filter((e) => e.pipelineId === p.id).length,
     }));
 
+    // Unlock set: a contact is shown unredacted when the viewer imported it OR
+    // rated it high_value in Discover (see isUnlocked / redact.ts).
+    const { data: discoverRows } = await scopedSelect(
+      "UserDiscover",
+      userId,
+      "contactId, rating",
+    );
+    const highValueIds = new Set<string>(
+      ((discoverRows as { contactId: string; rating: string }[]) || [])
+        .filter((d) => d.rating === "high_value")
+        .map((d) => d.contactId),
+    );
+
     if (!entries || entries.length === 0) {
       return NextResponse.json({
         pipelines: pipelineSummaries,
@@ -119,7 +133,8 @@ export async function GET(request: NextRequest) {
     for (const col of columns) grouped[col.key] = [];
     let sawUnsorted = false;
     const goingCold: unknown[] = [];
-    const orgPathCache = new Map<
+    // Pre-fetch warm paths per unique firm (cache by firm name).
+    const firmPathCache = new Map<
       string,
       Awaited<ReturnType<typeof findWarmPaths>>
     >();
@@ -143,15 +158,19 @@ export async function GET(request: NextRequest) {
         if (!grouped["unsorted"]) grouped["unsorted"] = [];
       }
 
-      let warmPaths = orgPathCache.get(contact.organization || "");
+      let warmPaths = firmPathCache.get(contact.firmName || "");
       if (warmPaths === undefined) {
-        warmPaths = await findWarmPaths(userId, contact.organization || "");
-        orgPathCache.set(contact.organization || "", warmPaths);
+        warmPaths = await findWarmPaths(userId, contact.firmName || "");
+        firmPathCache.set(contact.firmName || "", warmPaths);
       }
 
-      const isOwn = contact.importedByUserId === userId;
-      const safeName = isOwn ? contact.name || "" : redactName(contact.name || "");
-      const safeLinkedIn = isOwn
+      // Redact PII only when not unlocked. A contact is unlocked when the viewer
+      // imported it OR has rated it high_value in Discover. Pipeline contacts
+      // added from Discover (high_value) must show full identity since the user
+      // is actively reaching out to them.
+      const unlocked = isUnlocked(contact.importedByUserId, userId, highValueIds, contact.id);
+      const safeName = unlocked ? contact.name || "" : redactName(contact.name || "");
+      const safeLinkedIn = unlocked
         ? contact.linkedInUrl || ""
         : contact.linkedInUrl
           ? redactLinkedInUrl(contact.linkedInUrl)
@@ -165,7 +184,7 @@ export async function GET(request: NextRequest) {
         email: "",
         linkedin_url: safeLinkedIn,
         education: contact.education || "",
-        company_name: contact.organization || "",
+        company_name: contact.firmName || "",
         company_location: contact.location || "",
         total_score: contact.warmthScore || 0,
         tier: contact.tier || "cold",
@@ -181,7 +200,7 @@ export async function GET(request: NextRequest) {
           ? contact.affiliations.split(",").map((a: string) => a.trim()).filter(Boolean)
           : [],
         warmPaths: warmPaths.filter((wp) => wp.intermediaryName !== contact.name),
-        ...(isOwn ? {} : { isRedacted: true }),
+        ...(unlocked ? {} : { isRedacted: true }),
       };
 
       (grouped[columnKey] ||= []).push(card);
