@@ -1,101 +1,162 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { getUserClient } from "@/lib/supabase-user";
+import { requireUser, scopedSelect } from "@/lib/pipeline-auth";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
 
-const STAGES = [
-  "researched",
-  "connected",
-  "email_sent",
-  "follow_up",
-  "responded",
-  "meeting_set",
+// The 4 universal phases every pipeline's native stages roll up to in the "All" view.
+const UNIVERSAL_PHASES = [
+  { key: "identified", label: "Identified", color: "zinc" },
+  { key: "contacted", label: "Contacted", color: "blue" },
+  { key: "engaged", label: "Engaged", color: "amber" },
+  { key: "advanced", label: "Advanced", color: "green" },
 ];
+const UNSORTED = { key: "unsorted", label: "Unsorted", color: "zinc" };
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+interface StageMeta {
+  key: string;
+  label: string;
+  color: string;
+  universalPhase?: string;
+}
+interface PipelineRow {
+  id: string;
+  name: string;
+  kind: string;
+  stages: StageMeta[];
+  cadenceDays: number | null;
+}
+
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
+
+/** Parse the JSONB stages column, tolerating string-encoded JSON. */
+function parseStages(raw: unknown): StageMeta[] {
+  if (Array.isArray(raw)) return raw as StageMeta[];
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+export async function GET(request: NextRequest) {
+  const userId = await requireUser();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
-  // RLS-enforced client for this user's private tables (PipelineEntry, UserDiscover).
-  // AlumniContact stays on the service-role `supabase` client (shared pool + redaction).
-  const db = await getUserClient(userId, session.user.email ?? "");
+  const active = request.nextUrl.searchParams.get("pipeline") || "all";
 
   try {
-    // Fetch pipeline entries for current user
-    const { data: entries, error: entryError } = await db
-      .from("PipelineEntry")
-      .select("*")
-      .eq("userId", userId)
-      .order("addedAt", { ascending: false });
-
-    if (entryError) throw new Error(entryError.message);
-    if (!entries || entries.length === 0) {
-      return NextResponse.json({ stages: STAGES, contacts: {}, total: 0 });
-    }
-
-    // Fetch all contacts for those pipeline entries
-    const contactIds = [...new Set(entries.map((e) => e.contactId))];
-    const { data: contacts, error: contactError } = await supabase
-      .from("AlumniContact")
-      .select("*")
-      .in("id", contactIds);
-
-    if (contactError) throw new Error(contactError.message);
-
-    // Build a lookup map for contacts
-    const contactMap = new Map(
-      (contacts || []).map((c) => [c.id, c]),
+    // 1. The user's pipelines (userId-scoped via the IDOR guard).
+    const { data: pipelineRows, error: pErr } = await scopedSelect(
+      "Pipeline",
+      userId,
     );
+    if (pErr) throw new Error(pErr.message);
 
-    // Fetch high_value discovers for unlock check
-    const { data: discoverRows } = await db
-      .from("UserDiscover")
-      .select("contactId, rating")
-      .eq("userId", userId);
+    const pipelines: PipelineRow[] = (pipelineRows || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      stages: parseStages(p.stages),
+      cadenceDays: p.cadenceDays ?? null,
+    }));
+    const pipeMap = new Map(pipelines.map((p) => [p.id, p]));
+
+    // 2. Pipeline entries (userId-scoped). For a specific pipeline, filter by id.
+    let entryQuery = scopedSelect("PipelineEntry", userId).order("addedAt", {
+      ascending: false,
+    });
+    if (active !== "all") entryQuery = entryQuery.eq("pipelineId", active);
+    const { data: entries, error: eErr } = await entryQuery;
+    if (eErr) throw new Error(eErr.message);
+
+    // Columns for the requested view.
+    const activePipe = active === "all" ? null : pipeMap.get(active);
+    const columns: StageMeta[] =
+      active === "all"
+        ? [...UNIVERSAL_PHASES]
+        : activePipe?.stages.length
+          ? activePipe.stages
+          : [];
+
+    const pipelineSummaries = pipelines.map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      count: (entries || []).filter((e) => e.pipelineId === p.id).length,
+    }));
+
+    // Unlock set: a contact is shown unredacted when the viewer imported it OR
+    // rated it high_value in Discover (see isUnlocked / redact.ts).
+    const { data: discoverRows } = await scopedSelect(
+      "UserDiscover",
+      userId,
+      "contactId, rating",
+    );
     const highValueIds = new Set<string>(
-      (discoverRows || [])
+      ((discoverRows as { contactId: string; rating: string }[]) || [])
         .filter((d) => d.rating === "high_value")
         .map((d) => d.contactId),
     );
 
-    // Group pipeline entries by stage, transforming to PipelineContact shape
-    const grouped: Record<string, Array<{
-      id: string;
-      name: string;
-      title: string;
-      email: string;
-      linkedin_url: string;
-      education: string;
-      company_name: string;
-      company_location: string;
-      total_score: number;
-      tier: string;
-      stage: string;
-      notes: string;
-      added_at: string;
-      affiliations: string[];
-      warmPaths: Array<{ intermediaryName: string; intermediaryRelation: string; firmName: string; title: string }>;
-      isRedacted?: boolean;
-    }>> = {};
-
-    for (const stage of STAGES) {
-      grouped[stage] = [];
+    if (!entries || entries.length === 0) {
+      return NextResponse.json({
+        pipelines: pipelineSummaries,
+        activePipeline: active,
+        stages: columns,
+        contacts: {},
+        goingCold: [],
+        total: 0,
+      });
     }
 
-    // Pre-fetch warm paths per unique firm (cache by normalized firm name)
-    const firmPathCache = new Map<string, Awaited<ReturnType<typeof findWarmPaths>>>();
+    // 3. Contacts for those entries. NOTE: scoped by contactId, NOT userId —
+    //    contacts are shared/importable; non-owners get redacted (see redact.ts).
+    const contactIds = [...new Set(entries.map((e) => e.contactId))];
+    const { data: contacts, error: cErr } = await supabase
+      .from("AlumniContact")
+      .select("*")
+      .in("id", contactIds);
+    if (cErr) throw new Error(cErr.message);
+    const contactMap = new Map((contacts || []).map((c) => [c.id, c]));
+
+    const grouped: Record<string, unknown[]> = {};
+    for (const col of columns) grouped[col.key] = [];
+    let sawUnsorted = false;
+    const goingCold: unknown[] = [];
+    // Pre-fetch warm paths per unique firm (cache by firm name).
+    const firmPathCache = new Map<
+      string,
+      Awaited<ReturnType<typeof findWarmPaths>>
+    >();
 
     for (const entry of entries) {
       const contact = contactMap.get(entry.contactId);
       if (!contact) continue;
+      const pipe = entry.pipelineId ? pipeMap.get(entry.pipelineId) : undefined;
+      const nativeStage = (entry.stage || "researched").toLowerCase();
+      const stageMeta = pipe?.stages.find((s) => s.key === nativeStage);
 
-      const stage = (entry.stage || "researched").toLowerCase();
-      if (!grouped[stage]) grouped[stage] = [];
+      // Which column does this entry land in?
+      let columnKey: string;
+      if (active === "all") {
+        columnKey = stageMeta?.universalPhase || "unsorted";
+      } else {
+        columnKey = stageMeta ? nativeStage : "unsorted";
+      }
+      if (columnKey === "unsorted") {
+        sawUnsorted = true;
+        if (!grouped["unsorted"]) grouped["unsorted"] = [];
+      }
 
       let warmPaths = firmPathCache.get(contact.firmName || "");
       if (warmPaths === undefined) {
@@ -108,12 +169,15 @@ export async function GET() {
       // added from Discover (high_value) must show full identity since the user
       // is actively reaching out to them.
       const unlocked = isUnlocked(contact.importedByUserId, userId, highValueIds, contact.id);
-      const safeName = unlocked ? (contact.name || "") : redactName(contact.name || "");
+      const safeName = unlocked ? contact.name || "" : redactName(contact.name || "");
       const safeLinkedIn = unlocked
-        ? (contact.linkedInUrl || "")
-        : (contact.linkedInUrl ? redactLinkedInUrl(contact.linkedInUrl) : "");
+        ? contact.linkedInUrl || ""
+        : contact.linkedInUrl
+          ? redactLinkedInUrl(contact.linkedInUrl)
+          : "";
 
-      grouped[stage].push({
+      const lastTouchAt = entry.lastTouchAt || entry.addedAt || null;
+      const card = {
         id: contact.id,
         name: safeName,
         title: contact.title || "",
@@ -124,21 +188,59 @@ export async function GET() {
         company_location: contact.location || "",
         total_score: contact.warmthScore || 0,
         tier: contact.tier || "cold",
-        stage,
+        stage: nativeStage,
+        nativeStageLabel: stageMeta?.label || nativeStage,
+        pipelineId: entry.pipelineId || "",
+        pipelineKind: pipe?.kind || "",
         notes: entry.notes || "",
         added_at: entry.addedAt || new Date().toISOString(),
+        lastTouchAt,
+        daysSinceTouch: daysSince(lastTouchAt),
         affiliations: contact.affiliations
           ? contact.affiliations.split(",").map((a: string) => a.trim()).filter(Boolean)
           : [],
         warmPaths: warmPaths.filter((wp) => wp.intermediaryName !== contact.name),
         ...(unlocked ? {} : { isRedacted: true }),
-      });
+      };
+
+      (grouped[columnKey] ||= []).push(card);
+
+      // Nurture: overdue if past the pipeline's cadence and not in a terminal stage.
+      const terminalKey = pipe?.stages[pipe.stages.length - 1]?.key;
+      const d = card.daysSinceTouch;
+      if (
+        pipe?.cadenceDays &&
+        d !== null &&
+        d >= pipe.cadenceDays &&
+        nativeStage !== terminalKey
+      ) {
+        goingCold.push(card);
+      }
     }
 
-    const total = entries.length;
+    const stages = sawUnsorted ? [...columns, UNSORTED] : columns;
+    goingCold.sort(
+      (a, b) =>
+        ((b as { daysSinceTouch: number }).daysSinceTouch || 0) -
+        ((a as { daysSinceTouch: number }).daysSinceTouch || 0),
+    );
 
-    return NextResponse.json({ stages: STAGES, contacts: grouped, total });
+    return NextResponse.json({
+      pipelines: pipelineSummaries,
+      activePipeline: active,
+      stages,
+      contacts: grouped,
+      goingCold: goingCold.slice(0, 12),
+      total: entries.length,
+    });
   } catch {
-    return NextResponse.json({ stages: STAGES, contacts: {}, total: 0 });
+    return NextResponse.json({
+      pipelines: [],
+      activePipeline: active,
+      stages: [],
+      contacts: {},
+      goingCold: [],
+      total: 0,
+    });
   }
 }

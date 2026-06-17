@@ -147,6 +147,13 @@ export function getContactsRanked(
 
 // ─── Pipeline ────────────────────────────────────────────────────────
 
+export interface PipelineWarmPath {
+  intermediaryName: string;
+  intermediaryRelation: string;
+  firmName: string;
+  title: string;
+}
+
 export interface PipelineContact {
   id: string;
   name: string;
@@ -159,14 +166,38 @@ export interface PipelineContact {
   total_score: number;
   tier: string;
   stage: string;
+  nativeStageLabel: string;
+  pipelineId: string;
+  pipelineKind: string;
   notes: string;
   added_at: string;
+  lastTouchAt: string | null;
+  daysSinceTouch: number | null;
   affiliations: string[];
+  warmPaths?: PipelineWarmPath[];
+  isRedacted?: boolean;
+}
+
+export interface PipelineStageMeta {
+  key: string;
+  label: string;
+  color: string;
+  universalPhase?: string;
+}
+
+export interface PipelineSummary {
+  id: string;
+  name: string;
+  kind: string;
+  count: number;
 }
 
 export interface PipelineResponse {
-  stages: string[];
+  pipelines: PipelineSummary[];
+  activePipeline: string; // pipeline id, or "all"
+  stages: PipelineStageMeta[];
   contacts: Record<string, PipelineContact[]>;
+  goingCold: PipelineContact[];
   total: number;
 }
 

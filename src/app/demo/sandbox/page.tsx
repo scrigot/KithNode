@@ -288,7 +288,7 @@ function SandboxQuickActionRail() {
         </div>
         <div className="p-3">
           <p className="text-[13px] font-bold text-foreground">{nextBest.name}</p>
-          <p className="text-[11px] text-muted-foreground">{nextBest.firmName}</p>
+          <p className="text-[11px] text-muted-foreground">{nextBest.organization}</p>
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground/60">
               Score
@@ -841,7 +841,7 @@ export default function SandboxOverviewPage() {
                           {a.contactName}
                         </span>
                         <span className="truncate text-muted-foreground">
-                          {a.firmName}
+                          {a.organization}
                         </span>
                         <span className="ml-auto truncate text-[10px] text-muted-foreground/80">
                           {a.detail}
@@ -886,7 +886,7 @@ export default function SandboxOverviewPage() {
                         {o.contactName}
                       </span>
                       <span className="truncate text-muted-foreground">
-                        {o.firmName}
+                        {o.organization}
                       </span>
                       <span className="ml-auto font-mono text-[9px] tabular-nums text-amber-400">
                         {o.daysSinceTouch}d
@@ -912,7 +912,7 @@ export default function SandboxOverviewPage() {
                         {u.name}
                       </span>
                       <span className="truncate text-muted-foreground">
-                        {u.firmName}
+                        {u.organization}
                       </span>
                       <span
                         className={`ml-auto font-mono text-[10px] font-bold tabular-nums ${TIER_COLOR[u.tier]}`}
@@ -949,15 +949,15 @@ export default function SandboxOverviewPage() {
               );
               return (
                 <Link
-                  key={f.firmName}
+                  key={f.organization}
                   href="/waitlist?from=demo&section=contacts"
                   className="flex flex-col gap-0.5 border border-white/[0.06] bg-background px-2 py-1.5 hover:border-white/[0.18]"
                 >
                   <p
                     className="truncate text-[10px] font-bold uppercase tracking-wider text-foreground"
-                    title={f.firmName}
+                    title={f.organization}
                   >
-                    {f.firmName}
+                    {f.organization}
                   </p>
                   <div className="flex items-baseline justify-between gap-1">
                     <span className="font-mono text-base font-bold tabular-nums text-foreground">

@@ -30,7 +30,7 @@ type SwipeDir = "left" | "right" | null;
 function buildWarmChain(card: SandboxDiscoverCard): string {
   const wp = card.warmPaths[0];
   if (!wp) return "";
-  return `Via Sam Rigot UNC '29 -> ${wp.intermediaryName} -> ${card.name}, ${card.title} at ${card.firmName}`;
+  return `Via Sam Rigot UNC '29 -> ${wp.intermediaryName} -> ${card.name}, ${card.title} at ${card.organization}`;
 }
 
 function Avatar({ initials }: { initials: string }) {
@@ -173,7 +173,7 @@ export default function SandboxDiscoverPage() {
                 </h3>
                 <p className="mt-0.5 text-[12px] text-muted-foreground">
                   {card.title} @{" "}
-                  <span className="text-foreground">{card.firmName}</span>
+                  <span className="text-foreground">{card.organization}</span>
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] uppercase tracking-wider text-muted-foreground/80">
                   <span className="flex items-center gap-1">
