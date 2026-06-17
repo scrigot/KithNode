@@ -3,7 +3,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { genId } from "@/lib/kith/ids";
-import { getUserNames, userExists } from "@/lib/kith/users";
+import { getUserProfiles, userExists } from "@/lib/kith/users";
 
 export class FriendRequestError extends Error {
   constructor(message: string) {
@@ -85,8 +85,8 @@ export async function listFriends(userId: string) {
   const rows = [...((asReq.data as FriendshipRow[]) ?? []), ...((asAddr.data as FriendshipRow[]) ?? [])];
 
   const otherEmails = rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
-  const names = await getUserNames(otherEmails);
-  const label = (email: string) => ({ email, name: names.get(email) ?? email });
+  const profiles = await getUserProfiles(otherEmails);
+  const label = (email: string) => profiles.get(email) ?? { email, name: email, image: "" };
 
   return {
     friends: rows.filter((r) => r.status === "accepted").map((r) => label(r.requesterId === userId ? r.addresseeId : r.requesterId)),

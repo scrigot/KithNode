@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api-client";
-import { UserPlus, Check, X, Clock, Loader2, Users } from "lucide-react";
+import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search } from "lucide-react";
 
 interface Person {
   email: string;
   name: string;
+  image: string;
 }
 interface FriendsData {
   friends: Person[];
@@ -14,12 +15,31 @@ interface FriendsData {
   outgoing: Person[];
 }
 
+function Avatar({ person, size = 36 }: { person: { name: string; image?: string }; size?: number }) {
+  const initials =
+    person.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
+  if (person.image) {
+    return <img src={person.image} alt={person.name} width={size} height={size} className="shrink-0 object-cover" style={{ width: size, height: size }} />;
+  }
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center bg-accent-teal/15 text-[11px] font-bold text-accent-teal"
+      style={{ width: size, height: size }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 export function FriendsClient() {
   const [data, setData] = useState<FriendsData>({ friends: [], incoming: [], outgoing: [] });
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     const res = await apiFetch("/api/kith/friends");
@@ -31,22 +51,15 @@ export function FriendsClient() {
     load();
   }, [load]);
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+  async function addByEmail(email: string) {
     setError("");
     const res = await apiFetch("/api/kith/friends", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
-    if (res.ok) {
-      setEmail("");
-      await load();
-    } else {
-      setError((await res.json().catch(() => ({}))).error || "Failed to send request");
-    }
-    setBusy(false);
+    if (res.ok) await load();
+    else setError((await res.json().catch(() => ({}))).error || "Failed to send request");
   }
 
   async function respond(requesterId: string, action: "accept" | "block") {
@@ -60,7 +73,7 @@ export function FriendsClient() {
 
   return (
     <div className="px-6 py-6">
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
           Kith
         </h1>
@@ -69,25 +82,9 @@ export function FriendsClient() {
         </p>
       </div>
 
-      {/* Add by email */}
-      <form onSubmit={add} className="mb-6 flex gap-2">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="friend@university.edu"
-          className="flex-1 border border-white/[0.12] bg-card px-3 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:border-accent-teal focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="flex items-center gap-1.5 bg-accent-teal px-4 py-2.5 text-[12px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-accent-teal/80 disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-          Add
-        </button>
-      </form>
+      <ProfileCard />
+
+      <FriendSearch onAdd={addByEmail} />
       {error && <p className="mb-4 text-[12px] text-red-400">{error}</p>}
 
       {loading ? (
@@ -102,16 +99,10 @@ export function FriendsClient() {
             ) : (
               data.incoming.map((p) => (
                 <Row key={p.email} person={p}>
-                  <button
-                    onClick={() => respond(p.email, "accept")}
-                    className="flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-green-400 hover:bg-green-500/20"
-                  >
+                  <button onClick={() => respond(p.email, "accept")} className="flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-green-400 hover:bg-green-500/20">
                     <Check className="h-3.5 w-3.5" /> Accept
                   </button>
-                  <button
-                    onClick={() => respond(p.email, "block")}
-                    className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
-                  >
+                  <button onClick={() => respond(p.email, "block")} className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-500/10 hover:text-red-400">
                     <X className="h-3.5 w-3.5" /> Block
                   </button>
                 </Row>
@@ -121,7 +112,7 @@ export function FriendsClient() {
 
           <Section title="Friends" count={data.friends.length} icon={<Users className="h-3.5 w-3.5" />}>
             {data.friends.length === 0 ? (
-              <Empty>No friends yet — add one above.</Empty>
+              <Empty>No friends yet — search above.</Empty>
             ) : (
               data.friends.map((p) => (
                 <Row key={p.email} person={p}>
@@ -146,6 +137,127 @@ export function FriendsClient() {
   );
 }
 
+// Current user's avatar + upload control.
+function ProfileCard() {
+  const [profile, setProfile] = useState<{ name: string; image: string }>({ name: "", image: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    apiFetch("/api/kith/avatar").then(async (r) => {
+      if (r.ok) setProfile(await r.json());
+    });
+  }, []);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiFetch("/api/kith/avatar", { method: "POST", body: fd });
+    if (res.ok) {
+      const { image } = await res.json();
+      setProfile((p) => ({ ...p, image }));
+    } else {
+      setErr((await res.json().catch(() => ({}))).error || "Upload failed");
+    }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  return (
+    <div className="mb-5 flex items-center gap-3 border border-white/[0.06] bg-card px-4 py-3">
+      <Avatar person={profile} size={44} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-medium text-foreground">{profile.name || "Your profile"}</div>
+        <div className="text-[11px] text-muted-foreground">Profile picture · visible to your Kith & Nodes</div>
+        {err && <div className="text-[11px] text-red-400">{err}</div>}
+      </div>
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFile} className="hidden" />
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={busy}
+        className="flex items-center gap-1.5 border border-white/[0.12] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06] disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+        Upload
+      </button>
+    </div>
+  );
+}
+
+// Name/email typeahead → add as friend.
+function FriendSearch({ onAdd }: { onAdd: (email: string) => Promise<void> }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<Person[]>([]);
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (q.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    timer.current = setTimeout(async () => {
+      const res = await apiFetch(`/api/kith/users/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        setResults(await res.json());
+        setOpen(true);
+      }
+    }, 200);
+  }, [q]);
+
+  async function pick(email: string) {
+    await onAdd(email);
+    setQ("");
+    setResults([]);
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative mb-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (q.includes("@")) pick(q.trim());
+        }}
+        className="flex items-center gap-2 border border-white/[0.12] bg-card px-3"
+      >
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => results.length && setOpen(true)}
+          placeholder="Search by name or email…"
+          className="flex-1 bg-transparent py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+        />
+      </form>
+      {open && results.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full border border-white/[0.12] bg-bg-secondary shadow-2xl">
+          {results.map((r) => (
+            <button
+              key={r.email}
+              onClick={() => pick(r.email)}
+              className="flex w-full items-center gap-3 border-b border-white/[0.06] px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-white/[0.04]"
+            >
+              <Avatar person={r} size={32} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] text-foreground">{r.name}</div>
+                <div className="truncate font-mono text-[11px] text-muted-foreground">{r.email}</div>
+              </div>
+              <UserPlus className="h-4 w-4 shrink-0 text-accent-teal" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, count, icon, children }: { title: string; count: number; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
@@ -162,9 +274,12 @@ function Section({ title, count, icon, children }: { title: string; count: numbe
 function Row({ person, children }: { person: Person; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 last:border-b-0">
-      <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium text-foreground">{person.name}</div>
-        <div className="truncate font-mono text-[11px] text-muted-foreground">{person.email}</div>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar person={person} size={36} />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-medium text-foreground">{person.name}</div>
+          <div className="truncate font-mono text-[11px] text-muted-foreground">{person.email}</div>
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
