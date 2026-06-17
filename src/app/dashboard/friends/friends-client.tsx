@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api-client";
-import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search } from "lucide-react";
+import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search, Link2 } from "lucide-react";
 
 interface Person {
   email: string;
@@ -40,16 +40,35 @@ export function FriendsClient() {
   const [data, setData] = useState<FriendsData>({ friends: [], incoming: [], outgoing: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [suggestions, setSuggestions] = useState<Person[]>([]);
 
   const load = useCallback(async () => {
-    const res = await apiFetch("/api/kith/friends");
-    if (res.ok) setData(await res.json());
+    const [friendsRes, inviteRes, suggestRes] = await Promise.all([
+      apiFetch("/api/kith/friends"),
+      apiFetch("/api/kith/invite"),
+      apiFetch("/api/kith/friends/suggestions"),
+    ]);
+    if (friendsRes.ok) setData(await friendsRes.json());
+    if (inviteRes.ok) {
+      const { inviteLink: link } = await inviteRes.json();
+      setInviteLink(link ?? "");
+    }
+    if (suggestRes.ok) setSuggestions(await suggestRes.json());
     setLoading(false);
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  async function copyInvite() {
+    if (!inviteLink) return;
+    await navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function addByEmail(email: string) {
     setError("");
@@ -83,6 +102,22 @@ export function FriendsClient() {
       </div>
 
       <ProfileCard />
+
+      {inviteLink && (
+        <div className="mb-5 flex items-center gap-3 border border-white/[0.06] bg-card px-4 py-3">
+          <Link2 className="h-4 w-4 shrink-0 text-accent-teal" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">Your invite link</div>
+            <div className="truncate font-mono text-[11px] text-muted-foreground">{inviteLink}</div>
+          </div>
+          <button
+            onClick={copyInvite}
+            className="shrink-0 border border-white/[0.12] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06]"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      )}
 
       <FriendSearch onAdd={addByEmail} />
       {error && <p className="mb-4 text-[12px] text-red-400">{error}</p>}
@@ -127,6 +162,21 @@ export function FriendsClient() {
               {data.outgoing.map((p) => (
                 <Row key={p.email} person={p}>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Pending</span>
+                </Row>
+              ))}
+            </Section>
+          )}
+
+          {suggestions.length > 0 && (
+            <Section title="People in your chapter" count={suggestions.length} icon={<Users className="h-3.5 w-3.5" />}>
+              {suggestions.map((p) => (
+                <Row key={p.email} person={p}>
+                  <button
+                    onClick={() => addByEmail(p.email).then(() => setSuggestions((prev) => prev.filter((s) => s.email !== p.email)))}
+                    className="flex items-center gap-1 border border-accent-teal/30 bg-accent-teal/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accent-teal hover:bg-accent-teal/20"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Add
+                  </button>
                 </Row>
               ))}
             </Section>

@@ -29,6 +29,30 @@ async function findBetween(a: string, b: string): Promise<FriendshipRow | null> 
   return (r1.data as FriendshipRow | null) ?? (r2.data as FriendshipRow | null) ?? null;
 }
 
+/**
+ * Create an already-accepted Friendship between two users. Idempotent:
+ * - If no row exists, inserts with status='accepted'.
+ * - If a row exists in any status, leaves it as-is (never downgrades accepted/blocked).
+ * Used by the invite-link auto-friend path in the signIn callback.
+ * Neither user needs to exist yet (the caller checked existence before this).
+ */
+export async function createKithFriendship(inviterEmail: string, newUserEmail: string) {
+  const requesterId = inviterEmail.trim().toLowerCase();
+  const addresseeId = newUserEmail.trim().toLowerCase();
+  if (requesterId === addresseeId) return;
+
+  const existing = await findBetween(requesterId, addresseeId);
+  if (existing) return; // already any-status — don't touch it
+
+  const { error } = await supabase
+    .from("Friendship")
+    .insert({ id: genId(), requesterId, addresseeId, status: "accepted", respondedAt: new Date().toISOString() });
+  if (error && error.code !== "23505") {
+    // 23505 = unique violation (race); treat as success
+    throw new FriendRequestError(error.message);
+  }
+}
+
 /** Send (or auto-accept a reciprocal) friend request. Idempotent. */
 export async function sendFriendRequest(requesterId: string, addresseeEmailRaw: string) {
   const addresseeId = addresseeEmailRaw.trim().toLowerCase();
