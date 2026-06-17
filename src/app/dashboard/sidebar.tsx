@@ -22,6 +22,8 @@ import {
   X,
   ChevronRight,
   Gauge,
+  Network,
+  UserPlus,
   PanelLeft,
   PanelLeftOpen,
   PanelLeftClose,
@@ -62,6 +64,17 @@ const FOUNDER_NAV_GROUP = {
   ],
 };
 
+// Kith & Nodes social layer — only shown when the feature flag is on.
+const KITH_NODES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_KITH_NODES === "true";
+const KITH_NAV_GROUP = {
+  label: "KITH & NODES",
+  items: [
+    { href: "/dashboard/friends", label: "Kith", icon: UserPlus, tour: undefined },
+    { href: "/dashboard/nodes", label: "Nodes", icon: Network, tour: undefined },
+    { href: "/dashboard/messages", label: "Messages", icon: MessageSquare, tour: undefined },
+  ],
+};
+
 // Nav links only — shared by the desktop rail and the mobile drawer. Account
 // identity is NOT here: on desktop it lives in the top-right avatar dropdown; on
 // mobile (no top bar) it lives in <MobileAccount> at the bottom of the drawer.
@@ -76,7 +89,11 @@ function NavContent({
   collapsed: boolean;
   onNavClick?: () => void;
 }) {
-  const navGroups = isFounderUser ? [...NAV_GROUPS, FOUNDER_NAV_GROUP] : NAV_GROUPS;
+  const navGroups = [
+    ...NAV_GROUPS,
+    ...(KITH_NODES_ENABLED ? [KITH_NAV_GROUP] : []),
+    ...(isFounderUser ? [FOUNDER_NAV_GROUP] : []),
+  ];
 
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3">

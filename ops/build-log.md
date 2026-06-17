@@ -72,3 +72,65 @@
     - 65aaa36 fix(landing): embed real demo output (scoring + outreach) over mockups
     - 0264ac1 fix(landing): real demo proof + authentic copy over fabricated social proof
     - 5182b5f fix(import): findPoolRow uses maybeSingle, not single
+
+### 2026-06-17 16:07  (branch: reconcile/feat-main)
+- ` prose entries relevant to your reconciliation topics:
+- commits:
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+    - 0ca76d3 feat(landing): widen FAQ 50% + retitle 'Frequently asked questions'
+    - c0feaf4 feat(landing): drop founder section + centered animated FAQ accordion
+    - 06f7e40 feat(landing): Cluely centered hero — email demo up, network orb down to CTA
+    - 51e7ed3 feat(landing): FAQ + final CTA — Cluely two-column / hairline layout
+    - 3886513 feat(cockpit): land Founder Cockpit v2 schema + logic + roadmap->DB sync
+    - d19f0f4 feat(landing): scoring section — Cluely 'Instant meeting notes' layout
+    - 5f91f98 fix(landing): design-review pass — dark footer, uniform headline scale + section rhythm
+    - 32000c1 chore(landing): preserve superseded preview drafts (previews.tsx)
+    - f2f6b13 chore(ops): add Founder-OS scaffolding + cross-toolkit skill routing
+    - 265344e feat(landing): rebuild middle into Cluely-style dashboard-accurate demos
+    - 9b2aa0e docs(brand): split DESIGN.md into brand/landing.md + brand/dashboard.md
+    - 7483bd2 style(design): unify backgrounds — shared network mesh behind new sections + manifesto
+    - daba6ba fix(intro): gate the auto-send email off for beta (you send it yourself)
+    - 5d4b41a feat(landing): restructure to Cluely skeleton (wow / objection / FAQ / manifesto)
+    - 0ca90c1 docs(landing): implementation plan for the landing remake
+    - 4d48a31 feat(ops): agent OS spine + session auto-log + weekly digest + onboarding
+    - 298b302 feat(marketing): pre-launch marketing system + product-marketing context
+    - ada0d3b docs(landing): design spec for the Cluely-structure landing remake
+    - 14f1ae5 fix(landing,waitlist): drop the 'no browser extension' trust line
+    - 6af26c2 fix(waitlist): drop the demo-output embed from the request page
+    - 99b9240 feat(waitlist): scoring-transparency bullet + clearer data-handling at submit
+    - a563c9b feat(landing): plain-English scoring transparency + CRO + de-fabricate for beta
+    - 65aaa36 fix(landing): embed real demo output (scoring + outreach) over mockups
+    - 0264ac1 fix(landing): real demo proof + authentic copy over fabricated social proof

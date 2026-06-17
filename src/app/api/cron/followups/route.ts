@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   // a user has zero overdue leads, so no extra filtering is needed here.
   const { data: users, error } = await supabase
     .from("User")
-    .select("email, name")
+    .select("id, email, name")
     .eq("followupEmailEnabled", true);
 
   if (error || !users) {
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   let failed = 0;
 
   for (const user of users) {
-    const result = await sendFollowupReminders(user.email, user.email, user.name);
+    const result = await sendFollowupReminders(user.id, user.email, user.name);
     if (!result.success) failed++;
     else if (result.sent) sent++;
     else skipped++;

@@ -39,6 +39,16 @@ App uses service-role, so enabling RLS with no policy does NOT break it (service
 - [x] **Prod cutover — DONE 2026-06-17.** Backfill applied (1554 rows → UUID, 0 email leftover, 16 sentinels: 15 empty-string legacy + 1 `anonymous`) and code deployed to prod (`dpl_4foxbrNJQ3qrZyEqKNyLn34BFVka`, READY, kithnode.ai, commit `45bd5ee`). First attempt aborted at the test gate (mock sessions lacked `user.id`); rolled the data back via the frozen backups, fixed the 11 test files (+`user.id`), re-ran the backfill, re-deployed green. **Rollback insurance still live:** in-DB backup tables `_phase1_bk_*_20260617` (full copies) + `_phase1_bk_User_map_20260617` (id↔email). Drop them after a few days of stable prod.
 - [ ] Optional hardening: add FK constraints `userId → User.id`. NOTE: `AlumniContact.importedByUserId` has 15 empty-string (`''`) legacy rows — null them or exclude before adding that FK, or it will fail.
 
+### Phase 1b — finish the UUID flip on the kith surface (from the main↔feat reconciliation, 2026-06-17)
+Reconciling `main` (kith/nodes/messaging/sharing feature line) into the feat line surfaced that main's NEW code was written EMAIL-keyed against the now-UUID columns. Status:
+- [x] **Always-on bugs fixed** (would silently break prod on deploy — empty result sets, no error): `cron/followups` → `PipelineEntry.userId` (via `lib/leads/overdue.ts`) and `digest` GET-cron + POST → `AlumniContact.importedByUserId` (via `lib/email/weekly-digest.ts`). Callers now pass `User.id` as the key arg, keep email only for the send. (digest POST is MIXED: `User`-by-email lookup keeps email, digest key uses UUID.)
+- [ ] **BLOCKER before enabling `KITH_NODES_ENABLED` (currently OFF, so inert in prod):** the entire kith surface is still email-keyed against UUID columns. Must flip before un-gating, or friends/nodes/messaging silently return nothing and `createKithFriendship` writes emails into `Friendship.requesterId/addresseeId`:
+  - `src/lib/auth.ts:~49` `createKithFriendship(inviterEmail, user.email)` → `lib/kith/friendships.ts` writes email into `Friendship` (it lowercases its "userId" params = proof it's email).
+  - All ~16 `api/kith/*` routes + the messages page pass `session.user.email` into the kith lib (should be `session.user.id`).
+  - kith lib (`friendships.ts`, `nodes.ts`, `messaging.ts`, `authz.ts`, `leaderboard.ts`, `warm-path.ts`) keys `Friendship`/`NodeMember`/`Node.ownerId`/`Message.senderId`/`AlumniContact.importedByUserId` by email.
+  - **DM identity is email-encoded:** `dmThreadId` + the Realtime topic `kith:user:{email}` (`messaging.ts`) — flip the thread-key format AND the client subscription topic together.
+  - **DECISION (D):** `intro_requests.from_user_id` stays email. But `leaderboard.ts` reads it via `.in("from_user_id", memberIds)` where memberIds come from `NodeMember.userId`. Once NodeMember flips to UUID, resolve memberIds back to emails before that query (or migrate `intro_requests.from_user_id` to UUID too).
+
 ### Phase 2 — User-scoped Supabase client
 - [ ] Add `SUPABASE_JWT_SECRET` env (from Supabase dashboard → API settings).
 - [ ] New `src/lib/supabase-user.ts`: `getUserClient(userId)` → mints JWT `{ sub: userId, role: "authenticated", exp: +1h }`, returns a `createClient` with that bearer token.

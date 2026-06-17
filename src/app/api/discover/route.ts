@@ -5,6 +5,24 @@ import { findWarmPaths } from "@/lib/warm-paths";
 import { poolSafeContact } from "@/lib/redact";
 import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
 import { normalizeFirmName } from "@/lib/normalize-firm";
+import { KITH_NODES_ENABLED } from "@/lib/kith/flags";
+import { getCoMemberIds, getAcceptedFriendIds, getFriendSharedContacts } from "@/lib/kith/authz";
+import { getUserNames } from "@/lib/kith/users";
+
+/** The field subset the deck-building code (exclusion, warm-path enrichment,
+ *  redaction projection) reads off a contact row. Both the service-role
+ *  AlumniContact select("*") rows and PoolContact satisfy this; the index
+ *  signature lets the projection spread every other column through. */
+interface DeckRow {
+  id: string;
+  name: string;
+  firmName: string;
+  linkedInUrl: string;
+  importedByUserId: string;
+  sharedInNodes?: boolean;
+  sharedWithFriends?: boolean;
+  [key: string]: unknown;
+}
 
 /** Normalize a LinkedIn URL for identity matching: lowercase, strip trailing
  * slash, ignore empty/whitespace-only values. */
@@ -32,6 +50,23 @@ export async function GET(request: NextRequest) {
   }
   const userId = session.user.id;
 
+  // Kith & Nodes (flag-gated): a node co-member's node-shared contacts OR an
+  // accepted friend's friend-shared contacts are shown in FULL detail with a
+  // "via {friend}" path, instead of the redacted pool card. Both relationships
+  // resolve their owner display name from one unified name map.
+  let coMemberSet = new Set<string>();
+  let friendSet = new Set<string>();
+  let viaNames = new Map<string, string>();
+  if (KITH_NODES_ENABLED) {
+    const [coMemberIds, friendIds] = await Promise.all([
+      getCoMemberIds(userId),
+      getAcceptedFriendIds(userId),
+    ]);
+    coMemberSet = new Set(coMemberIds);
+    friendSet = new Set(friendIds);
+    viaNames = await getUserNames([...new Set([...coMemberIds, ...friendIds])]);
+  }
+
   const raw = request.nextUrl.searchParams.get("q") || "";
   const query = raw.replace(/[^\p{L}\p{N}\s.-]/gu, "").slice(0, 100);
   const tier = request.nextUrl.searchParams.get("tier") || "";
@@ -43,6 +78,12 @@ export async function GET(request: NextRequest) {
     ? (rawSource as DiscoverCategory)
     : "alumni";
   const allowedSources = sourcesForCategory(category);
+
+  // Friends view (flag-gated, relationship filter — NOT a contact source). When
+  // requested, the deck is built from accepted friends' friend-shared contacts
+  // rather than the open pool. Honored only behind the Kith flag; with the flag
+  // off this is ignored and the normal source path runs unchanged.
+  const friendsView = KITH_NODES_ENABLED && request.nextUrl.searchParams.get("view") === "friends";
 
   // Get contacts the user has already rated, with their ratings.
   const { data: rated } = await supabase
@@ -62,35 +103,57 @@ export async function GET(request: NextRequest) {
       .filter((r) => r.rating === "later")
       .map((r) => r.contactId),
   );
-  // Build query: prefer other users' contacts (shared pool)
-  let builder = supabase
-    .from("AlumniContact")
-    .select("*")
-    .neq("importedByUserId", userId)
-    .neq("importedByUserId", "");
+  // Source rows for the deck. Normal path = the open shared pool; friends view =
+  // accepted friends' friend-shared contacts (each carrying owner id/name).
+  // Typed as the field subset the shared exclusion + enrichment code reads, plus
+  // an index signature so the projection spread carries every other column
+  // through. Both the select("*") pool rows and PoolContact satisfy this shape.
+  let contacts: DeckRow[];
+  if (friendsView) {
+    const friendShared = await getFriendSharedContacts(userId);
+    // No friends → the UI renders the locked CTA; short-circuit before the
+    // exclusion work below (which would all no-op on an empty list anyway).
+    if (friendShared.length === 0) {
+      const { count: networkSize } = await supabase
+        .from("AlumniContact")
+        .select("*", { count: "exact", head: true })
+        .eq("importedByUserId", userId);
+      return NextResponse.json({ contacts: [], total: 0, networkSize: networkSize ?? 0, locked: true });
+    }
+    // PoolContact structurally satisfies DeckRow; the cast only bridges the
+    // missing index signature (TS won't infer one on a named interface).
+    contacts = friendShared as unknown as DeckRow[];
+  } else {
+    // Build query: prefer other users' contacts (shared pool)
+    let builder = supabase
+      .from("AlumniContact")
+      .select("*")
+      .neq("importedByUserId", userId)
+      .neq("importedByUserId", "");
 
-  if (query) {
-    builder = builder.or(
-      `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
-    );
-  }
-  if (tier) {
-    builder = builder.eq("tier", tier);
-  }
-  if (track) {
-    builder = builder.eq("track", track);
-  }
-  builder = builder.in("source", allowedSources);
+    if (query) {
+      builder = builder.or(
+        `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
+      );
+    }
+    if (tier) {
+      builder = builder.eq("tier", tier);
+    }
+    if (track) {
+      builder = builder.eq("track", track);
+    }
+    builder = builder.in("source", allowedSources);
 
-  const { data: otherData, error: otherError } = await builder
-    .order("warmthScore", { ascending: false })
-    .limit(100);
+    const { data: otherData, error: otherError } = await builder
+      .order("warmthScore", { ascending: false })
+      .limit(100);
 
-  if (otherError) {
-    return NextResponse.json({ contacts: [], total: 0 }, { status: 500 });
+    if (otherError) {
+      return NextResponse.json({ contacts: [], total: 0 }, { status: 500 });
+    }
+
+    contacts = otherData || [];
   }
-
-  let contacts = otherData || [];
 
   // Exclude shared-pool contacts that the CURRENT user has already imported
   // themselves (cross-user duplicate identities). Without this, a user who
@@ -169,7 +232,7 @@ export async function GET(request: NextRequest) {
       );
       // later-rated contacts carry a deferred flag so the UI can signal that
       // the user has already seen them once and deferred the decision.
-      return laterIds.has(c.id) ? { ...c, warmPaths, deferred: true } : { ...c, warmPaths };
+      return { ...c, warmPaths, deferred: laterIds.has(c.id) };
     }),
   );
 
@@ -184,8 +247,21 @@ export async function GET(request: NextRequest) {
   // reference the user's OWN imports, see src/lib/warm-paths.ts), so re-attach
   // them after projection strips everything off-allowlist.
   const projected = enriched.map(({ warmPaths, deferred, ...c }) => {
-    const safe = c.importedByUserId === userId ? c : poolSafeContact(c);
-    return { ...safe, warmPaths, ...(deferred ? { deferred: true } : {}) };
+    // A contact is shown in FULL (unredacted, "via {friend}"-tagged) when its
+    // owner is either a node co-member sharing into nodes (sharedInNodes !==
+    // false) OR an accepted friend sharing with friends (sharedWithFriends !==
+    // false). Either relationship is sufficient; the redacted pool card is the
+    // fallback for everyone else.
+    const isVisibleOwner =
+      (coMemberSet.has(c.importedByUserId) && c.sharedInNodes !== false) ||
+      (friendSet.has(c.importedByUserId) && c.sharedWithFriends !== false);
+    const safe = c.importedByUserId === userId || isVisibleOwner ? c : poolSafeContact(c);
+    return {
+      ...safe,
+      warmPaths,
+      ...(deferred ? { deferred: true } : {}),
+      ...(isVisibleOwner ? { viaFriend: viaNames.get(c.importedByUserId) ?? "a friend" } : {}),
+    };
   });
 
   // The user's own import count, so the UI can tell "you have no network"

@@ -50,6 +50,8 @@ export interface DeckContact {
   concentration?: string;
   // Set by the deck payload for contacts resurfaced after a "later" rating.
   deferred?: boolean;
+  // Kith & Nodes: owner name when this is a node friend's shared contact.
+  viaFriend?: string;
 }
 
 /** One labelled value cell. Renders nothing when the value is empty so blank
@@ -200,6 +202,13 @@ export function DeckCard({
             {sep}
             <span className="font-medium text-foreground">{contact.firmName}</span>
           </p>
+        )}
+
+        {/* Kith & Nodes: warm path through a node friend who owns this contact */}
+        {contact.viaFriend && (
+          <div className="mt-2 inline-flex items-center gap-1 border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-primary">
+            via {contact.viaFriend}
+          </div>
         )}
 
         {/* Track + role chips */}
