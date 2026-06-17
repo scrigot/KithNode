@@ -1,0 +1,4 @@
+name,school,club,signup_date,onboarded,contacts_imported,first_draft,first_send_date,first_reply_date,active,owner,notes
+Sam Example,UNC Kenan-Flagler,IB Club,2026-06-15,yes,42,yes,2026-06-16,2026-06-18,yes,I3,Landed a coffee chat with a GS analyst
+Riya Example,UNC Kenan-Flagler,PE Club,2026-06-16,yes,18,yes,2026-06-17,,yes,I4,Sent 3 messages no reply yet
+Marcus Example,Duke Fuqua,Consulting Club,2026-06-16,no,0,no,,,no,I5,Signed up but stuck before import
