@@ -3,7 +3,9 @@
 > Owner: Sam (trust plane — interns never touch RLS).
 > Evidence gathered 2026-06-17 from the live project (`jyjpitagxtdzedtooedw`) + code.
 >
-> **Status 2026-06-17:** Phase 0 ✅ · Phase 1 ✅ (live) · Phase 2 ✅ (`src/lib/supabase-user.ts` `getUserClient`) · Phase 3 ✅ (policies applied to prod + cross-tenant isolation proven; dormant until cutover — see `ops/migrations/phase3-rls-policies.sql`) · **Phase 4 (route cutover to the user client) NOT started** — the remaining work, done incrementally + gated on a preview round-trip test + Sam's smoke. Phase 1b (kith surface) still pending before enabling `KITH_NODES_ENABLED`.
+> **Status 2026-06-17:** Phase 0 ✅ · Phase 1 ✅ (live) · Phase 2 ✅ (`src/lib/supabase-user.ts` `getUserClient`) · Phase 3 ✅ (policies applied to prod + cross-tenant isolation proven; dormant until cutover — see `ops/migrations/phase3-rls-policies.sql`) · **Phase 4 BLOCKED on env var.**
+>
+> **Phase 4 blocker (found 2026-06-17):** `getUserClient` needs `SUPABASE_JWT_SECRET`, which is **not set in Vercel at all** (the only other consumer, `api/kith/realtime-token`, is flag-gated off so the gap never surfaced). The first pipeline cutover (increment 1) was promoted and **rolled back** (`a861424`) because `/api/pipeline` 500'd with `Error: SUPABASE_JWT_SECRET ...`. The RLS policies + cutover code are correct (proven) — only the secret is missing. **ACTION (Sam):** copy the project's JWT secret from Supabase dashboard → Project Settings → API → JWT Secret (legacy HS256), add it to Vercel env as `SUPABASE_JWT_SECRET` for Production + Preview + Development. (Confirm the project still exposes a symmetric HS256 secret; if it's migrated to asymmetric signing-keys-only, the mint approach in `supabase-user.ts` must switch to the signing key instead.) Then: re-apply the pipeline cutover (reverted in `a861424`), verify on preview, promote, smoke, continue increments.
 
 ## Problem
 
