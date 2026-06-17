@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 import { normalizeFirmName } from "@/lib/normalize-firm";
+import { isAddressSuppressed } from "@/lib/resend";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -188,6 +189,11 @@ export async function sendWeeklyDigest(
   if (!client) {
     console.warn("[digest] RESEND_API_KEY missing - skipping digest email");
     return { success: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  if (await isAddressSuppressed(email)) {
+    console.warn(`[digest] suppressed address — skipping digest email to ${email}`);
+    return { success: false, error: "Address suppressed" };
   }
 
   const sevenDaysAgo = new Date();

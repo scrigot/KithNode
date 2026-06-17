@@ -1,10 +1,24 @@
 import { Resend } from "resend";
 import { FOUNDER_EMAIL } from "./founder";
+import { prisma } from "./db";
 
 const API_KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
 const client = API_KEY ? new Resend(API_KEY) : null;
+
+/** Returns true if this address has ever bounced or complained. The EmailEvent
+ * table is the suppression list — no separate table needed. */
+export async function isAddressSuppressed(email: string): Promise<boolean> {
+  const hit = await prisma.emailEvent.findFirst({
+    where: {
+      recipient: email.toLowerCase(),
+      type: { in: ["email.bounced", "email.complained"] },
+    },
+    select: { id: true },
+  });
+  return hit !== null;
+}
 
 type FeedbackAlertArgs = {
   fromEmail: string;
@@ -62,6 +76,11 @@ export async function sendWaitlistConfirmation({
 }: ConfirmArgs): Promise<EmailResult> {
   if (!client) {
     console.warn("[resend] RESEND_API_KEY missing — skipping confirmation email");
+    return { status: "skipped" };
+  }
+
+  if (await isAddressSuppressed(email)) {
+    console.warn(`[resend] suppressed address — skipping confirmation email to ${email}`);
     return { status: "skipped" };
   }
 

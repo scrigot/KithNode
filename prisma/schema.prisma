@@ -226,6 +226,19 @@ model ContactConnection {
   @@index([ownerUserId, mutualContactId])
 }
 
+model EmailEvent {
+  id        String   @id @default(cuid())
+  emailId   String
+  type      String
+  recipient String
+  subject   String?
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([recipient])
+  @@index([emailId])
+}
+
 // ─── Founder Cockpit v2 — phased timeline + per-lane roadmap (read-mirror) ────
 // These three tables are the cockpit's derived read-mirror of ops/roadmap.md +
 // ops/build-log.md. Markdown is canonical; the /kithnode-roadmap sync upserts
