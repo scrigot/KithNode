@@ -324,6 +324,11 @@ function OnboardingFunnel() {
   const [minors, setMinors] = useState<string[]>([]);
   const [minorInput, setMinorInput] = useState("");
   const [clubMemberships, setClubMemberships] = useState<ClubEntry[]>([]);
+  // Gates the Edges → Connect advance: clubs are the #1 warm-path signal, so an
+  // empty clubs list can't silently slip through. The user must either add a
+  // club or make a deliberate, informed "I have none" acknowledgement.
+  const [clubsSkipAcknowledged, setClubsSkipAcknowledged] = useState(false);
+  const [clubsSkipPrompt, setClubsSkipPrompt] = useState(false);
   const [skills, setSkills] = useState<string[]>([]);
   const [skillKey, setSkillKey] = useState(0);
 
@@ -703,6 +708,23 @@ function OnboardingFunnel() {
     } finally {
       setSavingPrefs(false);
     }
+  };
+
+  // Edges → Connect: clubs are the #1 warm-path signal, so an empty clubs list
+  // can't silently advance. If the user has at least one club, save normally.
+  // Otherwise surface an inline confirm — they must either add a club or make a
+  // deliberate "I have none" acknowledgement before the wizard moves on.
+  const advanceFromEdges = () => {
+    const hasClubs = clubMemberships.some((c) => c.club.trim());
+    if (!hasClubs && !clubsSkipAcknowledged) {
+      setClubsSkipPrompt(true);
+      trackEvent("onboarding_clubs_skip_prompted", {});
+      return;
+    }
+    if (!hasClubs) {
+      trackEvent("onboarding_clubs_skipped", {});
+    }
+    void savePrefs(8);
   };
 
   // ── Connect handlers (contacts) ──────────────────────────────────────────
@@ -1525,6 +1547,7 @@ function OnboardingFunnel() {
                     loadOptions={loadHighSchools}
                     placeholder="East Chapel Hill High School"
                     ariaLabel="High School"
+                    commitOnBlur
                   />
                 </div>
                 <div>
@@ -1576,11 +1599,18 @@ function OnboardingFunnel() {
               </div>
             </section>
 
-            {/* Clubs (+ roles) */}
+            {/* Clubs (+ roles) — gated: clubs are the #1 warm-path signal, so an
+                empty list can't silently advance (see advanceFromEdges). */}
             <section
-              className={`border bg-bg-card p-5 ${resumeFilled.has("clubMemberships") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
+              className={`border bg-bg-card p-5 ${
+                clubsSkipPrompt
+                  ? "border-amber-400/60 ring-1 ring-amber-400/60"
+                  : resumeFilled.has("clubMemberships")
+                    ? "border-accent-teal/60 ring-1 ring-accent-teal/60"
+                    : "border-white/[0.06]"
+              }`}
             >
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-1 flex items-center gap-2">
                 <Users size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Clubs
@@ -1589,11 +1619,63 @@ function OnboardingFunnel() {
                   {clubMemberships.length}/6
                 </span>
               </div>
+              <p className="mb-3 text-[12px] text-muted-foreground">
+                <span className="font-bold text-foreground">
+                  Clubs power your warm paths.
+                </span>{" "}
+                People in your clubs are your strongest intros — add at least one
+                to light up the matches who already share a room with you.
+              </p>
               <ClubRowsEditor
                 rows={clubMemberships}
-                onChange={setClubMemberships}
+                onChange={(rows) => {
+                  setClubMemberships(rows);
+                  // Any real club entry clears the skip prompt + acknowledgement.
+                  if (rows.some((c) => c.club.trim())) {
+                    setClubsSkipPrompt(false);
+                    setClubsSkipAcknowledged(false);
+                  }
+                }}
                 resumeFilled={resumeFilled.has("clubMemberships")}
               />
+              {clubsSkipPrompt &&
+                !clubMemberships.some((c) => c.club.trim()) && (
+                  <div className="mt-3 border border-amber-400/40 bg-amber-400/[0.06] p-3">
+                    <p className="text-[12px] font-bold text-foreground">
+                      No clubs yet?
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Clubs are your #1 warm-path signal. Add at least one above,
+                      or confirm you have none.
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClubsSkipPrompt(false);
+                          setClubMemberships((p) =>
+                            p.length < 6 ? [...p, { club: "", role: "" }] : p,
+                          );
+                        }}
+                        className="border border-accent-teal bg-accent-teal/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-accent-teal transition-colors hover:bg-accent-teal/25"
+                      >
+                        Add a club
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClubsSkipAcknowledged(true);
+                          setClubsSkipPrompt(false);
+                          void savePrefs(8);
+                        }}
+                        disabled={savingPrefs}
+                        className="border border-white/[0.12] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        I have no clubs
+                      </button>
+                    </div>
+                  </div>
+                )}
             </section>
 
             {/* Past experiences */}
@@ -1672,7 +1754,7 @@ function OnboardingFunnel() {
                 Back
               </Button>
               <Button
-                onClick={() => savePrefs(8)}
+                onClick={advanceFromEdges}
                 disabled={savingPrefs}
                 className="gap-1 bg-accent-teal text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/90"
               >

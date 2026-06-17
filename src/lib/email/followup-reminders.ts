@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 import { getOverdueLeads } from "@/lib/leads/overdue";
+import { isAddressSuppressed } from "@/lib/resend";
 
 // Follow-up reminder email: nudges the USER about leads that have gone cold
 // (overdue for follow-up). KithNode never emails the lead — this respects
@@ -156,6 +157,11 @@ export async function sendFollowupReminders(
   if (!client) {
     console.warn("[followups] RESEND_API_KEY missing - skipping reminder email");
     return { success: false, sent: false, error: "RESEND_API_KEY not configured" };
+  }
+
+  if (await isAddressSuppressed(email)) {
+    console.warn(`[followups] suppressed address — skipping reminder email to ${email}`);
+    return { success: false, sent: false, error: "Address suppressed" };
   }
 
   const overdue = await getOverdueLeads(userId);
