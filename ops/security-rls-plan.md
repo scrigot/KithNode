@@ -1,7 +1,9 @@
 # Security Plan — Kill the Service-Role RLS Bypass
 
-> Owner: Sam (trust plane — interns never touch RLS). Status: planned, not started.
+> Owner: Sam (trust plane — interns never touch RLS).
 > Evidence gathered 2026-06-17 from the live project (`jyjpitagxtdzedtooedw`) + code.
+>
+> **Status 2026-06-17:** Phase 0 ✅ · Phase 1 ✅ (live) · Phase 2 ✅ (`src/lib/supabase-user.ts` `getUserClient`) · Phase 3 ✅ (policies applied to prod + cross-tenant isolation proven; dormant until cutover — see `ops/migrations/phase3-rls-policies.sql`) · **Phase 4 (route cutover to the user client) NOT started** — the remaining work, done incrementally + gated on a preview round-trip test + Sam's smoke. Phase 1b (kith surface) still pending before enabling `KITH_NODES_ENABLED`.
 
 ## Problem
 
