@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserClient } from "@/lib/supabase-user";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
@@ -21,13 +20,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  // RLS-enforced client for this user's private tables (PipelineEntry, UserDiscover).
-  // AlumniContact stays on the service-role `supabase` client (shared pool + redaction).
-  const db = await getUserClient(userId, session.user.email ?? "");
 
   try {
     // Fetch pipeline entries for current user
-    const { data: entries, error: entryError } = await db
+    const { data: entries, error: entryError } = await supabase
       .from("PipelineEntry")
       .select("*")
       .eq("userId", userId)
@@ -53,7 +49,7 @@ export async function GET() {
     );
 
     // Fetch high_value discovers for unlock check
-    const { data: discoverRows } = await db
+    const { data: discoverRows } = await supabase
       .from("UserDiscover")
       .select("contactId, rating")
       .eq("userId", userId);

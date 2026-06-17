@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { getUserClient } from "@/lib/supabase-user";
 
 const STAGES = [
   "researched",
@@ -22,13 +21,12 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const db = await getUserClient(userId, session.user.email ?? "");
 
   const { id: contactId } = await params;
 
   try {
     // Check if already in pipeline for this user
-    const { data: existing } = await db
+    const { data: existing } = await supabase
       .from("PipelineEntry")
       .select("*")
       .eq("contactId", contactId)
@@ -45,7 +43,7 @@ export async function POST(
     }
 
     // Create new pipeline entry with userId
-    const { data: entry, error } = await db
+    const { data: entry, error } = await supabase
       .from("PipelineEntry")
       .insert({
         contactId,
@@ -97,10 +95,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const db = await getUserClient(userId, session.user.email ?? "");
   const { id: contactId } = await params;
 
-  const { error, count } = await db
+  const { error, count } = await supabase
     .from("PipelineEntry")
     .delete({ count: "exact" })
     .eq("contactId", contactId)
@@ -123,7 +120,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const db = await getUserClient(userId, session.user.email ?? "");
 
   const { id: contactId } = await params;
 
@@ -131,7 +127,7 @@ export async function PATCH(
     const body = await request.json();
 
     // Get current pipeline entry for this user
-    const { data: existing, error: fetchError } = await db
+    const { data: existing, error: fetchError } = await supabase
       .from("PipelineEntry")
       .select("*")
       .eq("contactId", contactId)
@@ -165,7 +161,7 @@ export async function PATCH(
     }
 
     // Update the entry
-    const { data: updated, error: updateError } = await db
+    const { data: updated, error: updateError } = await supabase
       .from("PipelineEntry")
       .update({
         stage: newStage,
@@ -196,7 +192,7 @@ export async function PATCH(
         .maybeSingle();
 
       if (contact?.importedByUserId && contact.importedByUserId !== userId) {
-        const { data: rating } = await db
+        const { data: rating } = await supabase
           .from("UserDiscover")
           .select("rating")
           .eq("userId", userId)
