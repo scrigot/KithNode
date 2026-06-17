@@ -123,14 +123,15 @@ function buildIntroEmailHtml(
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   // Gate 1: subscription required.
-  const subGate = await requireSubscription(userId);
+  const subGate = await requireSubscription(userEmail);
   if (subGate) return subGate;
 
   const userName = session.user.name || session.user.email.split("@")[0];
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
   const { error: insertError } = await supabase
     .from("intro_requests")
     .insert({
-      from_user_id: userId,
+      from_user_id: userEmail,
       intermediary_name: intermediaryName,
       intermediary_email: intermediaryEmail || null,
       target_contact_id: targetContactId,

@@ -40,10 +40,11 @@ export interface EdgeResponse {
  */
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const email = session.user.email;
+  const userId = session.user.id;
 
   const prefs = await getUserPrefs(email);
   const targetTracks = viewerTargetTracks(prefs.targetIndustries, prefs.onboardingGoal);
@@ -53,7 +54,7 @@ export async function GET() {
   const { data: contacts } = await supabase
     .from("AlumniContact")
     .select("id, name, track, skills, clubMemberships, clubs, experiences")
-    .eq("importedByUserId", email);
+    .eq("importedByUserId", userId);
 
   const network = contacts ?? [];
   const totalNetwork = network.length;

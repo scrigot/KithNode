@@ -34,10 +34,11 @@ interface TopUnrated {
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   try {
     const now = new Date();
@@ -257,7 +258,7 @@ export async function GET() {
     const { data: userRow } = await supabase
       .from("User")
       .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
-      .eq("email", userId)
+      .eq("email", userEmail)
       .maybeSingle();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
@@ -275,7 +276,7 @@ export async function GET() {
       await supabase
         .from("User")
         .update({ subscriptionStatus: "trial", trialEndsAt: newTrialEndsAt })
-        .eq("email", userId);
+        .eq("email", userEmail);
       subscriptionStatus = "trial";
       trialEndsAt = newTrialEndsAt;
     }
@@ -303,7 +304,7 @@ export async function GET() {
     const { data: waitlistRow } = await supabase
       .from("waitlist_signups")
       .select("ref_code")
-      .eq("email", userId)
+      .eq("email", userEmail)
       .single();
 
     if (waitlistRow?.ref_code) {

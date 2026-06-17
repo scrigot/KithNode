@@ -64,10 +64,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
   const body = (await request.json().catch(() => ({}))) as { csvText?: string };
   const csvText = body.csvText || "";
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (slug) bySlug.set(slug, row);
   }
 
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const now = new Date().toISOString();
 
   // Collapse same-batch duplicates (last row wins) so one person can't be split
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
         isFriend: friendFromCloseness(patch.closeness, Boolean(existing?.isFriend)),
       };
 
-      const tags = existing?.id ? await loadContactTags(userId, existing.id as string) : [];
+      const tags = existing?.id ? await loadContactTags(userEmail, existing.id as string) : [];
       const { affiliations, score, tier } = rescoreContact(
         { ...(existing ?? {}), ...merged },
         prefs,

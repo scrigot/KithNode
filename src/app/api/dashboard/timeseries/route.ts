@@ -57,10 +57,10 @@ function fillDays(
 
 export async function GET(request: Request) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
 
   const searchParams = new URLSearchParams(request.url.split("?")[1] ?? "");
   const metric = searchParams.get("metric") ?? "warm_signals";

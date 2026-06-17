@@ -27,10 +27,10 @@ function normalizeNameFirm(
 
 export async function GET(request: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
 
   const raw = request.nextUrl.searchParams.get("q") || "";
   const query = raw.replace(/[^\p{L}\p{N}\s.-]/gu, "").slice(0, 100);
