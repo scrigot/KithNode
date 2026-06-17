@@ -71,6 +71,7 @@ const KITH_NAV_GROUP = {
   items: [
     { href: "/dashboard/friends", label: "Kith", icon: UserPlus, tour: undefined },
     { href: "/dashboard/nodes", label: "Nodes", icon: Network, tour: undefined },
+    { href: "/dashboard/messages", label: "Messages", icon: MessageSquare, tour: undefined },
   ],
 };
 
