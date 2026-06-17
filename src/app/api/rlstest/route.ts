@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserClient } from "@/lib/supabase-user";
 
-// TEMPORARY Phase 4 verification — proves the mint->PostgREST->RLS round-trip on a
-// PREVIEW deploy. Counts only (no PII); 404s in production. REMOVE before promote.
+// TEMPORARY Phase 4 verification — counts only, 404s in production, REMOVE before promote.
 export async function GET(req: NextRequest) {
   if (process.env.VERCEL_ENV === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -14,9 +13,9 @@ export async function GET(req: NextRequest) {
   const ud = await db.from("UserDiscover").select("*", { count: "exact", head: true });
   return NextResponse.json({
     uid,
-    pipelineEntry: pe.count ?? null,
-    userDiscover: ud.count ?? null,
-    peErr: pe.error?.message ?? null,
-    udErr: ud.error?.message ?? null,
+    pipelineEntry: pe.count,
+    userDiscover: ud.count,
+    peErr: pe.error ? { message: pe.error.message, code: (pe.error as { code?: string }).code, details: (pe.error as { details?: string }).details, hint: (pe.error as { hint?: string }).hint, status: pe.status } : null,
+    udErr: ud.error ? { message: ud.error.message, code: (ud.error as { code?: string }).code, status: ud.status } : null,
   });
 }

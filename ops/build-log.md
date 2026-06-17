@@ -1257,3 +1257,359 @@
     - 06f7e40 feat(landing): Cluely centered hero — email demo up, network orb down to CTA
     - 51e7ed3 feat(landing): FAQ + final CTA — Cluely two-column / hairline layout
     - 3886513 feat(cockpit): land Founder Cockpit v2 schema + logic + roadmap->DB sync
+
+### 2026-06-17 17:17  (branch: phase4-verify2)
+- deployed fix/userid-uuid (45bd5ee) to prod — UUID user-key migration closes stale-code window | learned Turbopack panics on port binding inside OMC sandbox, must disable sandbox for npm run build | no new errors introduced, all 923 tests passed
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+    - 0ca76d3 feat(landing): widen FAQ 50% + retitle 'Frequently asked questions'
+    - c0feaf4 feat(landing): drop founder section + centered animated FAQ accordion
+    - 06f7e40 feat(landing): Cluely centered hero — email demo up, network orb down to CTA
+    - 51e7ed3 feat(landing): FAQ + final CTA — Cluely two-column / hairline layout
+
+### 2026-06-17 17:18  (branch: phase4-verify2)
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+    - 0ca76d3 feat(landing): widen FAQ 50% + retitle 'Frequently asked questions'
+    - c0feaf4 feat(landing): drop founder section + centered animated FAQ accordion
+    - 06f7e40 feat(landing): Cluely centered hero — email demo up, network orb down to CTA
+
+### 2026-06-17 17:21  (branch: phase4-verify2)
+- deployed fix/userid-uuid (45bd5ee) to prod — UUID user-key migration closes stale-code window | learned Turbopack panics on port binding inside OMC sandbox, must disable sandbox for npm run build | no new errors introduced, all 923 tests passed
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+    - 0ca76d3 feat(landing): widen FAQ 50% + retitle 'Frequently asked questions'
+    - c0feaf4 feat(landing): drop founder section + centered animated FAQ accordion
+
+### 2026-06-17 17:24  (branch: phase4-verify2)
+- deployed fix/userid-uuid (45bd5ee) to prod — UUID user-key migration closes stale-code window | learned Turbopack panics on port binding inside OMC sandbox, must disable sandbox for npm run build | no new errors introduced, all 923 tests passed
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+    - 0ca76d3 feat(landing): widen FAQ 50% + retitle 'Frequently asked questions'
+
+### 2026-06-17 17:25  (branch: phase4-verify2)
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+    - 7057824 feat(landing): scoring as in-app Mac window + hide demo/sandbox
+
+### 2026-06-17 17:25  (branch: phase4-verify2)
+- deployed fix/userid-uuid (45bd5ee) to prod — UUID user-key migration closes stale-code window | learned Turbopack panics on port binding inside OMC sandbox, must disable sandbox for npm run build | no new errors introduced, all 923 tests passed
+- commits:
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
+    - b8d5c51 feat(signup): harden waitlist email + paid-path activation event
+
+### 2026-06-17 17:27  (branch: phase4-verify2)
+- deployed fix/userid-uuid (45bd5ee) to prod — UUID user-key migration closes stale-code window | learned Turbopack panics on port binding inside OMC sandbox, must disable sandbox for npm run build | no new errors introduced, all 923 tests passed
+- commits:
+    - a8f9ef8 chore: rebuild preview to pick up Preview-scoped NEXT_PUBLIC_SUPABASE_ANON_KEY
+    - 6aab72b test(security): re-apply pipeline RLS cutover + preview round-trip probe (SUPABASE_JWT_SECRET now set)
+    - 27ceb54 docs(security): Phase 4 blocked on missing SUPABASE_JWT_SECRET in Vercel
+    - a861424 revert(security): pipeline routes back to service-role client (Phase 4 increment 1 rollback)
+    - 1c4e440 chore: remove temporary rlstest verification endpoint before prod promotion
+    - b76e045 chore: rename _rlstest -> rlstest (underscore = Next private folder, unroutable)
+    - 0213553 feat(security): Phase 4 increment 1 — pipeline routes via getUserClient (RLS)
+    - 96150f5 feat(security): Phase 2-3 — user-scoped Supabase client + corrected RLS policies
+    - 7710e5c docs(security): log HIGH forced-friendship cookie finding as kith-enablement blocker
+    - 6023298 Merge remote-tracking branch 'origin/main' into reconcile/feat-main
+    - db8945f Merge pull request #17 from scrigot/fix/userid-uuid
+    - cefca01 docs(security): record Phase 1 UUID cutover as completed
+    - 45bd5ee test: add user.id to mock sessions for UUID user-key migration
+    - 6a55bfe fix(security): migrate user key from email to stable User.id (UUID)
+    - 8ff7349 Kith & Nodes — friends sharing, messaging, node invite, DMs, provenance (flag-gated) (#16)
+    - 2cc66dc feat(ops): intern-ready operating kit + automation map (ops/scaling/) (#15)
+    - 0ad094b feat(feedback): in-app beta feedback form at /dashboard/feedback
+    - b6e1f4b feat(feedback): beta survey route + feedback_response table + one-time credits
+    - e89a483 chore(groupme): daily Vercel cron + one-shot pull script
+    - 1e824c7 feat(groupme): read-only GroupMe client + scheduled pull (cursor dedupe)
+    - b07c243 feat(groupme): beta_feedback table + RLS migration
+    - 0b2b78c feat(P2-2): Resend event webhook + EmailEvent tracking + bounce/complaint suppression
+    - 60f1e45 test(activation): happy-path credit-wall smoke test [CHECK-1]
+    - 5e86a45 feat(dev): throwaway test-user script [DX-2]
+    - 2af9c5d feat(dev): onboarding-reset endpoint [DX-1]
+    - 2f5d8ee fix(onboarding): make clubs a deliberate step with explicit skip [P1-2]
+    - 6c40ef6 fix(onboarding): free-text high-school entry persists without dataset match [P2-1]
+    - 8c64352 fix(discover): drop the High-Value unlock gate + exclude piped contacts
+    - 792bee8 chore(test): exclude .claude worktrees from vitest scan
+    - 3b992c2 fix(credits): raise trial/beta credit floor above the activation path
+    - 295f666 feat: profile/draft/notification features + Supabase-style Settings & Import reworks (#14)
+    - 74612f8 Merge remote-tracking branch 'origin/main' into feat/contact-intelligence
+    - 31fbf37 feat(outreach): centered Draft Outreach modal
+    - 78b98c5 feat(import): 3-tab layout (Manual / Enrich with AI / Bulk) + add-by-hand
+    - 1ac34e5 feat(settings): Supabase-style left sub-nav + de-densified panes
+    - bb73486 feat(notifications): follow-up reminder emails + digest/follow-up opt-outs
+    - bdc409c feat(outreach): user-controlled draft style (tone/length/signature/subject)
+    - 3df449c feat(profile): completeness meter + digest cron + shared overdue-leads helper
+    - 5d9e08c feat: contact intelligence, Cluely landing rebuild, Founder Cockpit + Supabase-style dashboard shell (#13)
+    - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
+    - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
+    - 8184ea2 docs(spec): in-app outreach popup design
+    - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
+    - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
+    - fe7f10c docs(ops): landing Cluely-rebuild spec
