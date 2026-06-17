@@ -22,7 +22,7 @@ describe("POST /api/pipeline/[id] — unique-violation race is idempotent", () =
   });
 
   it("returns already_exists (200) when the insert hits 23505 instead of 500", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@example.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@example.com", email: "sam@example.com" } });
 
     // First query: existing-row check finds nothing. Second: insert returns a
     // unique-violation error (concurrent add won the race).
@@ -73,7 +73,7 @@ describe("DELETE /api/pipeline/[id]", () => {
   });
 
   it("deletes only this user's PipelineEntry and returns ok with count", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const builder = {
       delete: vi.fn().mockReturnThis(),
@@ -101,7 +101,7 @@ describe("DELETE /api/pipeline/[id]", () => {
   });
 
   it("returns ok with removed=0 when nothing matched (no cross-user leak)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const builder = {
       delete: vi.fn().mockReturnThis(),

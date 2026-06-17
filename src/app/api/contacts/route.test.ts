@@ -94,7 +94,7 @@ describe("GET /api/contacts", () => {
   };
 
   it("returns contacts from Supabase", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockListQueries([
       { ...baseContact, id: "1", name: "Jane Doe", warmthScore: 65, tier: "warm" },
     ]);
@@ -114,7 +114,7 @@ describe("GET /api/contacts", () => {
   });
 
   it("kith outranks every fit tier: friend sorts first and tier reads kith", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockListQueries([
       { ...baseContact, id: "stranger", name: "Perfect Stranger", warmthScore: 100, tier: "hot" },
       { ...baseContact, id: "friend", name: "Cooper", warmthScore: 60, tier: "warm", isFriend: true },
@@ -132,7 +132,7 @@ describe("GET /api/contacts", () => {
   });
 
   it("flags a bare cold stub as needs_info but not an enriched/warm contact", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockListQueries([
       // Bare LinkedIn stub: cold tier, no enrichable personal data → needs_info.
       { ...baseContact, id: "stub", name: "Bare Stub", warmthScore: 0, tier: "cold" },
@@ -149,7 +149,7 @@ describe("GET /api/contacts", () => {
   });
 
   it("a responded pipeline stage promotes to kith", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "test@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
     mockListQueries(
       [{ ...baseContact, id: "replied", name: "Replied Guy", warmthScore: 70, tier: "warm" }],
       [{ contactId: "replied", stage: "responded" }],
@@ -162,7 +162,7 @@ describe("GET /api/contacts", () => {
   });
 
   it("blanks the owner's private relationship fields for a non-owner viewing a pooled high_value contact", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "viewer@unc.edu" } });
+    mockAuth.mockResolvedValue({ user: { id: "viewer@unc.edu", email: "viewer@unc.edu" } });
     let callCount = 0;
     mockFrom.mockImplementation(() => {
       callCount++;

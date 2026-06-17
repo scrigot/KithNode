@@ -77,7 +77,7 @@ describe("POST /api/import/brain-dump", () => {
   });
 
   it("returns 400 when the CSV has no rows", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     mockSupabase([]);
     const res = await POST(makePost({ csvText: "" }));
     expect(res.status).toBe(400);
@@ -85,7 +85,7 @@ describe("POST /api/import/brain-dump", () => {
   });
 
   it("inserts new contacts with the mapped fields + a rescored tier", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([]);
 
     const res = await POST(makePost({ csvText: SAMPLE_CSV }));
@@ -122,7 +122,7 @@ describe("POST /api/import/brain-dump", () => {
   });
 
   it("name-merges onto an existing contact instead of inserting a duplicate", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([
       { id: "adler-id", name: "adler  rice", firmName: "Old Co", greekOrg: "" },
     ]);
@@ -141,7 +141,7 @@ describe("POST /api/import/brain-dump", () => {
   });
 
   it("merges by LinkedIn slug even when the name differs", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([
       {
         id: "adler-id",
@@ -160,7 +160,7 @@ Adler Rice,Mizuho,Analyst,UNC Chapel Hill,,,Chi Phi,,,,brother,friend,,https://w
   });
 
   it("does NOT merge a name match onto a different person (different real URL)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([
       {
         id: "js1",
@@ -179,7 +179,7 @@ John Smith,New Co,Analyst,,,,,,,,,acquaintance,,https://www.linkedin.com/in/john
   });
 
   it("downgrades isFriend when closeness is acquaintance/weak", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([
       { id: "jane-id", name: "Jane Roe", isFriend: true, linkedInUrl: "" },
     ]);
@@ -192,7 +192,7 @@ Jane Roe,Acme,PM,,,,,,,,,acquaintance,,`;
   });
 
   it("gives URL-less net-new contacts a unique non-URL sentinel", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([]);
     await POST(makePost({ csvText: SAMPLE_CSV }));
     expect(captured.inserts).toHaveLength(2);
@@ -202,7 +202,7 @@ Jane Roe,Acme,PM,,,,,,,,,acquaintance,,`;
   });
 
   it("collapses same-batch duplicate names to one contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([]);
     const csv = `name,company,title,school,major,clubs,greek_org,hometown,high_school,skills,relationship,closeness,notes,linkedin_url
 Dup Person,Acme,Analyst,,,,,,,,,friend,,
@@ -214,14 +214,14 @@ Dup Person,Beta,VP,,,,,,,,,friend,,`;
   });
 
   it("rejects an oversized paste with 413", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     mockSupabase([]);
     const res = await POST(makePost({ csvText: "x".repeat(500_001) }));
     expect(res.status).toBe(413);
   });
 
   it("skips a bad row and increments failed without aborting the batch", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     const captured = mockSupabase([]);
     // First insert throws, second succeeds.
     let n = 0;
@@ -256,7 +256,7 @@ describe("GET /api/import/brain-dump", () => {
   });
 
   it("returns a prompt string carrying the user's school", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "sam@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "sam@x.com", email: "sam@x.com" } });
     (getUserPrefs as Mock).mockResolvedValue({
       ...EMPTY_PREFS,
       university: "UNC Chapel Hill",

@@ -107,7 +107,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 400 when contactId is missing — and never charges a credit", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     const response = await POST(makeRequest({}));
     expect(response.status).toBe(400);
     // Credit ordering: a request with no contactId must not burn a credit.
@@ -115,7 +115,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 402 when the subscription gate denies", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     mockRequireSubscription.mockResolvedValue(
       NextResponse.json({ error: "Payment required", reason: "no_sub" }, { status: 402 }),
     );
@@ -124,7 +124,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 402 when out of credits (after the contact is validated)", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     // The credit gate now runs AFTER the contact fetch + ownership check, so a
     // valid contact must resolve first for the gate to be reached.
     supabaseResults.push({
@@ -140,7 +140,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns draft for valid contact", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     supabaseResults.push({
       data: {
         id: "1",
@@ -170,7 +170,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 404 when the contact is owned by another user and unrated", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     supabaseResults.push({
       data: {
         id: "99",
@@ -193,7 +193,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 404 when the contact does not exist — and never charges a credit", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     // Contact fetch resolves with no row -> 404 before the credit gate.
     supabaseResults.push({ data: null, error: { message: "not found" } });
 
@@ -204,7 +204,7 @@ describe("POST /api/outreach/draft", () => {
   });
 
   it("returns 500 on backend error", async () => {
-    mockAuth.mockResolvedValue({ user: { email: "user@unc.edu", name: "Sam Rigot" } });
+    mockAuth.mockResolvedValue({ user: { id: "user@unc.edu", email: "user@unc.edu", name: "Sam Rigot" } });
     // First contact fetch succeeds so route proceeds to generateText
     supabaseResults.push({
       data: { id: "1", name: "Jane Doe", title: "Analyst", firmName: "GS", affiliations: "" },

@@ -169,7 +169,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
 
   // ── CSV-contacts path ───────────────────────────────────────────────────────
   it("CSV: User B importing A's pooled contact LINKS to it (no overwrite, no re-enrich)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "bob@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "bob@x.com", email: "bob@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(
@@ -209,7 +209,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
   });
 
   it("CSV: the owner CAN still update their own contact (dedupe preserved)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "alice@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "alice@x.com", email: "alice@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(
@@ -240,7 +240,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
   });
 
   it("CSV: rejects a malformed/javascript: linkedInUrl before any DB write", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "alice@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "alice@x.com", email: "alice@x.com" } });
     (isValidLinkedInUrl as Mock).mockImplementation(
       (u: string) => !u.startsWith("javascript:"),
     );
@@ -274,7 +274,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
   });
 
   it("CSV: a genuine insert collision (race) returns a sanitized message, not raw DB error", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "bob@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "bob@x.com", email: "bob@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com", insertError: DUP_KEY });
 
     // A URL that does NOT match the pool, so owner-scoped + pool lookups all miss
@@ -305,7 +305,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
 
   // ── URL (scrape) path ───────────────────────────────────────────────────────
   it("URL: User B importing A's pooled contact LINKS to it (no overwrite)", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "bob@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "bob@x.com", email: "bob@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(makePost({ urls: [TARGET_URL] }));
@@ -326,7 +326,7 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
   });
 
   it("URL: the owner CAN still update their own contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: "alice@x.com" } });
+    (auth as Mock).mockResolvedValue({ user: { id: "alice@x.com", email: "alice@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(makePost({ urls: [TARGET_URL] }));

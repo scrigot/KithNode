@@ -39,7 +39,7 @@ describe("POST /api/intro", () => {
 
   // (a) Unsubscribed caller is blocked and NO email is sent.
   it("blocks unsubscribed caller with 402 and sends no email", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER, name: "Sam" } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER, name: "Sam" } });
     (requireSubscription as Mock).mockResolvedValue(
       new Response(JSON.stringify({ error: "Payment required", reason: "no_sub" }), {
         status: 402,
@@ -56,7 +56,7 @@ describe("POST /api/intro", () => {
 
   // (b) Caller without high_value on the target contact is blocked.
   it("blocks caller with only a 'skip' rating on the pool contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER, name: "Sam" } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER, name: "Sam" } });
     (requireSubscription as Mock).mockResolvedValue(null);
 
     let call = 0;
@@ -85,7 +85,7 @@ describe("POST /api/intro", () => {
   });
 
   it("blocks caller with NO rating on the pool contact", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER, name: "Sam" } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER, name: "Sam" } });
     (requireSubscription as Mock).mockResolvedValue(null);
 
     let call = 0;
@@ -114,7 +114,7 @@ describe("POST /api/intro", () => {
 
   // (c) A message containing <script> is escaped in the sent email body.
   it("HTML-escapes <script> in message before sending email", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER, name: "Sam" } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER, name: "Sam" } });
     (requireSubscription as Mock).mockResolvedValue(null);
 
     const emailSendSpy = vi.fn().mockResolvedValue({ id: "e1" });

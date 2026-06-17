@@ -34,7 +34,7 @@ beforeEach(() => {
 
 describe("POST /api/discover/rate", () => {
   it("returns 400 for an invalid rating", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
     (supabase as unknown as Record<string, unknown>).from = buildUpsertMock({ error: null });
 
     const res = await POST(
@@ -44,7 +44,7 @@ describe("POST /api/discover/rate", () => {
   });
 
   it("upserts later rating and returns success", async () => {
-    (auth as Mock).mockResolvedValue({ user: { email: USER } });
+    (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
     const upsertFn = vi.fn().mockResolvedValue({ error: null });
     const builder = { upsert: upsertFn };
