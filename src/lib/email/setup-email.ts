@@ -52,9 +52,19 @@ const SETUP_STEPS: SetupStep[] = [
   },
 ];
 
+/** Escape user-controlled text before interpolating into the HTML template. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Pure HTML builder — no I/O, fully unit-testable (mirrors weekly-digest). */
 export function buildSetupEmailHtml(userName: string): string {
-  const firstName = userName.trim().split(" ")[0] || "there";
+  const firstName = escapeHtml(userName.trim().split(" ")[0] || "there");
 
   const stepRows = SETUP_STEPS.map(
     (s, i) => `

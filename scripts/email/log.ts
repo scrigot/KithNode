@@ -10,7 +10,9 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 async function main() {
-  const limit = Number(process.argv[2]) || 50;
+  // Clamp to a safe range so a bad argv (negative, Infinity, huge) can't reach
+  // the DB query as an unbounded `take`.
+  const limit = Math.min(Math.max(Math.trunc(Number(process.argv[2])) || 50, 1), 1000);
   const { prisma } = await import("@/lib/db");
 
   const rows = await prisma.emailLog.findMany({

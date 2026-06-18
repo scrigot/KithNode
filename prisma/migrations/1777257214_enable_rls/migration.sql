@@ -193,3 +193,28 @@ CREATE POLICY "anon_deny" ON public."intro_requests"
 CREATE POLICY "authenticated_own" ON public."intro_requests"
   FOR ALL TO authenticated
   USING (auth.email() = "from_user_id") WITH CHECK (auth.email() = "from_user_id");
+
+-- ============================================================
+-- EmailLog
+-- ============================================================
+-- Outbound email audit log. Written server-side (Prisma/service role); never
+-- written by clients. userId stores the recipient's EMAIL ("" for non-user
+-- sends like waitlist/feedback) — so own-row matches on auth.email(), NOT
+-- auth.uid(). Authenticated users may read only their own; no client writes.
+DROP POLICY IF EXISTS "service_role_all" ON public."EmailLog";
+DROP POLICY IF EXISTS "anon_deny" ON public."EmailLog";
+DROP POLICY IF EXISTS "authenticated_own" ON public."EmailLog";
+
+ALTER TABLE public."EmailLog" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_all" ON public."EmailLog"
+  FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+CREATE POLICY "anon_deny" ON public."EmailLog"
+  FOR ALL TO anon
+  USING (false) WITH CHECK (false);
+
+CREATE POLICY "authenticated_own" ON public."EmailLog"
+  FOR SELECT TO authenticated
+  USING (auth.email() = "userId");

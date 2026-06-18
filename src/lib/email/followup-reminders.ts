@@ -194,13 +194,16 @@ export async function sendFollowupReminders(
   const subject = `KithNode: ${rows.length} lead${rows.length === 1 ? "" : "s"} need a follow-up`;
 
   try {
-    const { data } = await client.emails.send({
+    const { data, error } = await client.emails.send({
       from: `KithNode <${FROM}>`,
       to: email,
       replyTo: "samrigot31@gmail.com",
       subject,
       html: buildEmailHtml(userName, rows.slice(0, MAX_ROWS), rows.length),
     });
+    // Resend returns API-level failures in `error` rather than throwing — route
+    // them into the catch so we log "failed", not a phantom "sent".
+    if (error) throw new Error(error.message);
     await logEmail({
       toEmail: email,
       type: "followup",

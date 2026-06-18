@@ -22,11 +22,16 @@ async function main() {
   const { supabase } = await import("@/lib/supabase");
   const { sendSetupEmail } = await import("@/lib/email/setup-email");
 
-  const { data: user } = await supabase
+  const { data: user, error } = await supabase
     .from("User")
     .select("email, name")
     .eq("email", email)
     .maybeSingle();
+
+  if (error) {
+    console.error(`[email:setup] User lookup failed for ${email}:`, error.message);
+    process.exit(1);
+  }
 
   if (!user) {
     console.warn(`[email:setup] no User row for ${email} — sending anyway (they may not have signed in yet).`);

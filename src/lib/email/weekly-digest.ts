@@ -222,13 +222,16 @@ export async function sendWeeklyDigest(
       : "KithNode: Your weekly digest";
 
   try {
-    const { data } = await client.emails.send({
+    const { data, error } = await client.emails.send({
       from: `KithNode <${FROM}>`,
       to: email,
       replyTo: "samrigot31@gmail.com",
       subject,
       html: buildEmailHtml(userName, firms, newContacts.length),
     });
+    // Resend reports API-level failures in `error` instead of throwing — surface
+    // them so the catch logs "failed" rather than a false "sent".
+    if (error) throw new Error(error.message);
 
     await logEmail({
       toEmail: email,
