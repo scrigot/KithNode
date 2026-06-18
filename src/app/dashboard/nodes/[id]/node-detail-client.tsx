@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2, Settings, Trash2, ImageUp } from "lucide-react";
+import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2, Settings, Trash2, ImageUp, Activity, ArrowRight } from "lucide-react";
 import { ChatThread } from "@/app/dashboard/_components/chat-thread";
 
 const TIER_STYLES: Record<string, string> = {
@@ -34,7 +34,7 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
   const router = useRouter();
   const [data, setData] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"pool" | "leaderboard" | "chat" | "settings">("pool");
+  const [tab, setTab] = useState<"feed" | "leaderboard" | "pool" | "settings">("feed");
   const [copied, setCopied] = useState(false);
   const [introFor, setIntroFor] = useState<PoolContact | null>(null);
 
@@ -166,27 +166,23 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-white/[0.06]">
-        <Tab active={tab === "pool"} onClick={() => setTab("pool")} icon={<Users className="h-3.5 w-3.5" />}>
-          Shared Pool ({data.pool.length})
+        <Tab active={tab === "feed"} onClick={() => setTab("feed")} icon={<Activity className="h-3.5 w-3.5" />}>
+          Feed
         </Tab>
         <Tab active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} icon={<Trophy className="h-3.5 w-3.5" />}>
           Leaderboard
         </Tab>
-        <Tab active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquare className="h-3.5 w-3.5" />}>
-          Chat
+        <Tab active={tab === "pool"} onClick={() => setTab("pool")} icon={<Users className="h-3.5 w-3.5" />}>
+          Shared Pool ({data.pool.length})
         </Tab>
         <Tab active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings className="h-3.5 w-3.5" />}>
           Settings ({data.members.length})
         </Tab>
       </div>
 
+      {tab === "feed" && <FeedView nodeId={nodeId} nodeName={data.node.name} />}
       {tab === "pool" && <PoolView pool={data.pool} me={me} onIntro={setIntroFor} onUnshare={unshare} />}
       {tab === "leaderboard" && <LeaderboardView nodeId={nodeId} />}
-      {tab === "chat" && (
-        <div className="h-[60vh]">
-          <ChatThread threadType="node" threadId={nodeId} title={data.node.name} />
-        </div>
-      )}
       {tab === "settings" && (
         <SettingsView
           node={data.node}
@@ -405,6 +401,80 @@ function IntroModal({ contact, onClose, onSent }: { contact: PoolContact; onClos
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send request
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface FeedEvent {
+  id: string; actorName: string; kind: string;
+  contactName: string | null; phase: string | null; createdAt: string;
+}
+
+function relTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.max(0, Math.floor(diff / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return `${Math.floor(d / 7)}w ago`;
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Feed = durable activity log (newest first) stacked above the live node chat.
+function FeedView({ nodeId, nodeName }: { nodeId: string; nodeName: string }) {
+  const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch(`/api/kith/nodes/${nodeId}/feed`).then(async (res) => {
+      if (res.ok) setEvents(((await res.json()).events as FeedEvent[]) ?? []);
+      setLoading(false);
+    });
+  }, [nodeId]);
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-white/[0.06] bg-card">
+        <div className="border-b border-white/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+          Activity
+        </div>
+        {loading ? (
+          <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        ) : events.length === 0 ? (
+          <div className="px-3 py-8 text-center text-[12px] text-muted-foreground">No activity yet.</div>
+        ) : (
+          <div className="divide-y divide-white/[0.06]">
+            {events.map((e) => (
+              <div key={e.id} className="flex items-center gap-2 px-3 py-2 text-[12px]">
+                <ArrowRight className="h-3 w-3 shrink-0 text-accent-teal" />
+                <div className="min-w-0 flex-1 truncate text-foreground/90">
+                  <span className="font-semibold text-foreground">{e.actorName}</span> advanced{" "}
+                  <span className="font-semibold text-foreground">{e.contactName ?? "a contact"}</span>
+                  {e.phase ? (
+                    <>
+                      {" to "}
+                      <span className="text-accent-teal">{cap(e.phase)}</span>
+                    </>
+                  ) : null}
+                </div>
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground/60">{relTime(e.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="h-[55vh]">
+        <ChatThread threadType="node" threadId={nodeId} title={nodeName} />
       </div>
     </div>
   );
