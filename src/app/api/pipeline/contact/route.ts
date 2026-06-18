@@ -82,7 +82,14 @@ export async function POST(request: NextRequest) {
     )
       .select()
       .single();
-    if (eErr) throw new Error(eErr.message);
+    if (eErr) {
+      // One entry per (contactId, userId) (PipelineEntry_contactId_userId_key).
+      // Return the conflict gracefully instead of a generic 500.
+      if (eErr.code === "23505") {
+        return NextResponse.json({ ok: true, alreadyExists: true });
+      }
+      throw new Error(eErr.message);
+    }
 
     return NextResponse.json({
       contact_id: contact.id,

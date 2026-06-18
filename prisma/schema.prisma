@@ -137,6 +137,8 @@ model PipelineEntry {
   userId      String        @default("")
   contact     AlumniContact @relation(fields: [contactId], references: [id])
   pipeline    Pipeline?     @relation(fields: [pipelineId], references: [id])
+
+  @@unique([contactId, userId])
 }
 
 model Pipeline {
