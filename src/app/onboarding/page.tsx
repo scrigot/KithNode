@@ -892,10 +892,33 @@ function OnboardingFunnel() {
   };
 
   // ── Reveal → Activation ──────────────────────────────────────────────────
-  const goToActivation = () => {
+  const goToActivation = async () => {
     trackEvent("onboarding_reveal_unlock_clicked", {
       matches: rankedTotal || importedCount,
     });
+    // A user who already has access (active sub, or a live trial — every
+    // allowlisted beta user is auto-provisioned a 7-day trial on first sign-in)
+    // must not hit the Stripe paywall. Mirror checkSubscription's allow rule off
+    // the overview payload and send them straight into the product.
+    try {
+      const res = await apiFetch("/api/dashboard/overview");
+      if (res.ok) {
+        const data = await res.json();
+        const status = String(data?.subscription_status || "").toLowerCase();
+        const trialEnd = data?.trial_ends_at
+          ? new Date(data.trial_ends_at).getTime()
+          : 0;
+        const hasAccess =
+          status === "active" || (status === "trial" && trialEnd > Date.now());
+        if (hasAccess) {
+          router.push("/dashboard");
+          return;
+        }
+      }
+    } catch {
+      // Non-fatal: fall through to the activation step so the user is never
+      // stranded if the access check can't complete.
+    }
     setStep(ACTIVATION_STEP);
   };
 
@@ -2109,7 +2132,7 @@ function OnboardingFunnel() {
                 Back
               </Button>
               <Button
-                onClick={goToActivation}
+                onClick={() => void goToActivation()}
                 className="gap-1 bg-accent-teal text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/90"
               >
                 Unlock your network
