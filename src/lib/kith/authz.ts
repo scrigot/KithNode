@@ -112,7 +112,8 @@ export async function getPooledContactsForNode(
         .from("AlumniContact")
         .select(POOL_COLUMNS)
         .in("importedByUserId", memberIds)
-        .eq("sharedInNodes", true),
+        .eq("sharedInNodes", true)
+        .order("id"), // stable key so .range() pages don't skip/overlap rows
     ),
     supabase.from("User").select("id, email, name").in("id", memberIds),
   ]);
@@ -145,7 +146,8 @@ export async function getFriendSharedContacts(userId: string): Promise<PoolConta
         .from("AlumniContact")
         .select(POOL_COLUMNS)
         .in("importedByUserId", friendIds)
-        .eq("sharedWithFriends", true),
+        .eq("sharedWithFriends", true)
+        .order("id"), // stable key so .range() pages don't skip/overlap rows
     ),
     supabase.from("User").select("id, email, name").in("id", friendIds),
   ]);

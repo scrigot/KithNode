@@ -7,19 +7,22 @@ const { state } = vi.hoisted(() => ({ state: { tables: {} as Record<string, Reco
 vi.mock("@/lib/supabase", () => {
   function makeQuery(rows: Record<string, unknown>[]) {
     const filters: { op: "eq" | "in"; col: string; val: unknown }[] = [];
-    const apply = () =>
-      rows.filter((r) =>
+    let bounds: [number, number] | null = null; // set by .range() to emulate paging
+    const apply = () => {
+      const filtered = rows.filter((r) =>
         filters.every((f) =>
           f.op === "eq" ? r[f.col] === f.val : (f.val as unknown[]).includes(r[f.col]),
         ),
       );
+      return bounds ? filtered.slice(bounds[0], bounds[1] + 1) : filtered;
+    };
     const builder: Record<string, unknown> = {
       select: () => builder,
       eq: (col: string, val: unknown) => (filters.push({ op: "eq", col, val }), builder),
       in: (col: string, val: unknown) => (filters.push({ op: "in", col, val }), builder),
       gte: () => builder,
-      range: () => builder, // pagination passthrough (fetchAllRows); canned set is < 1 page
       order: () => builder,
+      range: (from: number, to: number) => ((bounds = [from, to]), builder), // slice like PostgREST
       maybeSingle: () => Promise.resolve({ data: apply()[0] ?? null, error: null }),
       single: () => Promise.resolve({ data: apply()[0] ?? null, error: null }),
       then: (res: (v: { data: unknown; error: null }) => unknown) =>

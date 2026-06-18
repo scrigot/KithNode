@@ -55,21 +55,24 @@ export async function computeLeaderboard(
         .from("AlumniContact")
         .select("importedByUserId, tier, createdAt")
         .in("importedByUserId", memberIds)
-        .gte("createdAt", since),
+        .gte("createdAt", since)
+        .order("id"), // stable key so .range() pages don't skip/overlap rows
     ),
     fetchAllRows<{ userId: string }>(() =>
       supabase
         .from("PipelineEntry")
         .select("userId, updatedAt")
         .in("userId", memberIds)
-        .gte("updatedAt", since),
+        .gte("updatedAt", since)
+        .order("id"),
     ),
     fetchAllRows<{ from_user_id: string }>(() =>
       supabase
         .from("intro_requests")
         .select("from_user_id, created_at")
         .in("from_user_id", memberIds)
-        .gte("created_at", since),
+        .gte("created_at", since)
+        .order("id"),
     ),
     getUserNames(memberIds),
   ]);

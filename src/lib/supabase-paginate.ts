@@ -18,7 +18,9 @@ interface RangeableQuery<T> {
 
 /** Read EVERY row a filter matches, paging past PostgREST's 1000-row cap.
  *  `makeQuery` MUST return a fresh builder per call (a builder is single-use
- *  once awaited). Throws on the first PostgREST error. */
+ *  once awaited) AND apply a stable, unique `.order()` (e.g. `.order("id")`) —
+ *  offset paging over an unordered result can skip or duplicate rows across
+ *  page boundaries. Throws on the first PostgREST error. */
 export async function fetchAllRows<T>(
   makeQuery: () => RangeableQuery<T>,
 ): Promise<T[]> {
