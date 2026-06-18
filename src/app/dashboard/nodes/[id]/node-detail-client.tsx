@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2, Settings, Trash2, ImageUp, Activity, ArrowRight } from "lucide-react";
 import { ChatThread } from "@/app/dashboard/_components/chat-thread";
+import { ProfileCardModal } from "@/app/dashboard/_components/profile-card";
 
 const TIER_STYLES: Record<string, string> = {
   hot: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -37,6 +38,7 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
   const [tab, setTab] = useState<"feed" | "leaderboard" | "pool" | "settings">("feed");
   const [copied, setCopied] = useState(false);
   const [introFor, setIntroFor] = useState<PoolContact | null>(null);
+  const [profileEmail, setProfileEmail] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await apiFetch(`/api/kith/nodes/${nodeId}`);
@@ -192,9 +194,12 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
           onAdd={addMember}
           onRemove={removeMember}
           onMessage={messageMember}
+          onProfile={setProfileEmail}
           onSaved={load}
         />
       )}
+
+      {profileEmail && <ProfileCardModal email={profileEmail} onClose={() => setProfileEmail(null)} />}
 
       {introFor && (
         <IntroModal
@@ -547,6 +552,7 @@ function SettingsView({
   onAdd,
   onRemove,
   onMessage,
+  onProfile,
   onSaved,
 }: {
   node: NodeDetail["node"];
@@ -556,6 +562,7 @@ function SettingsView({
   onAdd: (email: string, name: string) => void;
   onRemove: (email: string) => void;
   onMessage: (email: string) => void;
+  onProfile: (email: string) => void;
   onSaved: () => void;
 }) {
   const isOwner = node.ownerId === me;
@@ -608,10 +615,10 @@ function SettingsView({
         <div className="divide-y divide-white/[0.06]">
           {members.map((m) => (
             <div key={m.email} className="flex items-center gap-2 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-foreground">{m.name}</div>
+              <button onClick={() => onProfile(m.email)} className="min-w-0 flex-1 text-left">
+                <div className="truncate text-[13px] font-semibold text-foreground hover:text-accent-teal">{m.name}</div>
                 <div className="truncate font-mono text-[11px] text-muted-foreground">{m.email}</div>
-              </div>
+              </button>
               <span className="shrink-0 border border-white/[0.12] px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
                 {m.role}
               </span>
