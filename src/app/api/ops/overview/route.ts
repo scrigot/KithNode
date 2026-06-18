@@ -20,6 +20,19 @@ import {
   type CostRow,
   type Health,
 } from "@/lib/ops/metrics";
+import {
+  buildTimeline,
+  nextTasks,
+  laneSummary,
+  type Timeline,
+  type NextTask,
+  type LaneSummary,
+  type LaneStat,
+  type PhaseInput,
+  type MilestoneInput,
+  type OpsEventInput,
+} from "@/lib/ops/cockpit";
+import { LANES, type LaneMetricKey } from "@/lib/ops/lane-config";
 
 // ─── Response shape (shared with the client cockpit) ─────────────────────────
 export interface RecentSignup {
@@ -55,6 +68,15 @@ export interface OpsOverview {
   tasks: TasksResult;
   cost: CostResult;
   totalBurn: TotalBurnResult;
+  // ─── Cockpit v2 (optional; each degrades to null/[] independently) ─────────
+  /** Phased timeline ladder + active phase. null if the read failed. */
+  timeline: Timeline | null;
+  /** Next ~10 incomplete tasks under the active phase. [] if none / read failed. */
+  nextTasks: NextTask[];
+  /** The 8 lane cards for the OrgBand. [] if the read failed. */
+  lanes: LaneSummary[];
+  /** When the roadmap->DB mirror last ran (ISO), for the "synced Nh ago" badge. */
+  syncedAt: string | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -93,7 +115,71 @@ function emptyOverview(): OpsOverview {
       todayHealth: "neutral",
     },
     totalBurn: computeTotalBurn(FIXED_SUBSCRIPTIONS, 0),
+    timeline: null,
+    nextTasks: [],
+    lanes: [],
+    syncedAt: null,
   };
+}
+
+// Build a lane's headline stat from the already-computed metric signals. Maps
+// each lane's metricKey -> a {label,value,health} or null (null = the card
+// shows a muted "manual", never a fabricated number — the org-band rule).
+function laneStat(
+  metricKey: LaneMetricKey | null,
+  signals: {
+    velocity: VelocityResult;
+    funnel: FunnelResult;
+    totalBurn: TotalBurnResult;
+    revenue: RevenueResult;
+    activeUsers: ActiveUsersResult;
+    taskOpenCount: number;
+    taskHealthValue: Health;
+  },
+): LaneStat | null {
+  switch (metricKey) {
+    case "velocity": {
+      const v = signals.velocity;
+      const label =
+        v.wowPct == null
+          ? "new"
+          : `${v.wowPct >= 0 ? "+" : ""}${(v.wowPct * 100).toFixed(0)}% WoW`;
+      return { label: "Signups / wk", value: `${v.thisWeek}`, health: v.health };
+    }
+    case "funnel": {
+      const f = signals.funnel;
+      return {
+        label: "Signup→swipe",
+        value: `${f.signupToSwipePct}%`,
+        health: f.signupToSwipeHealth,
+      };
+    }
+    case "totalBurn": {
+      const b = signals.totalBurn;
+      return {
+        label: "Burn / mo",
+        value: `$${b.totalMonthly.toFixed(0)}`,
+        health: b.health,
+      };
+    }
+    case "revenue": {
+      const r = signals.revenue;
+      return { label: "MRR", value: `$${r.mrr}`, health: r.health };
+    }
+    case "activeUsers": {
+      const a = signals.activeUsers;
+      return { label: "Active 7d", value: `${a.active7d}`, health: a.health };
+    }
+    case "taskHealth": {
+      return {
+        label: "Open tasks",
+        value: `${signals.taskOpenCount}`,
+        health: signals.taskHealthValue,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 export async function GET() {
@@ -123,6 +209,9 @@ export async function GET() {
       revenueRows,
       taskRows,
       costRows,
+      phaseRows,
+      milestoneRows,
+      opsEventRows,
     ] = await Promise.all([
       // (a) signups velocity — 14d window of created_at
       supabase
@@ -165,6 +254,22 @@ export async function GET() {
         .from("api_cost_log")
         .select("cost_usd, provider, created_at, meta")
         .gte("created_at", thirtyDaysAgo),
+      // (cockpit) phases — the timeline ladder
+      supabase
+        .from("phases")
+        .select("id, name, gate, order, status, createdAt")
+        .order("order", { ascending: true }),
+      // (cockpit) milestones — per-lane roadmap + next-10
+      supabase
+        .from("milestones")
+        .select("id, title, lane, phaseId, gate, status, order, note, evidence")
+        .order("order", { ascending: true }),
+      // (cockpit) recent changes per lane — last 30 ops events
+      supabase
+        .from("ops_events")
+        .select("id, lane, kind, summary, ref, createdAt")
+        .order("createdAt", { ascending: false })
+        .limit(30),
     ]);
 
     // (a) velocity
@@ -252,6 +357,81 @@ export async function GET() {
     }, 0);
     const totalBurn = computeTotalBurn(FIXED_SUBSCRIPTIONS, variable30d);
 
+    // ─── Cockpit v2: timeline + next-10 + lane cards (per-section degrade) ────
+    // Each block guards on its own row error: a failed read degrades that
+    // section to neutral/empty while the rest of the payload still returns 200.
+    let timeline: Timeline | null = null;
+    let next: NextTask[] = [];
+    let lanes: LaneSummary[] = [];
+    let syncedAt: string | null = null;
+
+    const phases: PhaseInput[] = phaseRows.error
+      ? []
+      : (phaseRows.data ?? []).map((p) => ({
+          id: p.id as string,
+          name: (p.name as string) ?? "",
+          gate: (p.gate as string) ?? "",
+          order: (p.order as number) ?? 0,
+          status: (p.status as string) ?? "planned",
+        }));
+
+    const milestones: MilestoneInput[] = milestoneRows.error
+      ? []
+      : (milestoneRows.data ?? []).map((m) => ({
+          id: m.id as string,
+          title: (m.title as string) ?? "",
+          lane: (m.lane as string) ?? "",
+          phaseId: (m.phaseId as string | null) ?? null,
+          gate: (m.gate as string) ?? "",
+          status: (m.status as string) ?? "planned",
+          order: (m.order as number) ?? 0,
+          note: (m.note as string | null) ?? null,
+          evidence: (m.evidence as string | null) ?? null,
+        }));
+
+    const opsEvents: OpsEventInput[] = opsEventRows.error
+      ? []
+      : (opsEventRows.data ?? []).map((e) => ({
+          id: e.id as string,
+          lane: (e.lane as string) ?? "",
+          kind: (e.kind as string) ?? "",
+          summary: (e.summary as string) ?? "",
+          ref: (e.ref as string | null) ?? null,
+          createdAt: (e.createdAt as string) ?? new Date().toISOString(),
+        }));
+
+    if (!phaseRows.error) {
+      timeline = buildTimeline(phases, milestones);
+      next = nextTasks(milestones, timeline.activePhaseId);
+      // syncedAt = the most recent phase createdAt as a freshness proxy.
+      syncedAt =
+        (phaseRows.data ?? [])
+          .map((p) => p.createdAt as string | null)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null;
+    }
+
+    // Lane cards — always built from the static LANES config; a per-lane stat
+    // resolves from the metric signals, milestones, and events.
+    const laneSignals = {
+      velocity,
+      funnel,
+      totalBurn,
+      revenue,
+      activeUsers,
+      taskOpenCount: openCount,
+      taskHealthValue: tasksResult.health,
+    };
+    lanes = LANES.map((lane) =>
+      laneSummary(
+        lane,
+        milestones,
+        opsEvents,
+        laneStat(lane.metricKey, laneSignals),
+      ),
+    );
+
     const payload: OpsOverview = {
       velocity,
       recentSignups,
@@ -263,6 +443,10 @@ export async function GET() {
       tasks: tasksResult,
       cost,
       totalBurn,
+      timeline,
+      nextTasks: next,
+      lanes,
+      syncedAt,
     };
     return NextResponse.json(payload);
   } catch {

@@ -16,7 +16,6 @@ import {
   DollarSign,
   ListChecks,
   Inbox,
-  Map as MapIcon,
   Plus,
   Flame,
 } from "lucide-react";
@@ -25,19 +24,11 @@ import type { OpsOverview } from "@/app/api/ops/overview/route";
 import { healthColor, type Health } from "@/lib/ops/metrics";
 import { addOpsTask, toggleOpsTask } from "../actions";
 import { OpsTile, OpsEmpty } from "./ops-tile";
-import { healthChip, relativeTime } from "./state";
-
-// ─── (f) Roadmap / milestone strip — hardcoded const for v1 ──────────────────
-type MilestoneStatus = "done" | "upcoming" | "at-risk" | "overdue";
-interface Milestone {
-  label: string;
-  due: string; // ISO date
-  status: MilestoneStatus;
-}
-const MILESTONES: Milestone[] = [
-  { label: "Paid plans launch", due: "2026-07-15", status: "upcoming" },
-  { label: "First 100 signups", due: "2026-08-01", status: "upcoming" },
-];
+import { relativeTime } from "./state";
+import { BetaCodesPanel } from "./beta-codes-panel";
+import { FeedbackPanel } from "./feedback-panel";
+import { PhasedTimeline } from "./phased-timeline";
+import { OrgBand } from "./org-band";
 
 const TRACK_LABELS: Record<string, string> = {
   IB: "IB",
@@ -137,25 +128,38 @@ export function OpsCockpit() {
         </div>
       </div>
 
-      {/* ─── (f) Roadmap strip ──────────────────────────────────────────── */}
-      <RoadmapStrip />
-
       {loading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-40 animate-pulse border border-white/[0.06] bg-bg-card"
-            />
-          ))}
-        </div>
+        <>
+          {/* North-star band skeleton + tile skeletons */}
+          <div className="h-32 animate-pulse border border-white/[0.06] bg-bg-card" />
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-40 animate-pulse border border-white/[0.06] bg-bg-card"
+              />
+            ))}
+          </div>
+        </>
       ) : (
         <>
-          {/* ─── Row 1: pulse tiles ──────────────────────────────────────── */}
+          {/* ─── North star: phased timeline (read first) ────────────────── */}
+          <PhasedTimeline
+            timeline={data?.timeline ?? null}
+            nextTasks={data?.nextTasks ?? []}
+            syncedAt={data?.syncedAt ?? null}
+          />
+
+          {/* ─── Row 1: pulse tiles (status) ─────────────────────────────── */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <VelocityTile data={data} />
             <ActiveUsersTile data={data} />
             <CostBurnTile data={data} />
+          </div>
+
+          {/* ─── Agent-org strip (where to focus) ────────────────────────── */}
+          <div className="mt-4">
+            <OrgBand lanes={data?.lanes ?? []} />
           </div>
 
           {/* ─── Row 2: funnel | revenue | tasks ─────────────────────────── */}
@@ -172,71 +176,18 @@ export function OpsCockpit() {
             </div>
             <TotalBurnTile data={data} />
           </div>
+
+          {/* ─── Row 4: beta codes (full width) ──────────────────────────── */}
+          <div className="mt-4">
+            <BetaCodesPanel />
+          </div>
+
+          {/* ─── Row 5: tester feedback (full width) ─────────────────────── */}
+          <div className="mt-4">
+            <FeedbackPanel />
+          </div>
         </>
       )}
-    </div>
-  );
-}
-
-// ─── (f) Roadmap / milestone strip ───────────────────────────────────────────
-function milestoneHealth(m: Milestone): Health {
-  switch (m.status) {
-    case "done":
-      return "good";
-    case "overdue":
-      return "bad";
-    case "at-risk":
-      return "warn";
-    default:
-      return "neutral";
-  }
-}
-
-function RoadmapStrip() {
-  return (
-    <div className="border border-white/[0.06] bg-bg-card">
-      <div className="flex items-center gap-2 px-5 py-2.5">
-        <MapIcon size={13} className="text-accent-teal" />
-        <p className="text-sm font-bold uppercase tracking-wider text-accent-teal">
-          Roadmap
-        </p>
-      </div>
-      <div className="h-px bg-border" />
-      <div className="flex flex-wrap gap-px bg-white/[0.06]">
-        {MILESTONES.map((m) => {
-          const health = milestoneHealth(m);
-          const due = new Date(m.due + "T00:00:00.000Z");
-          const daysDiff = Math.round(
-            (due.getTime() - Date.now()) / 86_400_000,
-          );
-          const timing =
-            m.status === "done"
-              ? "shipped"
-              : daysDiff >= 0
-                ? `in ${daysDiff}d`
-                : `${Math.abs(daysDiff)}d overdue`;
-          return (
-            <div
-              key={m.label}
-              className="min-w-[180px] flex-1 bg-bg-card px-5 py-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[12px] font-bold text-text-primary">
-                  {m.label}
-                </p>
-                <span
-                  className={`shrink-0 border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider ${healthChip(health)}`}
-                >
-                  {m.status}
-                </span>
-              </div>
-              <p className="mt-1 font-mono text-[10px] text-text-muted">
-                {m.due} · <span className={healthColor(health)}>{timing}</span>
-              </p>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

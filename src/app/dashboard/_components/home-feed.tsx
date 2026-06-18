@@ -1,18 +1,23 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import type { RankedContact } from "@/lib/api";
+import { CreditCost } from "@/components/credit-cost";
+import { composeWhyNow } from "@/lib/why-now";
 
 // ─── Tier helpers ───────────────────────────────────────────────────────
-// Tier colors per DESIGN.md: HOT/red WARM/blue MONITOR/amber COLD/zinc.
-export type Tier = "hot" | "warm" | "monitor" | "cold";
+// Tier colors per brand/dashboard.md: HOT/red WARM/blue MONITOR/amber COLD/zinc.
+export type Tier = "kith" | "hot" | "warm" | "monitor" | "cold";
 
 export function normalizeTier(t: string | undefined | null): Tier {
   const v = (t || "").toLowerCase();
-  if (v === "hot" || v === "warm" || v === "monitor" || v === "cold") return v;
+  if (v === "kith" || v === "hot" || v === "warm" || v === "monitor" || v === "cold") return v;
   return "cold";
 }
 
 export const TIER_TEXT: Record<Tier, string> = {
+  kith: "text-amber-300",
   hot: "text-red-400",
   warm: "text-blue-400",
   monitor: "text-amber-400",
@@ -20,6 +25,7 @@ export const TIER_TEXT: Record<Tier, string> = {
 };
 
 export const TIER_CHIP: Record<Tier, string> = {
+  kith: "bg-amber-300/10 border-amber-300/30 text-amber-300",
   hot: "bg-red-500/10 border-red-500/30 text-red-400",
   warm: "bg-blue-500/10 border-blue-500/30 text-blue-400",
   monitor: "bg-amber-500/10 border-amber-500/30 text-amber-400",
@@ -27,6 +33,7 @@ export const TIER_CHIP: Record<Tier, string> = {
 };
 
 export const TIER_LABEL: Record<Tier, string> = {
+  kith: "KITH",
   hot: "HOT",
   warm: "WARM",
   monitor: "MON",
@@ -34,6 +41,8 @@ export const TIER_LABEL: Record<Tier, string> = {
 };
 
 // ─── Feed item model ────────────────────────────────────────────────────
+// "reconnect" renders inside the overdue group with an amber badge (no new
+// bucket key needed on the page — grouped.overdue covers both).
 export type DueBucket = "overdue" | "today" | "upcoming";
 
 export interface FeedItem {
@@ -53,6 +62,7 @@ export interface FeedItem {
   dueLabel: string;
   affiliations: string[];
   email?: string;
+  linkedInUrl?: string;
   isRedacted?: boolean;
 }
 
@@ -82,20 +92,29 @@ export function deriveWhyNow(
   affiliations: string[],
   bucket: DueBucket,
   dueLabel: string,
+  title?: string,
+  firm?: string,
+  tier?: string,
+  dormant?: boolean,
+  daysQuiet?: number,
 ): string {
+  // Dormant kith: composeWhyNow produces a tailored reconnect line.
+  if (dormant) {
+    return composeWhyNow({ affiliations, title, firm, tier, dormant, daysQuiet });
+  }
   // /api/contacts maps `why_now` to the raw affiliations CSV, so guard against
   // echoing a bare affiliation list as the headline "why now" reason.
   const affJoin = affiliations.map((a) => a.trim()).filter(Boolean).join(", ");
   const looksLikeAffList = !!affJoin && whyNow.trim() === affJoin;
   if (whyNow && whyNow.trim() && !looksLikeAffList) return whyNow.trim();
   const top = affiliations.map((a) => a.trim()).filter(Boolean)[0];
+  // OVERDUE urgency beats a generic hook — keep this branch exactly as-is.
   if (bucket === "overdue") {
     return top
       ? `Follow-up ${dueLabel.toLowerCase()} — ${top} connection still warm`
       : `Follow-up ${dueLabel.toLowerCase()} — re-engage before the window closes`;
   }
-  if (top) return `${top} overlap — strong, genuine first-touch hook`;
-  return "High-warmth match — reach while the signal is fresh";
+  return composeWhyNow({ affiliations, title, firm, tier });
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────
@@ -118,6 +137,9 @@ const DUE_BADGE: Record<DueBucket, string> = {
   today: "bg-amber-500/10 border-amber-500/30 text-amber-400",
   upcoming: "bg-white/[0.04] border-white/[0.12] text-muted-foreground",
 };
+// Reconnect items are bucket="overdue" but use a gold badge to distinguish
+// dormant kith from hard-overdue pipeline contacts.
+const RECONNECT_BADGE = "bg-amber-300/10 border-amber-300/30 text-amber-300";
 
 export function FeedDivider({
   label,
@@ -144,13 +166,28 @@ export function FeedRow({
   onSelect,
   onDraft,
   onSkip,
+  onAddToPipeline,
+  pipelineAdded,
 }: {
   item: FeedItem;
   selected: boolean;
   onSelect: () => void;
   onDraft: () => void;
   onSkip: () => void;
+  onAddToPipeline: () => Promise<void> | void;
+  pipelineAdded: boolean;
 }) {
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
+  async function handleAddToPipeline() {
+    setPipelineError(null);
+    try {
+      await onAddToPipeline();
+    } catch {
+      setPipelineError("Failed to add to pipeline");
+    }
+  }
+
   return (
     <div
       onClick={onSelect}
@@ -181,15 +218,25 @@ export function FeedRow({
       {/* Body */}
       <div className="flex min-w-0 flex-col gap-1 px-3 py-2.5">
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className="text-[13px] font-semibold text-foreground">
-            {item.name}
-          </span>
+          {item.isRedacted ? (
+            <span className="text-[13px] font-semibold text-foreground">
+              {item.name}
+            </span>
+          ) : (
+            <Link
+              href={`/contact/${item.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[13px] font-semibold text-foreground hover:underline"
+            >
+              {item.name}
+            </Link>
+          )}
           <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-muted-foreground">
             {item.title ? `${item.title} · ` : ""}
             <span className="font-medium text-foreground">{item.firm}</span>
           </span>
           <span
-            className={`ml-auto whitespace-nowrap border px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-[0.07em] ${DUE_BADGE[item.bucket]}`}
+            className={`ml-auto whitespace-nowrap border px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-[0.07em] ${item.dueLabel.startsWith("RECONNECT") ? RECONNECT_BADGE : DUE_BADGE[item.bucket]}`}
           >
             {item.dueLabel}
           </span>
@@ -212,9 +259,10 @@ export function FeedRow({
               e.stopPropagation();
               onDraft();
             }}
-            className="border border-primary/30 bg-primary/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/20"
+            className="inline-flex items-center gap-1 border border-primary/30 bg-primary/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-primary transition-colors hover:bg-primary/20"
           >
             Draft
+            <CreditCost action="draft" />
           </button>
           <button
             onClick={(e) => {
@@ -225,6 +273,40 @@ export function FeedRow({
           >
             Skip
           </button>
+          {!item.isRedacted && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToPipeline();
+              }}
+              disabled={pipelineAdded}
+              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] transition-colors ${
+                pipelineAdded
+                  ? "cursor-default border border-green-500/30 bg-green-500/10 text-green-400"
+                  : pipelineError
+                    ? "border border-red-500/30 bg-red-500/10 text-red-400"
+                    : "border border-accent-amber/30 bg-accent-amber/10 text-accent-amber hover:bg-accent-amber/20"
+              }`}
+              title={pipelineError ?? undefined}
+            >
+              {pipelineAdded ? "In Pipeline" : pipelineError ? "Failed" : "+ Pipeline"}
+            </button>
+          )}
+          {item.linkedInUrl &&
+            !item.isRedacted &&
+            !item.linkedInUrl.includes("█") &&
+            item.linkedInUrl.includes("linkedin.com") && (
+              <a
+                href={item.linkedInUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-slate-500 transition-colors hover:text-accent-teal"
+                title="LinkedIn profile"
+              >
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true"><path d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854zm4.943 12.248V6.169H2.542v7.225zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248S2.4 3.226 2.4 3.934c0 .694.521 1.248 1.327 1.248zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.184-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016l.016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225z"/></svg>
+              </a>
+            )}
         </div>
       </div>
     </div>
@@ -264,6 +346,44 @@ export function buildFeed(
   const used = new Set<string>();
   const items: FeedItem[] = [];
 
+  // RECONNECT — dormant kith contacts, rendered first (bucket="overdue" so the
+  // page's grouped.overdue section picks them up without any page changes).
+  const dormantKith = [...ranked]
+    .filter((r) => r.dormant === true)
+    .sort((a, b) => b.score.total_score - a.score.total_score);
+
+  for (const r of dormantKith) {
+    if (used.has(r.id)) continue;
+    used.add(r.id);
+    const affiliations = r.affiliations.map((a) => a.name);
+    const tier = normalizeTier(r.score.tier);
+    const daysQuiet =
+      r.last_spoken_at
+        ? Math.floor((Date.now() - new Date(r.last_spoken_at).getTime()) / 86_400_000)
+        : undefined;
+    const dueLabel = daysQuiet != null && daysQuiet > 0
+      ? `RECONNECT · ${daysQuiet}D`
+      : "RECONNECT";
+    const chain = deriveChain(r.warm_path, affiliations, r.company.name);
+    items.push({
+      id: r.id,
+      name: r.name,
+      title: r.title,
+      firm: r.company.name,
+      score: Math.round(r.score.total_score),
+      tier,
+      chain: chain.segments,
+      chainLead: chain.lead,
+      whyNow: deriveWhyNow(r.why_now, affiliations, "overdue", dueLabel, r.title, r.company.name, tier, true, daysQuiet),
+      bucket: "overdue",
+      dueLabel,
+      affiliations,
+      email: r.email,
+      linkedInUrl: r.linkedin_url,
+      isRedacted: (r as RankedContact & { isRedacted?: boolean }).isRedacted,
+    });
+  }
+
   // OVERDUE
   for (const o of overdue) {
     if (used.has(o.contactId)) continue;
@@ -283,11 +403,12 @@ export function buildFeed(
       tier,
       chain: chain.segments,
       chainLead: chain.lead,
-      whyNow: deriveWhyNow(rc?.why_now ?? "", affiliations, "overdue", dueLabel),
+      whyNow: deriveWhyNow(rc?.why_now ?? "", affiliations, "overdue", dueLabel, rc?.title, o.firmName, tier),
       bucket: "overdue",
       dueLabel,
       affiliations,
       email: rc?.email,
+      linkedInUrl: rc?.linkedin_url,
       isRedacted: o.isRedacted,
     });
   }
@@ -315,11 +436,12 @@ export function buildFeed(
       tier: normalizeTier(r.score.tier),
       chain: chain.segments,
       chainLead: chain.lead,
-      whyNow: deriveWhyNow(r.why_now, affiliations, bucket, dueLabel),
+      whyNow: deriveWhyNow(r.why_now, affiliations, bucket, dueLabel, r.title, r.company.name, r.score.tier),
       bucket,
       dueLabel,
       affiliations,
       email: r.email,
+      linkedInUrl: r.linkedin_url,
       isRedacted: (r as RankedContact & { isRedacted?: boolean }).isRedacted,
     });
   });

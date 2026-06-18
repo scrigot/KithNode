@@ -25,11 +25,13 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { findContacts, type CompanyInput } from "@/lib/discover/contact-finder";
+import { isLikelyPersonName } from "@/lib/discover/name-validator";
 import { detectSignals } from "@/lib/discover/signal-detector";
 import { findEmail } from "@/lib/discover/email-finder";
 import { rank } from "@/lib/discover/ranker";
 import { seedsForIndustries, seedsForSchool } from "@/lib/discover/seeds";
 import { requireSubscription } from "@/lib/subscription";
+import { requireCredits, grantCredits, CREDIT_COSTS } from "@/lib/credits";
 
 function dedupeSeeds(seeds: import("@/lib/discover/seeds").FirmSeed[]) {
   const seen = new Set<string>();
@@ -101,18 +103,19 @@ function makeEmitter(controller: ReadableStreamDefaultController<Uint8Array>) {
 export async function POST(request: NextRequest) {
   // ── Pre-stream validation (still plain JSON) ────────────────────────
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
+  const userId = session.user.id;
+  const userEmail = session.user.email;
 
-  const gate = await requireSubscription(userId);
+  const gate = await requireSubscription(userEmail);
   if (gate) return gate;
 
   const body = (await request.json().catch(() => ({}))) as DiscoverRunBody;
   const mode: "quick" | "deep" = body.mode === "deep" ? "deep" : "quick";
 
-  const prefs = await getUserPrefs(userId);
+  const prefs = await getUserPrefs(userEmail);
   const schoolSeeds = prefs.university ? seedsForSchool(prefs.university) : [];
   const industrySeeds = seedsForIndustries(prefs.targetIndustries);
   // Prefer school-specific seeds, dedup against industry seeds, then append.
@@ -136,11 +139,21 @@ export async function POST(request: NextRequest) {
   const seeds = allSeeds.slice(0, seedCap);
   const hunterApiKey = process.env.HUNTER_API_KEY || undefined;
 
+  // Charge once per run, up front — after no_seeds validation so an empty run
+  // never burns credits. 402 returns as plain JSON before the stream opens.
+  const creditGate = await requireCredits(userEmail, CREDIT_COSTS.discover, "discover");
+  if (creditGate) return creditGate;
+
   // ── Streaming pipeline ──────────────────────────────────────────────
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = makeEmitter(controller);
       const aborted = { value: false };
+      // Flipped true only once the run emits its `done` summary. Any earlier
+      // exit (kill-switch abort or a pipeline error) leaves it false, which
+      // triggers the refund in `finally` so the user is never charged 5 credits
+      // for a run that produced no results.
+      let completed = false;
       const onAbort = () => {
         aborted.value = true;
       };
@@ -226,11 +239,26 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        // ── Persistence boundary guard ───────────────────────────────
+        // Final safety net: reject any candidate whose name doesn't look like
+        // a real person's name, regardless of how it entered the pipeline.
+        // "candidatesFound" already counted everything; "filtered" tracks what
+        // was dropped here so the banner stays accurate.
+        let filtered = 0;
+        const safeEnriched = enriched.filter((row) => {
+          if (isLikelyPersonName(row.candidate.name)) return true;
+          console.warn(
+            `[discover] filtered non-person name at persistence boundary: "${row.candidate.name}" (${row.candidate.company})`,
+          );
+          filtered++;
+          return false;
+        });
+
         // ── Persistence ─────────────────────────────────────────────
         send({
           type: "stage",
           stage: "saving",
-          message: `Saving ${enriched.length} contacts`,
+          message: `Saving ${safeEnriched.length} contacts${filtered > 0 ? ` (${filtered} filtered)` : ""}`,
           progress: 92,
         });
 
@@ -247,7 +275,7 @@ export async function POST(request: NextRequest) {
           signalCount: number;
         }> = [];
 
-        for (const row of enriched) {
+        for (const row of safeEnriched) {
           if (aborted.value) {
             send({ type: "aborted" });
             return;
@@ -335,12 +363,19 @@ export async function POST(request: NextRequest) {
           hunterBudget,
           contacts: persistedSummaries,
         });
+        completed = true;
       } catch (err) {
         send({
           type: "error",
           message: err instanceof Error ? err.message : "discover pipeline failed",
         });
       } finally {
+        // Refund the up-front 5-credit charge when the run never reached its
+        // `done` summary — i.e. the user hit the kill switch (abort) or the
+        // pipeline threw. A completed run keeps the charge.
+        if (!completed) {
+          await grantCredits(userEmail, CREDIT_COSTS.discover);
+        }
         request.signal.removeEventListener("abort", onAbort);
         try {
           controller.close();

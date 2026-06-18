@@ -19,7 +19,7 @@ function makeFixtureHtml(contact: {
 } | null, orgName = "Carolina Investment Club"): string {
   const state = {
     preFetchedData: {
-      organization: contact
+      firmName: contact
         ? {
             id: 12345,
             name: orgName,
@@ -53,7 +53,7 @@ describe("parseInitialAppState", () => {
     const html = makeFixtureHtml({ firstName: "Jane", lastName: "Smith" });
     const state = parseInitialAppState(html);
     expect(state).not.toBeNull();
-    expect(state?.preFetchedData?.organization?.name).toBe("Carolina Investment Club");
+    expect(state?.preFetchedData?.firmName?.name).toBe("Carolina Investment Club");
   });
 
   it("returns null when initialAppState is missing", () => {
@@ -72,7 +72,7 @@ describe("parseInitialAppState", () => {
 // ---------------------------------------------------------------------------
 
 describe("extractSeedFromState", () => {
-  const SOURCE_URL = "https://heellife.unc.edu/organization/carolinainvestmentclub/about";
+  const SOURCE_URL = "https://heellife.unc.edu/firmName/carolinainvestmentclub/about";
 
   it("produces correct AlumniSeed from full contact", () => {
     const html = makeFixtureHtml({
@@ -131,7 +131,7 @@ describe("extractSeedFromState", () => {
     expect(seed!.email).toBe("jsmith@unc.edu");
   });
 
-  it("returns null when organization is null", () => {
+  it("returns null when firmName is null", () => {
     const html = makeFixtureHtml(null);
     const state = parseInitialAppState(html)!;
     const seed = extractSeedFromState(state, TEST_GROUP, SOURCE_URL);
@@ -141,7 +141,7 @@ describe("extractSeedFromState", () => {
   it("returns null when primaryContact has no name", () => {
     const state = {
       preFetchedData: {
-        organization: {
+        firmName: {
           name: "Carolina Investment Club",
           primaryContact: {
             firstName: "",

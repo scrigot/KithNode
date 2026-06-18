@@ -22,9 +22,32 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         email: session.user.email ?? undefined,
         name: session.user.name ?? undefined,
       });
-      trackEvent("user_signed_up");
+      // Once per browser session. This used to capture "user_signed_up" on
+      // EVERY authenticated page load, which made the signup funnel garbage.
+      if (!sessionStorage.getItem("kn:signin-tracked")) {
+        sessionStorage.setItem("kn:signin-tracked", "1");
+        trackEvent("user_signed_in");
+      }
     }
   }, [status, session]);
+
+  // Activation-success (paid path). Stripe's success page redirects here with
+  // ?activated=1; fire the completion event the checkout funnel was missing
+  // (the code-redeem path already fires method:code), then strip the param so a
+  // reload can't double-count.
+  useEffect(() => {
+    if (status !== "authenticated" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("activated") !== "1") return;
+    trackEvent("onboarding_activated", { method: "plan" });
+    params.delete("activated");
+    const qs = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      window.location.pathname + (qs ? `?${qs}` : ""),
+    );
+  }, [status]);
 
   return <>{children}</>;
 }

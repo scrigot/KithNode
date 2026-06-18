@@ -1,33 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useEffect } from "react";
-import { motion, useInView } from "framer-motion";
+import { Suspense } from "react";
+import { motion } from "framer-motion";
+import { HeroNetwork } from "./hero-network";
 
 // ---------------------------------------------------------------------------
 // Dense mesh -- more nodes + edges than solutions-section (this is the climax)
 // ---------------------------------------------------------------------------
-
-const TRUST_SCHOOLS = [
-  "UNC",
-  "Wharton",
-  "Stern",
-  "Booth",
-  "Georgetown",
-  "Harvard",
-  "Yale",
-  "Princeton",
-  "Columbia",
-  "MIT",
-  "Stanford",
-  "Duke",
-  "Cornell",
-  "Dartmouth",
-  "Ross",
-  "Kellogg",
-  "Notre Dame",
-  "Haas",
-];
 
 const MESH_NODES = [
   { x: 2,  y: 5  }, { x: 12, y: 2  }, { x: 22, y: 8  }, { x: 32, y: 3  },
@@ -86,38 +66,6 @@ const CONVERGENCE_PATHS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// CountUp -- same pattern as solutions-section
-// ---------------------------------------------------------------------------
-
-function CountUp({ end }: { end: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true, amount: 0.5 });
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (!isInView || started.current || !ref.current) return;
-    started.current = true;
-
-    const duration = 1800;
-    const startTime = performance.now();
-    const el = ref.current;
-
-    function tick(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const value = Math.round(eased * end);
-      if (el) el.textContent = value.toLocaleString();
-      if (progress < 1) requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
-  }, [isInView, end]);
-
-  return <span ref={ref}>0</span>;
-}
-
-// ---------------------------------------------------------------------------
 // ConvergenceLine -- single animated path drawing toward center
 // ---------------------------------------------------------------------------
 
@@ -152,7 +100,7 @@ export function CTASection() {
   return (
     <section
       id="cta"
-      className="relative overflow-hidden bg-black py-32 px-4"
+      className="relative overflow-hidden bg-black py-24 sm:py-32 px-4"
     >
       {/* ------------------------------------------------------------------ */}
       {/* Keyframes */}
@@ -184,7 +132,6 @@ export function CTASection() {
         .cta-btn-primary:hover {
           animation: none;
           box-shadow: 0 0 80px rgba(14,165,233,0.7), 0 0 140px rgba(14,165,233,0.3);
-          transform: translateY(-2px);
         }
       `}</style>
 
@@ -252,26 +199,6 @@ export function CTASection() {
               delay={i * 0.5}
             />
           ))}
-
-          {/* Center node -- the destination of all convergence lines */}
-          <motion.circle
-            cx="50%"
-            cy="50%"
-            r="1.2"
-            fill="#0EA5E9"
-            animate={{ r: [1.2, 2.0, 1.2], opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.circle
-            cx="50%"
-            cy="50%"
-            r="2.5"
-            fill="none"
-            stroke="#0EA5E9"
-            strokeWidth="0.3"
-            animate={{ r: [2.5, 4.5], opacity: [0.4, 0] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
-          />
         </svg>
       </div>
 
@@ -279,154 +206,78 @@ export function CTASection() {
       {/* Content -- scroll-reveal wrapper */}
       {/* ------------------------------------------------------------------ */}
       <motion.div
-        className="relative mx-auto max-w-3xl text-center"
-        initial={{ opacity: 0, scale: 0.95 }}
+        className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2"
+        initial={{ opacity: 0, scale: 0.97 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
       >
-        {/* Eyebrow label */}
-        <motion.div
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 px-4 py-1.5 backdrop-blur-sm"
-          initial={{ opacity: 0, y: -10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-        >
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0EA5E9]" />
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-[#0EA5E9]">
-            Private Alpha Open
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h2
-          className="font-heading text-4xl font-bold leading-tight tracking-tight text-white md:text-6xl"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
-        >
-          Your{" "}
-          <span className="text-[#0EA5E9]">warm path</span>{" "}
-          to the{" "}
-          <br className="hidden md:block" />
-          room where it happens.
-        </motion.h2>
-
-        {/* Subhead */}
-        <motion.p
-          className="mx-auto mt-6 max-w-xl text-lg text-white/70"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.22, ease: "easeOut" }}
-        >
-          KithNode maps every alumni connection between you and your target firms,
-          scores them, and drafts the outreach that actually gets a response.
-        </motion.p>
-
-        {/* CTA buttons */}
-        <motion.div
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.30, ease: "easeOut" }}
-        >
-          {/* Primary */}
-          <Link
-            href="/waitlist"
-            className="cta-btn-primary relative rounded-xl bg-[#0EA5E9] px-8 py-4 text-lg font-semibold text-white transition-all duration-300"
+        {/* LEFT -- headline + subhead + single CTA */}
+        <div className="text-center lg:text-left">
+          {/* Headline */}
+          <motion.h2
+            className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
           >
-            Request Access
-          </Link>
+            Stop cold-emailing strangers.{" "}
+            <br className="hidden md:block" />
+            Walk in <span className="text-[#0EA5E9]">warm</span>.
+          </motion.h2>
 
-          {/* Secondary -- ghost border matching hero */}
-          <Link
-            href="/demo"
-            className="rounded-xl border border-white/20 bg-white/[0.04] px-8 py-4 text-lg font-semibold text-white/80 backdrop-blur-sm transition-all duration-300 hover:border-white/40 hover:bg-white/[0.08] hover:text-white"
+          {/* Subhead */}
+          <motion.p
+            className="mx-auto mt-6 max-w-xl text-lg text-white/70 lg:mx-0"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.18, ease: "easeOut" }}
           >
-            See How It Works
-          </Link>
-        </motion.div>
+            KithNode maps every alumni connection between you and your target firms,
+            scores them, and drafts the outreach that actually gets a response.
+          </motion.p>
 
-        {/* Trust ticker */}
-        <motion.div
-          className="mt-8 flex w-full flex-col items-center gap-3"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
-            Used by students at
+          {/* Single primary CTA */}
+          <motion.div
+            className="mt-10 flex justify-center lg:justify-start"
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.26, ease: "easeOut" }}
+          >
+            <Link
+              href="/waitlist"
+              className="cta-btn-primary relative rounded-[12px] bg-[#0EA5E9] px-8 py-4 text-lg font-medium text-white transition-transform duration-150 ease-out hover:-translate-y-0.5"
+            >
+              Request Access
+            </Link>
+          </motion.div>
+
+          {/* Data-sourcing reassurance: the trust line skeptical users said would
+              flip them. Intentionally NOT scroll-animated so a trust-critical
+              message can never be hidden by an observer that fails to fire. */}
+          <p className="mx-auto mt-5 max-w-md text-[13px] leading-snug text-white/55 lg:mx-0">
+            Built on permitted public data. No LinkedIn login, password, or
+            extension required.
           </p>
-          <div className="relative w-full max-w-4xl overflow-hidden">
-            <div className="flex">
-              <div className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8">
-                {TRUST_SCHOOLS.map((school) => (
-                  <span
-                    key={`a-${school}`}
-                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                    {school}
-                  </span>
-                ))}
-              </div>
-              <div
-                className="trust-ticker-track flex shrink-0 items-center gap-8 pr-8"
-                aria-hidden
-              >
-                {TRUST_SCHOOLS.map((school) => (
-                  <span
-                    key={`b-${school}`}
-                    className="flex items-center gap-3 whitespace-nowrap text-[12px] font-medium text-white/55"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#0EA5E9]/60 shadow-[0_0_8px_rgba(14,165,233,0.5)]" />
-                    {school}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-black to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-black to-transparent" />
-          </div>
-          <style jsx>{`
-            @keyframes trust-ticker-slide {
-              0% {
-                transform: translateX(0);
-              }
-              100% {
-                transform: translateX(-100%);
-              }
-            }
-            .trust-ticker-track {
-              animation: trust-ticker-slide 45s linear infinite;
-            }
-          `}</style>
-        </motion.div>
+        </div>
 
-        {/* Live join counter */}
+        {/* RIGHT -- spinning 3D node network (the warm-path orb, moved from the hero) */}
         <motion.div
-          className="mt-10 inline-flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-6 py-4 backdrop-blur-sm"
-          initial={{ opacity: 0, scale: 0.92 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          className="relative hidden lg:block"
+          initial={{ opacity: 0, x: 24 }}
+          whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.48, ease: "easeOut" }}
+          transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+          aria-hidden
         >
-          {/* Pulsing status dot */}
-          <span className="relative flex h-2.5 w-2.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0EA5E9] opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#0EA5E9]" />
-          </span>
-          <span className="font-mono text-2xl font-bold tabular-nums text-[#0EA5E9]">
-            <CountUp end={127} />{/* TODO: replace with real DB count */}
-          </span>
-          <span className="text-[11px] font-medium uppercase tracking-widest text-white/50">
-            students joined this week
-          </span>
+          <div className="relative h-[340px] w-full lg:h-[440px]">
+            <Suspense fallback={<div className="h-full w-full" />}>
+              <HeroNetwork />
+            </Suspense>
+          </div>
         </motion.div>
       </motion.div>
     </section>

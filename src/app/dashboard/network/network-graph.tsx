@@ -7,7 +7,7 @@ import ForceGraph2D, {
 } from "react-force-graph-2d";
 import type { GraphNode, GraphLink, GraphData } from "./graph-model";
 
-// ─── Palette (mirrors DESIGN.md tokens) ──────────────────────────────────
+// ─── Palette (mirrors brand/dashboard.md tokens) ──────────────────────────────────
 const C = {
   accent: "#0EA5E9",
   text: "#E5E9F0",

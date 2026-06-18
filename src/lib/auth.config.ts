@@ -1,4 +1,5 @@
 import Google from "next-auth/providers/google";
+import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import type { NextAuthConfig } from "next-auth";
 
 /**
@@ -11,10 +12,22 @@ export const authConfig: NextAuthConfig = {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
+    // Microsoft (UNC @unc.edu accounts). Only registered when configured, so
+    // the build/middleware never breaks before the Azure app exists.
+    ...(process.env.AUTH_MICROSOFT_ENTRA_ID_ID
+      ? [
+          MicrosoftEntraID({
+            clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
+            clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
+            issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
+          }),
+        ]
+      : []),
   ],
   session: { strategy: "jwt" },
   pages: {
     signIn: "/sign-in",
+    error: "/sign-in",
   },
   callbacks: {
     authorized: ({ auth, request }) => {

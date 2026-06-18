@@ -8,7 +8,7 @@ export type SandboxContact = {
   name: string;
   initials: string;
   title: string;
-  firmName: string;
+  organization: string;
   email: string;
   education: string;
   location: string;
@@ -21,7 +21,7 @@ export type SandboxContact = {
 export type SandboxWarmPath = {
   intermediaryName: string;
   intermediaryRelation: string;
-  firmName: string;
+  organization: string;
   title: string;
 };
 
@@ -34,7 +34,7 @@ export type SandboxDiscoverCard = SandboxContact & {
 export type SandboxPipelineEntry = {
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   stage:
     | "researched"
     | "connected"
@@ -51,13 +51,13 @@ export type SandboxActivity = {
   type: "rate" | "pipeline_add" | "pipeline_move";
   contactId: string;
   contactName: string;
-  firmName: string;
+  organization: string;
   detail: string;
   timestamp: string;
 };
 
 export type SandboxTopFirm = {
-  firmName: string;
+  organization: string;
   count: number;
   hotCount: number;
 };
@@ -72,7 +72,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Morgan Reyes",
     initials: "MR",
     title: "VP, Investment Banking",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     email: "morgan.reyes@example.com",
     education: "UNC Kenan-Flagler '15",
     location: "New York, NY",
@@ -86,7 +86,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Ava Shah",
     initials: "AS",
     title: "Associate, M&A",
-    firmName: "Evercore",
+    organization: "Evercore",
     email: "ava.shah@example.com",
     education: "Duke '18",
     location: "New York, NY",
@@ -100,7 +100,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Theo Bennett",
     initials: "TB",
     title: "MD, LevFin",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     email: "theo.bennett@example.com",
     education: "UNC Kenan-Flagler '03",
     location: "Charlotte, NC",
@@ -114,7 +114,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Priya Kapoor",
     initials: "PK",
     title: "Principal, Buyout Coverage",
-    firmName: "KKR",
+    organization: "KKR",
     email: "priya.kapoor@example.com",
     education: "Wharton '13",
     location: "New York, NY",
@@ -128,7 +128,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Jordan Wright",
     initials: "JW",
     title: "Engagement Manager",
-    firmName: "McKinsey",
+    organization: "McKinsey",
     email: "jordan.wright@example.com",
     education: "UNC Kenan-Flagler '14",
     location: "Atlanta, GA",
@@ -142,7 +142,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Samira Okafor",
     initials: "SO",
     title: "Analyst, TMT",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     email: "samira.okafor@example.com",
     education: "UNC Kenan-Flagler '24",
     location: "New York, NY",
@@ -156,7 +156,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Luca Romero",
     initials: "LR",
     title: "Associate, FIG",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     email: "luca.romero@example.com",
     education: "Georgetown '19",
     location: "New York, NY",
@@ -170,7 +170,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Hannah Pritchard",
     initials: "HP",
     title: "VP, Healthcare M&A",
-    firmName: "Evercore",
+    organization: "Evercore",
     email: "hannah.pritchard@example.com",
     education: "UNC Kenan-Flagler '11",
     location: "New York, NY",
@@ -184,7 +184,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Diego Alvarez",
     initials: "DA",
     title: "Associate, Sponsors",
-    firmName: "Bain Capital",
+    organization: "Bain Capital",
     email: "diego.alvarez@example.com",
     education: "MIT '17",
     location: "Boston, MA",
@@ -198,7 +198,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Nadia Greene",
     initials: "NG",
     title: "Consultant",
-    firmName: "Bain",
+    organization: "Bain",
     email: "nadia.greene@example.com",
     education: "UNC Kenan-Flagler '22",
     location: "Charlotte, NC",
@@ -212,7 +212,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Ezra Lin",
     initials: "EL",
     title: "Analyst, Industrials",
-    firmName: "JPMorgan",
+    organization: "JPMorgan",
     email: "ezra.lin@example.com",
     education: "Cornell '24",
     location: "New York, NY",
@@ -226,7 +226,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Sasha Volkov",
     initials: "SV",
     title: "Director, ECM",
-    firmName: "Citi",
+    organization: "Citi",
     email: "sasha.volkov@example.com",
     education: "Columbia '08",
     location: "New York, NY",
@@ -240,7 +240,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Mira Castellano",
     initials: "MC",
     title: "Senior Associate, Growth",
-    firmName: "TPG",
+    organization: "TPG",
     email: "mira.castellano@example.com",
     education: "Stanford '16",
     location: "San Francisco, CA",
@@ -254,7 +254,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Caleb Whitford",
     initials: "CW",
     title: "Analyst, Coverage",
-    firmName: "Wells Fargo",
+    organization: "Wells Fargo",
     email: "caleb.whitford@example.com",
     education: "UNC Kenan-Flagler '23",
     location: "Charlotte, NC",
@@ -268,7 +268,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Yara Ahmadi",
     initials: "YA",
     title: "Consultant",
-    firmName: "McKinsey",
+    organization: "McKinsey",
     email: "yara.ahmadi@example.com",
     education: "Penn '20",
     location: "Washington, DC",
@@ -282,7 +282,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Reid Donovan",
     initials: "RD",
     title: "Associate, Real Estate",
-    firmName: "Blackstone",
+    organization: "Blackstone",
     email: "reid.donovan@example.com",
     education: "Notre Dame '17",
     location: "New York, NY",
@@ -296,7 +296,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Imani Foster",
     initials: "IF",
     title: "VP, Coverage",
-    firmName: "Bank of America",
+    organization: "Bank of America",
     email: "imani.foster@example.com",
     education: "Howard '10",
     location: "Charlotte, NC",
@@ -310,7 +310,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Felix Marquez",
     initials: "FM",
     title: "Senior Consultant",
-    firmName: "BCG",
+    organization: "BCG",
     email: "felix.marquez@example.com",
     education: "UT Austin '19",
     location: "Houston, TX",
@@ -324,7 +324,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Olive Hartwell",
     initials: "OH",
     title: "Associate, Restructuring",
-    firmName: "PJT Partners",
+    organization: "PJT Partners",
     email: "olive.hartwell@example.com",
     education: "Brown '18",
     location: "New York, NY",
@@ -338,7 +338,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Beau Caldwell",
     initials: "BC",
     title: "Analyst, Equity Research",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     email: "beau.caldwell@example.com",
     education: "Vanderbilt '24",
     location: "Nashville, TN",
@@ -352,7 +352,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Ines Halvorsen",
     initials: "IH",
     title: "Consultant",
-    firmName: "Bain",
+    organization: "Bain",
     email: "ines.halvorsen@example.com",
     education: "Princeton '19",
     location: "New York, NY",
@@ -366,7 +366,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Quinton Park",
     initials: "QP",
     title: "Analyst, Credit",
-    firmName: "Apollo",
+    organization: "Apollo",
     email: "quinton.park@example.com",
     education: "Northwestern '23",
     location: "Chicago, IL",
@@ -380,7 +380,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Roselyn Achebe",
     initials: "RA",
     title: "Associate, Sponsors",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     email: "roselyn.achebe@example.com",
     education: "Yale '18",
     location: "New York, NY",
@@ -394,7 +394,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Tobias Rune",
     initials: "TR",
     title: "Analyst, FIG",
-    firmName: "Citi",
+    organization: "Citi",
     email: "tobias.rune@example.com",
     education: "Emory '24",
     location: "New York, NY",
@@ -408,7 +408,7 @@ export const SANDBOX_CONTACTS: SandboxContact[] = [
     name: "Wren Kobayashi",
     initials: "WK",
     title: "Associate, Industrials",
-    firmName: "Lazard",
+    organization: "Lazard",
     email: "wren.kobayashi@example.com",
     education: "Williams '17",
     location: "New York, NY",
@@ -434,7 +434,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-001",
     contactName: "Morgan Reyes",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     stage: "meeting_set",
     addedAt: "2026-04-22T10:00:00Z",
     lastTouchedAt: "2026-05-12T15:30:00Z",
@@ -443,7 +443,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-002",
     contactName: "Ava Shah",
-    firmName: "Evercore",
+    organization: "Evercore",
     stage: "responded",
     addedAt: "2026-04-28T09:00:00Z",
     lastTouchedAt: "2026-05-13T12:00:00Z",
@@ -452,7 +452,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-003",
     contactName: "Theo Bennett",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     stage: "follow_up",
     addedAt: "2026-05-01T13:00:00Z",
     lastTouchedAt: "2026-05-09T11:00:00Z",
@@ -461,7 +461,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-004",
     contactName: "Priya Kapoor",
-    firmName: "KKR",
+    organization: "KKR",
     stage: "email_sent",
     addedAt: "2026-05-06T14:00:00Z",
     lastTouchedAt: "2026-05-10T16:00:00Z",
@@ -470,7 +470,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-005",
     contactName: "Jordan Wright",
-    firmName: "McKinsey",
+    organization: "McKinsey",
     stage: "connected",
     addedAt: "2026-05-09T10:00:00Z",
     lastTouchedAt: "2026-05-11T09:00:00Z",
@@ -479,7 +479,7 @@ export const SANDBOX_PIPELINE: SandboxPipelineEntry[] = [
   {
     contactId: "c-006",
     contactName: "Samira Okafor",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     stage: "researched",
     addedAt: "2026-05-12T18:00:00Z",
     lastTouchedAt: "2026-05-12T18:00:00Z",
@@ -499,14 +499,14 @@ export const SANDBOX_PIPELINE_BY_STAGE: Record<string, number> = {
 // ─── Top firms ──────────────────────────────────────────────────────────────
 
 export const SANDBOX_TOP_FIRMS: SandboxTopFirm[] = [
-  { firmName: "Goldman Sachs", count: 3, hotCount: 1 },
-  { firmName: "Morgan Stanley", count: 3, hotCount: 1 },
-  { firmName: "Evercore", count: 2, hotCount: 1 },
-  { firmName: "McKinsey", count: 2, hotCount: 1 },
-  { firmName: "Bain", count: 2, hotCount: 0 },
-  { firmName: "JPMorgan", count: 1, hotCount: 0 },
-  { firmName: "KKR", count: 1, hotCount: 1 },
-  { firmName: "Citi", count: 2, hotCount: 0 },
+  { organization: "Goldman Sachs", count: 3, hotCount: 1 },
+  { organization: "Morgan Stanley", count: 3, hotCount: 1 },
+  { organization: "Evercore", count: 2, hotCount: 1 },
+  { organization: "McKinsey", count: 2, hotCount: 1 },
+  { organization: "Bain", count: 2, hotCount: 0 },
+  { organization: "JPMorgan", count: 1, hotCount: 0 },
+  { organization: "KKR", count: 1, hotCount: 1 },
+  { organization: "Citi", count: 2, hotCount: 0 },
 ];
 
 // ─── Recent activity (7 entries) ────────────────────────────────────────────
@@ -516,7 +516,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "pipeline_move",
     contactId: "c-001",
     contactName: "Morgan Reyes",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     detail: "Moved to MEETING SET",
     timestamp: "2026-05-13T19:30:00Z",
   },
@@ -524,7 +524,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "rate",
     contactId: "c-006",
     contactName: "Samira Okafor",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     detail: "Rated HIGH VALUE",
     timestamp: "2026-05-13T14:10:00Z",
   },
@@ -532,7 +532,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "pipeline_move",
     contactId: "c-002",
     contactName: "Ava Shah",
-    firmName: "Evercore",
+    organization: "Evercore",
     detail: "Moved to RESPONDED",
     timestamp: "2026-05-13T11:45:00Z",
   },
@@ -540,7 +540,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "pipeline_add",
     contactId: "c-004",
     contactName: "Priya Kapoor",
-    firmName: "KKR",
+    organization: "KKR",
     detail: "Added to pipeline",
     timestamp: "2026-05-12T16:00:00Z",
   },
@@ -548,7 +548,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "rate",
     contactId: "c-005",
     contactName: "Jordan Wright",
-    firmName: "McKinsey",
+    organization: "McKinsey",
     detail: "Rated HIGH VALUE",
     timestamp: "2026-05-12T09:20:00Z",
   },
@@ -556,7 +556,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "pipeline_add",
     contactId: "c-003",
     contactName: "Theo Bennett",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     detail: "Added to pipeline",
     timestamp: "2026-05-11T13:00:00Z",
   },
@@ -564,7 +564,7 @@ export const SANDBOX_ACTIVITY: SandboxActivity[] = [
     type: "rate",
     contactId: "c-008",
     contactName: "Hannah Pritchard",
-    firmName: "Evercore",
+    organization: "Evercore",
     detail: "Rated HIGH VALUE",
     timestamp: "2026-05-10T15:30:00Z",
   },
@@ -609,7 +609,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Morgan Reyes",
     initials: "MR",
     title: "VP, Investment Banking",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     email: "morgan.reyes@example.com",
     education: "UNC Kenan-Flagler '15",
     location: "New York, NY",
@@ -621,7 +621,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Sarah Chen (UNC '24)",
         intermediaryRelation: "Chi Phi alum",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         title: "VP, Investment Banking",
       },
     ],
@@ -637,7 +637,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Ava Shah",
     initials: "AS",
     title: "Associate, M&A",
-    firmName: "Evercore",
+    organization: "Evercore",
     email: "ava.shah@example.com",
     education: "Duke '18",
     location: "New York, NY",
@@ -649,7 +649,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Hannah Pritchard (UNC '11)",
         intermediaryRelation: "Healthcare Club mentor",
-        firmName: "Evercore",
+        organization: "Evercore",
         title: "VP, Healthcare M&A",
       },
     ],
@@ -664,7 +664,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Theo Bennett",
     initials: "TB",
     title: "MD, LevFin",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     email: "theo.bennett@example.com",
     education: "UNC Kenan-Flagler '03",
     location: "Charlotte, NC",
@@ -676,7 +676,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Coach Mike Walsh",
         intermediaryRelation: "UNC Chi Phi house advisor",
-        firmName: "Morgan Stanley",
+        organization: "Morgan Stanley",
         title: "MD, LevFin",
       },
     ],
@@ -692,7 +692,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Priya Kapoor",
     initials: "PK",
     title: "Principal, Buyout Coverage",
-    firmName: "KKR",
+    organization: "KKR",
     email: "priya.kapoor@example.com",
     education: "Wharton '13",
     location: "New York, NY",
@@ -704,7 +704,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Jordan Wright (UNC '14)",
         intermediaryRelation: "Engagement Manager at McKinsey",
-        firmName: "KKR",
+        organization: "KKR",
         title: "Principal, Buyout Coverage",
       },
     ],
@@ -719,7 +719,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Jordan Wright",
     initials: "JW",
     title: "Engagement Manager",
-    firmName: "McKinsey",
+    organization: "McKinsey",
     email: "jordan.wright@example.com",
     education: "UNC Kenan-Flagler '14",
     location: "Atlanta, GA",
@@ -731,7 +731,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Prof. Linda Park",
         intermediaryRelation: "Strategy 401 professor",
-        firmName: "McKinsey",
+        organization: "McKinsey",
         title: "Engagement Manager",
       },
     ],
@@ -746,7 +746,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Samira Okafor",
     initials: "SO",
     title: "Analyst, TMT",
-    firmName: "Goldman Sachs",
+    organization: "Goldman Sachs",
     email: "samira.okafor@example.com",
     education: "UNC Kenan-Flagler '24",
     location: "New York, NY",
@@ -758,7 +758,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "KIBA Slack",
         intermediaryRelation: "Active UNC IB community",
-        firmName: "Goldman Sachs",
+        organization: "Goldman Sachs",
         title: "Analyst, TMT",
       },
     ],
@@ -773,7 +773,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Luca Romero",
     initials: "LR",
     title: "Associate, FIG",
-    firmName: "Morgan Stanley",
+    organization: "Morgan Stanley",
     email: "luca.romero@example.com",
     education: "Georgetown '19",
     location: "New York, NY",
@@ -785,7 +785,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Theo Bennett (UNC '03)",
         intermediaryRelation: "Same firm, mentor track",
-        firmName: "Morgan Stanley",
+        organization: "Morgan Stanley",
         title: "Associate, FIG",
       },
     ],
@@ -799,7 +799,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Hannah Pritchard",
     initials: "HP",
     title: "VP, Healthcare M&A",
-    firmName: "Evercore",
+    organization: "Evercore",
     email: "hannah.pritchard@example.com",
     education: "UNC Kenan-Flagler '11",
     location: "New York, NY",
@@ -811,7 +811,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Healthcare Club listserv",
         intermediaryRelation: "UNC undergrad club",
-        firmName: "Evercore",
+        organization: "Evercore",
         title: "VP, Healthcare M&A",
       },
     ],
@@ -826,7 +826,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Diego Alvarez",
     initials: "DA",
     title: "Associate, Sponsors",
-    firmName: "Bain Capital",
+    organization: "Bain Capital",
     email: "diego.alvarez@example.com",
     education: "MIT '17",
     location: "Boston, MA",
@@ -838,7 +838,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "Nadia Greene (UNC '22)",
         intermediaryRelation: "Bain consultant",
-        firmName: "Bain Capital",
+        organization: "Bain Capital",
         title: "Associate, Sponsors",
       },
     ],
@@ -852,7 +852,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
     name: "Nadia Greene",
     initials: "NG",
     title: "Consultant",
-    firmName: "Bain",
+    organization: "Bain",
     email: "nadia.greene@example.com",
     education: "UNC Kenan-Flagler '22",
     location: "Charlotte, NC",
@@ -864,7 +864,7 @@ export const SANDBOX_DISCOVER_QUEUE: SandboxDiscoverCard[] = [
       {
         intermediaryName: "UNC Career Services",
         intermediaryRelation: "Office hours referral",
-        firmName: "Bain",
+        organization: "Bain",
         title: "Consultant",
       },
     ],

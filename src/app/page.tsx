@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { SignInButton } from "./sign-in-button";
 import { Navbar } from "./_landing/navbar";
 import { HeroSection } from "./_landing/hero-section";
-import { ProductCards } from "./_landing/product-cards";
-import { SolutionsSection } from "./_landing/solutions-section";
-import { ValueProps } from "./_landing/value-props";
-import { Showcase } from "./_landing/showcase";
-import { Testimonials } from "./_landing/testimonials";
+import { SectionImportRank } from "./_landing/section-import-rank";
+import { SectionOutpace } from "./_landing/section-outpace";
 import { CTASection } from "./_landing/cta-section";
+import { FAQ } from "./_landing/faq";
+import { MeshBg } from "./_landing/mesh-bg";
+import { ScoringMacDemo } from "./_landing/scoring-mac-demo";
 
 export default async function Home({
   searchParams,
@@ -26,7 +26,7 @@ export default async function Home({
   const signinRequired = params.signin === "required";
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white">
+    <main className="relative min-h-screen overflow-hidden bg-black">
       <Navbar />
       {signinRequired && (
         <div className="fixed inset-x-0 top-16 z-30 border-b border-amber-300/40 bg-amber-50/95 px-6 py-2 text-center text-[13px] font-medium text-amber-900 backdrop-blur-sm">
@@ -36,65 +36,88 @@ export default async function Home({
       <HeroSection>
         <SignInButton />
       </HeroSection>
-      <ProductCards />
-      <SolutionsSection />
-      <ValueProps />
-      <Showcase />
-      <Testimonials />
+      <SectionImportRank />
+
+      <section className="relative bg-black px-4 py-24 sm:py-32">
+        <MeshBg />
+        <div className="relative mx-auto max-w-7xl">
+          <div className="text-center">
+            <h2 className="font-heading text-4xl font-medium leading-[1.25] tracking-[-0.027em] text-white sm:text-5xl">
+              Every path, scored so you know who to talk to first.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-base text-white/60">
+              Same school, same club, mutual connections, a firm on your list. You see every signal behind the number, no black box.
+            </p>
+          </div>
+          <div className="relative mt-14 sm:mt-16">
+            <ScoringMacDemo />
+          </div>
+        </div>
+      </section>
+
+      <SectionOutpace />
+
+      <FAQ />
       <CTASection />
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 px-6 py-16 bg-slate-50">
+      <footer className="border-t border-white/10 bg-black px-6 py-16">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="flex flex-col gap-3">
-            <span className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight text-slate-900">
+            <span className="inline-flex items-center gap-2 font-heading text-lg font-bold tracking-tight text-white">
               <LogoIcon className="h-7 w-7" />
               <span>
-                Kith<span className="text-[#0369A1]">Node</span>
+                Kith<span className="text-[#0EA5E9]">Node</span>
               </span>
             </span>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-white/55">
               AI-powered networking intelligence for ambitious students breaking
               into finance.
             </p>
           </div>
           {/* Product */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Product</h4>
+            <h4 className="text-sm font-semibold text-white">Product</h4>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/waitlist"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Signal Detection
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/waitlist"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               AI Scoring
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/waitlist"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Smart Outreach
             </a>
             <a
-              href="#products"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              href="/waitlist"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Discover
             </a>
           </div>
           {/* Company */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Company</h4>
+            <h4 className="text-sm font-semibold text-white">Company</h4>
+            <a
+              href="/manifesto"
+              className="text-sm text-white/55 transition-colors hover:text-white"
+            >
+              Why KithNode
+            </a>
             <a
               href="https://www.linkedin.com/in/samrigot"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               About
             </a>
@@ -102,30 +125,30 @@ export default async function Home({
               href="https://kithnode.canny.io"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Feedback
             </a>
           </div>
           {/* Legal */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-sm font-semibold text-slate-900">Legal</h4>
+            <h4 className="text-sm font-semibold text-white">Legal</h4>
             <a
               href="/privacy"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Privacy
             </a>
             <a
               href="/terms"
-              className="text-sm text-slate-600 transition-colors hover:text-slate-900"
+              className="text-sm text-white/55 transition-colors hover:text-white"
             >
               Terms
             </a>
           </div>
         </div>
-        <div className="mx-auto mt-12 max-w-6xl border-t border-slate-200 pt-8">
-          <p className="text-xs text-slate-500">
+        <div className="mx-auto mt-12 max-w-6xl border-t border-white/10 pt-8">
+          <p className="text-xs text-white/40">
             &copy; {new Date().getFullYear()} KithNode &middot; Warm-path
             recruiting intelligence for 2026.
           </p>

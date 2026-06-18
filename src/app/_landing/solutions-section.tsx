@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import {
   motion,
-  useInView,
   useScroll,
   useTransform,
 } from "framer-motion";
@@ -13,34 +12,6 @@ import { TrendingUp, Building2, Briefcase } from "lucide-react";
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
-
-const FIRMS: { name: string; count: number }[] = [
-  { name: "Goldman Sachs", count: 312 }, // TODO: replace with real DB count
-  { name: "Morgan Stanley", count: 287 }, // TODO: replace with real DB count
-  { name: "JPM", count: 295 }, // TODO: replace with real DB count
-  { name: "Evercore", count: 142 }, // TODO: replace with real DB count
-  { name: "Centerview", count: 89 }, // TODO: replace with real DB count
-  { name: "Lazard", count: 156 }, // TODO: replace with real DB count
-  { name: "PJT Partners", count: 67 }, // TODO: replace with real DB count
-  { name: "Moelis", count: 71 }, // TODO: replace with real DB count
-  { name: "KKR", count: 134 }, // TODO: replace with real DB count
-  { name: "Blackstone", count: 198 }, // TODO: replace with real DB count
-  { name: "Apollo", count: 167 }, // TODO: replace with real DB count
-  { name: "Carlyle", count: 121 }, // TODO: replace with real DB count
-  { name: "Warburg Pincus", count: 87 }, // TODO: replace with real DB count
-  { name: "McKinsey", count: 412 }, // TODO: replace with real DB count
-  { name: "Bain & Company", count: 287 }, // TODO: replace with real DB count
-  { name: "BCG", count: 245 }, // TODO: replace with real DB count
-  { name: "Deloitte", count: 567 }, // TODO: replace with real DB count
-  { name: "EY", count: 489 }, // TODO: replace with real DB count
-  { name: "PwC", count: 421 }, // TODO: replace with real DB count
-  { name: "KPMG", count: 356 }, // TODO: replace with real DB count
-  { name: "Citadel", count: 78 }, // TODO: replace with real DB count
-  { name: "Point72", count: 65 }, // TODO: replace with real DB count
-  { name: "Two Sigma", count: 54 }, // TODO: replace with real DB count
-  { name: "Bridgewater", count: 47 }, // TODO: replace with real DB count
-  { name: "D.E. Shaw", count: 39 }, // TODO: replace with real DB count
-];
 
 // Deterministic mini network graph specs -- one per card
 type NodeSpec = { cx: number; cy: number; pulse?: true };
@@ -112,7 +83,6 @@ const SOLUTIONS = [
     title: "Investment Banking",
     subtitle: "Break into bulge bracket and elite boutiques",
     Icon: TrendingUp,
-    alumniCount: 2400, // TODO: replace with real DB count
     points: [
       "Map alumni at Goldman, Evercore, Centerview, and 50+ firms",
       "Score connections by shared school, Greek org, and hometown",
@@ -124,7 +94,6 @@ const SOLUTIONS = [
     title: "Private Equity & Hedge Funds",
     subtitle: "Build relationships at mega funds and top HFs",
     Icon: Building2,
-    alumniCount: 1800, // TODO: replace with real DB count
     points: [
       "Discover warm paths to KKR, Blackstone, Apollo, and more",
       "Track who changed roles or got promoted recently",
@@ -136,7 +105,6 @@ const SOLUTIONS = [
     title: "Consulting",
     subtitle: "Connect with MBB and Big 4 alumni",
     Icon: Briefcase,
-    alumniCount: 3200, // TODO: replace with real DB count
     points: [
       "Find McKinsey, Bain, BCG alumni in your network",
       "AI scoring highlights your strongest connections",
@@ -219,40 +187,7 @@ function NetworkThumbnail({ graph }: { graph: GraphSpec }) {
 }
 
 // ---------------------------------------------------------------------------
-// CountUp -- framer-motion useInView + rAF animation
-// ---------------------------------------------------------------------------
-
-function CountUp({ end }: { end: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once: true, amount: 0.5 });
-  const started = useRef(false);
-
-  useEffect(() => {
-    if (!isInView || started.current || !ref.current) return;
-    started.current = true;
-
-    const duration = 1500;
-    const startTime = performance.now();
-    const el = ref.current;
-
-    function tick(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const value = Math.round(eased * end);
-      el.textContent = value.toLocaleString();
-      if (progress < 1) requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
-  }, [isInView, end]);
-
-  return <span ref={ref}>0</span>;
-}
-
-// ---------------------------------------------------------------------------
-// SolutionCard -- 3D tilt + gradient border + CountUp + NetworkThumbnail
+// SolutionCard -- 3D tilt + gradient border + NetworkThumbnail
 // ---------------------------------------------------------------------------
 
 type SolutionCardProps = {
@@ -329,16 +264,6 @@ function SolutionCard({ sol, index }: SolutionCardProps) {
           </h3>
           <p className="mt-1 text-sm text-white/70">{sol.subtitle}</p>
 
-          {/* Live alumni counter */}
-          <div className="mt-4">
-            <div className="font-mono text-3xl font-bold tabular-nums text-[#0EA5E9]">
-              <CountUp end={sol.alumniCount} />+
-            </div>
-            <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/40">
-              alumni mapped
-            </div>
-          </div>
-
           {/* Bullets */}
           <ul className="mt-4 flex-1 space-y-2">
             {sol.points.map((point) => (
@@ -379,44 +304,6 @@ function SolutionCard({ sol, index }: SolutionCardProps) {
 }
 
 // ---------------------------------------------------------------------------
-// FirmTicker -- status-dot marquee
-// ---------------------------------------------------------------------------
-
-function FirmTicker() {
-  return (
-    <div className="mt-16 overflow-hidden border-t border-white/[0.06] pt-6">
-      <p className="mb-4 text-center text-[10px] font-medium uppercase tracking-widest text-white/40">
-        Target Firms
-      </p>
-      <div className="relative flex overflow-hidden">
-        <div className="animate-ticker flex shrink-0 items-center gap-8">
-          {FIRMS.map((firm) => (
-            <span
-              key={firm.name}
-              className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-white/60"
-            >
-              <span className="ticker-dot inline-block h-1.5 w-1.5 rounded-full bg-[#0EA5E9]" />
-              {firm.name} · {firm.count.toLocaleString()} alumni
-            </span>
-          ))}
-        </div>
-        <div className="animate-ticker flex shrink-0 items-center gap-8" aria-hidden>
-          {FIRMS.map((firm) => (
-            <span
-              key={firm.name}
-              className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-white/60"
-            >
-              <span className="ticker-dot inline-block h-1.5 w-1.5 rounded-full bg-[#0EA5E9]" />
-              {firm.name} · {firm.count.toLocaleString()} alumni
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // SolutionsSection
 // ---------------------------------------------------------------------------
 
@@ -439,22 +326,6 @@ export function SolutionsSection() {
       {/* Keyframes injected via plain <style> (no jsx prop -- App Router) */}
       {/* ------------------------------------------------------------------ */}
       <style>{`
-        @keyframes ticker {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-ticker {
-          animation: ticker 50s linear infinite;
-        }
-
-        @keyframes dot-pulse {
-          0%, 100% { opacity: 0.4; transform: scale(1); }
-          50%       { opacity: 1;   transform: scale(1.4); }
-        }
-        .ticker-dot {
-          animation: dot-pulse 2.4s ease-in-out infinite;
-        }
-
         @keyframes thumb-pulse-r {
           0%, 100% { r: 3; }
           50%       { r: 5; }
@@ -576,9 +447,6 @@ export function SolutionsSection() {
             <SolutionCard key={sol.title} sol={sol} index={i} />
           ))}
         </div>
-
-        {/* Ticker */}
-        <FirmTicker />
       </div>
     </section>
   );
