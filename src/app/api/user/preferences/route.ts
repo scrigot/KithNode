@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { notifyFounder } from "@/lib/notify";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { normalizeDegrees } from "@/lib/normalize-degrees";
 import {
@@ -247,6 +248,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Detect first-time onboarding completion: only when this request is setting a
+  // real tutorialDoneAt and it was previously empty. Read prior state before the
+  // update so re-saves / settings edits never re-alert.
+  let justFinishedOnboarding = false;
+  if (tutorialDoneAt) {
+    const { data: prior } = await supabase
+      .from("User")
+      .select("tutorialDoneAt")
+      .eq("email", email)
+      .maybeSingle();
+    justFinishedOnboarding = !prior?.tutorialDoneAt;
+  }
+
   const { error } = await supabase
     .from("User")
     .update(patch)
@@ -254,6 +268,15 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: "Failed to save preferences" }, { status: 500 });
+  }
+
+  if (justFinishedOnboarding) {
+    // Best-effort founder ping — the profile is already saved.
+    await notifyFounder({
+      event: "onboarding_done",
+      title: "🎓 Onboarding complete",
+      lines: [email],
+    }).catch(() => {});
   }
 
   return NextResponse.json({ ok: true });
