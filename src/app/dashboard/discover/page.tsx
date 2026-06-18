@@ -27,7 +27,7 @@ interface RateResult {
 
 async function rateContact(
   contactId: string,
-  rating: "high_value" | "skip" | "later",
+  rating: "high_value" | "skip",
 ): Promise<RateResult> {
   try {
     const res = await apiFetch("/api/discover/rate", {
@@ -78,7 +78,7 @@ export default function DiscoverPage() {
   const [hasAnyContacts, setHasAnyContacts] = useState(true);
   const [reviewed, setReviewed] = useState(0);
 
-  // Card exit transition: "" | "left" (skip) | "right" (high value) | "down" (later).
+  // Card exit transition: "" | "left" (skip) | "right" (add to pipeline).
   const [exitDir, setExitDir] = useState<"" | "left" | "right" | "down">("");
 
   // Discover pipeline modal state: streamed NDJSON progress.
@@ -108,10 +108,11 @@ export default function DiscoverPage() {
   } | null>(null);
   const [userName, setUserName] = useState("");
 
-  // High-value confirm reveal: the unlocked contact shown after a positive
-  // rating, awaiting "keep browsing" or "send to pipeline".
-  const [confirmCard, setConfirmCard] = useState<DeckContact | null>(null);
-  const [pipelineSendState, setPipelineSendState] = useState<"idle" | "pending" | "sent">("idle");
+  // Add-to-pipeline state, keyed by the contact currently being added so the
+  // card can show pending/sent feedback without a separate reveal phase.
+  const [pipelineState, setPipelineState] = useState<{ id: string; state: "pending" | "sent" } | null>(null);
+  // The user's default pipeline target for Discover adds (first owned pipeline).
+  const [targetPipelineId, setTargetPipelineId] = useState<string>("");
   const ratingLockRef = useRef(false);
 
   const fetchDeck = useCallback(
@@ -135,8 +136,7 @@ export default function DiscoverPage() {
         setDeck(next);
         setIndex(0);
         setReviewed(0);
-        setConfirmCard(null);
-        setPipelineSendState("idle");
+        setPipelineState(null);
 
         // "No network" only when the user truly has no imports — an exhausted
         // pool (rated everyone) or an empty search must NOT read as no-network.
@@ -174,7 +174,7 @@ export default function DiscoverPage() {
   }, [query, activeTier, sourceFilter, trackFilter, fetchDeck]);
 
   const current = deck[index] ?? null;
-  const exhausted = !loading && deck.length > 0 && index >= deck.length && !confirmCard;
+  const exhausted = !loading && deck.length > 0 && index >= deck.length;
 
   // Fire the first-warm-path analytics event once, the first time a card with a
   // warm path becomes the active card.
@@ -204,7 +204,8 @@ export default function DiscoverPage() {
     if (ratingLockRef.current || !current) return;
     ratingLockRef.current = true;
     trackEvent("discover_rate", { contact_id: current.id, rating: "skip" });
-    // Skip: fire-and-forget, advance immediately with a left slide.
+    // Skip: fire-and-forget, advance immediately with a left slide. Logged as a
+    // rating but never gates visibility.
     rateContact(current.id, "skip");
     advance("left");
     setTimeout(() => {
@@ -212,70 +213,62 @@ export default function DiscoverPage() {
     }, 220);
   }, [current, advance]);
 
-  const handleLater = useCallback(() => {
+  /** Add the current contact to the user's pipeline, then advance the deck. */
+  const handleAddToPipeline = useCallback(async () => {
     if (ratingLockRef.current || !current) return;
-    ratingLockRef.current = true;
-    trackEvent("discover_rate", { contact_id: current.id, rating: "later" });
-    // Later: fire-and-forget, advance immediately with a down slide.
-    rateContact(current.id, "later");
-    advance("down");
-    setTimeout(() => {
-      ratingLockRef.current = false;
-    }, 220);
-  }, [current, advance]);
-
-  const handleHighValue = useCallback(async () => {
-    if (ratingLockRef.current || !current) return;
-    ratingLockRef.current = true;
     const target = current;
-    trackEvent("discover_rate", { contact_id: target.id, rating: "high_value" });
-    // High value: await the rate call so we get the unlocked contact back, then
-    // reveal it as the confirm card (slid in from the right).
-    const result = await rateContact(target.id, "high_value");
-    const unlocked: DeckContact = result.contact
-      ? { ...target, ...result.contact, isRedacted: false }
-      : { ...target, isRedacted: false };
-    setExitDir("right");
-    setTimeout(() => {
-      setIndex((i) => i + 1);
-      setReviewed((r) => r + 1);
-      setConfirmCard(unlocked);
-      setPipelineSendState("idle");
-      setExitDir("");
-      ratingLockRef.current = false;
-    }, 200);
-  }, [current]);
-
-  /** Dismiss the confirm reveal and continue the deck. */
-  const handleKeepBrowsing = useCallback(() => {
-    setConfirmCard(null);
-    setPipelineSendState("idle");
-  }, []);
-
-  /** Send the confirmed card to the pipeline, then continue. */
-  const handleSendToPipeline = useCallback(async () => {
-    if (!confirmCard) return;
-    const contactId = confirmCard.id;
-    setPipelineSendState("pending");
+    ratingLockRef.current = true;
+    setPipelineState({ id: target.id, state: "pending" });
+    trackEvent("discover_add_pipeline", { contact_id: target.id, source: "deck" });
     try {
-      const res = await apiFetch(`/api/pipeline/${contactId}`, { method: "POST" });
-      if (res.ok) {
-        trackEvent("discover_add_pipeline", { contact_id: contactId, source: "confirm_state" });
-        setPipelineSendState("sent");
+      // Record high_value so the contact stays unredacted in the pipeline view
+      // (pipeline GET keys "unlocked" off high_value ratings). Non-gating.
+      rateContact(target.id, "high_value");
+      // Resolve the target pipeline (first owned). If the cached id is missing
+      // (fetch not yet resolved), fetch fresh so the add never silently 400s on
+      // an empty pipelineId.
+      let pipelineId = targetPipelineId;
+      if (!pipelineId) {
+        const pRes = await apiFetch("/api/pipeline");
+        const pData = await pRes.json().catch(() => ({}));
+        pipelineId = pData?.pipelines?.[0]?.id ?? "";
+        if (pipelineId) setTargetPipelineId(pipelineId);
+      }
+      const res = pipelineId
+        ? await apiFetch(`/api/pipeline/${target.id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pipelineId }),
+          })
+        : null;
+      if (res === null) {
+        // No pipeline to add into — advance without trapping the user.
+        setPipelineState(null);
+        advance("right");
         setTimeout(() => {
-          setConfirmCard(null);
-          setPipelineSendState("idle");
-        }, 900);
+          ratingLockRef.current = false;
+        }, 220);
+        return;
+      }
+      if (res.ok) {
+        setPipelineState({ id: target.id, state: "sent" });
+        setTimeout(() => {
+          setPipelineState(null);
+          advance("right");
+          setTimeout(() => {
+            ratingLockRef.current = false;
+          }, 220);
+        }, 600);
       } else {
-        setConfirmCard(null);
-        setPipelineSendState("idle");
+        setPipelineState(null);
+        ratingLockRef.current = false;
       }
     } catch (err) {
       Sentry.captureException(err);
-      setConfirmCard(null);
-      setPipelineSendState("idle");
+      setPipelineState(null);
+      ratingLockRef.current = false;
     }
-  }, [confirmCard]);
+  }, [current, advance, targetPipelineId]);
 
   const handleAskIntro = useCallback(
     (contact: DeckContact, warmPath: WarmPath) => {
@@ -284,12 +277,12 @@ export default function DiscoverPage() {
     [],
   );
 
-  // Keyboard: ArrowLeft = skip, ArrowRight = high value, ArrowDown = later.
-  // Ignored while a request is in flight, a confirm card is showing, or any modal is open.
+  // Keyboard: ArrowLeft = skip, ArrowRight = add to pipeline.
+  // Ignored while a request is in flight or any modal is open.
   useEffect(() => {
     const anyModalOpen =
       introTarget !== null || discoverLoading || seedLoading;
-    if (anyModalOpen || confirmCard || !current) return;
+    if (anyModalOpen || !current) return;
     const handleKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA"].includes(target.tagName)) return;
@@ -299,15 +292,12 @@ export default function DiscoverPage() {
         handleSkip();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        handleHighValue();
-      } else if (e.key === "ArrowDown") {
-        e.preventDefault();
-        handleLater();
+        handleAddToPipeline();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [current, confirmCard, introTarget, discoverLoading, seedLoading, handleSkip, handleHighValue, handleLater]);
+  }, [current, introTarget, discoverLoading, seedLoading, handleSkip, handleAddToPipeline]);
 
   // Fetch user name for intro modal
   useEffect(() => {
@@ -318,6 +308,18 @@ export default function DiscoverPage() {
         else if (data?.user?.email) setUserName(data.user.email.split("@")[0]);
       })
       .catch(() => {});
+  }, []);
+
+  // Resolve the default pipeline target for Discover adds: the user's first
+  // owned pipeline. Adds POST /api/pipeline/:contactId with this id.
+  useEffect(() => {
+    apiFetch("/api/pipeline")
+      .then((r) => r.json())
+      .then((data) => {
+        const first = data?.pipelines?.[0]?.id;
+        if (first) setTargetPipelineId(first);
+      })
+      .catch((err) => Sentry.captureException(err));
   }, []);
 
   const runDiscover = useCallback(async () => {
@@ -821,7 +823,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* ─── Progress indicator + keyboard hints ─── */}
-      {!loading && !exhausted && (current || confirmCard) && (
+      {!loading && !exhausted && current && (
         <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
           <span className="font-mono tabular-nums">
             {position} / {total}
@@ -833,13 +835,8 @@ export default function DiscoverPage() {
             </span>
             <span className="text-muted-foreground/40">·</span>
             <span className="flex items-center gap-1">
-              <Kbd>↓</Kbd>
-              <span className="text-muted-foreground">later</span>
-            </span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="flex items-center gap-1">
               <Kbd>→</Kbd>
-              <span className="text-muted-foreground">high value</span>
+              <span className="text-muted-foreground">add to pipeline</span>
             </span>
           </div>
         </div>
@@ -934,8 +931,8 @@ export default function DiscoverPage() {
           </div>
         )}
 
-        {/* Active card: confirm reveal takes priority over the rate card. */}
-        {!loading && (confirmCard || (current && !exhausted)) && (
+        {/* Active card: always fully revealed; primary action adds to pipeline. */}
+        {!loading && current && !exhausted && (
           <div className="w-full max-w-2xl">
             <div
               className={`transition-all duration-200 ease-out ${
@@ -948,28 +945,15 @@ export default function DiscoverPage() {
                       : "translate-x-0 opacity-100"
               }`}
             >
-              {confirmCard ? (
-                <DeckCard
-                  key={`confirm-${confirmCard.id}`}
-                  contact={confirmCard}
-                  phase="confirm"
-                  pipelineState={pipelineSendState}
-                  onAskIntro={(wp) => handleAskIntro(confirmCard, wp)}
-                  onKeepBrowsing={handleKeepBrowsing}
-                  onSendToPipeline={handleSendToPipeline}
-                />
-              ) : current ? (
-                <DeckCard
-                  key={current.id}
-                  contact={current}
-                  phase="rate"
-                  inFlight={false}
-                  onSkip={handleSkip}
-                  onLater={handleLater}
-                  onHighValue={handleHighValue}
-                  onAskIntro={(wp) => handleAskIntro(current, wp)}
-                />
-              ) : null}
+              <DeckCard
+                key={current.id}
+                contact={current}
+                pipelineState={pipelineState?.id === current.id ? pipelineState.state : "idle"}
+                inFlight={false}
+                onSkip={handleSkip}
+                onAddToPipeline={handleAddToPipeline}
+                onAskIntro={(wp) => handleAskIntro(current, wp)}
+              />
             </div>
           </div>
         )}

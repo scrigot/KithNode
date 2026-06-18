@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, X, Star, ExternalLink, Send } from "lucide-react";
+import { X, ExternalLink, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const TIER_STYLES: Record<string, string> = {
@@ -65,7 +65,7 @@ function Field({
   value?: string | number | null;
   mono?: boolean;
 }) {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || value === "" || value === 0 || value === "0") return null;
   return (
     <div className="min-w-0">
       <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
@@ -87,38 +87,25 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 /**
- * Detail-rich Tinder-style card. Surfaces every field the API provides per
- * contact, collapsing empty rows. Redacted (locked) contacts keep the blurred
- * name treatment from the shared pool and swap the LinkedIn link for an
- * import-to-unlock affordance.
- *
- * `phase`:
- *   - "rate":    bottom buttons are SKIP / HIGH VALUE (the primary deck loop).
- *   - "confirm": post high-value reveal — the contact is unlocked and shown
- *                with KEEP BROWSING / SEND TO PIPELINE.
+ * Detail-rich deck card. Surfaces every field the API provides per contact,
+ * collapsing empty rows. Every card is fully revealed: the primary action is
+ * "Add to pipeline" and the secondary "Skip" advances the deck. `pipelineState`
+ * drives the add button's pending/sent feedback.
  */
 export function DeckCard({
   contact,
-  phase,
   pipelineState = "idle",
   inFlight = false,
   onSkip,
-  onLater,
-  onHighValue,
+  onAddToPipeline,
   onAskIntro,
-  onKeepBrowsing,
-  onSendToPipeline,
 }: {
   contact: DeckContact;
-  phase: "rate" | "confirm";
   pipelineState?: "idle" | "pending" | "sent";
   inFlight?: boolean;
   onSkip?: () => void;
-  onLater?: () => void;
-  onHighValue?: () => void;
+  onAddToPipeline?: () => void;
   onAskIntro?: (warmPath: WarmPath) => void;
-  onKeepBrowsing?: () => void;
-  onSendToPipeline?: () => void;
 }) {
   const isProfessor = contact.source === "professor";
   const tierKey = (contact.tier || "cold").toLowerCase();
@@ -130,13 +117,7 @@ export function DeckCard({
   const sep = contact.title && contact.firmName ? (isProfessor ? " · " : " @ ") : "";
 
   return (
-    <div
-      className={`flex flex-col border bg-card ${
-        phase === "confirm"
-          ? "border-primary/40 shadow-sm shadow-primary/10"
-          : "border-white/[0.06]"
-      }`}
-    >
+    <div className="flex flex-col border border-white/[0.06] bg-card">
       {/* ─── Header: tier + score (the prominent warmth number) ─── */}
       <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
         <div className="flex items-center gap-2">
@@ -164,33 +145,14 @@ export function DeckCard({
 
       {/* ─── Identity ─── */}
       <div className="border-b border-white/[0.06] px-5 py-4">
-        {phase === "confirm" && (
-          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-primary/70">
-            Added to your network
-          </p>
-        )}
-        <h3
-          className={`flex items-center gap-1.5 text-lg font-bold ${
-            contact.isRedacted ? "text-muted-foreground/80" : "text-foreground"
-          }`}
-        >
-          {contact.isRedacted && <Lock className="h-4 w-4 shrink-0 opacity-70" />}
-          {contact.isRedacted ? (
-            <span className="truncate">{contact.name}</span>
-          ) : (
-            <a
-              href={`/contact/${contact.id}`}
-              className="truncate hover:underline hover:decoration-white/40"
-            >
-              {contact.name}
-            </a>
-          )}
+        <h3 className="flex items-center gap-1.5 text-lg font-bold text-foreground">
+          <a
+            href={`/contact/${contact.id}`}
+            className="truncate hover:underline hover:decoration-white/40"
+          >
+            {contact.name}
+          </a>
         </h3>
-        {contact.isRedacted && (
-          <span className="mt-1 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
-            Blurred · High value to unlock
-          </span>
-        )}
         {contact.deferred && (
           <span className="mt-1 inline-block border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400">
             Later
@@ -240,11 +202,9 @@ export function DeckCard({
         <Field
           label="LinkedIn"
           value={
-            contact.isRedacted
-              ? undefined
-              : contact.linkedInUrl
-                ? contact.linkedInUrl.replace(/^https?:\/\/(www\.)?/, "")
-                : undefined
+            contact.linkedInUrl
+              ? contact.linkedInUrl.replace(/^https?:\/\/(www\.)?/, "")
+              : undefined
           }
           mono
         />
@@ -296,86 +256,24 @@ export function DeckCard({
         </div>
       )}
 
-      {/* ─── Bottom actions ─── */}
-      {phase === "rate" ? (
-        <div className="grid grid-cols-3 gap-2 border-t border-white/[0.06] p-3">
+      {/* ─── Bottom actions ─── Primary: Add to pipeline. Secondary: Skip. ─── */}
+      <div className="flex flex-col gap-2 border-t border-white/[0.06] p-3">
+        <div className="grid grid-cols-[auto_1fr] gap-2">
           <button
             type="button"
             onClick={onSkip}
-            disabled={inFlight}
-            className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+            disabled={inFlight || pipelineState === "pending"}
+            className="flex items-center justify-center gap-1.5 border border-white/[0.12] px-4 py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
             aria-label={`Skip ${contact.name}`}
           >
             <X className="h-4 w-4" />
             Skip
           </button>
-          <button
-            type="button"
-            onClick={onLater}
-            disabled={inFlight}
-            className="flex items-center justify-center gap-1.5 border border-amber-500/30 bg-amber-500/10 py-3 text-[12px] font-bold uppercase tracking-wider text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
-            aria-label={`Save ${contact.name} for later`}
-          >
-            Later
-          </button>
-          <button
-            type="button"
-            onClick={onHighValue}
-            disabled={inFlight}
-            className="flex items-center justify-center gap-1.5 bg-primary py-3 text-[12px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-primary/80 disabled:opacity-50"
-            aria-label={`Rate ${contact.name} high value`}
-          >
-            <Star className="h-4 w-4" />
-            High value
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2 border-t border-white/[0.06] p-3">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={onKeepBrowsing}
-              disabled={pipelineState === "pending"}
-              className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-3 text-[12px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] disabled:opacity-50"
-            >
-              Keep browsing
-            </button>
-            {!contact.isRedacted && contact.linkedInUrl ? (
-              <div className="grid grid-cols-[1fr_auto] gap-2">
-                <button
-                  type="button"
-                  onClick={onSendToPipeline}
-                  disabled={pipelineState !== "idle"}
-                  className={`flex items-center justify-center gap-1.5 py-3 text-[12px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
-                    pipelineState === "sent"
-                      ? "border border-green-500/30 bg-green-500/10 text-green-400"
-                      : pipelineState === "pending"
-                        ? "bg-primary/60 text-white"
-                        : "bg-primary text-white hover:bg-primary/80"
-                  }`}
-                >
-                  <Send className="h-4 w-4" />
-                  {pipelineState === "sent"
-                    ? "In pipeline"
-                    : pipelineState === "pending"
-                      ? "..."
-                      : "Pipeline"}
-                </button>
-                <a
-                  href={contact.linkedInUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center border border-white/[0.12] px-3 text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label="View LinkedIn profile"
-                  title="View LinkedIn profile"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </div>
-            ) : (
+          {contact.linkedInUrl ? (
+            <div className="grid grid-cols-[1fr_auto] gap-2">
               <button
                 type="button"
-                onClick={onSendToPipeline}
+                onClick={onAddToPipeline}
                 disabled={pipelineState !== "idle"}
                 className={`flex items-center justify-center gap-1.5 py-3 text-[12px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
                   pipelineState === "sent"
@@ -384,28 +282,60 @@ export function DeckCard({
                       ? "bg-primary/60 text-white"
                       : "bg-primary text-white hover:bg-primary/80"
                 }`}
+                aria-label={`Add ${contact.name} to pipeline`}
               >
                 <Send className="h-4 w-4" />
                 {pipelineState === "sent"
                   ? "In pipeline"
                   : pipelineState === "pending"
                     ? "..."
-                    : "Send to pipeline"}
+                    : "Add to pipeline"}
               </button>
-            )}
-          </div>
-          {/* Edit profile: opens /contact/:id?edit=1 in a new tab so deck position is preserved. */}
-          <a
-            href={`/contact/${contact.id}?edit=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Edit profile
-          </a>
+              <a
+                href={contact.linkedInUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center border border-white/[0.12] px-3 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="View LinkedIn profile"
+                title="View LinkedIn profile"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onAddToPipeline}
+              disabled={pipelineState !== "idle"}
+              className={`flex items-center justify-center gap-1.5 py-3 text-[12px] font-bold uppercase tracking-wider transition-colors disabled:cursor-default ${
+                pipelineState === "sent"
+                  ? "border border-green-500/30 bg-green-500/10 text-green-400"
+                  : pipelineState === "pending"
+                    ? "bg-primary/60 text-white"
+                    : "bg-primary text-white hover:bg-primary/80"
+              }`}
+              aria-label={`Add ${contact.name} to pipeline`}
+            >
+              <Send className="h-4 w-4" />
+              {pipelineState === "sent"
+                ? "In pipeline"
+                : pipelineState === "pending"
+                  ? "..."
+                  : "Add to pipeline"}
+            </button>
+          )}
         </div>
-      )}
+        {/* Edit profile: opens /contact/:id?edit=1 in a new tab so deck position is preserved. */}
+        <a
+          href={`/contact/${contact.id}?edit=1`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Edit profile
+        </a>
+      </div>
     </div>
   );
 }
