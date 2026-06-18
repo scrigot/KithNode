@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit config for KithNode. Encodes the hard rules from CLAUDE.md / AGENTS.md
+# so the bot enforces them on every PR. See https://docs.coderabbit.ai
+
+language: en-US
+early_access: false
+
+reviews:
+  profile: assertive            # terse, high-signal — matches Sam's no-slop preference
+  request_changes_workflow: true # block merge until flagged issues are resolved
+  high_level_summary: true
+  poem: false                   # no fluff
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false               # only review PRs once marked ready
+    base_branches:
+      - main
+
+  # Skip generated / vendored / non-source noise
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/dist/**"
+    - "!**/*.lock"
+    - "!package-lock.json"
+    - "!**/*.min.js"
+    - "!prisma/migrations/**"   # generated SQL — review schema.prisma instead
+
+  path_instructions:
+    # --- RLS: the #1 landmine. RLS lives in Supabase, NOT Prisma ---
+    - path: "prisma/schema.prisma"
+      instructions: >
+        Any NEW model/table MUST have RLS enabled in Supabase with at least one
+        user-scoped policy. The Prisma migration alone is insufficient and RLS is
+        NOT visible in this file. If a PR adds a table here, hard-flag it and require
+        the author to confirm an RLS policy was added in the Supabase dashboard/migration.
+        Never approve a new table without that confirmation. Also flag any bare
+        `new PrismaClient()` without a driver adapter (better-sqlite3 dev / pg prod).
+
+    # --- Stripe: signature verification is the only fake-payment guard ---
+    - path: "src/app/api/stripe/**"
+      instructions: >
+        Webhook handlers MUST verify the Stripe signature via constructEvent with
+        STRIPE_WEBHOOK_SECRET. Flag any handler that trusts the body without
+        signature verification. Flag any STRIPE_SECRET_KEY usage that could reach
+        the client bundle.
+
+    # --- AI calls: AI SDK v6 + Gateway, not raw Anthropic SDK ---
+    - path: "src/lib/**"
+      instructions: >
+        New LLM calls must use Vercel AI SDK v6 + AI Gateway, NOT raw
+        @anthropic-ai/sdk. Flag direct @anthropic-ai/sdk usage as a migration
+        candidate. Pure business-logic functions (scoring.ts, outreach.ts) should
+        stay pure and deterministic where possible.
+
+    # --- AutoGuard: the outreach kill-switch ---
+    - path: "src/lib/autoguard.ts"
+      instructions: >
+        This is the kill-switch that pauses outreach automation when a contact
+        replies. Flag ANY change that could let follow-ups send after a reply, or
+        that bypasses isAutomationAllowed()/the Connection.automationPaused field.
+
+    - path: "src/app/api/outreach/**"
+      instructions: >
+        Outreach must respect AutoGuard (isAutomationAllowed) before sending.
+        Flag any send path that skips the AutoGuard check. Flag new outreach
+        channels or tracking events — these touch trust/compliance and need
+        explicit owner sign-off.
+
+    # --- Next.js 16 / framework version gotchas ---
+    - path: "src/**"
+      instructions: >
+        Next.js 16: use proxy.ts not middleware.ts; `next lint` is removed (use
+        eslint). NextAuth v5, Prisma v7, Tailwind v4 all have breaking changes from
+        older docs — flag patterns that look like Next 13/14, NextAuth v4, or
+        Prisma v5/v6. Server Components by default; client components only for
+        interactivity.
+
+    # --- Backend is a SEPARATE service, never bundled ---
+    - path: "backend/**"
+      instructions: >
+        FastAPI on Railway — separate deploy, separate env vars, Python. Must NOT
+        be bundled into the Next.js/Vercel build. Never hardcode API keys; they
+        live in the Railway dashboard.
+
+    # --- Secrets / env hygiene everywhere ---
+    - path: "**/*.{ts,tsx,js,py}"
+      instructions: >
+        Flag any hardcoded secret, API key, or service-role key. Only NEXT_PUBLIC_*
+        vars may cross the client bundle; the Supabase service role key must never
+        reach the client.
+
+  tools:
+    eslint:
+      enabled: true
+
+chat:
+  auto_reply: true
