@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { sendWaitlistConfirmation } from "@/lib/resend";
+import { notifyFounder } from "@/lib/notify";
 import { headers } from "next/headers";
 
 export type WaitlistInput = {
@@ -52,6 +53,17 @@ export async function submitWaitlist(input: WaitlistInput): Promise<WaitlistResu
     }
     return { ok: false, error: "Something broke on our end. Try again in a minute." };
   }
+
+  // Best-effort founder ping: the signup row is already saved, so a Slack
+  // failure must never fail the request.
+  await notifyFounder({
+    event: "access_request",
+    title: "🟢 New access request",
+    lines: [
+      `${payload.full_name} · ${payload.email}`,
+      `${payload.university} · ${payload.target_track} · class of ${payload.grad_year}`,
+    ],
+  }).catch(() => {});
 
   const h = await headers();
   const host = h.get("host") || "kithnode.vercel.app";

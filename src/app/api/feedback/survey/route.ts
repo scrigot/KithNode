@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { grantCredits } from "@/lib/credits";
 import { FEEDBACK_CREDITS } from "@/lib/credit-costs";
+import { notifyFounder } from "@/lib/notify";
 
 // Structured beta-feedback survey (distinct from /api/feedback, which is the
 // help-widget "message the founder" route). Persists to feedback_response and
@@ -110,6 +111,18 @@ export async function POST(req: Request) {
     console.error("[feedback-survey] insert failed:", error.message);
     return NextResponse.json({ error: "Failed to save feedback" }, { status: 500 });
   }
+
+  // First-submit only (the existing-edit branch returns earlier): ping the
+  // founder. Best-effort — the response is already saved.
+  await notifyFounder({
+    event: "feedback_survey",
+    title: "📝 Beta feedback submitted",
+    lines: [
+      email,
+      `PMF: ${pmf} · furthest step: ${furthestStep ?? "—"}`,
+      `Friction: ${friction.slice(0, 280)}`,
+    ],
+  }).catch(() => {});
 
   const balance = await grantCredits(email, FEEDBACK_CREDITS);
   return NextResponse.json({

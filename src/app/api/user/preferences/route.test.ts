@@ -8,6 +8,8 @@ vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: () => ({
+      // Prior-state read for first-time onboarding detection: no prior row.
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }),
       update: (p: Record<string, unknown>) => {
         capturedPatch = p;
         return { eq: () => Promise.resolve({ error: null }) };
@@ -16,6 +18,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
+vi.mock("@/lib/notify", () => ({ notifyFounder: vi.fn(() => Promise.resolve()) }));
 
 import { POST } from "./route";
 

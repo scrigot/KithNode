@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { isFounder } from "@/lib/founder";
 import { sendFounderFeedbackAlert } from "@/lib/resend";
+import { notifyFounder } from "@/lib/notify";
 
 const MAX_MESSAGE_LEN = 2000;
 
@@ -42,11 +43,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });
   }
 
-  // Best-effort email alert: the message is already stored, so a Resend
+  // Best-effort alerts: the message is already stored, so a Resend or Slack
   // failure must never fail the request.
   await sendFounderFeedbackAlert({ fromEmail: email, page, message }).catch(
     () => {},
   );
+  await notifyFounder({
+    event: "help_feedback",
+    title: "💬 Help-widget message",
+    lines: [`${email} · ${page || "unknown"}`, message.slice(0, 280)],
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }

@@ -6,7 +6,8 @@ export type EmailType =
   | "weekly_digest"
   | "followup"
   | "waitlist"
-  | "feedback";
+  | "feedback"
+  | "founder_alert";
 
 interface LogEmailArgs {
   toEmail: string;

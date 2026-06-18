@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 import { CREDIT_ALLOTMENTS } from "@/lib/credits";
+import { notifyFounder } from "@/lib/notify";
 import Stripe from "stripe";
 
 /**
@@ -109,6 +110,13 @@ export async function POST(req: NextRequest) {
           await supabase.from("User").update(update).eq("email", userEmail);
         }
 
+        // Best-effort founder ping on a new paid subscription.
+        await notifyFounder({
+          event: "subscription",
+          title: "💸 New subscription",
+          lines: [userEmail || customerId, `Plan: ${plan || "—"}`],
+        }).catch(() => {});
+
         break;
       }
 
@@ -145,6 +153,13 @@ export async function POST(req: NextRequest) {
             subscriptionPlan: "",
           })
           .eq("stripeCustomerId", customerId);
+
+        // Best-effort founder ping on churn.
+        await notifyFounder({
+          event: "subscription",
+          title: "📉 Subscription canceled",
+          lines: [`Stripe customer: ${customerId}`],
+        }).catch(() => {});
 
         break;
       }
