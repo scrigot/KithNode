@@ -1,16 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "KithNode LinkedIn Capture",
+  "name": "KithNode Contact Clipper",
   "version": "0.1.0",
-  "description": "Capture the LinkedIn profile you're viewing into your KithNode network (skills, experience, education, clubs).",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "description": "Capture the LinkedIn profile you are viewing and pre-fill a KithNode contact. Personal use, one profile at a time.",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": [
     "https://www.linkedin.com/*",
     "https://kithnode.ai/*",
+    "https://*.kithnode.ai/*",
     "http://localhost:3000/*"
   ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "Capture to KithNode"
-  }
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "panel.html" },
+  "action": { "default_title": "Clip this LinkedIn profile to KithNode" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "128": "icon.png" }
 }

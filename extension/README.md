@@ -1,45 +1,51 @@
-# KithNode LinkedIn Capture (Chrome extension)
+# KithNode Contact Clipper (browser extension)
 
-Capture the LinkedIn profile you're viewing into your KithNode network — the
-skills / experience / education / clubs that PDL can't get for students. Personal
-tool, not for distribution. Reading profiles this way is against LinkedIn's ToS,
-so use it on profiles you actually visit, at human pace.
+A personal Chrome extension that reads the LinkedIn profile you are viewing and pre-fills a
+KithNode contact. One profile at a time, on demand. This is the P0/P1 build of the spec in
+`docs/LINKEDIN-EXTENSION-SPEC.md`.
 
-## Install (load unpacked)
-1. Chrome → `chrome://extensions`
-2. Toggle **Developer mode** (top-right) ON.
-3. **Load unpacked** → select this `extension/` folder.
-4. Pin "KithNode LinkedIn Capture" to the toolbar.
+What it does:
+- Parses the open `linkedin.com/in/<handle>` page (name, title, firm, education, location,
+  profile URL) into an editable form in the side panel.
+- **Copy JSON** / **Copy CSV row** for KithNode's existing import (no auth, works today).
+- **Add to KithNode** posts to `/api/import/linkedin` using your signed-in session cookie.
 
-## Use
-1. Be signed in to KithNode in the same Chrome (cookie auth — no token needed).
-2. Open someone's profile: `linkedin.com/in/…`
-3. Click the extension. It parses the page and shows the fields.
-4. Review/fix anything (LinkedIn's layout shifts, so the parse isn't perfect),
-   then **Save to KithNode**.
-5. Use the **Save to** dropdown to target Production (kithnode.ai) or Localhost
-   (localhost:3000) while testing.
+It does not crawl, navigate, bulk-import, auto-connect, or message anyone. See the spec's
+ToS / risk section.
 
-It upserts by LinkedIn URL, so capturing a profile already in your network just
-fills in the missing skills/experience/clubs and re-scores them.
+## Install (unpacked, personal use)
 
-## If Save says "Not logged in" (401)
-The browser didn't attach your kithnode.ai cookie to the extension request
-(SameSite). Open kithnode.ai, sign in, and retry. If it persists, tell me and
-I'll switch this to a paste-once token.
+1. Add a 128x128 `icon.png` in this folder (any placeholder works for local use).
+2. Chrome → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select
+   this `extension/` folder.
+3. Open a LinkedIn profile, click the KithNode icon to open the side panel, click **Read
+   this profile**, review the fields, then either copy or **Add to KithNode**.
 
-## How it extracts (no CSS scraping)
-The popup injects a tiny `grabProfile()` (via `chrome.scripting.executeScript`)
-that scrolls the page to load LinkedIn's lazy sections and returns the visible
-TEXT. That text is POSTed to `POST /api/extension/extract`, where an AI model
-(the same pattern as résumé upload, `src/lib/linkedin-extract.ts`) returns the
-structured fields. The popup shows them for review; **Save** posts to
-`POST /api/extension/ingest`, which upserts by slug + re-scores. Because the AI
-reads text, this doesn't break when LinkedIn changes its markup.
+## Configure "Add to KithNode"
 
-## Notes
-- No icons bundled (Chrome shows a default). Add `icons` to `manifest.json` later.
-- No persistent content script → no hard-refresh needed after updating the
-  extension; just reload the extension at `chrome://extensions`.
-- Each capture makes one AI call (free for now; wire a credit charge in
-  `extract/route.ts` when this ships in-product).
+- Open the panel's **Settings** and set your KithNode URL (e.g. `https://kithnode.ai`, or
+  `http://localhost:3000` for dev).
+- You must be **signed in to KithNode in the same browser** for the cookie-authenticated
+  send to work (this is the v1 auth path in the spec).
+- If you only use the copy buttons, no URL is needed.
+
+If your deployed app rejects the extension-origin request, fall back to the copy buttons +
+KithNode's CSV import, and see the spec's v2 (personal access token) auth option, which is
+app-side work owned by the features session.
+
+## Files
+
+| File | Role |
+|---|---|
+| `manifest.json` | MV3 manifest, host permissions, side panel |
+| `content.js` | parses the profile DOM (best-effort, brittle selectors, always editable) |
+| `background.js` | service worker; owns the import POST so cookie auth works |
+| `panel.html` / `panel.js` / `panel.css` | the review-and-edit UI (dashboard design language) |
+
+## Known limits
+
+- LinkedIn markup changes; selectors in `content.js` are best-effort and degrade to empty
+  fields rather than break. Always review before adding.
+- Email is never on the page; leave it blank or let KithNode enrichment fill it.
+- `host_permissions` lists `kithnode.ai` and `localhost:3000`. Add your real origin there
+  if it differs, or cookie auth will not attach.

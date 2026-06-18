@@ -1,0 +1,35 @@
+/* KithNode dashboard language: dark, dense, 0px corners, teal accent. */
+:root{
+  --bg:#0A1628; --card:#111D2E; --line:rgba(255,255,255,.08);
+  --text:#F8FAFC; --muted:#94A3B8; --teal:#0EA5E9; --ok:#22C55E; --err:#EF4444;
+}
+*{box-sizing:border-box;border-radius:0}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"DM Sans",system-ui,-apple-system,sans-serif;font-size:13px}
+header{padding:12px 14px;border-bottom:1px solid var(--line)}
+.mark{font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;letter-spacing:.02em}
+.mark b{color:var(--teal)}
+main{padding:14px}
+
+.btn{background:#162438;color:var(--text);border:1px solid var(--line);
+  padding:8px 12px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--teal)}
+.btn.primary{background:var(--teal);color:#04222e;border-color:var(--teal);font-weight:600}
+.btn.primary:hover{filter:brightness(1.05)}
+
+.hint{color:var(--muted);font-size:12px;margin:10px 0 0;line-height:1.4}
+
+form{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.06em}
+input{background:#0d1726;color:var(--text);border:1px solid var(--line);
+  padding:8px 10px;font:inherit;font-size:13px;text-transform:none;letter-spacing:0}
+input:focus{outline:none;border-color:var(--teal)}
+
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.status{min-height:16px;font-size:12px;margin:2px 0 0}
+.status.ok{color:var(--ok)} .status.err{color:var(--err)}
+
+.settings{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+.settings summary{cursor:pointer;color:var(--muted);font-size:12px}
+.settings label{margin-top:10px}
