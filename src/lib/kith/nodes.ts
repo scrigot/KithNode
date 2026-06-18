@@ -6,6 +6,7 @@ import { genId, genInviteCode } from "@/lib/kith/ids";
 import { getUserNames, idsForEmails, emailsForIds } from "@/lib/kith/users";
 import {
   assertNodeMember,
+  assertNodeOwner,
   getUserNodeIds,
   getNodeMemberIds,
   getPooledContactsForNode,
@@ -49,7 +50,7 @@ export async function getMyNodes(userId: string) {
   if (nodeIds.length === 0) return [];
 
   const [{ data: nodes }, { data: members }] = await Promise.all([
-    supabase.from("Node").select("id, name, ownerId, inviteCode, createdAt").in("id", nodeIds),
+    supabase.from("Node").select("id, name, ownerId, inviteCode, createdAt, description, \"avatarUrl\"").in("id", nodeIds),
     supabase.from("NodeMember").select("nodeId").in("nodeId", nodeIds),
   ]);
 
@@ -142,7 +143,7 @@ export async function getNodeDetail(nodeId: string, requesterId: string) {
 
   const { data: node } = await supabase
     .from("Node")
-    .select("id, name, ownerId, inviteCode, createdAt")
+    .select("id, name, ownerId, inviteCode, createdAt, description, \"avatarUrl\"")
     .eq("id", nodeId)
     .maybeSingle();
   if (!node) throw new NodeError("Node not found");
@@ -153,4 +154,66 @@ export async function getNodeDetail(nodeId: string, requesterId: string) {
   ]);
 
   return { node, members, pool };
+}
+
+/** Owner-only: edit a node's name/description. Undefined keys are left alone;
+ *  name is required (a blank name is rejected). Returns the updated node. */
+export async function updateNodeSettings(
+  requesterId: string,
+  nodeId: string,
+  patch: { name?: string; description?: string },
+) {
+  await assertNodeOwner(requesterId, nodeId);
+
+  const update: { name?: string; description?: string } = {};
+  if (patch.name !== undefined) {
+    const name = patch.name.trim().slice(0, 80);
+    if (!name) throw new NodeError("Node name required");
+    update.name = name;
+  }
+  if (patch.description !== undefined) update.description = patch.description.trim().slice(0, 280);
+
+  const { data: node, error } = await supabase
+    .from("Node")
+    .update(update)
+    .eq("id", nodeId)
+    .select("id, name, ownerId, inviteCode, description, \"avatarUrl\"")
+    .single();
+  if (error) throw new NodeError(error.message);
+
+  return node;
+}
+
+/** Owner-only: set the node's avatar url (after the file is uploaded). */
+export async function setNodeAvatarUrl(requesterId: string, nodeId: string, url: string) {
+  await assertNodeOwner(requesterId, nodeId);
+
+  const { error } = await supabase.from("Node").update({ avatarUrl: url }).eq("id", nodeId);
+  if (error) throw new NodeError(error.message);
+
+  return { avatarUrl: url };
+}
+
+/** Owner-only: kick a member by email. Refuses to remove the owner. Pool
+ *  visibility is checked live, so a kicked member's contacts drop from the pool
+ *  automatically — no extra cleanup. Returns the refreshed named member list. */
+export async function removeNodeMember(requesterId: string, nodeId: string, targetEmailRaw: string) {
+  await assertNodeOwner(requesterId, nodeId);
+
+  const targetEmail = targetEmailRaw.trim().toLowerCase();
+  if (!targetEmail) throw new NodeError("Member email required");
+  const targetUserId = (await idsForEmails([targetEmail])).get(targetEmail);
+  if (!targetUserId) throw new NodeError("No KithNode user with that email");
+
+  const { data: node } = await supabase.from("Node").select("ownerId").eq("id", nodeId).maybeSingle();
+  if (targetUserId === node?.ownerId) throw new NodeError("Cannot remove the owner");
+
+  const { error } = await supabase
+    .from("NodeMember")
+    .delete()
+    .eq("nodeId", nodeId)
+    .eq("userId", targetUserId);
+  if (error) throw new NodeError(error.message);
+
+  return namedMembers(nodeId);
 }
