@@ -40,6 +40,9 @@ export interface RankerInput {
    *  students) or within the last ~year (recent grads) is down-weighted; a
    *  clearly-graduated year is up-weighted. 0 / missing → no signal. */
   graduationYear?: number;
+  /** Authoritative pool key ("alumni" | "student" | "professor"). When set it
+   *  drives the recency weight in preference to source. Omit when unknown. */
+  personType?: string;
 }
 
 const BASE_SCORE = 30;
@@ -57,17 +60,26 @@ const STUDENT_PENALTY = 8;
 /**
  * Recency weight off the contact's category. Prefers the explicit grad year
  * (current / very-recent grads are the low-value "people you already know"
- * matches), then falls back to the source→category map. Alumni up-weight,
- * current students / recent grads down-weight, professors + unknown stay
- * neutral. Returns a signed boost added to the total boost sum.
+ * matches), then the authoritative personType when present, then falls back to
+ * the source→category map. Alumni up-weight, current students / recent grads
+ * down-weight, professors + unknown stay neutral. Returns a signed boost added
+ * to the total boost sum.
  */
-export function categoryBoostFor(source: string | undefined, graduationYear: number | undefined): number {
+export function categoryBoostFor(
+  source: string | undefined,
+  graduationYear: number | undefined,
+  personType?: string,
+): number {
   const gradYear = graduationYear || 0;
   if (gradYear > 0) {
     const currentYear = new Date().getFullYear();
     // At/after this year = current student; within ~1 year = recent grad.
     return gradYear >= currentYear - 1 ? -STUDENT_PENALTY : ALUMNI_BOOST;
   }
+  // personType is authoritative when set — prefer it over the source map.
+  if (personType === "alumni") return ALUMNI_BOOST;
+  if (personType === "student") return -STUDENT_PENALTY;
+  if (personType === "professor") return 0;
   const category = source ? categoryForSource(source) : null;
   if (category === "alumni") return ALUMNI_BOOST;
   if (category === "student") return -STUDENT_PENALTY;
@@ -130,7 +142,7 @@ function confidenceFor(signals: Signal[]): number {
 }
 
 export function rank(input: RankerInput): RankResult {
-  const { signals, emailConfidence, title, source, graduationYear } = input;
+  const { signals, emailConfidence, title, source, graduationYear, personType } = input;
 
   // Informational subscores — exposed in the breakdown for the UI's
   // signal chips, but the final score is driven by the total boost sum
@@ -152,7 +164,7 @@ export function rank(input: RankerInput): RankResult {
   // so it flows through base → score → persisted warmthScore (the column the
   // Discover deck orders by) exactly like every other boost. Clamp at 0 so a
   // student penalty can't push the base below the floor.
-  const categoryBoost = categoryBoostFor(source, graduationYear);
+  const categoryBoost = categoryBoostFor(source, graduationYear, personType);
   const totalBoost = signals.reduce((sum, s) => sum + s.boost, 0) + categoryBoost;
   const base = Math.min(SCORE_CAP, Math.max(0, BASE_SCORE + totalBoost));
   const raw = base * BASE_WEIGHT + reachability * REACH_WEIGHT;
