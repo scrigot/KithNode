@@ -248,17 +248,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Detect first-time onboarding completion: only when this request is setting a
-  // real tutorialDoneAt and it was previously empty. Read prior state before the
-  // update so re-saves / settings edits never re-alert.
+  // Detect first-time onboarding completion atomically. A read-before-write lets
+  // two concurrent saves both observe an empty tutorialDoneAt and both alert;
+  // instead, claim the null→set transition with a conditional update scoped to
+  // the still-null state. Only the request that actually flips it wins the claim
+  // (and alerts); re-saves / settings edits never re-alert.
   let justFinishedOnboarding = false;
   if (tutorialDoneAt) {
-    const { data: prior } = await supabase
+    const { data: claimed } = await supabase
       .from("User")
-      .select("tutorialDoneAt")
+      .update({ tutorialDoneAt })
       .eq("email", email)
-      .maybeSingle();
-    justFinishedOnboarding = !prior?.tutorialDoneAt;
+      .is("tutorialDoneAt", null)
+      .select("id");
+    justFinishedOnboarding = (claimed?.length ?? 0) > 0;
   }
 
   const { error } = await supabase

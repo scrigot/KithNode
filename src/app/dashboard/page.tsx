@@ -67,12 +67,24 @@ export default function DashboardPage() {
     name: string;
     email?: string;
   } | null>(null);
+  // Has the user ever drafted an outreach? Drives the first-task nudge. A draft
+  // logs a UsageEvent (action:"draft") via requireCredits, so its presence in
+  // the credits feed is the precise "reached the wow" signal — no new table.
+  const [hasDrafted, setHasDrafted] = useState(true);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+
+  useEffect(() => {
+    setNudgeDismissed(
+      window.sessionStorage.getItem("kn:draft-nudge-dismissed") === "1",
+    );
+  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [ovRes, ctRes] = await Promise.all([
+      const [ovRes, ctRes, crRes] = await Promise.all([
         apiFetch("/api/dashboard/overview"),
         apiFetch("/api/contacts"),
+        apiFetch("/api/user/credits"),
       ]);
       if (!ovRes.ok) {
         setFetchError(`Overview unavailable (HTTP ${ovRes.status}). Retry?`);
@@ -81,6 +93,11 @@ export default function DashboardPage() {
       }
       setData(await ovRes.json());
       setContacts(ctRes.ok ? await ctRes.json() : []);
+      if (crRes.ok) {
+        const cr = await crRes.json();
+        const recent: Array<{ action?: string }> = cr?.recent ?? [];
+        setHasDrafted(recent.some((e) => e.action === "draft"));
+      }
       setFetchError(null);
     } catch (err) {
       setFetchError(
@@ -122,6 +139,11 @@ export default function DashboardPage() {
   const openDraft = useCallback((item: FeedItem) => {
     setSelectedId(item.id);
     setOutreachTarget({ id: item.id, name: item.name, email: item.email });
+  }, []);
+
+  const dismissNudge = useCallback(() => {
+    window.sessionStorage.setItem("kn:draft-nudge-dismissed", "1");
+    setNudgeDismissed(true);
   }, []);
 
   const addToPipeline = useCallback(async (item: FeedItem) => {
@@ -259,6 +281,13 @@ export default function DashboardPage() {
   const weeklyTarget = data?.weekly_goal_target ?? 3;
   const tc = data?.tier_counts ?? { hot: 0, warm: 0, monitor: 0, cold: 0 };
 
+  // First-task nudge: user has imported contacts but never drafted an outreach.
+  // Points them at the wow — drafting the top warm match — instead of leaving
+  // the tour as the only (purely descriptive) post-onboarding guidance.
+  const topMatch = feed[0] ?? null;
+  const showDraftNudge =
+    !hasDrafted && !nudgeDismissed && totalContacts > 0 && topMatch !== null;
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <OutreachSheet
@@ -270,6 +299,34 @@ export default function DashboardPage() {
       />
 
       <TopBar data={data} overdueCount={overdueCount} warmSignals={warmSignals} />
+
+      {showDraftNudge && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-accent-teal/30 bg-accent-teal/[0.07] px-4 py-2.5">
+          <Zap className="h-4 w-4 shrink-0 text-accent-teal" />
+          <p className="min-w-0 flex-1 text-[12px] text-foreground">
+            <span className="font-bold">
+              You&apos;ve imported {totalContacts} contact
+              {totalContacts === 1 ? "" : "s"}.
+            </span>{" "}
+            <span className="text-muted-foreground">
+              Draft your first intro to {topMatch.name} — your warmest match.
+            </span>
+          </p>
+          <button
+            onClick={() => openDraft(topMatch)}
+            className="shrink-0 bg-accent-teal px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-white hover:bg-accent-teal/90"
+          >
+            Draft first intro
+          </button>
+          <button
+            onClick={dismissNudge}
+            aria-label="Dismiss"
+            className="shrink-0 px-1.5 py-1 text-[14px] leading-none text-muted-foreground hover:text-foreground"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* ─── SLIM KPI STRIP ─────────────────────────────────────────── */}

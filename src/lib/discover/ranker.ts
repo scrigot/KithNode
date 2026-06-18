@@ -25,6 +25,7 @@
 // with low confidence multiplies the whole score down.
 
 import type { RankBreakdown, RankResult, Signal, Tier } from "./types";
+import { categoryForSource } from "./source-categories";
 
 export interface RankerInput {
   signals: Signal[];
@@ -32,12 +33,46 @@ export interface RankerInput {
   emailConfidence: number;
   /** Free-text title used for role accessibility. */
   title: string;
+  /** AlumniContact.source key, mapped to an alumni/student/professor category
+   *  for the recency weight. Omit when the source is unknown (→ neutral). */
+  source?: string;
+  /** Grad year, when known. A grad year at/after the current year (current
+   *  students) or within the last ~year (recent grads) is down-weighted; a
+   *  clearly-graduated year is up-weighted. 0 / missing → no signal. */
+  graduationYear?: number;
 }
 
 const BASE_SCORE = 30;
 const SCORE_CAP = 100;
 const BASE_WEIGHT = 0.85;
 const REACH_WEIGHT = 0.15;
+
+// Alumni-vs-student recency weight (beta feedback: alumni are higher-value
+// connections than current students / recent grads the user already knows).
+// Modest magnitudes so they only re-order ties / near-ties — a genuinely
+// strong same-firm student is not nuked out of the deck.
+const ALUMNI_BOOST = 5;
+const STUDENT_PENALTY = 8;
+
+/**
+ * Recency weight off the contact's category. Prefers the explicit grad year
+ * (current / very-recent grads are the low-value "people you already know"
+ * matches), then falls back to the source→category map. Alumni up-weight,
+ * current students / recent grads down-weight, professors + unknown stay
+ * neutral. Returns a signed boost added to the total boost sum.
+ */
+export function categoryBoostFor(source: string | undefined, graduationYear: number | undefined): number {
+  const gradYear = graduationYear || 0;
+  if (gradYear > 0) {
+    const currentYear = new Date().getFullYear();
+    // At/after this year = current student; within ~1 year = recent grad.
+    return gradYear >= currentYear - 1 ? -STUDENT_PENALTY : ALUMNI_BOOST;
+  }
+  const category = source ? categoryForSource(source) : null;
+  if (category === "alumni") return ALUMNI_BOOST;
+  if (category === "student") return -STUDENT_PENALTY;
+  return 0;
+}
 
 /** Tier cutoffs match the existing scoring scheme in linkedin-import.ts. */
 function tierFor(score: number): Tier {
@@ -95,7 +130,7 @@ function confidenceFor(signals: Signal[]): number {
 }
 
 export function rank(input: RankerInput): RankResult {
-  const { signals, emailConfidence, title } = input;
+  const { signals, emailConfidence, title, source, graduationYear } = input;
 
   // Informational subscores — exposed in the breakdown for the UI's
   // signal chips, but the final score is driven by the total boost sum
@@ -113,8 +148,13 @@ export function rank(input: RankerInput): RankResult {
   const reachability = reachabilityFor(emailConfidence, title);
   const confidence = confidenceFor(signals);
 
-  const totalBoost = signals.reduce((sum, s) => sum + s.boost, 0);
-  const base = Math.min(SCORE_CAP, BASE_SCORE + totalBoost);
+  // Alumni up-weight / current-student down-weight folds into the boost sum,
+  // so it flows through base → score → persisted warmthScore (the column the
+  // Discover deck orders by) exactly like every other boost. Clamp at 0 so a
+  // student penalty can't push the base below the floor.
+  const categoryBoost = categoryBoostFor(source, graduationYear);
+  const totalBoost = signals.reduce((sum, s) => sum + s.boost, 0) + categoryBoost;
+  const base = Math.min(SCORE_CAP, Math.max(0, BASE_SCORE + totalBoost));
   const raw = base * BASE_WEIGHT + reachability * REACH_WEIGHT;
   const score = Math.round(raw * confidence);
 

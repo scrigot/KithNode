@@ -80,7 +80,16 @@ export async function POST(
     })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      // The DB enforces one entry per (contactId, userId)
+      // (PipelineEntry_contactId_userId_key). The pre-check above is scoped to a
+      // single pipeline, so a contact already in ANOTHER of this user's pipelines
+      // surfaces here as a unique violation — return it gracefully, not a 500.
+      if (error.code === "23505") {
+        return NextResponse.json({ ok: true, alreadyExists: true });
+      }
+      throw new Error(error.message);
+    }
 
     return NextResponse.json({
       contact_id: contactId,
