@@ -67,7 +67,7 @@ async function main() {
   const work = rows.slice(0, Number.isFinite(limit) ? limit : rows.length);
   console.log(`[backfill] ${rows.length} rows missing personType; processing ${work.length}`);
 
-  const counts = { student: 0, alumni: 0, professor: 0 };
+  const counts = { student: 0, alum: 0, professor: 0 };
   let aiCalls = 0;
   let updated = 0;
   const sample: string[] = [];
@@ -80,7 +80,7 @@ async function main() {
     await Promise.all(
       chunk.map(async (r) => {
         const src = r.source || "";
-        let personType: "student" | "alumni" | "professor";
+        let personType: "student" | "alum" | "professor";
         let gradYear: number | null = r.graduationYear || null;
         let conf = 1;
 
