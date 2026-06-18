@@ -24,7 +24,7 @@ interface RateResult {
 
 async function rateContact(
   contactId: string,
-  rating: "high_value" | "skip",
+  rating: "high_value" | "skip" | "later",
 ): Promise<RateResult> {
   try {
     const res = await apiFetch("/api/discover/rate", {
@@ -255,6 +255,32 @@ export default function DiscoverPage() {
       ratingLockRef.current = false;
     }
   }, [current, advance, targetPipelineId]);
+
+  /** Add the current contact to the user's network (contacts list), advance down. */
+  const handleAddToNetwork = useCallback(() => {
+    if (ratingLockRef.current || !current) return;
+    const target = current;
+    ratingLockRef.current = true;
+    rateContact(target.id, "high_value");
+    trackEvent("discover_add_network", { contact_id: target.id });
+    advance("down");
+    globalThis.setTimeout(() => {
+      ratingLockRef.current = false;
+    }, 220);
+  }, [current, advance]);
+
+  /** Defer this contact — it resurfaces in a future deck. Advance down. */
+  const handleLater = useCallback(() => {
+    if (ratingLockRef.current || !current) return;
+    const target = current;
+    ratingLockRef.current = true;
+    rateContact(target.id, "later");
+    trackEvent("discover_rate", { contact_id: target.id, rating: "later" });
+    advance("down");
+    globalThis.setTimeout(() => {
+      ratingLockRef.current = false;
+    }, 220);
+  }, [current, advance]);
 
   const handleAskIntro = useCallback(
     (contact: DeckContact, warmPath: WarmPath) => {
@@ -889,6 +915,8 @@ export default function DiscoverPage() {
                 inFlight={false}
                 onSkip={handleSkip}
                 onAddToPipeline={handleAddToPipeline}
+                onAddToNetwork={handleAddToNetwork}
+                onLater={handleLater}
                 onAskIntro={(wp) => handleAskIntro(current, wp)}
               />
             </div>

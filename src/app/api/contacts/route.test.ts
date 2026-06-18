@@ -199,33 +199,43 @@ describe("GET /api/contacts", () => {
       }
       // Call #4: AlumniContact discovered (select→in), the foreign pool row,
       // carrying the OWNER's private relationship data the viewer must not see.
+      if (callCount === 4) {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() =>
+              Promise.resolve({
+                data: [
+                  {
+                    id: "foreign1",
+                    name: "Foreign Owner",
+                    title: "Analyst",
+                    linkedInUrl: "",
+                    education: "",
+                    location: "",
+                    affiliations: "",
+                    university: "",
+                    firmName: "GS",
+                    warmthScore: 70,
+                    tier: "warm",
+                    importedByUserId: "someone-else@x.com",
+                    isFriend: true,
+                    lastSpokenAt: "2026-06-01T12:00:00.000Z",
+                    speakFrequency: "weekly",
+                    createdAt: "2026-06-01T12:00:00.000Z",
+                  },
+                ],
+                error: null,
+              }),
+            ),
+          })),
+        };
+      }
+      // Call #5: contact_override (select→eq→in), viewer has no overlay edits.
       return {
         select: vi.fn(() => ({
-          in: vi.fn(() =>
-            Promise.resolve({
-              data: [
-                {
-                  id: "foreign1",
-                  name: "Foreign Owner",
-                  title: "Analyst",
-                  linkedInUrl: "",
-                  education: "",
-                  location: "",
-                  affiliations: "",
-                  university: "",
-                  firmName: "GS",
-                  warmthScore: 70,
-                  tier: "warm",
-                  importedByUserId: "someone-else@x.com",
-                  isFriend: true,
-                  lastSpokenAt: "2026-06-01T12:00:00.000Z",
-                  speakFrequency: "weekly",
-                  createdAt: "2026-06-01T12:00:00.000Z",
-                },
-              ],
-              error: null,
-            }),
-          ),
+          eq: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
         })),
       };
     });

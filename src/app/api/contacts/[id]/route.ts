@@ -27,6 +27,7 @@ import {
 } from "@/lib/relationship-score";
 import { edgesToResolvedMutuals } from "@/lib/mutuals";
 import { contactNeedsInfo } from "@/lib/needs-info";
+import { applyOverlay } from "@/lib/contact-overrides";
 
 // Editable free-text contact columns. title/firmName/university are now
 // user-correctable: the manual-override flow lets a user fix WHO a contact is
@@ -279,17 +280,41 @@ export async function GET(
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  if (contact.importedByUserId && contact.importedByUserId !== userId) {
-    const { data: rating } = await supabase
+  // Read access is open to any signed-in user: the same pool contacts are
+  // already exposed (redacted) via Discover, and UUID ids aren't enumerable.
+  // MUTATION stays owner/claimer-only (PATCH/DELETE have their own checks).
+  //
+  // Three viewer kinds, all collapsed into `view` (what THIS viewer sees):
+  //  - owner               → the canonical row, read/written directly.
+  //  - claimer (added to   → canonical MERGED with their private overlay
+  //    network = high_value)  (contact_override): profile fields fall through to
+  //                           canonical, personal fields come from their overlay.
+  //  - browse (neither)    → canonical with personal columns blanked, plus the
+  //                           non-poolSafe attributes hidden below (inNetwork gate).
+  // `editable`/`inNetwork` drive which UI affordances render.
+  const owns = !contact.importedByUserId || contact.importedByUserId === userId;
+  let hasHighValue = false;
+  let overrides: Record<string, unknown> = {};
+  if (!owns) {
+    const { data: hv } = await supabase
       .from("UserDiscover")
       .select("rating")
       .eq("userId", userId)
       .eq("contactId", id)
       .maybeSingle();
-    if (!rating || rating.rating !== "high_value") {
-      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    hasHighValue = hv?.rating === "high_value";
+    if (hasHighValue) {
+      const { data: ov } = await supabase
+        .from("contact_override")
+        .select("overrides")
+        .eq("user_id", userId)
+        .eq("contact_id", id)
+        .maybeSingle();
+      overrides = (ov?.overrides as Record<string, unknown>) ?? {};
     }
   }
+  const inNetwork = owns || hasHighValue;
+  const view = owns ? contact : applyOverlay(contact, overrides);
 
   // Mutual-connection edges, SCOPED TO THE VIEWER: a non-owner high_value rater
   // correctly sees [] (these are the owner's captured warm paths, not theirs).
@@ -310,29 +335,31 @@ export async function GET(
   const tags = (tagRows ?? []).map((r: { tag: string }) => r.tag);
 
   // Recompute affiliations live so each chip carries its REAL boost — the
-  // stored column is names-only and the UI used to fake a uniform +10.
+  // stored column is names-only and the UI used to fake a uniform +10. Scored off
+  // `view` so a claimer's overlay edits re-tier the contact in their own view.
   const prefs = await getUserPrefs(userEmail);
-  const { affiliations: liveAffiliations } = rescoreContact(contact, prefs, tags);
+  const { affiliations: liveAffiliations } = rescoreContact(view, prefs, tags);
 
   // Synthesize structured rows from flat columns when the educations column is
   // empty (old profiles render rows immediately without requiring a re-save).
-  const contactEducations = contact.educations
-    ? parseEducations(contact.educations as string)
+  // Built off `view` so overlay edits are reflected.
+  const contactEducations = view.educations
+    ? parseEducations(view.educations as string)
     : educationsFromFlat(
-        contact.major as string | null,
-        contact.degrees as string | null,
-        contact.concentration as string | null,
+        view.major as string | null,
+        view.degrees as string | null,
+        view.concentration as string | null,
       );
 
   // Synthesize club membership rows from flat clubs when column is empty.
-  const contactClubMemberships = contact.clubMemberships
-    ? parseClubMemberships(contact.clubMemberships as string)
-    : membershipsFromFlat(contact.clubs as string | null);
+  const contactClubMemberships = view.clubMemberships
+    ? parseClubMemberships(view.clubMemberships as string)
+    : membershipsFromFlat(view.clubs as string | null);
 
   // Synthesize experience rows from flat pastFirms when column is empty.
-  const contactExperiences = contact.experiences
-    ? parseExperiences(contact.experiences as string)
-    : (contact.pastFirms as string | null)
+  const contactExperiences = view.experiences
+    ? parseExperiences(view.experiences as string)
+    : (view.pastFirms as string | null)
         ?.split(",")
         .map((f: string) => f.trim())
         .filter(Boolean)
@@ -348,76 +375,80 @@ export async function GET(
     .eq("contactId", id)
     .eq("userId", userId)
     .maybeSingle();
-  const fit = (contact.warmthScore as number) || 0;
-  // Private relationship/personal columns belong to the importer. A non-owner
-  // viewing this row via a high_value pool link must not see them (mirrors
-  // POOL_SAFE_FIELDS / poolSafeContact). The viewer's own pipeline stage still
+  const fit = (view.warmthScore as number) || 0;
+  // Relationship/personal fields come from `view`: the owner's canonical values,
+  // or a claimer's OWN overlay (never the canonical owner's private data — a
+  // browse viewer's `view` has them blanked). The viewer's pipeline stage still
   // promotes via pipelineEntry (per-user).
-  const owns = !contact.importedByUserId || contact.importedByUserId === userId;
-  const ownIsFriend = owns ? (contact.isFriend as boolean | null | undefined) : false;
-  const ownLastSpokenAt = owns
-    ? (contact.lastSpokenAt as string | null | undefined)
-    : null;
-  const ownSpeakFrequency = owns
-    ? (contact.speakFrequency as string | null | undefined)
-    : "";
+  const viewIsFriend = view.isFriend as boolean | null | undefined;
+  const viewLastSpokenAt = view.lastSpokenAt as string | null | undefined;
+  const viewSpeakFrequency = view.speakFrequency as string | null | undefined;
   const klass = relationshipClass({
-    isFriend: ownIsFriend,
+    isFriend: viewIsFriend,
     pipelineStage: pipelineEntry?.stage as string | undefined,
-    lastSpokenAt: ownLastSpokenAt,
+    lastSpokenAt: viewLastSpokenAt,
     now: Date.now(),
   });
   const engagement = engagementScore({
-    lastSpokenAt: ownLastSpokenAt,
-    speakFrequency: ownSpeakFrequency,
+    lastSpokenAt: viewLastSpokenAt,
+    speakFrequency: viewSpeakFrequency,
     now: Date.now(),
   });
   const dormant =
     klass === "kith" &&
     isDormantKith({
-      lastSpokenAt: ownLastSpokenAt,
+      lastSpokenAt: viewLastSpokenAt,
       now: Date.now(),
     });
-  const tier = displayTier(contact.tier as string | undefined, klass);
+  const tier = displayTier(view.tier as string | undefined, klass);
 
   return NextResponse.json({
     id: contact.id,
-    name: contact.name,
-    title: contact.title,
+    name: view.name,
+    title: view.title,
     email: "",
-    linkedin_url: contact.linkedInUrl,
-    education: contact.education,
-    linkedin_location: contact.location,
-    hometown: owns ? (contact.hometown || "") : "",
-    high_school: owns ? contact.highSchool : "",
-    greek_org: contact.greekOrg,
-    clubs: contact.clubs,
-    passions: owns ? contact.passions : "",
-    notes: owns ? (contact.notes || "") : "",
-    major: contact.major || "",
-    minor: contact.minor || "",
-    concentration: contact.concentration || "",
-    degrees: contact.degrees || "",
-    skills: contact.skills || "",
-    past_firms: contact.pastFirms || "",
-    educations: contactEducations,
+    linkedin_url: view.linkedInUrl,
+    education: view.education,
+    linkedin_location: view.location,
+    // Personal/relationship columns come from `view`: the owner's canonical
+    // values, a claimer's own overlay, or blank for a browse viewer (applyOverlay
+    // strips them) — so the canonical owner's private data never leaks.
+    hometown: (view.hometown as string | null) || "",
+    high_school: (view.highSchool as string | null) || "",
+    passions: (view.passions as string | null) || "",
+    notes: (view.notes as string | null) || "",
+    // Contact attributes OUTSIDE the Discover poolSafe allowlist (greek_org,
+    // clubs, major, minor, skills, pastFirms, structured rows, personType): shown
+    // to the owner and to in-network (high_value) viewers — matching the
+    // contacts list — but hidden from a pure browse view, so the detail page
+    // never exposes more of a pool contact than the Discover deck already does.
+    // concentration/degrees/graduationYear ARE in the allowlist, so stay clear.
+    greek_org: inNetwork ? view.greekOrg : "",
+    clubs: inNetwork ? view.clubs : "",
+    major: inNetwork ? (view.major || "") : "",
+    minor: inNetwork ? (view.minor || "") : "",
+    concentration: view.concentration || "",
+    degrees: view.degrees || "",
+    skills: inNetwork ? (view.skills || "") : "",
+    past_firms: inNetwork ? (view.pastFirms || "") : "",
+    educations: inNetwork ? contactEducations : [],
     // camelCase to match the edit modal + detail page readers (which read
     // these via a Record cast, so a snake_case key would silently load blank).
-    clubMemberships: contactClubMemberships,
-    experiences: contactExperiences,
-    graduationYear: (contact.graduationYear as number | null) ?? null,
-    isFriend: !!ownIsFriend,
-    speakFrequency: ownSpeakFrequency || "",
-    lastSpokenAt: ownLastSpokenAt || "",
-    person_type: contact.personType || "",
-    track: contact.track || "",
-    role: contact.role || "",
-    university: contact.university || "",
+    clubMemberships: inNetwork ? contactClubMemberships : [],
+    experiences: inNetwork ? contactExperiences : [],
+    graduationYear: (view.graduationYear as number | null) ?? null,
+    isFriend: !!view.isFriend,
+    speakFrequency: (view.speakFrequency as string | null) || "",
+    lastSpokenAt: (view.lastSpokenAt as string | null) || "",
+    person_type: inNetwork ? (view.personType || "") : "",
+    track: view.track || "",
+    role: view.role || "",
+    university: view.university || "",
     company: {
-      name: contact.firmName,
+      name: view.firmName,
       domain: "",
       website: "",
-      location: contact.location,
+      location: view.location,
       industry_tags: [],
     },
     score: {
@@ -429,15 +460,24 @@ export async function GET(
     },
     relationship_class: klass,
     dormant,
-    needs_info: contactNeedsInfo(contact, tier),
+    // `editable`: this viewer may edit — the owner (writes the canonical row) OR a
+    // claimer who added the contact to their network (writes their private
+    // overlay). The page renders edit affordances on this; PATCH routes the write.
+    // A pure-browse viewer is read-only. `inNetwork` gates outreach + tags.
+    // `isOwner` distinguishes the two editors so the UI can label destructive
+    // actions correctly (owner DELETE = hard delete; claimer = unlink/remove).
+    editable: inNetwork,
+    inNetwork,
+    isOwner: owns,
+    needs_info: contactNeedsInfo(view, tier),
     pipeline_stage: (pipelineEntry?.stage as string) || "",
     affiliations: liveAffiliations.map((a, i) => ({
       id: i,
       name: a.name,
       boost: a.boost,
     })),
-    why_now: contact.affiliations || "",
-    warm_path: contact.university || "",
+    why_now: view.affiliations || "",
+    warm_path: view.university || "",
     outreach_history: [],
     signals: [],
     tags,
@@ -472,6 +512,8 @@ export async function DELETE(
     await supabase.from("PipelineEntry").delete().eq("contactId", contactId);
     await supabase.from("UserDiscover").delete().eq("contactId", contactId);
     await supabase.from("AuditLog").delete().eq("contactId", contactId);
+    // Drop every user's private overlay for this now-deleted contact.
+    await supabase.from("contact_override").delete().eq("contact_id", contactId);
     const { error: deleteError } = await supabase
       .from("AlumniContact")
       .delete()
@@ -502,7 +544,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Contact not found" }, { status: 404 });
   }
 
-  // Unlink: remove only this user's rows; the pool contact survives.
+  // Unlink: remove only this user's rows (incl. their private overlay); the pool
+  // contact survives for everyone else.
   await Promise.all([
     supabase
       .from("UserDiscover")
@@ -514,6 +557,11 @@ export async function DELETE(
       .delete()
       .eq("userId", userId)
       .eq("contactId", contactId),
+    supabase
+      .from("contact_override")
+      .delete()
+      .eq("user_id", userId)
+      .eq("contact_id", contactId),
   ]);
 
   return NextResponse.json({ ok: true, removed: "unlinked" });
@@ -535,16 +583,12 @@ export async function PATCH(
   if (accessResult instanceof NextResponse) return accessResult;
   const { contact } = accessResult;
 
-  // The AlumniContact row is shared across the Discover pool; checkAccess admits
-  // any user holding a high_value rating, but only the importer may MUTATE the
-  // canonical row. A non-owner write would rewrite owner A's identity
-  // (name/title/firmName) and personal relationship fields (isFriend/
-  // lastSpokenAt/speakFrequency) and recompute warmth/tier from B's prefs.
-  // An empty importedByUserId is legacy-owned (matches checkAccess/DELETE), so
-  // gate only when a non-empty importer is someone else.
-  if (contact.importedByUserId && contact.importedByUserId !== userId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // The AlumniContact row is shared across the Discover pool. checkAccess admits
+  // the owner AND any user holding a high_value rating (a "claimer" who added the
+  // contact to their network). Only the importer may MUTATE the canonical row; a
+  // claimer's edits go to a PRIVATE per-user overlay instead. An empty
+  // importedByUserId is legacy-owned (matches checkAccess/DELETE).
+  const owns = !contact.importedByUserId || contact.importedByUserId === userId;
 
   const body = await request.json().catch(() => ({}));
   const { fields: updates, invalid } = pickEditableFields(body);
@@ -563,6 +607,37 @@ export async function PATCH(
     );
   }
 
+  // Claimer (non-owner with high_value access): write the validated fields into
+  // their private overlay (contact_override), merged over any prior overlay.
+  // Never touch the canonical row or its warmth — that's the owner's, and the
+  // overlay is re-merged + re-scored per-viewer in GET.
+  if (!owns) {
+    const { data: existing } = await supabase
+      .from("contact_override")
+      .select("overrides")
+      .eq("user_id", userId)
+      .eq("contact_id", contactId)
+      .maybeSingle();
+    const mergedOverrides = {
+      ...((existing?.overrides as Record<string, unknown>) ?? {}),
+      ...updates,
+    };
+    const { error: ovErr } = await supabase.from("contact_override").upsert(
+      {
+        user_id: userId,
+        contact_id: contactId,
+        overrides: mergedOverrides,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,contact_id" },
+    );
+    if (ovErr) {
+      return NextResponse.json({ error: ovErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, ...updates, overlay: true });
+  }
+
+  // Owner: write the canonical row directly.
   // Auto-deduce hometown from a newly-set highSchool, but ONLY when the user did
   // not also set hometown in this PATCH (manual edits win) AND the contact's
   // stored hometown is empty (never overwrite an existing value). A unique

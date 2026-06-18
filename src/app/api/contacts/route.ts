@@ -9,6 +9,7 @@ import {
 } from "@/lib/linkedin-import";
 import { redactName, redactLinkedInUrl } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
+import { applyOverlay } from "@/lib/contact-overrides";
 import { contactNeedsInfo } from "@/lib/needs-info";
 import {
   engagementScore,
@@ -61,6 +62,31 @@ export async function GET() {
         .select("*")
         .in("id", Array.from(highValueIds));
       discoveredContacts = data || [];
+
+      // Layer the viewer's private overlay over each discovered (non-owned) row
+      // so the list reflects their edits (e.g. a corrected title), mirroring the
+      // contact detail GET. Personal columns are blanked by applyOverlay anyway,
+      // and the mapping below re-blanks owner-private fields for non-owned rows.
+      if (discoveredContacts.length > 0) {
+        const { data: ovRows } = await supabase
+          .from("contact_override")
+          .select("contact_id, overrides")
+          .eq("user_id", userId)
+          .in("contact_id", Array.from(highValueIds));
+        const ovByContact = new Map<string, Record<string, unknown>>(
+          (ovRows || []).map((r) => [
+            r.contact_id as string,
+            (r.overrides as Record<string, unknown>) ?? {},
+          ]),
+        );
+        // applyOverlay EVERY discovered (non-owned) row — even with no overlay it
+        // blanks the canonical owner's personal columns, so the importer's
+        // relationship data never leaks, AND a claimer's own overlay relationship
+        // fields (isFriend / lastSpokenAt) surface, matching the detail page.
+        discoveredContacts = discoveredContacts.map(
+          (c) => applyOverlay(c, ovByContact.get(c.id) ?? {}) as typeof c,
+        );
+      }
     }
 
     // Merge and deduplicate
@@ -87,27 +113,26 @@ export async function GET() {
         // relationship promotes into the KITH class above the fit tiers.
         // Engagement only orders contacts within a class + flags dormancy.
         const fit = c.warmthScore || 0;
-        // isFriend / lastSpokenAt / speakFrequency are the OWNER's private data on
-        // the shared pool row. For a contact the viewer doesn't own (a high_value
-        // pool link), never surface them — they'd imply a relationship that's the
-        // importer's, not the viewer's. The viewer's own pipeline stage still
-        // promotes via stageByContact (per-user). Mirrors POOL_SAFE_FIELDS in redact.
-        const owns = !c.importedByUserId || c.importedByUserId === userId;
-        const ownIsFriend = owns ? c.isFriend : false;
-        const ownLastSpokenAt = owns ? c.lastSpokenAt : null;
-        const ownSpeakFrequency = owns ? c.speakFrequency : "";
+        // isFriend / lastSpokenAt / speakFrequency are the VIEWER's own here:
+        // canonical for owned rows, the viewer's overlay (canonical blanked) for
+        // discovered rows — every discovered row was run through applyOverlay
+        // above, so the importer's private relationship data can never leak. The
+        // viewer's own pipeline stage also promotes via stageByContact (per-user).
+        const viewIsFriend = c.isFriend;
+        const viewLastSpokenAt = c.lastSpokenAt;
+        const viewSpeakFrequency = c.speakFrequency;
         const klass = relationshipClass({
-          isFriend: ownIsFriend,
+          isFriend: viewIsFriend,
           pipelineStage: stageByContact.get(c.id),
-          lastSpokenAt: ownLastSpokenAt,
+          lastSpokenAt: viewLastSpokenAt,
           now,
         });
         const engagement = engagementScore({
-          lastSpokenAt: ownLastSpokenAt,
-          speakFrequency: ownSpeakFrequency,
+          lastSpokenAt: viewLastSpokenAt,
+          speakFrequency: viewSpeakFrequency,
           now,
         });
-        const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: ownLastSpokenAt, now });
+        const dormant = klass === "kith" && isDormantKith({ lastSpokenAt: viewLastSpokenAt, now });
         const displayedTier = displayTier(c.tier, klass);
         return {
           id: c.id,
@@ -142,9 +167,9 @@ export async function GET() {
           relationship_class: klass,
           dormant,
           needs_info: contactNeedsInfo(c, displayedTier),
-          is_friend: !!ownIsFriend,
-          speak_frequency: ownSpeakFrequency || "",
-          last_spoken_at: ownLastSpokenAt || "",
+          is_friend: !!viewIsFriend,
+          speak_frequency: viewSpeakFrequency || "",
+          last_spoken_at: viewLastSpokenAt || "",
           graduation_year: c.graduationYear ?? null,
           created_at: c.createdAt || "",
           ...(unlocked ? {} : { isRedacted: true }),
