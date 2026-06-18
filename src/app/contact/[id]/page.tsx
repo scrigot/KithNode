@@ -548,6 +548,25 @@ export default function ContactDetailPage() {
     );
   }
 
+  // Ownership gate from the API. Only the importer of a pool contact may mutate
+  // the canonical row, so a non-owner (browsing a Discover contact, or viewing a
+  // high_value contact they added to their network) gets a READ-ONLY page —
+  // edit controls would 403. `inNetwork` (owner or high_value) gates the
+  // per-user outreach action. Default closed so an old API shape can't expose
+  // edit affordances that error.
+  const access = contact as unknown as {
+    editable?: boolean;
+    inNetwork?: boolean;
+    isOwner?: boolean;
+  };
+  const editable = access.editable ?? false;
+  const inNetwork = access.inNetwork ?? editable;
+  // Owner deletes the canonical contact; a claimer (edits via overlay) only
+  // unlinks it from their network. Label the destructive control accordingly.
+  const isOwner = access.isOwner ?? false;
+  const deleteLabel = isOwner ? "Delete contact" : "Remove from network";
+  const deleteConfirm = isOwner ? "CONFIRM?" : "REMOVE?";
+
   // Read structured + flat fields defensively so this compiles regardless of
   // api.ts version. Relationship fields default defensively when absent.
   const contactExt = contact as {
@@ -576,27 +595,27 @@ export default function ContactDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <BackLink backHref={backHref} backLabel={backLabel} />
-            {/* Two-click-confirm delete */}
-            {deleteState === "armed" ? (
+            {/* Two-click-confirm delete — owner only (non-owners can't mutate). */}
+            {editable && (deleteState === "armed" ? (
               <button
                 type="button"
                 onClick={handlePageDelete}
                 className="border border-red-500/30 px-2 py-0.5 text-[10px] font-bold text-red-400 transition-colors hover:bg-red-500/10"
               >
-                CONFIRM?
+                {deleteConfirm}
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handlePageDelete}
                 className="flex items-center text-muted-foreground/40 transition-colors hover:text-red-400"
-                title="Delete contact"
+                title={deleteLabel}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            )}
-            {/* Friend star toggle — quick PATCH without opening the full modal */}
-            {(() => {
+            ))}
+            {/* Friend star toggle — owner only (private relationship field). */}
+            {editable && (() => {
               const ext = contact as unknown as Record<string, unknown>;
               const isFriend = typeof ext.isFriend === "boolean" ? ext.isFriend : false;
               return (
@@ -622,16 +641,20 @@ export default function ContactDetailPage() {
               );
             })()}
           </div>
-          <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
-            <FieldEditor
-              contactId={contact.id}
-              field="name"
-              label=""
-              initialValue={contact.name || ""}
-              placeholder="Add name"
-              onSaved={loadContact}
-            />
-          </div>
+          {editable ? (
+            <div className="mt-1 [&_button]:!text-xl [&_button]:!font-bold [&_input]:!text-xl [&_input]:!font-bold [&_p]:flex [&_p]:items-center [&_p]:gap-1">
+              <FieldEditor
+                contactId={contact.id}
+                field="name"
+                label=""
+                initialValue={contact.name || ""}
+                placeholder="Add name"
+                onSaved={loadContact}
+              />
+            </div>
+          ) : (
+            <h1 className="mt-1 text-xl font-bold text-foreground">{contact.name}</h1>
+          )}
           <p className="text-xs text-muted-foreground">
             {contact.title}
             {contact.title && contact.company.name ? " @ " : ""}
@@ -643,23 +666,27 @@ export default function ContactDetailPage() {
             </p>
           )}
         </div>
-        {contact.outreach_history.some((o) => o.status === "replied") ? (
-          <Badge
-            variant="outline"
-            className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs"
-          >
-            AUTOGUARD ACTIVE
-          </Badge>
-        ) : (
-          <Button
-            variant="outline"
-            className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
-            onClick={() => setShowOutreach(true)}
-          >
-            DRAFT OUTREACH
-            <CreditCost action="draft" />
-          </Button>
-        )}
+        {/* Outreach is a per-user action gated by network membership (owner or
+            high_value). A non-owner browsing a Discover contact adds it to their
+            network first; the draft route would 403 otherwise. */}
+        {inNetwork &&
+          (contact.outreach_history.some((o) => o.status === "replied") ? (
+            <Badge
+              variant="outline"
+              className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs"
+            >
+              AUTOGUARD ACTIVE
+            </Badge>
+          ) : (
+            <Button
+              variant="outline"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
+              onClick={() => setShowOutreach(true)}
+            >
+              DRAFT OUTREACH
+              <CreditCost action="draft" />
+            </Button>
+          ))}
       </div>
 
       <OutreachSheet
@@ -670,7 +697,7 @@ export default function ContactDetailPage() {
         onClose={() => setShowOutreach(false)}
       />
 
-      {showEditProfile && (
+      {showEditProfile && editable && (
         <EditProfileModal
           contact={contact}
           onSaved={loadContact}
@@ -859,22 +886,49 @@ export default function ContactDetailPage() {
         <CareerTimeline experiences={contactExt.experiences ?? []} />
         {/* PANE 2 — Classification & signals */}
         <div className="border border-border bg-card p-4">
-          <TypeToggle
-            contactId={contact.id}
-            value={contact.person_type || ""}
-            graduationYear={contactExt.graduationYear ?? undefined}
-            title={contact.title}
-            experience={contact.company.name}
-            education={contact.education}
-            onSaved={loadContact}
-          />
+          {editable ? (
+            <>
+              <TypeToggle
+                contactId={contact.id}
+                value={contact.person_type || ""}
+                graduationYear={contactExt.graduationYear ?? undefined}
+                title={contact.title}
+                experience={contact.company.name}
+                education={contact.education}
+                onSaved={loadContact}
+              />
 
-          <TrackRoleEditor
-            contactId={contact.id}
-            track={contact.track || ""}
-            role={contact.role || ""}
-            onSaved={loadContact}
-          />
+              <TrackRoleEditor
+                contactId={contact.id}
+                track={contact.track || ""}
+                role={contact.role || ""}
+                onSaved={loadContact}
+              />
+            </>
+          ) : (
+            <>
+              {contact.person_type && (
+                <div className="mb-3">
+                  <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    TYPE
+                  </h3>
+                  <span className="border border-border px-2 py-1 text-[10px] font-bold tracking-wider text-foreground">
+                    {contact.person_type.toUpperCase()}
+                  </span>
+                </div>
+              )}
+              {(contact.track || contact.role) && (
+                <div className="mb-3">
+                  <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    CAREER TRACK
+                  </h3>
+                  <p className="text-xs text-foreground">
+                    {[contact.track, contact.role].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           <h3 className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             AFFILIATIONS
@@ -904,8 +958,14 @@ export default function ContactDetailPage() {
             </p>
           )}
 
-          <Separator className="my-3" />
-          <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
+          {/* Tags are per-user but the route requires owner/high_value access
+              (same gate as outreach), so only surface them once in-network. */}
+          {inNetwork && (
+            <>
+              <Separator className="my-3" />
+              <TagEditor contactId={contact.id} initialTags={contact.tags ?? []} />
+            </>
+          )}
         </div>
 
         {/* RIGHT — Details (read-only; edited via the Edit Profile modal) */}
@@ -914,14 +974,16 @@ export default function ContactDetailPage() {
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               DETAILS
             </h3>
-            <button
-              type="button"
-              onClick={() => setShowEditProfile(true)}
-              className="inline-flex items-center gap-1.5 border border-white/[0.12] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-            >
-              <Pencil className="h-3 w-3" />
-              EDIT PROFILE
-            </button>
+            {editable && (
+              <button
+                type="button"
+                onClick={() => setShowEditProfile(true)}
+                className="inline-flex items-center gap-1.5 border border-white/[0.12] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                <Pencil className="h-3 w-3" />
+                EDIT PROFILE
+              </button>
+            )}
           </div>
           <dl className="space-y-1.5 text-xs">
             <DetailRow label="Title" value={contact.title} />

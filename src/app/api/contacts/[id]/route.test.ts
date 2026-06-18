@@ -480,23 +480,29 @@ describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
     vi.clearAllMocks();
   });
 
-  it("rejects a non-owner PATCH with 403 and never updates the shared row", async () => {
+  it("routes a non-owner (claimer) PATCH to their private overlay, never the shared row", async () => {
     (auth as Mock).mockResolvedValue({ user: { id: USER, email: USER } });
 
-    // A non-owner who holds a high_value rating clears checkAccess but must be
-    // blocked by the ownership guard before any write.
-    const updateSpy = vi.fn().mockReturnThis();
-    const makeBuilder = (table: string) => {
+    // A non-owner who holds a high_value rating clears checkAccess. Their edit
+    // must land in the private overlay (contact_override), NEVER the canonical
+    // AlumniContact row (which belongs to OTHER).
+    const updateSpy = vi.fn().mockReturnThis(); // AlumniContact.update — forbidden here
+    const upsertSpy = vi.fn().mockReturnValue({
+      then: (r: (v: unknown) => unknown) =>
+        Promise.resolve({ error: null }).then(r),
+    });
+    const makeBuilder = () => {
       const b: Record<string, unknown> = {};
       b.select = vi.fn().mockReturnValue(b);
       b.eq = vi.fn().mockReturnValue(b);
       b.update = updateSpy;
+      b.upsert = upsertSpy;
       // checkAccess: contact owned by someone else.
       b.single = vi.fn().mockResolvedValue({
         data: { id: "c1", importedByUserId: OTHER, hometown: "" },
         error: null,
       });
-      // checkAccess: this user DOES hold a high_value rating (passes access).
+      // UserDiscover access rating + existing-overlay lookup both via maybeSingle.
       b.maybeSingle = vi
         .fn()
         .mockResolvedValue({ data: { rating: "high_value" }, error: null });
@@ -506,16 +512,20 @@ describe("PATCH /api/contacts/[id] — cross-tenant write guard", () => {
     };
     (supabase as unknown as Record<string, unknown>).from = vi
       .fn()
-      .mockImplementation((t: string) => makeBuilder(t));
+      .mockImplementation(() => makeBuilder());
 
     const res = await PATCH(
-      makePatchRequest("c1", { name: "Hijacked Name" }) as import("next/server").NextRequest,
+      makePatchRequest("c1", { name: "My Correction" }) as import("next/server").NextRequest,
       makeParams("c1"),
     );
+    const body = await res.json();
 
-    expect(res.status).toBe(403);
-    // The shared AlumniContact row must NOT have been written.
+    expect(res.status).toBe(200);
+    expect(body.overlay).toBe(true);
+    // The shared AlumniContact row must NOT have been written...
     expect(updateSpy).not.toHaveBeenCalled();
+    // ...the edit went to the private overlay instead.
+    expect(upsertSpy).toHaveBeenCalled();
   });
 
   it("lets the owner PATCH their own contact (200, updates the row)", async () => {
@@ -624,12 +634,15 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
       affiliations: "",
     };
 
-    // Wire the detail GET's query chain by call order:
-    //  1. AlumniContact  → select.eq.single → the foreign contact row
-    //  2. UserDiscover   → select.eq.eq.maybeSingle → high_value rating (access)
-    //  3. ContactConnection → select.eq.eq → [] (viewer-scoped edges)
-    //  4. contact_tags   → select.eq.eq.order → []
-    //  5. PipelineEntry  → select.eq.eq.maybeSingle → null
+    // Wire the detail GET's query chain by call order. Read access is open to any
+    // signed-in user; for a non-owner the UserDiscover rating + the private
+    // overlay are loaded UP FRONT to build the merged `view`, then the rest:
+    //  1. AlumniContact     → select.eq.single → the foreign contact row
+    //  2. UserDiscover      → select.eq.eq.maybeSingle → high_value (claimer)
+    //  3. contact_override  → select.eq.eq.maybeSingle → {} (no edits yet)
+    //  4. ContactConnection → select.eq.eq → [] (viewer-scoped edges)
+    //  5. contact_tags      → select.eq.eq.order → []
+    //  6. PipelineEntry     → select.eq.eq.maybeSingle → null
     let callCount = 0;
     mockFrom.mockImplementation(() => {
       callCount++;
@@ -645,6 +658,7 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
         };
       }
       if (callCount === 2) {
+        // UserDiscover rating → high_value (this viewer is a claimer)
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -658,6 +672,21 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
         };
       }
       if (callCount === 3) {
+        // contact_override → no overlay yet (empty)
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(() =>
+                  Promise.resolve({ data: { overrides: {} }, error: null }),
+                ),
+              })),
+            })),
+          })),
+        };
+      }
+      if (callCount === 4) {
+        // ContactConnection (mutuals)
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -666,7 +695,8 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
           })),
         };
       }
-      if (callCount === 4) {
+      if (callCount === 5) {
+        // contact_tags
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -677,7 +707,7 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
           })),
         };
       }
-      // callCount === 5: PipelineEntry
+      // callCount === 6: PipelineEntry
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -696,7 +726,8 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    // Owner's private/personal columns blanked for the non-owner viewer.
+    // Canonical owner's private/personal columns never leak to the viewer — with
+    // an empty overlay they read blank (applyOverlay strips them).
     expect(body.notes).toBe("");
     expect(body.hometown).toBe("");
     expect(body.high_school).toBe("");
@@ -706,5 +737,11 @@ describe("GET /api/contacts/[id]: pool-safe non-owner view", () => {
     expect(body.lastSpokenAt).toBe("");
     // The owner's isFriend must NOT promote the viewer into the kith class.
     expect(body.relationship_class).not.toBe("kith");
+    // A claimer (high_value) is in their network AND editable — their edits land
+    // in the private overlay (PATCH routes them), not the canonical row. isOwner
+    // stays false so the UI labels destructive actions as "remove from network".
+    expect(body.editable).toBe(true);
+    expect(body.inNetwork).toBe(true);
+    expect(body.isOwner).toBe(false);
   });
 });

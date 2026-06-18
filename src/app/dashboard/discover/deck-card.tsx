@@ -1,6 +1,6 @@
 "use client";
 
-import { X, ExternalLink, Send } from "lucide-react";
+import { X, ExternalLink, Send, UserPlus, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const TIER_STYLES: Record<string, string> = {
@@ -98,6 +98,8 @@ export function DeckCard({
   inFlight = false,
   onSkip,
   onAddToPipeline,
+  onAddToNetwork,
+  onLater,
   onAskIntro,
 }: {
   contact: DeckContact;
@@ -105,6 +107,8 @@ export function DeckCard({
   inFlight?: boolean;
   onSkip?: () => void;
   onAddToPipeline?: () => void;
+  onAddToNetwork?: () => void;
+  onLater?: () => void;
   onAskIntro?: (warmPath: WarmPath) => void;
 }) {
   const isProfessor = contact.source === "professor";
@@ -256,8 +260,10 @@ export function DeckCard({
         </div>
       )}
 
-      {/* ─── Bottom actions ─── Primary: Add to pipeline. Secondary: Skip. ─── */}
+      {/* ─── Bottom actions ─── Primary row: Skip | Add to pipeline (+ LinkedIn).
+           Secondary row: Add to network | Later. ─── */}
       <div className="flex flex-col gap-2 border-t border-white/[0.06] p-3">
+        {/* Primary row */}
         <div className="grid grid-cols-[auto_1fr] gap-2">
           <button
             type="button"
@@ -325,16 +331,29 @@ export function DeckCard({
             </button>
           )}
         </div>
-        {/* Edit profile: opens /contact/:id?edit=1 in a new tab so deck position is preserved. */}
-        <a
-          href={`/contact/${contact.id}?edit=1`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 border border-white/[0.12] py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Edit profile
-        </a>
+        {/* Secondary row: Add to network | Later */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onAddToNetwork}
+            disabled={inFlight || pipelineState !== "idle"}
+            className="flex items-center justify-center gap-1.5 border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+            aria-label={`Add ${contact.name} to network`}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Add to network
+          </button>
+          <button
+            type="button"
+            onClick={onLater}
+            disabled={inFlight || pipelineState !== "idle"}
+            className="flex items-center justify-center gap-1.5 border border-white/[0.12] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:border-white/20 hover:text-foreground disabled:opacity-50"
+            aria-label={`Show ${contact.name} later`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Later
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -163,6 +163,24 @@ model UserDiscover {
   contact   AlumniContact @relation(fields: [contactId], references: [id])
 }
 
+// Per-user private edits layered over a shared AlumniContact (Profile/Relationship
+// split). Lets a user personalize a pool contact they've added to their network
+// without mutating the canonical, globally-unique row. `overrides` is a partial
+// JSON map of editable AlumniContact columns; the contacts routes merge it over
+// the canonical row for the editing user only. RLS: service-role only.
+model ContactOverride {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id")
+  contactId String   @map("contact_id")
+  overrides Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, contactId])
+  @@index([userId])
+  @@map("contact_override")
+}
+
 model WaitlistSignup {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   created_at        DateTime @default(now()) @db.Timestamptz(6)
