@@ -79,3 +79,4 @@ npm run db:seed      # Seed test data
 - Providers chain: SessionProvider → PostHogProvider (in `src/app/providers.tsx`)
 - PostHog env vars: `NEXT_PUBLIC_POSTHOG_KEY` (required), `NEXT_PUBLIC_POSTHOG_HOST` (optional, defaults to us.i.posthog.com)
 - Tracked events: user_signed_up, contact_viewed, outreach_drafted, outreach_sent, autoguard_triggered
+- PostgREST/Supabase caps every read at 1000 rows by default — unbounded `.in(...)` reads silently truncate past that with no error. Use `fetchAllRows()` (`src/lib/supabase-paginate.ts`) for sets that can exceed 1000 (node pools, leaderboard tallies). Symptom this caused: a node's shared pool dropped contacts and the leaderboard showed recently-onboarded members with 0 contacts once the node crossed 1000 shared contacts.
