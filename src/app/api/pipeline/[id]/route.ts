@@ -6,6 +6,7 @@ import {
   scopedInsert,
   scopedDelete,
 } from "@/lib/pipeline-auth";
+import { recordPipelineAdvance } from "@/lib/kith/events";
 
 interface StageMeta {
   key: string;
@@ -162,6 +163,17 @@ export async function PATCH(
       .select()
       .single();
     if (updateError) throw new Error(updateError.message);
+
+    // Best-effort node activity log. Fire-and-forget: recordPipelineAdvance never
+    // throws, and the trailing .catch() ensures a rejected promise can't surface
+    // here — the PATCH response is unaffected either way.
+    void recordPipelineAdvance({
+      actorId: userId,
+      contactId,
+      oldStage: existing.stage,
+      newStage,
+      stages,
+    }).catch(() => {});
 
     // Conversion tracking: reaching the pipeline's final stage.
     const terminalKey = stageKeys[stageKeys.length - 1];
