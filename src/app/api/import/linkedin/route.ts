@@ -8,6 +8,7 @@ import {
   computeWarmthScore,
   isValidLinkedInUrl,
 } from "@/lib/linkedin-import";
+import { heuristicPersonType } from "@/lib/discover/classify-person-type";
 
 interface CsvContact {
   name: string;
@@ -166,6 +167,17 @@ export async function POST(request: NextRequest) {
           existing = data;
         }
 
+        // Classify the Discover pool at import time so a new CSV contact lands
+        // in the right pool (Alumni | Student | Professor) without waiting for
+        // the AI backfill. Cheap title/firm heuristic — synchronous, never
+        // throws, never blocks the import. The backfill upgrades it later.
+        const { personType } = heuristicPersonType({
+          name: meta.name,
+          title: meta.title,
+          firmName: meta.experience,
+          education: meta.education,
+        });
+
         const record = {
           name: meta.name,
           title: meta.title,
@@ -179,6 +191,7 @@ export async function POST(request: NextRequest) {
           warmthScore: score,
           tier,
           source: "linkedin_csv",
+          personType,
           importedByUserId: userId,
         };
 
@@ -277,6 +290,14 @@ export async function POST(request: NextRequest) {
         const meta = await scrapeLinkedInMeta(url);
         const affiliations = detectAffiliations(meta, prefs);
         const { score, tier } = computeWarmthScore(affiliations);
+        // Classify the Discover pool at import time (see CSV path) — cheap
+        // heuristic, synchronous, never throws; the backfill upgrades it later.
+        const { personType } = heuristicPersonType({
+          name: meta.name,
+          title: meta.title,
+          firmName: meta.experience,
+          education: meta.education,
+        });
 
         // Existing-contact lookup, SCOPED TO THE CALLER (see CSV path above): the
         // importedByUserId filter prevents overwriting another user's pool row.
@@ -304,6 +325,7 @@ export async function POST(request: NextRequest) {
               warmthScore: score,
               tier,
               source: "linkedin_import",
+              personType,
               importedByUserId: userId,
             })
             .eq("id", existing.id);
@@ -345,6 +367,7 @@ export async function POST(request: NextRequest) {
               warmthScore: score,
               tier,
               source: "linkedin_import",
+              personType,
               importedByUserId: userId,
             })
             .select("id")

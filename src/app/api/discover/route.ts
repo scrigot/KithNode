@@ -3,8 +3,9 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { poolSafeContact } from "@/lib/redact";
-import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
-import { categoryBoostFor } from "@/lib/discover/ranker";
+import { type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
+import { poolRankBonus } from "@/lib/discover/pool-rank";
+import { getUserPrefs } from "@/lib/user-prefs";
 import { normalizeFirmName } from "@/lib/normalize-firm";
 import { KITH_NODES_ENABLED } from "@/lib/kith/flags";
 import { getCoMemberIds, getAcceptedFriendIds, getFriendSharedContacts } from "@/lib/kith/authz";
@@ -78,7 +79,6 @@ export async function GET(request: NextRequest) {
   const category: DiscoverCategory = ALL_CATEGORIES.includes(rawSource as DiscoverCategory)
     ? (rawSource as DiscoverCategory)
     : "alumni";
-  const allowedSources = sourcesForCategory(category);
 
   // Friends view (flag-gated, relationship filter — NOT a contact source). When
   // requested, the deck is built from accepted friends' friend-shared contacts
@@ -143,7 +143,20 @@ export async function GET(request: NextRequest) {
     if (track) {
       builder = builder.eq("track", track);
     }
-    builder = builder.in("source", allowedSources);
+    // Pool by what the contact IS (personType), not where it was imported from
+    // (source). personType is the authoritative pool key after the backfill.
+    // Empty / null personType falls ONLY into the alumni pool so unclassified
+    // contacts (pre-backfill rows) still appear somewhere rather than vanishing.
+    if (category === "alumni") {
+      // "alum" is the legacy token the manual contact-page toggle + scoring lib
+      // still write; treat it as alumni so a manually-tagged alum never falls
+      // out of every pool.
+      builder = builder.or(
+        "personType.eq.alumni,personType.eq.alum,personType.is.null,personType.eq.",
+      );
+    } else {
+      builder = builder.eq("personType", category);
+    }
 
     const { data: otherData, error: otherError } = await builder
       .order("warmthScore", { ascending: false })
@@ -215,19 +228,19 @@ export async function GET(request: NextRequest) {
   const unrated = contacts.filter((c) => !finalRated.has(c.id) && !laterIds.has(c.id));
   const deferred = contacts.filter((c) => laterIds.has(c.id));
 
-  // Re-rank the unrated deck by an alumni-vs-student adjustment layered on top
-  // of the persisted warmthScore (beta feedback: alumni outrank the current
-  // students / recent grads the user already knows). Applied here at read time
-  // so it reorders the WHOLE pool — including seed-scored student rows that are
-  // never scored through rank() — with no re-score. Sort is by the adjusted
-  // score descending; SQL already returned them warmth-ordered, so equal
-  // adjustments keep their warmth order.
+  // Re-rank the unrated deck by a category-aware affinity bonus layered on top
+  // of the persisted warmthScore. poolRankBonus reads the contact row + the
+  // requesting user's prefs to surface the most relevant contacts WITHIN the
+  // pool (shared greek / same college / target firm / target industry for
+  // alumni, every signal for students, teaches-here / field / seniority for
+  // professors) without re-scoring. Applied here at read time so it reorders the
+  // WHOLE pool — including seed-scored rows never scored through rank(). Sort is
+  // by the adjusted score descending; SQL already returned them warmth-ordered,
+  // so equal bonuses keep their warmth order.
+  const prefs = await getUserPrefs(session.user.email ?? "");
   const adjustedScore = (c: DeckRow) =>
     (typeof c.warmthScore === "number" ? c.warmthScore : 0) +
-    categoryBoostFor(
-      typeof c.source === "string" ? c.source : undefined,
-      typeof c.graduationYear === "number" ? c.graduationYear : undefined,
-    );
+    poolRankBonus(c, prefs, category);
   unrated.sort((a, b) => adjustedScore(b) - adjustedScore(a));
 
   // Stable ordering: unrated first, later-rated appended at the end.

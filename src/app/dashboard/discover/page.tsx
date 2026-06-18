@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
 import { apiFetch } from "@/lib/api-client";
-import { X, Star, Search, Sparkles, Loader2, GraduationCap, RefreshCw, Users, UserPlus } from "lucide-react";
+import { X, Star, Search, Sparkles, Loader2, GraduationCap, RefreshCw } from "lucide-react";
 import { IntroModal } from "./intro-modal";
 import { DeckCard, type DeckContact, type WarmPath } from "./deck-card";
 import { ALL_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
@@ -13,12 +13,9 @@ import { CreditCost } from "@/components/credit-cost";
 
 const TIERS = ["KITH", "HOT", "WARM", "MONITOR", "COLD"] as const;
 
-// Client-side Kith flag (Next inlines NEXT_PUBLIC_* at build time). Gates the
-// "Friends" relationship tab; source tabs are unaffected.
-const KITH_NODES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_KITH_NODES === "true";
-
-// "friends" is a relationship view (calls ?view=friends), NOT a contact source.
-type SourceFilter = "alumni" | "professor" | "student" | "friends";
+// Discover pools, keyed off AlumniContact.personType (Alumni = graduated,
+// Professor = faculty at the user's school, Student = current student).
+type SourceFilter = "alumni" | "professor" | "student";
 
 interface RateResult {
   ok: boolean;
@@ -57,15 +54,10 @@ export default function DiscoverPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(() => {
-    const view = searchParams.get("view");
-    if (KITH_NODES_ENABLED && view === "friends") return "friends";
     const s = searchParams.get("source");
     if (s === "professor" || s === "student") return s;
     return "alumni";
   });
-  // Friends tab with zero accepted friends → API returns { locked: true } and
-  // the deck renders an add-a-friend CTA instead of cards.
-  const [friendsLocked, setFriendsLocked] = useState(false);
   const [query, setQuery] = useState("");
   const [activeTier, setActiveTier] = useState<string>("");
   // Optional career-track filter ("" = all tracks). Refetches the pool on change.
@@ -121,9 +113,7 @@ export default function DiscoverPage() {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       if (tier) params.set("tier", tier.toLowerCase());
-      // Friends is a relationship view (?view=friends), not a contact source.
-      if (src === "friends") params.set("view", "friends");
-      else params.set("source", src);
+      params.set("source", src);
       if (track) params.set("track", track);
       const qs = params.toString();
 
@@ -132,7 +122,6 @@ export default function DiscoverPage() {
         if (!res.ok) throw new Error();
         const data = await res.json();
         const next: DeckContact[] = data.contacts || [];
-        setFriendsLocked(src === "friends" && data.locked === true);
         setDeck(next);
         setIndex(0);
         setReviewed(0);
@@ -140,10 +129,7 @@ export default function DiscoverPage() {
 
         // "No network" only when the user truly has no imports — an exhausted
         // pool (rated everyone) or an empty search must NOT read as no-network.
-        // The friends view drives its own locked CTA (above), so never let an
-        // empty friends deck fall through to the "No Network Yet" import prompt.
         if (
-          src !== "friends" &&
           !q &&
           !tier &&
           next.length === 0 &&
@@ -431,16 +417,9 @@ export default function DiscoverPage() {
   const handleSourceFilter = useCallback((src: SourceFilter) => {
     setSourceFilter(src);
     const params = new URLSearchParams(searchParams.toString());
-    // Friends is a relationship view; the source tabs use ?source. Keep the two
-    // params mutually exclusive so switching tabs never leaves a stale filter.
-    if (src === "friends") {
-      params.delete("source");
-      params.set("view", "friends");
-    } else {
-      params.delete("view");
-      if (src === "alumni") params.delete("source");
-      else params.set("source", src);
-    }
+    params.delete("view");
+    if (src === "alumni") params.delete("source");
+    else params.set("source", src);
     const qs = params.toString();
     router.replace(`/dashboard/discover${qs ? `?${qs}` : ""}`, { scroll: false });
   }, [router, searchParams]);
@@ -650,19 +629,15 @@ export default function DiscoverPage() {
               {sourceFilter === "professor"
                 ? "PROFESSORS"
                 : sourceFilter === "student"
-                  ? "ACTIVE STUDENTS"
-                  : sourceFilter === "friends"
-                    ? "FRIENDS"
-                    : "ALUMNI"}
+                  ? "STUDENTS"
+                  : "ALUMNI"}
             </h2>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
               {sourceFilter === "professor"
-                ? "Review professors one at a time"
+                ? "Faculty at your school"
                 : sourceFilter === "student"
-                  ? "Review active students one at a time"
-                  : sourceFilter === "friends"
-                    ? "Warm paths through people you know"
-                    : "Review contacts one at a time"}
+                  ? "Current students · ranked by every shared signal"
+                  : "Graduated contacts · ranked by shared firm · school · clubs"}
             </p>
           </div>
 
@@ -696,25 +671,12 @@ export default function DiscoverPage() {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Active Students
+              Students
             </button>
-            {KITH_NODES_ENABLED && (
-              <button
-                onClick={() => handleSourceFilter("friends")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                  sourceFilter === "friends"
-                    ? "bg-primary text-white"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Users className="h-3 w-3" />
-                Friends
-              </button>
-            )}
           </div>
         </div>
 
-        {sourceFilter === "friends" ? null : sourceFilter === "professor" ? (
+        {sourceFilter === "professor" ? (
           <button
             onClick={runSeedProfessors}
             disabled={seedLoading}
@@ -850,33 +812,8 @@ export default function DiscoverPage() {
           </div>
         )}
 
-        {/* Friends tab, zero accepted friends → locked CTA to add a friend. */}
-        {!loading && friendsLocked && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-full max-w-md border border-white/[0.06] bg-card px-10 py-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center border border-primary/30 bg-primary/10">
-                <Users className="h-6 w-6 text-primary" />
-              </div>
-              <p className="text-lg font-bold text-foreground">
-                Add a friend to unlock warm paths through people you know
-              </p>
-              <p className="mt-2 text-[12px] text-muted-foreground">
-                When a friend shares their contacts, they show up here as warm
-                introductions — full detail, tagged with who can connect you.
-              </p>
-              <a
-                href="/dashboard/friends"
-                className="mt-5 inline-flex items-center gap-2 bg-primary px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-primary/80"
-              >
-                <UserPlus className="h-4 w-4" />
-                Add a friend
-              </a>
-            </div>
-          </div>
-        )}
-
         {/* No search matches (pool exists, but the query/tier filtered to empty). */}
-        {!loading && !friendsLocked && deck.length === 0 && hasAnyContacts && (
+        {!loading && deck.length === 0 && hasAnyContacts && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-sm text-muted-foreground">
               No contacts match your filters.
