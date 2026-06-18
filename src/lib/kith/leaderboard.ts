@@ -1,108 +1,151 @@
-// Per-Node engagement leaderboard. Computed entirely from existing tables
-// (AlumniContact tiers, PipelineEntry stage activity, intro_requests, contacts
-// added). Two windows: week (7d) and month (30d). Identity = the User UUID;
-// names resolve from the User table (getUserNames keys by id).
+// Per-Node leaderboard — a SNAPSHOT of each member's CURRENT pipeline progression
+// plus their total contacts added. (Replaces the old 7/30-day activity score.)
+// Identity = the User UUID; names resolve from the User table (getUserNames keys
+// by id). Computed entirely from existing tables — no events log.
+//
+// Each member's pipeline contacts are bucketed into the 4 universal phases
+// (identified -> contacted -> engaged -> advanced) by mapping each entry's native
+// stage through its Pipeline's stage config (stageMeta.universalPhase), mirroring
+// the "All" view in /api/pipeline (UNIVERSAL_PHASES there). Score rewards
+// progression: a booked meeting (advanced) is worth far more than an email sent
+// (contacted); pre-outreach (identified) scores nothing. contactsAdded is a light
+// per-contact reward for network-building (lifetime).
 
 import { supabase } from "@/lib/supabase";
 import { fetchAllRows } from "@/lib/supabase-paginate";
 import { assertNodeMember, getNodeMemberIds } from "@/lib/kith/authz";
 import { getUserNames } from "@/lib/kith/users";
 
-export type LeaderboardWindow = "week" | "month";
+// Must match UNIVERSAL_PHASES in src/app/api/pipeline/route.ts.
+export const LEADERBOARD_PHASES = ["identified", "contacted", "engaged", "advanced"] as const;
+export type LeaderboardPhase = (typeof LEADERBOARD_PHASES)[number];
 
-const WINDOW_DAYS: Record<LeaderboardWindow, number> = { week: 7, month: 30 };
+// Progression weights. identified (sourced, not yet contacted) scores 0 so the
+// board rewards actually advancing relationships, not bulk-importing leads.
+export const PHASE_WEIGHTS: Record<LeaderboardPhase, number> = {
+  identified: 0,
+  contacted: 2,
+  engaged: 5,
+  advanced: 10,
+};
+export const CONTACT_ADDED_WEIGHT = 1;
 
-// Each signal is weighted by how much intent it shows.
-const WEIGHTS = { warmSignals: 3, coffeeChats: 5, intros: 4, contactsAdded: 1 };
+/** Pure score for one member: progression-weighted phases + contacts added. */
+export function scoreSnapshot(
+  phases: Record<LeaderboardPhase, number>,
+  contactsAdded: number,
+): number {
+  return (
+    phases.identified * PHASE_WEIGHTS.identified +
+    phases.contacted * PHASE_WEIGHTS.contacted +
+    phases.engaged * PHASE_WEIGHTS.engaged +
+    phases.advanced * PHASE_WEIGHTS.advanced +
+    contactsAdded * CONTACT_ADDED_WEIGHT
+  );
+}
 
 export interface LeaderboardRow {
+  /** The member's User UUID. Named `email` for response-shape compatibility. */
   email: string;
   name: string;
-  warmSignals: number;
-  coffeeChats: number;
-  intros: number;
   contactsAdded: number;
+  phases: Record<LeaderboardPhase, number>;
   score: number;
 }
 
-function tally<T>(rows: T[] | null | undefined, key: (r: T) => string): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const r of rows ?? []) {
-    const k = key(r);
-    m.set(k, (m.get(k) ?? 0) + 1);
+interface StageMeta {
+  key: string;
+  universalPhase?: string;
+}
+
+function zeroPhases(): Record<LeaderboardPhase, number> {
+  return { identified: 0, contacted: 0, engaged: 0, advanced: 0 };
+}
+
+// Pipeline.stages is stored as a JSON array (or a JSON string). Parse tolerantly
+// into the {key, universalPhase} subset the bucketing needs.
+export function parseStages(raw: unknown): StageMeta[] {
+  let arr: unknown[] = [];
+  if (Array.isArray(raw)) arr = raw;
+  else if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw || "[]");
+      arr = Array.isArray(v) ? v : [];
+    } catch {
+      arr = [];
+    }
   }
-  return m;
+  return arr
+    .filter((s): s is StageMeta => !!s && typeof s === "object" && typeof (s as StageMeta).key === "string")
+    .map((s) => ({ key: s.key, universalPhase: s.universalPhase }));
 }
 
 export async function computeLeaderboard(
   nodeId: string,
   requesterId: string,
-  window: LeaderboardWindow,
 ): Promise<LeaderboardRow[]> {
   await assertNodeMember(requesterId, nodeId);
 
   const memberIds = await getNodeMemberIds(nodeId);
   if (memberIds.length === 0) return [];
 
-  const since = new Date(Date.now() - WINDOW_DAYS[window] * 86_400_000).toISOString();
-
-  // fetchAllRows pages past PostgREST's 1000-row cap: once a node crosses 1000
-  // contacts in the window, a plain .in() read silently truncates and recent
-  // members (whose rows sort last) tally as 0.
-  const [contactRows, pipelineRows, introRows, names] = await Promise.all([
-    fetchAllRows<{ importedByUserId: string; tier: string | null; createdAt: string }>(() =>
+  // Snapshot — no time window. Lifetime contacts added + current pipeline state.
+  // fetchAllRows pages past PostgREST's 1000-row cap (a plain .in() silently
+  // truncates once a node crosses 1000 rows, zeroing recent members).
+  const [contactRows, entryRows, names] = await Promise.all([
+    fetchAllRows<{ importedByUserId: string }>(() =>
       supabase
         .from("AlumniContact")
-        .select("importedByUserId, tier, createdAt")
+        .select("importedByUserId")
         .in("importedByUserId", memberIds)
-        .gte("createdAt", since)
-        .order("id"), // stable key so .range() pages don't skip/overlap rows
-    ),
-    fetchAllRows<{ userId: string }>(() =>
-      supabase
-        .from("PipelineEntry")
-        .select("userId, updatedAt")
-        .in("userId", memberIds)
-        .gte("updatedAt", since)
         .order("id"),
     ),
-    fetchAllRows<{ from_user_id: string }>(() =>
+    fetchAllRows<{ userId: string; pipelineId: string | null; stage: string | null }>(() =>
       supabase
-        .from("intro_requests")
-        .select("from_user_id, created_at")
-        .in("from_user_id", memberIds)
-        .gte("created_at", since)
+        .from("PipelineEntry")
+        .select("userId, pipelineId, stage")
+        .in("userId", memberIds)
         .order("id"),
     ),
     getUserNames(memberIds),
   ]);
 
-  const contactsAdded = tally(contactRows, (r) => r.importedByUserId);
-  const warmSignals = tally(
-    contactRows.filter((r) => ["hot", "warm"].includes(String(r.tier).toLowerCase())),
-    (r) => r.importedByUserId,
-  );
-  const coffeeChats = tally(pipelineRows, (r) => r.userId);
-  const intros = tally(introRows, (r) => r.from_user_id);
+  // Map each pipeline -> (native stage key -> universal phase). A stage with no
+  // universalPhase (or an entry whose stage is unmapped) is excluded from the
+  // phase tally — same "unsorted" fallthrough as the pipeline All view.
+  const pipelineIds = [...new Set(entryRows.map((e) => e.pipelineId).filter((x): x is string => !!x))];
+  const stageToPhase = new Map<string, Map<string, string>>();
+  if (pipelineIds.length > 0) {
+    const { data: pipes } = await supabase.from("Pipeline").select("id, stages").in("id", pipelineIds);
+    for (const p of pipes ?? []) {
+      const m = new Map<string, string>();
+      for (const s of parseStages((p as { stages: unknown }).stages)) {
+        if (s.universalPhase) m.set(s.key.toLowerCase(), s.universalPhase);
+      }
+      stageToPhase.set(p.id as string, m);
+    }
+  }
+
+  const contactsAdded = new Map<string, number>();
+  for (const r of contactRows) {
+    contactsAdded.set(r.importedByUserId, (contactsAdded.get(r.importedByUserId) ?? 0) + 1);
+  }
+
+  const byMember = new Map<string, Record<LeaderboardPhase, number>>();
+  for (const e of entryRows) {
+    const phase = e.pipelineId
+      ? stageToPhase.get(e.pipelineId)?.get((e.stage || "").toLowerCase())
+      : undefined;
+    if (!phase || !(phase in PHASE_WEIGHTS)) continue;
+    const rec = byMember.get(e.userId) ?? zeroPhases();
+    rec[phase as LeaderboardPhase] += 1;
+    byMember.set(e.userId, rec);
+  }
 
   const rows: LeaderboardRow[] = memberIds.map((id) => {
-    const ws = warmSignals.get(id) ?? 0;
-    const cc = coffeeChats.get(id) ?? 0;
-    const ic = intros.get(id) ?? 0;
+    const phases = byMember.get(id) ?? zeroPhases();
     const ca = contactsAdded.get(id) ?? 0;
-    return {
-      email: id,
-      name: names.get(id) ?? id,
-      warmSignals: ws,
-      coffeeChats: cc,
-      intros: ic,
-      contactsAdded: ca,
-      score:
-        ws * WEIGHTS.warmSignals +
-        cc * WEIGHTS.coffeeChats +
-        ic * WEIGHTS.intros +
-        ca * WEIGHTS.contactsAdded,
-    };
+    return { email: id, name: names.get(id) ?? id, contactsAdded: ca, phases, score: scoreSnapshot(phases, ca) };
   });
 
   return rows.sort((a, b) => b.score - a.score);
