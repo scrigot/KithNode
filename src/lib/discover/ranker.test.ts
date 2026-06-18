@@ -79,6 +79,56 @@ describe("rank()", () => {
     expect(result.score).toBeGreaterThan(0);
   });
 
+  it("ranks an alumnus above a current student identical on firm/title/email", () => {
+    const base = {
+      title: "Analyst",
+      emailConfidence: 1.0,
+      signals: [linkedinSignal("firm-tier", "Bulge Bracket", 18)],
+    };
+    const thisYear = new Date().getFullYear();
+
+    // By source category: discover_run/linkedin → alumni, club → student.
+    const alumnusBySource = rank({ ...base, source: "linkedin_csv" });
+    const studentBySource = rank({ ...base, source: "unc_greek_clubs" });
+    expect(alumnusBySource.score).toBeGreaterThan(studentBySource.score);
+
+    // By grad year: a clearly-graduated year beats a current student.
+    const alumnusByYear = rank({ ...base, graduationYear: thisYear - 5 });
+    const studentByYear = rank({ ...base, graduationYear: thisYear });
+    expect(alumnusByYear.score).toBeGreaterThan(studentByYear.score);
+
+    // A very-recent grad (within ~1 year) is treated as a student.
+    const recentGrad = rank({ ...base, graduationYear: thisYear - 1 });
+    expect(recentGrad.score).toBeLessThan(alumnusByYear.score);
+    expect(recentGrad.score).toBe(studentByYear.score);
+  });
+
+  it("applies ALUMNI_BOOST (+5) and STUDENT_PENALTY (-8) relative to neutral", () => {
+    const base = {
+      title: "Analyst",
+      emailConfidence: 1.0,
+      signals: [linkedinSignal("firm-tier", "Bulge Bracket", 18)],
+    };
+    // No source / unknown source / professor are neutral (no recency weight).
+    const neutral = rank(base);
+    expect(rank({ ...base, source: "unknown_src" }).score).toBe(neutral.score);
+    expect(rank({ ...base, source: "professor" }).score).toBe(neutral.score);
+
+    const alum = rank({ ...base, source: "linkedin_csv" });
+    const student = rank({ ...base, source: "unc_greek_clubs" });
+    expect(alum.score).toBeGreaterThan(neutral.score);
+    expect(student.score).toBeLessThan(neutral.score);
+
+    // Closed form for this fixture: base = 30 + 18(±boost), reachability = 100
+    // (verified email + Analyst), confidence = 0.95 (single 0.95 signal).
+    //   score = round((30 + 18 + boost) * 0.85 + 100 * 0.15) * 0.95)
+    const scoreFor = (boost: number) =>
+      Math.round(((48 + boost) * 0.85 + 100 * 0.15) * 0.95);
+    expect(alum.score).toBe(scoreFor(5)); // +ALUMNI_BOOST
+    expect(student.score).toBe(scoreFor(-8)); // -STUDENT_PENALTY
+    expect(neutral.score).toBe(scoreFor(0));
+  });
+
   it("coerces non-finite emailConfidence to a finite score and valid tier", () => {
     const validTiers = ["hot", "warm", "monitor", "cold"];
     const signals = [linkedinSignal("firm-tier", "Bulge Bracket", 18)];

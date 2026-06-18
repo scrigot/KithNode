@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { findWarmPaths } from "@/lib/warm-paths";
 import { poolSafeContact } from "@/lib/redact";
 import { sourcesForCategory, type DiscoverCategory, ALL_CATEGORIES } from "@/lib/discover/source-categories";
+import { categoryBoostFor } from "@/lib/discover/ranker";
 import { normalizeFirmName } from "@/lib/normalize-firm";
 import { KITH_NODES_ENABLED } from "@/lib/kith/flags";
 import { getCoMemberIds, getAcceptedFriendIds, getFriendSharedContacts } from "@/lib/kith/authz";
@@ -213,6 +214,21 @@ export async function GET(request: NextRequest) {
   // later-rated contacts are kept but separated so they can be appended last.
   const unrated = contacts.filter((c) => !finalRated.has(c.id) && !laterIds.has(c.id));
   const deferred = contacts.filter((c) => laterIds.has(c.id));
+
+  // Re-rank the unrated deck by an alumni-vs-student adjustment layered on top
+  // of the persisted warmthScore (beta feedback: alumni outrank the current
+  // students / recent grads the user already knows). Applied here at read time
+  // so it reorders the WHOLE pool — including seed-scored student rows that are
+  // never scored through rank() — with no re-score. Sort is by the adjusted
+  // score descending; SQL already returned them warmth-ordered, so equal
+  // adjustments keep their warmth order.
+  const adjustedScore = (c: DeckRow) =>
+    (typeof c.warmthScore === "number" ? c.warmthScore : 0) +
+    categoryBoostFor(
+      typeof c.source === "string" ? c.source : undefined,
+      typeof c.graduationYear === "number" ? c.graduationYear : undefined,
+    );
+  unrated.sort((a, b) => adjustedScore(b) - adjustedScore(a));
 
   // Stable ordering: unrated first, later-rated appended at the end.
   const filtered = [...unrated, ...deferred];
