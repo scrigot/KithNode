@@ -148,11 +148,12 @@ export async function GET(request: NextRequest) {
     // Empty / null personType falls ONLY into the alumni pool so unclassified
     // contacts (pre-backfill rows) still appear somewhere rather than vanishing.
     if (category === "alumni") {
-      // "alum" is the legacy token the manual contact-page toggle + scoring lib
-      // still write; treat it as alumni so a manually-tagged alum never falls
-      // out of every pool.
+      // The alumni pool keys on personType "alum" — the value the classifier,
+      // import path, contact-page toggle, and scoring lib all write. "alumni"
+      // is tolerated defensively; empty/null is the unclassified fallback so a
+      // not-yet-classified contact still appears somewhere.
       builder = builder.or(
-        "personType.eq.alumni,personType.eq.alum,personType.is.null,personType.eq.",
+        "personType.eq.alum,personType.eq.alumni,personType.is.null,personType.eq.",
       );
     } else {
       builder = builder.eq("personType", category);

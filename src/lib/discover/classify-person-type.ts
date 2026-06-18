@@ -15,7 +15,7 @@ import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
 import { z } from "zod";
 
-export type PersonType = "student" | "alumni" | "professor";
+export type PersonType = "student" | "alum" | "professor";
 
 export interface PersonInput {
   name: string;
@@ -32,14 +32,14 @@ export interface PersonTypeResult {
 }
 
 const Schema = z.object({
-  personType: z.enum(["student", "alumni", "professor"]),
+  personType: z.enum(["student", "alum", "professor"]),
   graduationYear: z.number().int().min(1950).max(2035).nullable(),
   confidence: z.number().min(0).max(1),
 });
 
 const SYSTEM_PROMPT = `You classify a person's relationship to college, for a student networking app, into exactly one of:
 - "student": currently enrolled undergraduate or graduate student. Signals: internships ("Intern", "Summer Analyst", "Co-op"), campus jobs, fraternity/sorority officer roles, student-club or student-government leadership, research assistant while enrolled, no full-time post-graduation role.
-- "alumni": has graduated and works a real full-time professional role (e.g. Analyst / Associate / VP / Manager at a company). Interns are NOT alumni.
+- "alum": has graduated and works a real full-time professional role (e.g. Analyst / Associate / VP / Manager at a company). Interns are NOT alumni.
 - "professor": faculty, lecturer, instructor, adjunct, or teaching/research staff employed BY a university.
 
 Decide from the current title and firm/org. A title that is clearly an internship or a campus / Greek / student-club role => student. A clear full-time professional role at a company => alumni. When genuinely ambiguous between student and alumni, prefer "student" (this app's contacts skew current-undergrad).
@@ -78,7 +78,7 @@ export function heuristicPersonType(p: PersonInput): PersonTypeResult {
   }
   // Unknown full-time-ish role: this app skews current students, but a bare
   // professional title with no internship marker is more likely alumni.
-  return { personType: "alumni", graduationYear: p.graduationYear || null, confidence: 0.2 };
+  return { personType: "alum", graduationYear: p.graduationYear || null, confidence: 0.2 };
 }
 
 export async function classifyPersonType(p: PersonInput): Promise<PersonTypeResult> {
