@@ -58,6 +58,15 @@ export function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
+        <motion.a
+          href="/sign-in"
+          className="text-sm font-semibold transition-colors duration-200 ease-in-out"
+          style={{
+            color: useTransform(scrolled, (v) => (v > 0.5 ? "#0f172a" : "#ffffff")),
+          }}
+        >
+          Sign in
+        </motion.a>
         <Link
           href="/waitlist"
           className="rounded-[12px] bg-white/20 px-5 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:bg-white/30"
