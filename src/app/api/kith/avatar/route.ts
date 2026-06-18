@@ -17,11 +17,12 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 export async function GET() {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Avatar is a display attribute on the User row; looked up by the stable id.
   const { data } = await supabase
     .from("User")
     .select("name, image")
-    .eq("email", session.user.email)
+    .eq("id", session.user.id)
     .maybeSingle();
   return NextResponse.json({ name: data?.name ?? "", image: data?.image ?? "" });
 }
@@ -30,8 +31,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const userId = session.user.email;
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = session.user.id;
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   const publicUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
 
-  const { error: dbErr } = await supabase.from("User").update({ image: publicUrl }).eq("email", userId);
+  const { error: dbErr } = await supabase.from("User").update({ image: publicUrl }).eq("id", userId);
   if (dbErr) {
     console.error("[kith] avatar db update failed", dbErr);
     return NextResponse.json({ error: "Failed to save avatar" }, { status: 500 });

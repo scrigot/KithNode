@@ -34,9 +34,11 @@ import {
   NotNodeMemberError,
 } from "@/lib/kith/authz";
 
-const ME = "me@x.com";
-const FRIEND = "grayson@x.com";
-const STRANGER = "stranger@x.com";
+// Identity = the User UUID. Members/owners and AlumniContact.importedByUserId
+// are user ids; email lives only on the User row (display/transport).
+const ME = "11111111-1111-1111-1111-111111111111";
+const FRIEND = "22222222-2222-2222-2222-222222222222";
+const STRANGER = "33333333-3333-3333-3333-333333333333";
 
 beforeEach(() => {
   state.tables = {
@@ -45,8 +47,8 @@ beforeEach(() => {
       { id: "m2", nodeId: "n1", userId: FRIEND, role: "member" },
     ],
     User: [
-      { email: ME, name: "Me" },
-      { email: FRIEND, name: "Grayson" },
+      { id: ME, email: "me@x.com", name: "Me" },
+      { id: FRIEND, email: "grayson@x.com", name: "Grayson" },
     ],
     AlumniContact: [
       { id: "c1", name: "Shared One", linkedInUrl: "li/1", importedByUserId: FRIEND, sharedInNodes: true, tier: "warm", enrichedAt: null },

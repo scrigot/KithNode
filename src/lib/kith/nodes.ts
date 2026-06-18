@@ -1,8 +1,9 @@
-// Nodes (named groups that pool contacts). Identity = email.
+// Nodes (named groups that pool contacts). Identity = the User UUID; email is a
+// display/transport attribute resolved from the User table.
 
 import { supabase } from "@/lib/supabase";
 import { genId, genInviteCode } from "@/lib/kith/ids";
-import { getUserNames, userExists } from "@/lib/kith/users";
+import { getUserNames, idsForEmails, emailsForIds } from "@/lib/kith/users";
 import {
   assertNodeMember,
   getUserNodeIds,
@@ -82,38 +83,51 @@ export async function joinNodeByCode(userId: string, codeRaw: string) {
   return node;
 }
 
+/** Resolve a node's member rows (userId = uuid) into the display shape the UI
+ *  needs: each member carries its REAL email + name (resolved from User), plus
+ *  role + joinedAt. Email is required for display and the DM/realtime seam. */
+async function namedMembers(nodeId: string) {
+  const memberIds = await getNodeMemberIds(nodeId);
+  const [names, emails, { data: memberRows }] = await Promise.all([
+    getUserNames(memberIds),
+    emailsForIds(memberIds),
+    supabase.from("NodeMember").select("userId, role, joinedAt").eq("nodeId", nodeId),
+  ]);
+  return (memberRows ?? []).map((m) => {
+    const id = m.userId as string;
+    return {
+      email: emails.get(id) ?? id,
+      name: names.get(id) ?? (emails.get(id) ?? id),
+      role: m.role as string,
+      joinedAt: m.joinedAt as string,
+    };
+  });
+}
+
 /**
  * Add a user to a node by email (the invite-UI add-member path). The requester
  * must already be a member (assertNodeMember — the trust boundary), and the
- * invitee must be a real KithNode user. Idempotent via the unique(nodeId,userId)
- * constraint. Returns the refreshed named member list.
+ * invitee must be a real KithNode user. The invitee email is resolved to a
+ * User.id and stored as NodeMember.userId (uuid). Idempotent via the
+ * unique(nodeId,userId) constraint. Returns the refreshed named member list.
  */
 export async function addNodeMember(requesterId: string, nodeId: string, inviteeEmailRaw: string) {
   await assertNodeMember(requesterId, nodeId);
 
   const inviteeEmail = inviteeEmailRaw.trim().toLowerCase();
   if (!inviteeEmail) throw new NodeError("Invitee email required");
-  if (!(await userExists(inviteeEmail))) throw new NodeError("No KithNode user with that email");
+  const inviteeId = (await idsForEmails([inviteeEmail])).get(inviteeEmail);
+  if (!inviteeId) throw new NodeError("No KithNode user with that email");
 
   const { error } = await supabase
     .from("NodeMember")
     .upsert(
-      { id: genId(), nodeId, userId: inviteeEmail, role: "member" },
+      { id: genId(), nodeId, userId: inviteeId, role: "member" },
       { onConflict: "nodeId,userId", ignoreDuplicates: true },
     );
   if (error) throw new NodeError(error.message);
 
-  const memberIds = await getNodeMemberIds(nodeId);
-  const [names, { data: memberRows }] = await Promise.all([
-    getUserNames(memberIds),
-    supabase.from("NodeMember").select("userId, role, joinedAt").eq("nodeId", nodeId),
-  ]);
-  return (memberRows ?? []).map((m) => ({
-    email: m.userId as string,
-    name: names.get(m.userId as string) ?? (m.userId as string),
-    role: m.role as string,
-    joinedAt: m.joinedAt as string,
-  }));
+  return namedMembers(nodeId);
 }
 
 /** Leaving instantly revokes pool visibility (membership is checked live). */
@@ -133,19 +147,10 @@ export async function getNodeDetail(nodeId: string, requesterId: string) {
     .maybeSingle();
   if (!node) throw new NodeError("Node not found");
 
-  const memberIds = await getNodeMemberIds(nodeId);
-  const [names, { data: memberRows }, pool] = await Promise.all([
-    getUserNames(memberIds),
-    supabase.from("NodeMember").select("userId, role, joinedAt").eq("nodeId", nodeId),
+  const [members, pool] = await Promise.all([
+    namedMembers(nodeId),
     getPooledContactsForNode(nodeId, requesterId),
   ]);
-
-  const members = (memberRows ?? []).map((m) => ({
-    email: m.userId as string,
-    name: names.get(m.userId as string) ?? (m.userId as string),
-    role: m.role as string,
-    joinedAt: m.joinedAt as string,
-  }));
 
   return { node, members, pool };
 }

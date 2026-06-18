@@ -1,4 +1,7 @@
-// In-app messaging: user DMs + Node group chat. Identity = email everywhere.
+// In-app messaging: user DMs + Node group chat. Identity = the User UUID; the
+// uuid↔email seam lives here. DM thread keys ('emailA|emailB') and realtime
+// topics ('kith:user:{email}') STAY email-encoded — we resolve uuid↔email at
+// those edges. Message.senderId stays homogeneous email.
 //
 // THE TRUST BOUNDARY (mirrors authz.ts): the app uses the service-role key
 // (bypasses RLS) under NextAuth (auth.email() is NULL), so RLS cannot enforce
@@ -13,7 +16,7 @@
 import { supabase } from "@/lib/supabase";
 import { genId } from "@/lib/kith/ids";
 import { getAcceptedFriendIds, getCoMemberIds, getNodeMemberIds, isNodeMember } from "@/lib/kith/authz";
-import { getUserNames } from "@/lib/kith/users";
+import { getUserNames, idsForEmails, emailsForIds } from "@/lib/kith/users";
 
 export class MessageError extends Error {
   constructor(message: string) {
@@ -61,35 +64,37 @@ function dmPair(threadId: string): [string, string] | null {
 }
 
 /**
- * May `userId` DM `otherId`? DM scope = accepted friends OR node co-members.
- * (Two independent reasons; either grants access.)
+ * May `userId` DM `otherId` (both User UUIDs)? DM scope = accepted friends OR
+ * node co-members. (Two independent reasons; either grants access.)
  */
 export async function canDM(userId: string, otherId: string): Promise<boolean> {
-  const me = userId.trim().toLowerCase();
-  const other = otherId.trim().toLowerCase();
-  if (me === other) return false;
-  const [friends, coMembers] = await Promise.all([getAcceptedFriendIds(me), getCoMemberIds(me)]);
-  return friends.includes(other) || coMembers.includes(other);
+  if (userId === otherId) return false;
+  const [friends, coMembers] = await Promise.all([getAcceptedFriendIds(userId), getCoMemberIds(userId)]);
+  return friends.includes(otherId) || coMembers.includes(otherId);
 }
 
 /**
- * The gate for every thread read/write. node → must be a member; dm → must be
- * one of the pair AND still allowed to DM the other party (membership/friendship
- * can be revoked, so we re-check live, not just at thread-open time).
+ * The gate for every thread read/write (userId = the caller's User UUID). node →
+ * must be a member; dm → must be one of the pair AND still allowed to DM the
+ * other party (membership/friendship can be revoked, so we re-check live, not
+ * just at thread-open time). DM thread keys are email pairs, so we resolve the
+ * caller's uuid↔email and the other party's email↔uuid at this seam.
  */
 export async function canAccessThread(
   userId: string,
   threadType: ThreadType,
   threadId: string,
 ): Promise<boolean> {
-  const me = userId.trim().toLowerCase();
-  if (threadType === "node") return isNodeMember(me, threadId);
+  if (threadType === "node") return isNodeMember(userId, threadId);
 
   const pair = dmPair(threadId);
   if (!pair) return false;
-  if (!pair.includes(me)) return false;
-  const other = pair[0] === me ? pair[1] : pair[0];
-  return canDM(me, other);
+  const myEmail = (await emailsForIds([userId])).get(userId)?.trim().toLowerCase();
+  if (!myEmail || !pair.includes(myEmail)) return false;
+  const otherEmail = pair[0] === myEmail ? pair[1] : pair[0];
+  const otherId = (await idsForEmails([otherEmail])).get(otherEmail);
+  if (!otherId) return false;
+  return canDM(userId, otherId);
 }
 
 async function assertThreadAccess(userId: string, threadType: ThreadType, threadId: string): Promise<void> {
@@ -136,9 +141,15 @@ export async function listMessages(
   return rows.map((r) => ({ ...r, senderName: names.get(r.senderId) ?? r.senderId }));
 }
 
-/** Recipient emails for a message (who the server broadcasts it to). */
+/** Recipient emails for a message (who the server broadcasts it to). Node member
+ *  ids are uuids → resolved to emails so they match the client's realtime topic
+ *  subscription ('kith:user:{email}'). DM thread keys are already email pairs. */
 async function threadRecipients(threadType: ThreadType, threadId: string): Promise<string[]> {
-  if (threadType === "node") return getNodeMemberIds(threadId);
+  if (threadType === "node") {
+    const memberIds = await getNodeMemberIds(threadId);
+    const emails = await emailsForIds(memberIds);
+    return memberIds.map((id) => emails.get(id) ?? id);
+  }
   const pair = dmPair(threadId);
   return pair ?? [];
 }
@@ -193,7 +204,8 @@ export async function sendMessage(
   if (!body) throw new MessageError("Message body required");
   if (body.length > MAX_BODY) throw new MessageError("Message too long");
 
-  const senderId = userId.trim().toLowerCase();
+  // senderId stays homogeneous email: resolve the caller's uuid → email.
+  const senderId = ((await emailsForIds([userId])).get(userId) ?? userId).trim().toLowerCase();
   const { data, error } = await supabase
     .from("Message")
     .insert({ id: genId(), threadType, threadId, senderId, body })
@@ -225,7 +237,8 @@ export interface DmThreadSummary {
  * contain the user (LIKE could false-match a substring of another address).
  */
 export async function listDmThreads(userId: string): Promise<DmThreadSummary[]> {
-  const me = userId.trim().toLowerCase();
+  // DM thread keys are email pairs: resolve the caller's uuid → email first.
+  const me = ((await emailsForIds([userId])).get(userId) ?? userId).trim().toLowerCase();
 
   // Pull this user's DM messages (their email is always one side of the key).
   const { data, error } = await supabase

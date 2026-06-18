@@ -7,7 +7,7 @@ import { searchUsers } from "@/lib/kith/users";
 export async function GET(req: NextRequest) {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const q = req.nextUrl.searchParams.get("q") || "";
-  return NextResponse.json(await searchUsers(q, session.user.email));
+  return NextResponse.json(await searchUsers(q, session.user.id));
 }

@@ -7,9 +7,9 @@ import { mapKithError } from "@/lib/kith/http";
 export async function GET() {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    return NextResponse.json(await getMyNodes(session.user.email));
+    return NextResponse.json(await getMyNodes(session.user.id));
   } catch (err) {
     return mapKithError(err);
   }
@@ -18,13 +18,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { name } = await req.json();
     if (!name || typeof name !== "string") {
       return NextResponse.json({ error: "Node name required" }, { status: 400 });
     }
-    return NextResponse.json(await createNode(session.user.email, name));
+    return NextResponse.json(await createNode(session.user.id, name));
   } catch (err) {
     return mapKithError(err);
   }

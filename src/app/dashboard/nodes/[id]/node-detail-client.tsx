@@ -29,7 +29,7 @@ interface LbRow {
 }
 interface UserProfile { email: string; name: string; image: string }
 
-export function NodeDetailClient({ nodeId, me }: { nodeId: string; me: string }) {
+export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: string; myEmail: string }) {
   const router = useRouter();
   const [data, setData] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,7 +163,7 @@ export function NodeDetailClient({ nodeId, me }: { nodeId: string; me: string })
         <InviteView
           inviteCode={data.node.inviteCode}
           members={data.members}
-          me={me}
+          me={myEmail}
           onAdd={addMember}
           onMessage={messageMember}
         />
