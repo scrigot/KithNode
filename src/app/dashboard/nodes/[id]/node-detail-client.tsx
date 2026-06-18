@@ -24,8 +24,9 @@ interface NodeDetail {
   pool: PoolContact[];
 }
 interface LbRow {
-  email: string; name: string; warmSignals: number; coffeeChats: number;
-  intros: number; contactsAdded: number; score: number;
+  email: string; name: string; contactsAdded: number;
+  phases: { identified: number; contacted: number; engaged: number; advanced: number };
+  score: number;
 }
 interface UserProfile { email: string; name: string; image: string }
 
@@ -410,65 +411,60 @@ function IntroModal({ contact, onClose, onSent }: { contact: PoolContact; onClos
 }
 
 function LeaderboardView({ nodeId }: { nodeId: string }) {
-  const [window, setWindow] = useState<"week" | "month">("week");
   const [rows, setRows] = useState<LbRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    apiFetch(`/api/kith/nodes/${nodeId}/leaderboard?window=${window}`).then(async (res) => {
+    apiFetch(`/api/kith/nodes/${nodeId}/leaderboard`).then(async (res) => {
       if (res.ok) setRows((await res.json()).rows);
       setLoading(false);
     });
-  }, [nodeId, window]);
+  }, [nodeId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+    );
+  }
 
   return (
     <div>
-      <div className="mb-3 flex gap-1">
-        {(["week", "month"] as const).map((w) => (
-          <button
-            key={w}
-            onClick={() => setWindow(w)}
-            className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors ${
-              window === w ? "bg-accent-teal text-white" : "border border-white/[0.12] text-muted-foreground hover:bg-white/[0.06]"
-            }`}
-          >
-            {w}
-          </button>
-        ))}
-      </div>
-      {loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
-      ) : (
-        <div className="overflow-hidden border border-white/[0.06] bg-card">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-white/[0.06] text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                <th className="px-3 py-2">#</th>
-                <th className="px-3 py-2">Member</th>
-                <th className="px-3 py-2 text-right">Warm</th>
-                <th className="px-3 py-2 text-right">Chats</th>
-                <th className="px-3 py-2 text-right">Intros</th>
-                <th className="px-3 py-2 text-right">Added</th>
-                <th className="px-3 py-2 text-right">Score</th>
+      {/* Snapshot of current pipeline progression + total contacts added. Score
+          rewards advancing: contacted ×2, engaged ×5, advanced ×10, added ×1. */}
+      <p className="mb-3 text-[11px] text-muted-foreground/70">
+        Live snapshot. Score = contacted&times;2 + engaged&times;5 + advanced&times;10 + contacts added&times;1.
+      </p>
+      <div className="overflow-hidden border border-white/[0.06] bg-card">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-white/[0.06] text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              <th className="px-3 py-2">#</th>
+              <th className="px-3 py-2">Member</th>
+              <th className="px-3 py-2 text-right">Added</th>
+              <th className="px-3 py-2 text-right">Identified</th>
+              <th className="px-3 py-2 text-right">Contacted</th>
+              <th className="px-3 py-2 text-right">Engaged</th>
+              <th className="px-3 py-2 text-right">Advanced</th>
+              <th className="px-3 py-2 text-right">Score</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono text-[12px] tabular-nums">
+            {rows.map((r, i) => (
+              <tr key={r.email} className="border-b border-white/[0.06] last:border-b-0">
+                <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
+                <td className="px-3 py-2.5 font-sans text-foreground">{r.name}</td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground">{r.contactsAdded}</td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground/60">{r.phases.identified}</td>
+                <td className="px-3 py-2.5 text-right text-muted-foreground">{r.phases.contacted}</td>
+                <td className="px-3 py-2.5 text-right text-blue-400">{r.phases.engaged}</td>
+                <td className="px-3 py-2.5 text-right text-green-400">{r.phases.advanced}</td>
+                <td className="px-3 py-2.5 text-right font-bold text-accent-teal">{r.score}</td>
               </tr>
-            </thead>
-            <tbody className="font-mono text-[12px] tabular-nums">
-              {rows.map((r, i) => (
-                <tr key={r.email} className="border-b border-white/[0.06] last:border-b-0">
-                  <td className="px-3 py-2.5 text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-2.5 font-sans text-foreground">{r.name}</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{r.warmSignals}</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{r.coffeeChats}</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{r.intros}</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">{r.contactsAdded}</td>
-                  <td className="px-3 py-2.5 text-right font-bold text-accent-teal">{r.score}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
