@@ -18,6 +18,8 @@ vi.mock("@/lib/supabase", () => {
       eq: (col: string, val: unknown) => (filters.push({ op: "eq", col, val }), builder),
       in: (col: string, val: unknown) => (filters.push({ op: "in", col, val }), builder),
       gte: () => builder,
+      range: () => builder, // pagination passthrough (fetchAllRows); canned set is < 1 page
+      order: () => builder,
       maybeSingle: () => Promise.resolve({ data: apply()[0] ?? null, error: null }),
       single: () => Promise.resolve({ data: apply()[0] ?? null, error: null }),
       then: (res: (v: { data: unknown; error: null }) => unknown) =>

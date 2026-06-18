@@ -11,7 +11,11 @@
 // resolved from the User table at the edges that need it.
 
 import { supabase } from "@/lib/supabase";
+import { fetchAllRows } from "@/lib/supabase-paginate";
 import { dedupePooled, type PoolContact } from "@/lib/kith/pool";
+
+/** A pooled contact row as selected (owner id/name are attached afterwards). */
+type PoolRow = Omit<PoolContact, "ownerId" | "ownerName">;
 
 /** Thrown when a caller tries to touch a Node they're not a member of. */
 export class NotNodeMemberError extends Error {
@@ -100,22 +104,26 @@ export async function getPooledContactsForNode(
   const memberIds = await getNodeMemberIds(nodeId);
   if (memberIds.length === 0) return [];
 
-  const [{ data: contacts }, { data: users }] = await Promise.all([
-    supabase
-      .from("AlumniContact")
-      .select(POOL_COLUMNS)
-      .in("importedByUserId", memberIds)
-      .eq("sharedInNodes", true),
+  // fetchAllRows pages past PostgREST's 1000-row cap so a large pool isn't
+  // silently truncated (which drops whole owners' contacts from the pool).
+  const [contacts, { data: users }] = await Promise.all([
+    fetchAllRows<PoolRow>(() =>
+      supabase
+        .from("AlumniContact")
+        .select(POOL_COLUMNS)
+        .in("importedByUserId", memberIds)
+        .eq("sharedInNodes", true),
+    ),
     supabase.from("User").select("id, email, name").in("id", memberIds),
   ]);
 
   const nameById = new Map((users ?? []).map((u) => [u.id as string, (u.name as string) || (u.email as string)]));
   const emailById = new Map((users ?? []).map((u) => [u.id as string, u.email as string]));
 
-  const rows: PoolContact[] = (contacts ?? []).map((c) => {
-    const ownerId = c.importedByUserId as string;
+  const rows: PoolContact[] = contacts.map((c) => {
+    const ownerId = c.importedByUserId;
     return {
-      ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
+      ...c,
       ownerId,
       ownerName: nameById.get(ownerId) ?? emailById.get(ownerId) ?? ownerId,
     };
@@ -131,22 +139,24 @@ export async function getFriendSharedContacts(userId: string): Promise<PoolConta
   const friendIds = await getAcceptedFriendIds(userId);
   if (friendIds.length === 0) return [];
 
-  const [{ data: contacts }, { data: users }] = await Promise.all([
-    supabase
-      .from("AlumniContact")
-      .select(POOL_COLUMNS)
-      .in("importedByUserId", friendIds)
-      .eq("sharedWithFriends", true),
+  const [contacts, { data: users }] = await Promise.all([
+    fetchAllRows<PoolRow>(() =>
+      supabase
+        .from("AlumniContact")
+        .select(POOL_COLUMNS)
+        .in("importedByUserId", friendIds)
+        .eq("sharedWithFriends", true),
+    ),
     supabase.from("User").select("id, email, name").in("id", friendIds),
   ]);
 
   const nameById = new Map((users ?? []).map((u) => [u.id as string, (u.name as string) || (u.email as string)]));
   const emailById = new Map((users ?? []).map((u) => [u.id as string, u.email as string]));
 
-  const rows: PoolContact[] = (contacts ?? []).map((c) => {
-    const ownerId = c.importedByUserId as string;
+  const rows: PoolContact[] = contacts.map((c) => {
+    const ownerId = c.importedByUserId;
     return {
-      ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
+      ...c,
       ownerId,
       ownerName: nameById.get(ownerId) ?? emailById.get(ownerId) ?? ownerId,
     };

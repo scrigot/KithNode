@@ -4,6 +4,7 @@
 // names resolve from the User table (getUserNames keys by id).
 
 import { supabase } from "@/lib/supabase";
+import { fetchAllRows } from "@/lib/supabase-paginate";
 import { assertNodeMember, getNodeMemberIds } from "@/lib/kith/authz";
 import { getUserNames } from "@/lib/kith/users";
 
@@ -45,32 +46,41 @@ export async function computeLeaderboard(
 
   const since = new Date(Date.now() - WINDOW_DAYS[window] * 86_400_000).toISOString();
 
-  const [contactsRes, pipelineRes, introsRes, names] = await Promise.all([
-    supabase
-      .from("AlumniContact")
-      .select("importedByUserId, tier, createdAt")
-      .in("importedByUserId", memberIds)
-      .gte("createdAt", since),
-    supabase
-      .from("PipelineEntry")
-      .select("userId, updatedAt")
-      .in("userId", memberIds)
-      .gte("updatedAt", since),
-    supabase
-      .from("intro_requests")
-      .select("from_user_id, created_at")
-      .in("from_user_id", memberIds)
-      .gte("created_at", since),
+  // fetchAllRows pages past PostgREST's 1000-row cap: once a node crosses 1000
+  // contacts in the window, a plain .in() read silently truncates and recent
+  // members (whose rows sort last) tally as 0.
+  const [contactRows, pipelineRows, introRows, names] = await Promise.all([
+    fetchAllRows<{ importedByUserId: string; tier: string | null; createdAt: string }>(() =>
+      supabase
+        .from("AlumniContact")
+        .select("importedByUserId, tier, createdAt")
+        .in("importedByUserId", memberIds)
+        .gte("createdAt", since),
+    ),
+    fetchAllRows<{ userId: string }>(() =>
+      supabase
+        .from("PipelineEntry")
+        .select("userId, updatedAt")
+        .in("userId", memberIds)
+        .gte("updatedAt", since),
+    ),
+    fetchAllRows<{ from_user_id: string }>(() =>
+      supabase
+        .from("intro_requests")
+        .select("from_user_id, created_at")
+        .in("from_user_id", memberIds)
+        .gte("created_at", since),
+    ),
     getUserNames(memberIds),
   ]);
 
-  const contactsAdded = tally(contactsRes.data, (r) => r.importedByUserId as string);
+  const contactsAdded = tally(contactRows, (r) => r.importedByUserId);
   const warmSignals = tally(
-    (contactsRes.data ?? []).filter((r) => ["hot", "warm"].includes(String(r.tier).toLowerCase())),
-    (r) => r.importedByUserId as string,
+    contactRows.filter((r) => ["hot", "warm"].includes(String(r.tier).toLowerCase())),
+    (r) => r.importedByUserId,
   );
-  const coffeeChats = tally(pipelineRes.data, (r) => r.userId as string);
-  const intros = tally(introsRes.data, (r) => r.from_user_id as string);
+  const coffeeChats = tally(pipelineRows, (r) => r.userId);
+  const intros = tally(introRows, (r) => r.from_user_id);
 
   const rows: LeaderboardRow[] = memberIds.map((id) => {
     const ws = warmSignals.get(id) ?? 0;
