@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search, Link2, MessageSquare } from "lucide-react";
 
 interface Person {
+  id: string;
   email: string;
   name: string;
   image: string;
@@ -155,11 +156,11 @@ export function FriendsClient() {
               <Empty>No pending requests.</Empty>
             ) : (
               data.incoming.map((p) => (
-                <Row key={p.email} person={p}>
-                  <button onClick={() => respond(p.email, "accept")} className="flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-green-400 hover:bg-green-500/20">
+                <Row key={p.id} person={p}>
+                  <button onClick={() => respond(p.id, "accept")} className="flex items-center gap-1 border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-green-400 hover:bg-green-500/20">
                     <Check className="h-3.5 w-3.5" /> Accept
                   </button>
-                  <button onClick={() => respond(p.email, "block")} className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-500/10 hover:text-red-400">
+                  <button onClick={() => respond(p.id, "block")} className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-500/10 hover:text-red-400">
                     <X className="h-3.5 w-3.5" /> Block
                   </button>
                 </Row>

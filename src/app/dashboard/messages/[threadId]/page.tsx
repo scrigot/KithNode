@@ -14,15 +14,16 @@ export default async function MessageThreadPage({
   params: Promise<{ threadId: string }>;
 }) {
   const session = await auth();
-  if (!KITH_NODES_ENABLED || !session?.user?.email) notFound();
+  if (!KITH_NODES_ENABLED || !session?.user?.email || !session?.user?.id) notFound();
 
   const { threadId: raw } = await params;
   const threadId = decodeURIComponent(raw);
-  const me = session.user.email.trim().toLowerCase();
+  const myEmail = session.user.email.trim().toLowerCase();
 
-  if (!(await canAccessThread(me, "dm", threadId))) notFound();
+  // canAccessThread takes the User UUID; the DM thread key stays an email pair.
+  if (!(await canAccessThread(session.user.id, "dm", threadId))) notFound();
 
-  const otherEmail = threadId.split("|").find((e) => e !== me) ?? threadId;
+  const otherEmail = threadId.split("|").find((e) => e !== myEmail) ?? threadId;
   const names = await getUserNames([otherEmail]);
   const otherName = names.get(otherEmail) ?? otherEmail;
 
