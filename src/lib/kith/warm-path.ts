@@ -4,7 +4,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { canUserSeeContact } from "@/lib/kith/authz";
-import { getUserNames } from "@/lib/kith/users";
+import { getUserNames, emailsForIds } from "@/lib/kith/users";
 
 export class WarmPathError extends Error {
   constructor(message: string) {
@@ -38,15 +38,16 @@ export async function createIntroFromPool(viewerId: string, contactId: string, m
   const ownerId = contact.importedByUserId as string;
   if (ownerId === viewerId) throw new WarmPathError("This is already your contact — no intro needed");
 
-  const names = await getUserNames([ownerId]);
+  const [names, emails] = await Promise.all([getUserNames([ownerId]), emailsForIds([ownerId])]);
   const ownerName = names.get(ownerId) ?? ownerId;
+  const ownerEmail = emails.get(ownerId) ?? ownerId;
 
   const { data, error } = await supabase
     .from("intro_requests")
     .insert({
       from_user_id: viewerId,
       intermediary_name: ownerName,
-      intermediary_email: ownerId, // identity is the email
+      intermediary_email: ownerEmail, // display/transport: the owner's email
       target_contact_id: contactId,
       message,
       status: "pending",

@@ -1,6 +1,7 @@
 // Per-Node engagement leaderboard. Computed entirely from existing tables
 // (AlumniContact tiers, PipelineEntry stage activity, intro_requests, contacts
-// added). Two windows: week (7d) and month (30d). Identity = email.
+// added). Two windows: week (7d) and month (30d). Identity = the User UUID;
+// names resolve from the User table (getUserNames keys by id).
 
 import { supabase } from "@/lib/supabase";
 import { assertNodeMember, getNodeMemberIds } from "@/lib/kith/authz";
@@ -71,14 +72,14 @@ export async function computeLeaderboard(
   const coffeeChats = tally(pipelineRes.data, (r) => r.userId as string);
   const intros = tally(introsRes.data, (r) => r.from_user_id as string);
 
-  const rows: LeaderboardRow[] = memberIds.map((email) => {
-    const ws = warmSignals.get(email) ?? 0;
-    const cc = coffeeChats.get(email) ?? 0;
-    const ic = intros.get(email) ?? 0;
-    const ca = contactsAdded.get(email) ?? 0;
+  const rows: LeaderboardRow[] = memberIds.map((id) => {
+    const ws = warmSignals.get(id) ?? 0;
+    const cc = coffeeChats.get(id) ?? 0;
+    const ic = intros.get(id) ?? 0;
+    const ca = contactsAdded.get(id) ?? 0;
     return {
-      email,
-      name: names.get(email) ?? email,
+      email: id,
+      name: names.get(id) ?? id,
       warmSignals: ws,
       coffeeChats: cc,
       intros: ic,

@@ -6,7 +6,7 @@ function contact(over: Partial<PoolContact>): PoolContact {
     id: "c", name: "", firmName: "", title: "", linkedInUrl: "", education: "",
     location: "", warmthScore: 0, tier: "cold", affiliations: "", graduationYear: null,
     degrees: "", concentration: "", hometown: "", enrichedAt: null,
-    importedByUserId: "owner@x.com", sharedInNodes: true, ownerId: "owner@x.com", ownerName: "Owner",
+    importedByUserId: "owner-uuid", sharedInNodes: true, ownerId: "owner-uuid", ownerName: "Owner",
     ...over,
   };
 }

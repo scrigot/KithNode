@@ -6,7 +6,9 @@
 // read/write path MUST go through them. RLS on the tables is deny-all defense
 // in depth only.
 //
-// User identity = email everywhere (matches AlumniContact.importedByUserId).
+// User identity = the User UUID everywhere (matches AlumniContact.importedByUserId
+// and PipelineEntry.userId). Email is a display/transport attribute only,
+// resolved from the User table at the edges that need it.
 
 import { supabase } from "@/lib/supabase";
 import { dedupePooled, type PoolContact } from "@/lib/kith/pool";
@@ -19,7 +21,19 @@ export class NotNodeMemberError extends Error {
   }
 }
 
-/** Accepted (mutual) friends of a user — emails. Two parameterized queries, no
+/** Defense-in-depth: identity columns hold User UUIDs after the email→uuid
+ *  backfill. An email-shaped id reaching the trust boundary means an un-migrated
+ *  row slipped through — log loudly (a leftover email could silently widen
+ *  visibility if it ever collided with a contact's importedByUserId) rather than
+ *  failing silently. Returns the ids unchanged. */
+function flagEmailIds(ids: string[], where: string): string[] {
+  if (ids.some((id) => id.includes("@"))) {
+    console.error(`[kith] email-shaped identity in ${where} — email→uuid backfill incomplete`);
+  }
+  return ids;
+}
+
+/** Accepted (mutual) friends of a user — user ids. Two parameterized queries, no
  *  .or() string interpolation (avoids the PostgREST filter-injection vector). */
 export async function getAcceptedFriendIds(userId: string): Promise<string[]> {
   const [outgoing, incoming] = await Promise.all([
@@ -30,7 +44,7 @@ export async function getAcceptedFriendIds(userId: string): Promise<string[]> {
     ...(outgoing.data?.map((r) => r.addresseeId as string) ?? []),
     ...(incoming.data?.map((r) => r.requesterId as string) ?? []),
   ];
-  return [...new Set(ids)];
+  return flagEmailIds([...new Set(ids)], "getAcceptedFriendIds");
 }
 
 /** Node ids the user belongs to. */
@@ -54,10 +68,10 @@ export async function assertNodeMember(userId: string, nodeId: string): Promise<
   if (!(await isNodeMember(userId, nodeId))) throw new NotNodeMemberError();
 }
 
-/** Member emails of a node (caller should assertNodeMember first). */
+/** Member ids of a node (caller should assertNodeMember first). */
 export async function getNodeMemberIds(nodeId: string): Promise<string[]> {
   const { data } = await supabase.from("NodeMember").select("userId").eq("nodeId", nodeId);
-  return data?.map((r) => r.userId as string) ?? [];
+  return flagEmailIds(data?.map((r) => r.userId as string) ?? [], "getNodeMemberIds");
 }
 
 /** Everyone who shares at least one node with the user (excludes self). */
@@ -65,7 +79,10 @@ export async function getCoMemberIds(userId: string): Promise<string[]> {
   const nodeIds = await getUserNodeIds(userId);
   if (nodeIds.length === 0) return [];
   const { data } = await supabase.from("NodeMember").select("userId").in("nodeId", nodeIds);
-  return [...new Set((data?.map((r) => r.userId as string) ?? []).filter((id) => id !== userId))];
+  return flagEmailIds(
+    [...new Set((data?.map((r) => r.userId as string) ?? []).filter((id) => id !== userId))],
+    "getCoMemberIds",
+  );
 }
 
 const POOL_COLUMNS =
@@ -73,7 +90,7 @@ const POOL_COLUMNS =
 
 /** The pooled, deduped contact view for a node. NON-MEMBER → throws (never
  *  returns rows). sharedInNodes=false contacts are excluded. Each row carries
- *  the owner email + name for the "via {friend}" warm path. */
+ *  the owner id + name for the "via {friend}" warm path. */
 export async function getPooledContactsForNode(
   nodeId: string,
   requesterId: string,
@@ -89,22 +106,26 @@ export async function getPooledContactsForNode(
       .select(POOL_COLUMNS)
       .in("importedByUserId", memberIds)
       .eq("sharedInNodes", true),
-    supabase.from("User").select("email, name").in("email", memberIds),
+    supabase.from("User").select("id, email, name").in("id", memberIds),
   ]);
 
-  const nameByEmail = new Map((users ?? []).map((u) => [u.email as string, (u.name as string) || (u.email as string)]));
+  const nameById = new Map((users ?? []).map((u) => [u.id as string, (u.name as string) || (u.email as string)]));
+  const emailById = new Map((users ?? []).map((u) => [u.id as string, u.email as string]));
 
-  const rows: PoolContact[] = (contacts ?? []).map((c) => ({
-    ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
-    ownerId: c.importedByUserId as string,
-    ownerName: nameByEmail.get(c.importedByUserId as string) ?? (c.importedByUserId as string),
-  }));
+  const rows: PoolContact[] = (contacts ?? []).map((c) => {
+    const ownerId = c.importedByUserId as string;
+    return {
+      ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
+      ownerId,
+      ownerName: nameById.get(ownerId) ?? emailById.get(ownerId) ?? ownerId,
+    };
+  });
 
   return dedupePooled(rows);
 }
 
 /** Friend-shared pooled contacts: contacts owned by the user's accepted friends
- *  with sharedWithFriends=true. Deduped, each row tagged with the owner email +
+ *  with sharedWithFriends=true. Deduped, each row tagged with the owner id +
  *  name for the "via {friend}" warm path. Parallels getPooledContactsForNode. */
 export async function getFriendSharedContacts(userId: string): Promise<PoolContact[]> {
   const friendIds = await getAcceptedFriendIds(userId);
@@ -116,16 +137,20 @@ export async function getFriendSharedContacts(userId: string): Promise<PoolConta
       .select(POOL_COLUMNS)
       .in("importedByUserId", friendIds)
       .eq("sharedWithFriends", true),
-    supabase.from("User").select("email, name").in("email", friendIds),
+    supabase.from("User").select("id, email, name").in("id", friendIds),
   ]);
 
-  const nameByEmail = new Map((users ?? []).map((u) => [u.email as string, (u.name as string) || (u.email as string)]));
+  const nameById = new Map((users ?? []).map((u) => [u.id as string, (u.name as string) || (u.email as string)]));
+  const emailById = new Map((users ?? []).map((u) => [u.id as string, u.email as string]));
 
-  const rows: PoolContact[] = (contacts ?? []).map((c) => ({
-    ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
-    ownerId: c.importedByUserId as string,
-    ownerName: nameByEmail.get(c.importedByUserId as string) ?? (c.importedByUserId as string),
-  }));
+  const rows: PoolContact[] = (contacts ?? []).map((c) => {
+    const ownerId = c.importedByUserId as string;
+    return {
+      ...(c as Omit<PoolContact, "ownerId" | "ownerName">),
+      ownerId,
+      ownerName: nameById.get(ownerId) ?? emailById.get(ownerId) ?? ownerId,
+    };
+  });
 
   return dedupePooled(rows);
 }

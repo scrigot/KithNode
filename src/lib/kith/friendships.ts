@@ -1,9 +1,10 @@
 // Kith (friends). Mutual = a Friendship row with status 'accepted'.
-// Identity = email. All access via the service-role client.
+// Identity = the User UUID; email is a display/transport attribute resolved from
+// the User table. All access via the service-role client.
 
 import { supabase } from "@/lib/supabase";
 import { genId } from "@/lib/kith/ids";
-import { getUserProfiles, getUserNames, userExists } from "@/lib/kith/users";
+import { getUserProfiles, getUserNames, idsForEmails } from "@/lib/kith/users";
 import { getAcceptedFriendIds, getUserNodeIds } from "@/lib/kith/authz";
 
 /** How a Friendship row was created, relative to the schema's `source` column. */
@@ -35,16 +36,22 @@ async function findBetween(a: string, b: string): Promise<FriendshipRow | null> 
 }
 
 /**
- * Create an already-accepted Friendship between two users. Idempotent:
+ * Create an already-accepted Friendship between two users (identified by email,
+ * resolved to User ids). Idempotent:
  * - If no row exists, inserts with status='accepted'.
  * - If a row exists in any status, leaves it as-is (never downgrades accepted/blocked).
- * Used by the invite-link auto-friend path in the signIn callback.
- * Neither user needs to exist yet (the caller checked existence before this).
+ * Used by the invite-link auto-friend path in the signIn callback. Best-effort:
+ * if either user doesn't exist yet, skips gracefully.
  */
 export async function createKithFriendship(inviterEmail: string, newUserEmail: string) {
-  const requesterId = inviterEmail.trim().toLowerCase();
-  const addresseeId = newUserEmail.trim().toLowerCase();
-  if (requesterId === addresseeId) return;
+  const inviter = inviterEmail.trim().toLowerCase();
+  const newUser = newUserEmail.trim().toLowerCase();
+  if (inviter === newUser) return;
+
+  const ids = await idsForEmails([inviter, newUser]);
+  const requesterId = ids.get(inviter);
+  const addresseeId = ids.get(newUser);
+  if (!requesterId || !addresseeId) return; // best-effort: skip if either user is missing
 
   const existing = await findBetween(requesterId, addresseeId);
   if (existing) return; // already any-status — don't touch it
@@ -65,10 +72,11 @@ export async function sendFriendRequest(
   addresseeEmailRaw: string,
   source: FriendshipSource = "direct",
 ) {
-  const addresseeId = addresseeEmailRaw.trim().toLowerCase();
-  if (!addresseeId) throw new FriendRequestError("Email required");
-  if (addresseeId === requesterId.toLowerCase()) throw new FriendRequestError("You can't friend yourself");
-  if (!(await userExists(addresseeId))) throw new FriendRequestError("No KithNode user with that email");
+  const addresseeEmail = addresseeEmailRaw.trim().toLowerCase();
+  if (!addresseeEmail) throw new FriendRequestError("Email required");
+  const addresseeId = (await idsForEmails([addresseeEmail])).get(addresseeEmail);
+  if (!addresseeId) throw new FriendRequestError("No KithNode user with that email");
+  if (addresseeId === requesterId) throw new FriendRequestError("You can't friend yourself");
 
   const existing = await findBetween(requesterId, addresseeId);
   if (existing) {
@@ -118,6 +126,7 @@ export interface FriendProvenance {
 }
 
 interface FriendPerson {
+  id: string;
   email: string;
   name: string;
   image: string;
@@ -149,8 +158,8 @@ export async function friendContext(userId: string): Promise<Map<string, FriendP
     supabase.from("Friendship").select("*").eq("addresseeId", userId).eq("status", "accepted"),
   ]);
   const acceptedRows = [...((asReq.data as FriendshipRow[]) ?? []), ...((asAddr.data as FriendshipRow[]) ?? [])];
-  const friendEmails = acceptedRows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
-  if (friendEmails.length === 0) return new Map();
+  const friendIds = acceptedRows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
+  if (friendIds.length === 0) return new Map();
 
   const [myNodeIds, myFriendIds, referralRows, friendNodeRows, theirFriendRows] = await Promise.all([
     getUserNodeIds(userId),
@@ -159,15 +168,15 @@ export async function friendContext(userId: string): Promise<Map<string, FriendP
     supabase
       .from("Friendship")
       .select("requesterId, addresseeId")
-      .in("addresseeId", friendEmails)
+      .in("addresseeId", friendIds)
       .eq("source", "invite")
       .eq("status", "accepted"),
     // shared nodes: NodeMember rows for friends — intersect with my nodes in memory.
-    supabase.from("NodeMember").select("nodeId, userId").in("userId", friendEmails),
+    supabase.from("NodeMember").select("nodeId, userId").in("userId", friendIds),
     // mutual friends: accepted Friendship rows where a friend is on either side.
     Promise.all([
-      supabase.from("Friendship").select("requesterId, addresseeId").in("requesterId", friendEmails).eq("status", "accepted"),
-      supabase.from("Friendship").select("requesterId, addresseeId").in("addresseeId", friendEmails).eq("status", "accepted"),
+      supabase.from("Friendship").select("requesterId, addresseeId").in("requesterId", friendIds).eq("status", "accepted"),
+      supabase.from("Friendship").select("requesterId, addresseeId").in("addresseeId", friendIds).eq("status", "accepted"),
     ]),
   ]);
 
@@ -194,7 +203,7 @@ export async function friendContext(userId: string): Promise<Map<string, FriendP
     sharedNodesByFriend.set(m.userId, arr);
   }
 
-  // friendsOf: email → set of that friend's accepted-friend emails (for mutual-count).
+  // friendsOf: id → set of that friend's accepted-friend ids (for mutual-count).
   const [theirAsReq, theirAsAddr] = theirFriendRows;
   const friendsOf = new Map<string, Set<string>>();
   const addFriendOf = (owner: string, other: string) => {
@@ -208,15 +217,15 @@ export async function friendContext(userId: string): Promise<Map<string, FriendP
 
   const out = new Map<string, FriendProvenance>();
   for (const row of acceptedRows) {
-    const friendEmail = row.requesterId === userId ? row.addresseeId : row.requesterId;
-    const referrer = referrerByFriend.get(friendEmail);
-    const theirFriends = friendsOf.get(friendEmail) ?? new Set<string>();
+    const friendId = row.requesterId === userId ? row.addresseeId : row.requesterId;
+    const referrer = referrerByFriend.get(friendId);
+    const theirFriends = friendsOf.get(friendId) ?? new Set<string>();
     let mutualFriends = 0;
     for (const f of theirFriends) if (f !== userId && mySet.has(f)) mutualFriends++;
-    out.set(friendEmail, {
+    out.set(friendId, {
       howConnected: howConnected(row, userId),
       referredIn: referrer ? `Joined via ${referrerNames.get(referrer) ?? referrer}` : null,
-      mutuals: { sharedNodes: sharedNodesByFriend.get(friendEmail) ?? [], mutualFriends },
+      mutuals: { sharedNodes: sharedNodesByFriend.get(friendId) ?? [], mutualFriends },
     });
   }
   return out;
@@ -230,15 +239,18 @@ export async function listFriends(userId: string) {
   ]);
   const rows = [...((asReq.data as FriendshipRow[]) ?? []), ...((asAddr.data as FriendshipRow[]) ?? [])];
 
-  const otherEmails = rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
-  const [profiles, context] = await Promise.all([getUserProfiles(otherEmails), friendContext(userId)]);
-  const label = (email: string) => profiles.get(email) ?? { email, name: email, image: "" };
+  // Identity is the User UUID; resolve each other-party id to a display profile
+  // (which carries the real id + email). incoming items expose the requester's
+  // id so the client can respond with it.
+  const otherIds = rows.map((r) => (r.requesterId === userId ? r.addresseeId : r.requesterId));
+  const [profiles, context] = await Promise.all([getUserProfiles(otherIds), friendContext(userId)]);
+  const label = (id: string) => profiles.get(id) ?? { id, email: id, name: id, image: "" };
   const fallbackProvenance: FriendProvenance = {
     howConnected: "",
     referredIn: null,
     mutuals: { sharedNodes: [], mutualFriends: 0 },
   };
-  const friendPerson = (email: string): FriendPerson => ({ ...label(email), provenance: context.get(email) ?? fallbackProvenance });
+  const friendPerson = (id: string): FriendPerson => ({ ...label(id), provenance: context.get(id) ?? fallbackProvenance });
 
   return {
     friends: rows

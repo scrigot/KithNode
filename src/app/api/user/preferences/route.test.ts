@@ -8,6 +8,8 @@ vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: () => ({
+      // Prior-state read for first-time onboarding detection: no prior row.
+      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }),
       update: (p: Record<string, unknown>) => {
         capturedPatch = p;
         // eq() is awaited directly by the main patch update, and also extended

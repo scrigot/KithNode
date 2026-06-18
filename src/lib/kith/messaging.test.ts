@@ -30,10 +30,17 @@ vi.mock("@/lib/supabase", () => {
 
 import { dmThreadId, canDM, canAccessThread } from "@/lib/kith/messaging";
 
-const ME = "me@x.com";
-const FRIEND = "grayson@x.com";
-const CO_MEMBER = "co@x.com";
-const STRANGER = "stranger@x.com";
+// Identity = the User UUID. canDM takes uuids; thread keys stay email pairs, so
+// canAccessThread resolves uuid↔email at the seam. Each principal has both.
+const ME = "11111111-1111-1111-1111-111111111111";
+const FRIEND = "22222222-2222-2222-2222-222222222222";
+const CO_MEMBER = "44444444-4444-4444-4444-444444444444";
+const STRANGER = "33333333-3333-3333-3333-333333333333";
+
+const ME_EMAIL = "me@x.com";
+const FRIEND_EMAIL = "grayson@x.com";
+const CO_EMAIL = "co@x.com";
+const STRANGER_EMAIL = "stranger@x.com";
 
 beforeEach(() => {
   state.tables = {
@@ -45,9 +52,10 @@ beforeEach(() => {
       { id: "m2", nodeId: "n1", userId: CO_MEMBER, role: "member" },
     ],
     User: [
-      { email: ME, name: "Me" },
-      { email: FRIEND, name: "Grayson" },
-      { email: CO_MEMBER, name: "Co" },
+      { id: ME, email: ME_EMAIL, name: "Me" },
+      { id: FRIEND, email: FRIEND_EMAIL, name: "Grayson" },
+      { id: CO_MEMBER, email: CO_EMAIL, name: "Co" },
+      { id: STRANGER, email: STRANGER_EMAIL, name: "Stranger" },
     ],
   };
 });
@@ -62,7 +70,7 @@ describe("dmThreadId", () => {
   });
 });
 
-describe("canDM — DM scope = friends OR node co-members", () => {
+describe("canDM — DM scope = friends OR node co-members (identity = uuid)", () => {
   it("allows DMing an accepted friend", async () => {
     expect(await canDM(ME, FRIEND)).toBe(true);
   });
@@ -77,7 +85,7 @@ describe("canDM — DM scope = friends OR node co-members", () => {
   });
 });
 
-describe("canAccessThread", () => {
+describe("canAccessThread (caller identity = uuid; dm key = email pair)", () => {
   it("node: member can access", async () => {
     expect(await canAccessThread(ME, "node", "n1")).toBe(true);
   });
@@ -85,13 +93,13 @@ describe("canAccessThread", () => {
     expect(await canAccessThread(STRANGER, "node", "n1")).toBe(false);
   });
   it("dm: a participant who may DM the other gets access", async () => {
-    expect(await canAccessThread(ME, "dm", dmThreadId(ME, FRIEND))).toBe(true);
+    expect(await canAccessThread(ME, "dm", dmThreadId(ME_EMAIL, FRIEND_EMAIL))).toBe(true);
   });
   it("dm: someone not in the pair is denied even if the key is valid", async () => {
-    expect(await canAccessThread(STRANGER, "dm", dmThreadId(ME, FRIEND))).toBe(false);
+    expect(await canAccessThread(STRANGER, "dm", dmThreadId(ME_EMAIL, FRIEND_EMAIL))).toBe(false);
   });
   it("dm: a participant who may NOT DM the other (stranger pair) is denied", async () => {
-    expect(await canAccessThread(ME, "dm", dmThreadId(ME, STRANGER))).toBe(false);
+    expect(await canAccessThread(ME, "dm", dmThreadId(ME_EMAIL, STRANGER_EMAIL))).toBe(false);
   });
   it("dm: malformed thread id is denied", async () => {
     expect(await canAccessThread(ME, "dm", "not-a-pair")).toBe(false);

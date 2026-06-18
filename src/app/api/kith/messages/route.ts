@@ -11,7 +11,7 @@ function parseThreadType(v: string | null): ThreadType | null {
 export async function GET(req: NextRequest) {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const sp = req.nextUrl.searchParams;
     const threadType = parseThreadType(sp.get("threadType"));
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "threadType and threadId required" }, { status: 400 });
     }
     const since = sp.get("since") ?? undefined;
-    return NextResponse.json(await listMessages(session.user.email, threadType, threadId, since));
+    return NextResponse.json(await listMessages(session.user.id, threadType, threadId, since));
   } catch (err) {
     return mapKithError(err);
   }
@@ -29,14 +29,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!KITH_NODES_ENABLED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email || !session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { threadType: rawType, threadId, body } = await req.json();
     const threadType = parseThreadType(rawType);
     if (!threadType || !threadId || typeof threadId !== "string") {
       return NextResponse.json({ error: "threadType and threadId required" }, { status: 400 });
     }
-    return NextResponse.json(await sendMessage(session.user.email, threadType, threadId, body));
+    return NextResponse.json(await sendMessage(session.user.id, threadType, threadId, body));
   } catch (err) {
     return mapKithError(err);
   }

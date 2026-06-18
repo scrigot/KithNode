@@ -21,7 +21,7 @@ export interface PoolContact {
   concentration: string;
   hometown: string;
   enrichedAt: string | null;
-  importedByUserId: string; // owner (email)
+  importedByUserId: string; // owner (User id)
   sharedInNodes: boolean;
   // Attached for the "via {friend}" warm path:
   ownerId: string; // = importedByUserId
