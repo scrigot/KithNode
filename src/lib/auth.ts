@@ -24,16 +24,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // allows "trial" while that date is in the future. (Switch back to "none"
       // = code-or-pay for a paid launch.)
       const { supabase } = await import("./supabase");
-      const { error } = await supabase.from("User").upsert(
-        {
-          email: user.email,
-          name: user.name ?? "",
-          image: user.image ?? "",
-          subscriptionStatus: "trial",
-          credits: TRIAL_CREDITS,
-        },
-        { onConflict: "email", ignoreDuplicates: true }
-      );
+      const { data, error } = await supabase
+        .from("User")
+        .upsert(
+          {
+            email: user.email,
+            name: user.name ?? "",
+            image: user.image ?? "",
+            subscriptionStatus: "trial",
+            credits: TRIAL_CREDITS,
+          },
+          { onConflict: "email", ignoreDuplicates: true }
+        )
+        .select();
       if (error) {
         console.error("[auth] User upsert failed:", error);
       }
@@ -56,6 +59,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } catch (err) {
           // Non-fatal: log and proceed. The user is still signed in.
           console.error("[auth] kith auto-friend failed:", err);
+        }
+      }
+
+      // ignoreDuplicates ⇒ a returned row means this was a fresh INSERT (first
+      // sign-in), not a conflict-skip. Welcome the new user with the setup
+      // checklist exactly once. Never block sign-in on a send failure.
+      const isNewUser = !error && Array.isArray(data) && data.length > 0;
+      if (isNewUser && user.email) {
+        try {
+          const { sendSetupEmail } = await import("./email/setup-email");
+          await sendSetupEmail({
+            email: user.email,
+            name: user.name ?? "",
+            userId: user.email,
+          });
+        } catch (err) {
+          console.error("[auth] setup email failed:", err);
         }
       }
 

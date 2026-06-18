@@ -16,7 +16,9 @@
     "db:generate": "prisma generate",
     "db:roadmap-sync": "tsx prisma/sync-roadmap.ts",
     "dev:test-user": "tsx scripts/dev/make-test-user.ts",
-    "groupme:pull": "tsx scripts/dev/groupme-pull-once.ts"
+    "groupme:pull": "tsx scripts/dev/groupme-pull-once.ts",
+    "email:setup": "tsx scripts/email/send-setup.ts",
+    "email:log": "tsx scripts/email/log.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.91",
