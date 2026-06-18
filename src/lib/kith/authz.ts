@@ -72,6 +72,13 @@ export async function assertNodeMember(userId: string, nodeId: string): Promise<
   if (!(await isNodeMember(userId, nodeId))) throw new NotNodeMemberError();
 }
 
+/** Owner-only gate (node settings, avatar, kick). Throws NotNodeMemberError if
+ *  the user isn't the node's owner — same error style/HTTP mapping as member. */
+export async function assertNodeOwner(userId: string, nodeId: string): Promise<void> {
+  const { data } = await supabase.from("Node").select("ownerId").eq("id", nodeId).maybeSingle();
+  if (!data || (data.ownerId as string) !== userId) throw new NotNodeMemberError("Not the owner of this node");
+}
+
 /** Member ids of a node (caller should assertNodeMember first). */
 export async function getNodeMemberIds(nodeId: string): Promise<string[]> {
   const { data } = await supabase.from("NodeMember").select("userId").eq("nodeId", nodeId);

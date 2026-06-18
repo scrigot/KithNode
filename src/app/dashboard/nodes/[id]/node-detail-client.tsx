@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2 } from "lucide-react";
+import { Loader2, Users, Copy, Check, LogOut, Send, Trophy, Network, EyeOff, UserPlus, Search, MessageSquare, Link2, Settings, Trash2, ImageUp } from "lucide-react";
 import { ChatThread } from "@/app/dashboard/_components/chat-thread";
 
 const TIER_STYLES: Record<string, string> = {
@@ -19,7 +19,7 @@ interface PoolContact {
 }
 interface Member { email: string; name: string; role: string }
 interface NodeDetail {
-  node: { id: string; name: string; inviteCode: string; ownerId: string };
+  node: { id: string; name: string; inviteCode: string; ownerId: string; description: string; avatarUrl: string };
   members: Member[];
   pool: PoolContact[];
 }
@@ -33,7 +33,7 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
   const router = useRouter();
   const [data, setData] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"pool" | "leaderboard" | "invite" | "chat">("pool");
+  const [tab, setTab] = useState<"pool" | "leaderboard" | "chat" | "settings">("pool");
   const [copied, setCopied] = useState(false);
   const [introFor, setIntroFor] = useState<PoolContact | null>(null);
 
@@ -83,6 +83,21 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
     }
   }
 
+  // Owner kicks a member. Reconcile from the server's authoritative member list.
+  async function removeMember(email: string) {
+    const res = await apiFetch(`/api/kith/nodes/${nodeId}/members`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (res.ok) {
+      const members = (await res.json()) as Member[];
+      setData((d) => d && { ...d, members });
+    } else {
+      await load();
+    }
+  }
+
   // Open (or reuse) a DM with this person, then jump to the messages thread.
   async function messageMember(email: string) {
     const res = await apiFetch("/api/kith/dm/open", {
@@ -110,7 +125,11 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
       <div className="mb-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Network className="h-5 w-5 text-accent-teal" />
+            {data.node.avatarUrl ? (
+              <img src={data.node.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border border-white/[0.12] object-cover" />
+            ) : (
+              <Network className="h-5 w-5 text-accent-teal" />
+            )}
             <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
               {data.node.name}
             </h1>
@@ -118,6 +137,9 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-muted-foreground">
             <Users className="h-3.5 w-3.5" /> {data.members.length} members
           </div>
+          {data.node.description && (
+            <div className="mt-1 max-w-xl text-[12px] text-muted-foreground">{data.node.description}</div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -149,29 +171,32 @@ export function NodeDetailClient({ nodeId, me, myEmail }: { nodeId: string; me: 
         <Tab active={tab === "leaderboard"} onClick={() => setTab("leaderboard")} icon={<Trophy className="h-3.5 w-3.5" />}>
           Leaderboard
         </Tab>
-        <Tab active={tab === "invite"} onClick={() => setTab("invite")} icon={<UserPlus className="h-3.5 w-3.5" />}>
-          Invite / Members ({data.members.length})
-        </Tab>
         <Tab active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquare className="h-3.5 w-3.5" />}>
           Chat
+        </Tab>
+        <Tab active={tab === "settings"} onClick={() => setTab("settings")} icon={<Settings className="h-3.5 w-3.5" />}>
+          Settings ({data.members.length})
         </Tab>
       </div>
 
       {tab === "pool" && <PoolView pool={data.pool} me={me} onIntro={setIntroFor} onUnshare={unshare} />}
       {tab === "leaderboard" && <LeaderboardView nodeId={nodeId} />}
-      {tab === "invite" && (
-        <InviteView
-          inviteCode={data.node.inviteCode}
-          members={data.members}
-          me={myEmail}
-          onAdd={addMember}
-          onMessage={messageMember}
-        />
-      )}
       {tab === "chat" && (
         <div className="h-[60vh]">
           <ChatThread threadType="node" threadId={nodeId} title={data.node.name} />
         </div>
+      )}
+      {tab === "settings" && (
+        <SettingsView
+          node={data.node}
+          members={data.members}
+          me={me}
+          myEmail={myEmail}
+          onAdd={addMember}
+          onRemove={removeMember}
+          onMessage={messageMember}
+          onSaved={load}
+        />
       )}
 
       {introFor && (
@@ -201,13 +226,82 @@ function Tab({ active, onClick, icon, children }: { active: boolean; onClick: ()
   );
 }
 
+const TIER_RANK: Record<string, number> = { hot: 0, warm: 1, monitor: 2, cold: 3 };
+const TIER_FILTERS = ["all", "hot", "warm", "monitor", "cold"] as const;
+type PoolSort = "tier" | "name" | "owner";
+
 function PoolView({ pool, me, onIntro, onUnshare }: { pool: PoolContact[]; me: string; onIntro: (c: PoolContact) => void; onUnshare: (id: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<PoolSort>("tier");
+  const [tier, setTier] = useState<string>("all");
+
   if (pool.length === 0) {
     return <div className="border border-white/[0.06] bg-card px-4 py-10 text-center text-[13px] text-muted-foreground">No shared contacts yet. Members&apos; contacts pool here.</div>;
   }
+
+  const q = query.trim().toLowerCase();
+  const filtered = pool
+    .filter((c) => tier === "all" || (c.tier || "cold").toLowerCase() === tier)
+    .filter((c) =>
+      !q ||
+      c.name.toLowerCase().includes(q) ||
+      (c.firmName || "").toLowerCase().includes(q) ||
+      (c.title || "").toLowerCase().includes(q),
+    )
+    .sort((a, b) => {
+      if (sort === "name") return a.name.localeCompare(b.name);
+      if (sort === "owner") return a.ownerName.localeCompare(b.ownerName);
+      return (TIER_RANK[(a.tier || "cold").toLowerCase()] ?? 3) - (TIER_RANK[(b.tier || "cold").toLowerCase()] ?? 3);
+    });
+
   return (
+    <div className="space-y-3">
+      {/* Controls */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 items-center gap-2 border border-white/[0.12] bg-bg-primary px-2">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, firm, title…"
+              className="h-8 flex-1 bg-transparent text-[12px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            />
+          </div>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as PoolSort)}
+            className="h-8 border border-white/[0.12] bg-bg-primary px-2 text-[12px] text-foreground focus:border-accent-teal focus:outline-none"
+          >
+            <option value="tier">Tier</option>
+            <option value="name">Name A-Z</option>
+            <option value="owner">Owner</option>
+          </select>
+        </div>
+        <div className="flex gap-1">
+          {TIER_FILTERS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTier(t)}
+              className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                tier === t
+                  ? t === "all"
+                    ? "border-accent-teal/40 bg-accent-teal/20 text-accent-teal"
+                    : TIER_STYLES[t]
+                  : "border-white/[0.12] text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="border border-white/[0.06] bg-card px-4 py-10 text-center text-[13px] text-muted-foreground">No contacts match.</div>
+      ) : (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {pool.map((c) => {
+      {filtered.map((c) => {
         const mine = c.ownerId === me;
         return (
           <div key={c.id} className="flex flex-col border border-white/[0.06] bg-card p-4">
@@ -257,6 +351,8 @@ function PoolView({ pool, me, onIntro, onUnshare }: { pool: PoolContact[]; me: s
           </div>
         );
       })}
+    </div>
+      )}
     </div>
   );
 }
@@ -377,19 +473,27 @@ function LeaderboardView({ nodeId }: { nodeId: string }) {
   );
 }
 
-function InviteView({
-  inviteCode,
+function SettingsView({
+  node,
   members,
   me,
+  myEmail,
   onAdd,
+  onRemove,
   onMessage,
+  onSaved,
 }: {
-  inviteCode: string;
+  node: NodeDetail["node"];
   members: Member[];
   me: string;
+  myEmail: string;
   onAdd: (email: string, name: string) => void;
+  onRemove: (email: string) => void;
   onMessage: (email: string) => void;
+  onSaved: () => void;
 }) {
+  const isOwner = node.ownerId === me;
+  const inviteCode = node.inviteCode;
   const memberEmails = new Set(members.map((m) => m.email));
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [query, setQuery] = useState("");
@@ -425,6 +529,10 @@ function InviteView({
       : `/dashboard/nodes?join=${inviteCode}`;
 
   return (
+    <div className="space-y-4">
+      {/* Owner-only: edit node identity + avatar */}
+      {isOwner && <NodeSettingsForm node={node} onSaved={onSaved} />}
+
     <div className="grid gap-4 lg:grid-cols-2">
       {/* Current members */}
       <div className="border border-white/[0.06] bg-card">
@@ -441,13 +549,24 @@ function InviteView({
               <span className="shrink-0 border border-white/[0.12] px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
                 {m.role}
               </span>
-              {m.email !== me && (
+              {m.email !== myEmail && (
                 <button
                   onClick={() => onMessage(m.email)}
                   className="flex shrink-0 items-center gap-1 border border-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06] hover:text-accent-teal"
                   title="Message"
                 >
                   <MessageSquare className="h-3 w-3" /> Message
+                </button>
+              )}
+              {isOwner && m.email !== myEmail && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Remove ${m.name}? Their contacts stop being visible in this node.`)) onRemove(m.email);
+                  }}
+                  className="flex shrink-0 items-center gap-1 border border-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
+                  title="Remove member"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
                 </button>
               )}
             </div>
@@ -526,6 +645,101 @@ function InviteView({
               )}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+    </div>
+  );
+}
+
+function NodeSettingsForm({ node, onSaved }: { node: NodeDetail["node"]; onSaved: () => void }) {
+  const [name, setName] = useState(node.name);
+  const [description, setDescription] = useState(node.description);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    const res = await apiFetch(`/api/kith/nodes/${node.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description }),
+    });
+    if (res.ok) onSaved();
+    else setError((await res.json().catch(() => ({}))).error || "Failed to save");
+    setSaving(false);
+  }
+
+  async function uploadAvatar(file: File) {
+    setUploading(true);
+    setError("");
+    const form = new FormData();
+    form.append("file", file);
+    const res = await apiFetch(`/api/kith/nodes/${node.id}/avatar`, { method: "POST", body: form });
+    if (res.ok) onSaved();
+    else setError((await res.json().catch(() => ({}))).error || "Upload failed");
+    setUploading(false);
+  }
+
+  return (
+    <div className="border border-white/[0.06] bg-card p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+        <Settings className="h-3.5 w-3.5" /> Node settings
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+        {/* Avatar */}
+        <div className="flex flex-col items-center gap-2">
+          {node.avatarUrl ? (
+            <img src={node.avatarUrl} alt="" className="h-16 w-16 rounded-md border border-white/[0.12] object-cover" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-white/[0.12] bg-bg-primary">
+              <Network className="h-6 w-6 text-muted-foreground" />
+            </div>
+          )}
+          <label className="flex cursor-pointer items-center gap-1 border border-white/[0.12] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06]">
+            {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ImageUp className="h-3 w-3" />} Avatar
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+
+        {/* Name + description */}
+        <div className="flex flex-col gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={80}
+            placeholder="Node name"
+            className="border border-white/[0.12] bg-bg-primary px-2 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:border-accent-teal focus:outline-none"
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={280}
+            rows={2}
+            placeholder="Description (optional)"
+            className="resize-none border border-white/[0.12] bg-bg-primary px-2 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground/60 focus:border-accent-teal focus:outline-none"
+          />
+          {error && <p className="text-[12px] text-red-400">{error}</p>}
+          <div className="flex justify-end">
+            <button
+              onClick={save}
+              disabled={saving || !name.trim()}
+              className="flex items-center gap-1.5 bg-accent-teal px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-accent-teal/80 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save
+            </button>
+          </div>
         </div>
       </div>
     </div>
