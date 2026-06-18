@@ -8,11 +8,16 @@ vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: () => ({
-      // Prior-state read for first-time onboarding detection: no prior row.
-      select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null }) }) }),
       update: (p: Record<string, unknown>) => {
         capturedPatch = p;
-        return { eq: () => Promise.resolve({ error: null }) };
+        // eq() is awaited directly by the main patch update, and also extended
+        // with .is().select() by the atomic first-onboarding-completion claim,
+        // so the returned object is both thenable and chainable.
+        const eqResult = {
+          is: () => ({ select: () => Promise.resolve({ data: [] }) }),
+          then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+        };
+        return { eq: () => eqResult };
       },
     }),
   },

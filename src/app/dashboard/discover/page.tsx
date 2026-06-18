@@ -193,7 +193,7 @@ export default function DiscoverPage() {
   /** Advance the cursor with a directional slide, then settle. */
   const advance = useCallback((dir: "left" | "right" | "down") => {
     setExitDir(dir);
-    setTimeout(() => {
+    globalThis.setTimeout(() => {
       setIndex((i) => i + 1);
       setReviewed((r) => r + 1);
       setExitDir("");
@@ -208,7 +208,7 @@ export default function DiscoverPage() {
     // rating but never gates visibility.
     rateContact(current.id, "skip");
     advance("left");
-    setTimeout(() => {
+    globalThis.setTimeout(() => {
       ratingLockRef.current = false;
     }, 220);
   }, [current, advance]);
@@ -245,17 +245,17 @@ export default function DiscoverPage() {
         // No pipeline to add into — advance without trapping the user.
         setPipelineState(null);
         advance("right");
-        setTimeout(() => {
+        globalThis.setTimeout(() => {
           ratingLockRef.current = false;
         }, 220);
         return;
       }
       if (res.ok) {
         setPipelineState({ id: target.id, state: "sent" });
-        setTimeout(() => {
+        globalThis.setTimeout(() => {
           setPipelineState(null);
           advance("right");
-          setTimeout(() => {
+          globalThis.setTimeout(() => {
             ratingLockRef.current = false;
           }, 220);
         }, 600);

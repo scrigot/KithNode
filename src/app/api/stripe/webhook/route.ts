@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 import { CREDIT_ALLOTMENTS } from "@/lib/credits";
@@ -110,12 +110,16 @@ export async function POST(req: NextRequest) {
           await supabase.from("User").update(update).eq("email", userEmail);
         }
 
-        // Best-effort founder ping on a new paid subscription.
-        await notifyFounder({
-          event: "subscription",
-          title: "💸 New subscription",
-          lines: [userEmail || customerId, `Plan: ${plan || "—"}`],
-        }).catch(() => {});
+        // Best-effort founder ping on a new paid subscription. Deferred via
+        // after() so a slow Slack POST never blocks the webhook ack — Stripe
+        // would otherwise time out and retry, duplicating the credit grant.
+        after(() =>
+          notifyFounder({
+            event: "subscription",
+            title: "💸 New subscription",
+            lines: [userEmail || customerId, `Plan: ${plan || "—"}`],
+          }).catch(() => {}),
+        );
 
         break;
       }
@@ -154,12 +158,15 @@ export async function POST(req: NextRequest) {
           })
           .eq("stripeCustomerId", customerId);
 
-        // Best-effort founder ping on churn.
-        await notifyFounder({
-          event: "subscription",
-          title: "📉 Subscription canceled",
-          lines: [`Stripe customer: ${customerId}`],
-        }).catch(() => {});
+        // Best-effort founder ping on churn. Deferred via after() so it never
+        // blocks the webhook ack (see above).
+        after(() =>
+          notifyFounder({
+            event: "subscription",
+            title: "📉 Subscription canceled",
+            lines: [`Stripe customer: ${customerId}`],
+          }).catch(() => {}),
+        );
 
         break;
       }
