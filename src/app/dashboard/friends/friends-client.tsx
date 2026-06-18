@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import { ProfileCardModal } from "@/app/dashboard/_components/profile-card";
 import { UserPlus, Check, X, Clock, Loader2, Users, Camera, Search, Link2, MessageSquare } from "lucide-react";
 
 interface Person {
@@ -54,6 +55,7 @@ export function FriendsClient() {
   const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
   const [suggestions, setSuggestions] = useState<Person[]>([]);
+  const [profileEmail, setProfileEmail] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [friendsRes, inviteRes, suggestRes] = await Promise.all([
@@ -173,7 +175,7 @@ export function FriendsClient() {
               <Empty>No friends yet — search above.</Empty>
             ) : (
               data.friends.map((p) => (
-                <Row key={p.email} person={p} provenance={p.provenance}>
+                <Row key={p.email} person={p} provenance={p.provenance} onProfile={setProfileEmail}>
                   <button
                     onClick={() => openDM(p.email)}
                     className="flex items-center gap-1 border border-white/[0.12] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-white/[0.06]"
@@ -211,6 +213,8 @@ export function FriendsClient() {
           )}
         </div>
       )}
+
+      {profileEmail && <ProfileCardModal email={profileEmail} onClose={() => setProfileEmail(null)} />}
     </div>
   );
 }
@@ -352,21 +356,32 @@ function Section({ title, count, icon, children }: { title: string; count: numbe
 function Row({
   person,
   provenance,
+  onProfile,
   children,
 }: {
   person: Person;
   provenance?: FriendProvenance;
+  onProfile?: (email: string) => void;
   children: React.ReactNode;
 }) {
+  const Info = (
+    <>
+      <div className="truncate text-[13px] font-medium text-foreground">{person.name}</div>
+      <div className="truncate font-mono text-[11px] text-muted-foreground">{person.email}</div>
+      {provenance && <Provenance provenance={provenance} />}
+    </>
+  );
   return (
     <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
         <Avatar person={person} size={36} />
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-medium text-foreground">{person.name}</div>
-          <div className="truncate font-mono text-[11px] text-muted-foreground">{person.email}</div>
-          {provenance && <Provenance provenance={provenance} />}
-        </div>
+        {onProfile ? (
+          <button onClick={() => onProfile(person.email)} className="min-w-0 text-left [&_.text-foreground]:hover:text-accent-teal">
+            {Info}
+          </button>
+        ) : (
+          <div className="min-w-0">{Info}</div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
