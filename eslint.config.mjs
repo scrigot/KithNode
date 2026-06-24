@@ -71,6 +71,27 @@ export default [
     },
   },
   {
+    // Isolation boundary for the personal "/me" workspace: it must source data
+    // via Prisma (local Postgres) ONLY — never the prod Supabase service-role
+    // client (@/lib/supabase points at prod and bypasses RLS). This rule makes
+    // the boundary a build-time gate, not a convention. See the isolation plan.
+    files: ["src/app/me/**/*.{ts,tsx}", "src/app/api/me/**/*.{ts,tsx}", "src/lib/me/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/supabase", "**/lib/supabase", "@supabase/supabase-js"],
+              message:
+                "The /me personal workspace is isolated: use Prisma against the local Postgres, never the prod Supabase client. (autoplan isolation boundary)",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     ignores: [".next/", "node_modules/", "*.config.*", "src/generated/"],
   },
 ];

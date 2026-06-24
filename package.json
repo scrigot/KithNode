@@ -4,6 +4,11 @@
   "description": "AI-driven recruitment networking intelligence platform",
   "scripts": {
     "dev": "next dev",
+    "dev:me": "DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/kithnode_me' PERSONAL_MODE=1 ME_USER_EMAIL='samrigot@kithnode.ai' NEXT_PUBLIC_SUPABASE_URL='http://127.0.0.1:54321' next dev -p 3030",
+    "me:up": "bash scripts/me/up.sh",
+    "me:db:push": "prisma db push --url 'postgresql://postgres:postgres@127.0.0.1:54322/kithnode_me'",
+    "me:db:studio": "docker exec -it supabase_db_bangalore psql -U postgres -d kithnode_me",
+    "me:import-prod": "tsx scripts/me/import-from-prod.ts",
     "build": "prisma generate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

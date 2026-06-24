@@ -347,3 +347,121 @@ model EmailLog {
   @@index([toEmail])
   @@index([type, createdAt])
 }
+
+// ─── Personal Networking OS ("/me" workspace) — ADDITIVE, local-first ──────────
+// These Me* tables back the single-player /me workspace (see
+// ~/.claude/plans/...zesty-eich.md). They are PURELY ADDITIVE: no existing table
+// is altered. They are gated behind PERSONAL_MODE and accessed ONLY via Prisma
+// from src/lib/me/** — never the service-role Supabase client (ESLint-enforced).
+// userId is the owner's email (matches the rest of the app's userId convention).
+// Designed to run against a LOCAL Postgres (supabase start / dev project), never
+// prod, while dogfooding.
+
+// The personal contact. A dedicated table (NOT a reuse of AlumniContact) so
+// imported LinkedIn rows never need fake placeholder values, dedup is scoped
+// per-user (not global), and personal data never lands in the shared contact
+// table. `alumniContactId` optionally links a row imported from a prod
+// AlumniContact so we can trace provenance.
+model MeContact {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  firmName       String?
+  title          String?
+  linkedInUrl    String?
+  email          String?
+  location       String?
+  education      String?
+  industry       String?
+  seniorityLevel String?
+  pastFirms      String?
+  notes          String   @default("")
+  source         String   @default("manual") // manual | linkedin_csv | prod_import | apollo
+  alumniContactId String? // provenance link when imported from a prod AlumniContact row
+  connectedOn    DateTime? // LinkedIn "Connected On" date when known
+  lastSpokenAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  pipelineEntries MePipelineEntry[]
+  memory          MeContactMemory?
+  prepBriefs      MePrepBrief[]
+
+  @@unique([userId, linkedInUrl]) // scoped dedup — normalized URL, per-user
+  @@index([userId])
+}
+
+// An org/purpose pipeline in the personal workspace. Seeded: Comfort, Anvil, UNC,
+// AI Consulting. `stages` mirrors the existing Pipeline.stages JSON shape
+// ([{ key, label, color, universalPhase }]) so the existing board components can
+// render it. cadenceDays drives the going-cold rail.
+model MePipeline {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  kind        String   @default("ORG") // ORG for now; future: PURPOSE, etc.
+  stages      Json     @default("[]")
+  cadenceDays Int?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  entries MePipelineEntry[]
+
+  @@index([userId])
+}
+
+// Per-contact-per-pipeline membership. UNIQUE on (userId, contactId, pipelineId)
+// gives multi-pipeline membership (one person can be in Comfort AND UNC) WITHOUT
+// touching the prod PipelineEntry table (which is unique on (contactId,userId)).
+model MePipelineEntry {
+  id          String    @id @default(cuid())
+  userId      String
+  contactId   String
+  pipelineId  String
+  stage       String    @default("identified")
+  notes       String    @default("")
+  lastTouchAt DateTime?
+  addedAt     DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  contact  MeContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipeline MePipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactId, pipelineId])
+  @@index([userId])
+  @@index([pipelineId])
+}
+
+// The personal memory layer over a contact (relationship type drives ICP ranking;
+// strategic value + action items + notes are free context for coffee-prep).
+model MeContactMemory {
+  id               String   @id @default(cuid())
+  userId           String
+  contactId        String   @unique
+  relationshipType String   @default("") // "" | buyer | practitioner | ecosystem
+  strategicValue   String   @default("")
+  actionItems      Json     @default("[]")
+  notes            String   @default("")
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Cached coffee-chat prep brief. Cache key = contactId + memoryHash + promptVersion
+// so a stale brief is regenerated when the memory or the prompt changes.
+model MePrepBrief {
+  id            String   @id @default(cuid())
+  userId        String
+  contactId     String
+  brief         Json
+  model         String   @default("")
+  promptVersion String   @default("v1")
+  memoryHash    String   @default("")
+  createdAt     DateTime @default(now())
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId])
+}
