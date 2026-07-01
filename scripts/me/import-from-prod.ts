@@ -117,6 +117,33 @@ async function main() {
   const userId = (user as { id: string }).id;
   console.log(`resolved prod userId: ${userId}`);
 
+  // Seed Sam's own profile (for warm-signal ranking) from prod User prefs.
+  const { data: prefs } = await prod
+    .from("User")
+    .select("university, educations, clubs, clubMemberships, hometown, pastFirms, targetLocations")
+    .eq("id", userId)
+    .single();
+  if (prefs) {
+    const p = prefs as Record<string, string | null>;
+    const profileData = {
+      userId: ME_EMAIL,
+      schools: [p.university, p.educations].filter(Boolean).join(" "),
+      clubs: [p.clubs, p.clubMemberships].filter(Boolean).join(" "),
+      pastFirms: p.pastFirms || "",
+      hometown: p.hometown || "",
+      location: p.targetLocations || p.hometown || "",
+    };
+    console.log(`profile → schools="${profileData.schools.slice(0, 40)}" hometown="${profileData.hometown}"`);
+    if (COMMIT) {
+      await local.meProfile.upsert({ where: { userId: ME_EMAIL }, create: profileData, update: profileData });
+      console.log("✓ MeProfile seeded");
+    }
+  }
+  if (process.argv.includes("--profile-only")) {
+    await local.$disconnect();
+    return;
+  }
+
   const [owned, pooled] = await Promise.all([fetchOwned(userId), fetchPoolLinked(userId)]);
   // Combine, dedupe by prod row id, then by normalized URL.
   const byId = new Map<string, ProdRow>();

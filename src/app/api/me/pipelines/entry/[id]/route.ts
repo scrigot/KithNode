@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PERSONAL_MODE, meUserEmail } from "@/lib/me/config";
 import { prisma } from "@/lib/me/db";
+import { logContactActivity } from "@/lib/me/activity";
 
 export const runtime = "nodejs";
 
@@ -18,10 +19,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  // updateMany with the userId guard so you can only touch your own rows.
-  const res = await prisma.mePipelineEntry.updateMany({ where: { id, userId }, data });
-  if (res.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ ok: true });
+  const existing = await prisma.mePipelineEntry.findFirst({
+    where: { id, userId },
+    include: { pipeline: { select: { name: true } }, contact: { select: { id: true } } },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const entry = await prisma.mePipelineEntry.update({ where: { id }, data });
+  if (data.stage && data.stage !== existing.stage) {
+    await logContactActivity({
+      userId,
+      contactId: existing.contact.id,
+      type: "stage_change",
+      title: `Moved in ${existing.pipeline.name}`,
+      detail: `${existing.stage.replaceAll("_", " ")} → ${data.stage.replaceAll("_", " ")}`,
+      meta: { pipeline: existing.pipeline.name, from: existing.stage, to: data.stage },
+    });
+  }
+  if (body.touch === true) {
+    await logContactActivity({
+      userId,
+      contactId: existing.contact.id,
+      type: "touch",
+      title: `Touched in ${existing.pipeline.name}`,
+      detail: data.stage && data.stage !== existing.stage ? `Also moved to ${data.stage.replaceAll("_", " ")}` : "",
+      meta: { pipeline: existing.pipeline.name, stage: data.stage || existing.stage },
+    });
+  }
+  return NextResponse.json({ ok: true, entry });
 }
 
 // Remove a contact from a pipeline.

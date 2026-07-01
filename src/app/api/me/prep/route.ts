@@ -8,8 +8,12 @@ import {
   parsePrepBrief,
   fallbackBrief,
   memoryHash,
+  contextHash,
+  prepExtraFromActivities,
+  mergePrepExtra,
   PROMPT_VERSION,
   type PrepContext,
+  type PrepExtra,
 } from "@/lib/me/coffee-prep";
 
 export const runtime = "nodejs";
@@ -17,14 +21,31 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const userId = meUserEmail();
-  const { contactId, force } = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({}));
+  const { contactId, force } = body;
   if (!contactId) return NextResponse.json({ error: "contactId required" }, { status: 400 });
+
+  const mtg = body.meeting && typeof body.meeting === "object" ? body.meeting : {};
+  const manualExtra: PrepExtra = {
+    meeting: {
+      purpose: String(mtg.purpose || "").trim() || undefined,
+      time: String(mtg.time || "").trim() || undefined,
+      location: String(mtg.location || "").trim() || undefined,
+    },
+    person: typeof body.person === "string" ? body.person.trim() || undefined : undefined,
+    refine: typeof body.refine === "string" ? body.refine.trim() || undefined : undefined,
+  };
 
   const contact = await prisma.meContact.findFirst({
     where: { id: contactId, userId },
     include: {
       memory: true,
       pipelineEntries: { include: { pipeline: { select: { name: true } } } },
+      activities: {
+        orderBy: { occurredAt: "desc" },
+        take: 12,
+        select: { type: true, title: true, detail: true, occurredAt: true },
+      },
     },
   });
   if (!contact) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
@@ -46,22 +67,25 @@ export async function POST(req: NextRequest) {
     pipelines: contact.pipelineEntries.map((e) => ({ name: e.pipeline.name, stage: e.stage })),
     daysSinceTouch: lastTouch ? Math.floor((Date.now() - lastTouch) / 86_400_000) : null,
   };
+  const autoExtra = prepExtraFromActivities(contact.activities);
+  const extra = mergePrepExtra(autoExtra, manualExtra);
 
   const hash = memoryHash(ctx);
+  const ch = contextHash(extra);
 
-  // Cache: reuse the latest brief unless the inputs changed or force=true.
-  if (!force) {
+  // Cache on memory + meeting/person context. A refine instruction always
+  // regenerates (it's an explicit "give me a different take").
+  if (!force && !extra.refine) {
     const cached = await prisma.mePrepBrief.findFirst({
-      where: { userId, contactId, promptVersion: PROMPT_VERSION, memoryHash: hash },
+      where: { userId, contactId, promptVersion: PROMPT_VERSION, memoryHash: hash, contextHash: ch },
       orderBy: { createdAt: "desc" },
     });
     if (cached) {
-      return NextResponse.json({ brief: cached.brief, ai: cached.model !== "fallback", cached: true });
+      return NextResponse.json({ brief: cached.brief, ai: cached.model !== "fallback", cached: true, context: cached.meta ?? extra });
     }
   }
 
-  const sender = (userId.split("@")[0] || "I").replace(/[._-]/g, " ");
-  const gen = await generateMeText(buildPrepPrompt(ctx, "Sam"));
+  const gen = await generateMeText(buildPrepPrompt(ctx, "Sam", extra));
   const parsed = gen.ok ? parsePrepBrief(gen.text) : null;
   const brief = parsed ?? fallbackBrief(ctx);
   const model = parsed ? gen.model : "fallback";
@@ -74,9 +98,10 @@ export async function POST(req: NextRequest) {
       model,
       promptVersion: PROMPT_VERSION,
       memoryHash: hash,
+      contextHash: ch,
+      meta: extra as unknown as Prisma.InputJsonValue,
     },
   });
 
-  void sender; // (reserved for future per-sender personalization)
-  return NextResponse.json({ brief, ai: model !== "fallback", cached: false });
+  return NextResponse.json({ brief, ai: model !== "fallback", cached: false, context: extra });
 }

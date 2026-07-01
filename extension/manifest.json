@@ -8,7 +8,8 @@
     "https://www.linkedin.com/*",
     "https://kithnode.ai/*",
     "https://*.kithnode.ai/*",
-    "http://localhost:3000/*"
+    "http://localhost:3030/*",
+    "http://localhost:3051/*"
   ],
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "panel.html" },
@@ -19,6 +20,5 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "icons": { "128": "icon.png" }
+  ]
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useOpenContact } from "@/components/me/open-contact";
 
 export interface BoardStage {
   key: string;
@@ -41,11 +42,9 @@ const REL_DOT: Record<string, string> = {
 export default function Board({
   pipelines,
   entries,
-  contacts,
 }: {
   pipelines: BoardPipeline[];
   entries: BoardEntry[];
-  contacts: { id: string; name: string; firmName: string | null }[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -104,7 +103,6 @@ export default function Board({
         <PipelineView
           pipeline={activePipeline}
           entries={entries.filter((e) => e.pipelineId === activePipeline.id)}
-          contacts={contacts}
           isCold={isCold}
           mutate={mutate}
         />
@@ -124,28 +122,33 @@ function Card({
   cold: boolean;
   mutate: (url: string, method: string, body?: unknown) => void;
 }) {
+  const open = useOpenContact();
   return (
-    <div className="rounded-lg border border-[#38332F] bg-[#262220] p-3 group">
+    <div className="rounded-lg border border-[#38332F] bg-[#262220] p-3.5 group">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          {e.contact.linkedInUrl ? (
-            <a href={e.contact.linkedInUrl} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-white hover:text-[#E8643C] truncate block">
-              {e.contact.name}
-            </a>
-          ) : (
-            <span className="text-[13px] font-medium text-white truncate block">{e.contact.name}</span>
-          )}
-          <p className="text-[11px] text-[#9C948C] truncate">
+          <button onClick={() => open(e.contact.id)} className="text-[14px] font-medium text-white hover:text-[#E8643C] truncate block text-left">
+            {e.contact.name}
+          </button>
+          <p className="text-[12px] text-[#9C948C] truncate">
             {[e.contact.title, e.contact.firmName].filter(Boolean).join(" · ") || "—"}
           </p>
         </div>
-        <button
-          onClick={() => mutate(`/api/me/pipelines/entry/${e.id}`, "DELETE")}
-          className="opacity-0 group-hover:opacity-100 text-[#6F665E] hover:text-[#E8643C] text-xs leading-none"
-          title="Remove from pipeline"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {e.contact.linkedInUrl && (
+            <a href={e.contact.linkedInUrl} target="_blank" rel="noreferrer" title="Open LinkedIn"
+              className="text-[#6F665E] hover:text-[#E8643C] text-[12px]">in↗</a>
+          )}
+          <button onClick={() => open(e.contact.id, "actions")} title="Generate outreach draft"
+            className="text-[#6F665E] hover:text-[#E8643C] text-[12px]">✉</button>
+          <button
+            onClick={() => mutate(`/api/me/pipelines/entry/${e.id}`, "DELETE")}
+            className="opacity-0 group-hover:opacity-100 text-[#6F665E] hover:text-[#E8643C] text-xs leading-none"
+            title="Remove from pipeline"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
@@ -193,18 +196,14 @@ function Card({
 function PipelineView({
   pipeline,
   entries,
-  contacts,
   isCold,
   mutate,
 }: {
   pipeline: BoardPipeline;
   entries: BoardEntry[];
-  contacts: { id: string; name: string; firmName: string | null }[];
   isCold: (e: BoardEntry, cadence: number | null) => boolean;
   mutate: (url: string, method: string, body?: unknown) => void;
 }) {
-  const inPipeline = new Set(entries.map((e) => e.contact.id));
-  const available = contacts.filter((c) => !inPipeline.has(c.id));
   const coldCount = entries.filter((e) => isCold(e, pipeline.cadenceDays)).length;
 
   return (
@@ -215,18 +214,10 @@ function PipelineView({
           {coldCount > 0 && <span className="text-[#E8643C]"> · {coldCount} going cold</span>}
           {pipeline.cadenceDays != null && <span> · cadence {pipeline.cadenceDays}d</span>}
         </div>
-        <select
-          value=""
-          onChange={(e) => {
-            if (e.target.value) mutate("/api/me/pipelines/entry", "POST", { pipelineId: pipeline.id, contactId: e.target.value });
-          }}
-          className="text-[12px] bg-[#232020] border border-[#38332F] rounded-lg px-2.5 py-1.5 text-[#C9C2BB] outline-none max-w-[240px]"
-        >
-          <option value="">+ Add contact…</option>
-          {available.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}{c.firmName ? ` — ${c.firmName}` : ""}</option>
-          ))}
-        </select>
+        <AddTypeahead
+          pipelineId={pipeline.id}
+          onAdd={(id) => mutate("/api/me/pipelines/entry", "POST", { pipelineId: pipeline.id, contactId: id })}
+        />
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">
@@ -255,7 +246,82 @@ function PipelineView({
   );
 }
 
+function AddTypeahead({
+  pipelineId,
+  onAdd,
+}: {
+  pipelineId: string;
+  onAdd: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [matches, setMatches] = useState<{ id: string; name: string; firmName: string | null; title: string | null }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const query = q.trim();
+    if (query.length < 2) {
+      setMatches([]);
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ q: query, excludePipelineId: pipelineId });
+        const res = await fetch(`/api/me/contacts/search?${params.toString()}`, { signal: controller.signal });
+        const data = await res.json();
+        setMatches(res.ok ? data.contacts ?? [] : []);
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") setMatches([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 180);
+    return () => {
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [pipelineId, q]);
+
+  return (
+    <div className="relative w-[260px]">
+      <input
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="+ Add contact (search)…"
+        className="w-full text-[12px] bg-[#232020] border border-[#38332F] rounded-lg px-2.5 py-1.5 text-[#C9C2BB] outline-none focus:border-[#E8643C]"
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-[#38332F] bg-[#1F1C1B] shadow-xl">
+          {matches.map((c) => (
+            <button
+              key={c.id}
+              onMouseDown={(e) => { e.preventDefault(); onAdd(c.id); setQ(""); setOpen(false); }}
+              className="block w-full text-left px-3 py-2 text-[12px] text-[#C9C2BB] hover:bg-[#2E2A27] hover:text-white truncate"
+            >
+              {c.name}
+              {[c.title, c.firmName].filter(Boolean).length ? (
+                <span className="text-[#6F665E]"> — {[c.title, c.firmName].filter(Boolean).join(" · ")}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && q.trim().length >= 2 && !loading && matches.length === 0 && (
+        <div className="absolute z-10 mt-1 w-full rounded-lg border border-[#38332F] bg-[#1F1C1B] px-3 py-2 text-[12px] text-[#6F665E] shadow-xl">
+          No matches
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Rollup({ pipelines, entries }: { pipelines: BoardPipeline[]; entries: BoardEntry[] }) {
+  const open = useOpenContact();
   // Map each entry's native stage → its universal phase via its pipeline's stages.
   const phaseOf = (e: BoardEntry): string => {
     const p = pipelines.find((p) => p.id === e.pipelineId);
@@ -278,7 +344,12 @@ function Rollup({ pipelines, entries }: { pipelines: BoardPipeline[]; entries: B
               {col.map((e) => (
                 <div key={e.id} className="rounded-lg border border-[#38332F] bg-[#262220] p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-medium text-white truncate">{e.contact.name}</span>
+                    <button
+                      onClick={() => open(e.contact.id)}
+                      className="text-[13px] font-medium text-white hover:text-[#E8643C] truncate text-left"
+                    >
+                      {e.contact.name}
+                    </button>
                     <span className="text-[9px] uppercase tracking-wide text-[#8A8077] bg-[#1C1A19] border border-[#38332F] rounded px-1.5 py-0.5 shrink-0">
                       {nameOf(e.pipelineId)}
                     </span>

@@ -22,10 +22,26 @@ export interface RankInput {
   email: string;
   relationshipType: string; // "" | buyer | practitioner | ecosystem
   inPipeline: boolean;
+  education?: string;
+  pastFirms?: string;
+  location?: string;
+}
+
+// Sam's own profile, for warm-signal overlap. Optional everywhere — when absent,
+// warmth is 0 and ranking is byte-for-byte the ICP-only behavior.
+export interface MeProfileLite {
+  schools?: string;
+  pastFirms?: string;
+  hometown?: string;
+  location?: string;
 }
 
 export interface RankedContact extends RankInput {
-  score: number;
+  score: number; // icp + warmth
+  icpScore: number;
+  warmthScore: number;
+  icpReasons: string[];
+  warmthReasons: string[];
   reasons: string[];
   connector: boolean;
 }
@@ -40,51 +56,81 @@ const CONNECTOR =
 const AI_DATA_FIRM =
   /\b(anthropic|openai|deepmind|mistral|cohere|databricks|snowflake|scale ai|hugging\s*face|palantir|nvidia|fivetran|dbt|confluent|datadog|sigma|looker|tableau|data|analytics|ai\b|\bml\b|intelligence)\b/i;
 
-export function rankAiConsulting(contacts: RankInput[]): RankedContact[] {
+const wnorm = (s: string | undefined) => (s || "").toLowerCase();
+const wtokens = (s: string | undefined) => wnorm(s).split(/[^a-z0-9]+/).filter((t) => t.length > 2);
+
+// Warm-signal overlap between Sam's profile and a contact's stored fields. Only
+// uses fields we actually store (education / pastFirms / firmName / location).
+function warmth(c: RankInput, p?: MeProfileLite): { score: number; reasons: string[] } {
+  if (!p) return { score: 0, reasons: [] };
+  const reasons: string[] = [];
+  let score = 0;
+  const overlap = (a: string | undefined, b: string | undefined) => {
+    const ta = new Set(wtokens(a));
+    return wtokens(b).some((t) => ta.has(t));
+  };
+  if (overlap(p.schools, c.education)) { score += 15; reasons.push("shared school"); }
+  if (overlap(p.pastFirms, c.pastFirms) || overlap(p.pastFirms, c.firmName)) { score += 12; reasons.push("shared employer"); }
+  if (overlap(p.location, c.location) || overlap(p.hometown, c.location)) { score += 8; reasons.push("same area"); }
+  return { score, reasons };
+}
+
+export function rankAiConsulting(contacts: RankInput[], opts: { profile?: MeProfileLite } = {}): RankedContact[] {
   return contacts
     .map((c): RankedContact => {
       const title = c.title || "";
       const firm = c.firmName || "";
-      const reasons: string[] = [];
-      let score = 0;
+      const icpReasons: string[] = [];
+      let icpScore = 0;
       let connector = false;
 
       if (DATA_LEADER.test(title)) {
-        score += 40;
-        reasons.push("data leader · buyer");
+        icpScore += 40;
+        icpReasons.push("data leader · buyer");
       } else if (FOUNDER_EXEC.test(title)) {
-        score += 26;
-        reasons.push("founder / exec");
+        icpScore += 26;
+        icpReasons.push("founder / exec");
       } else if (PRACTITIONER.test(title)) {
-        score += 18;
-        reasons.push("practitioner");
+        icpScore += 18;
+        icpReasons.push("practitioner");
       }
       if (CONNECTOR.test(title)) {
-        score += 12;
+        icpScore += 12;
         connector = true;
-        reasons.push("connector");
+        icpReasons.push("connector");
       }
       if (AI_DATA_FIRM.test(firm)) {
-        score += 14;
-        reasons.push("AI/data firm");
+        icpScore += 14;
+        icpReasons.push("AI/data firm");
       }
 
       // Manual label always adds on top (Sam's judgment wins).
       if (c.relationshipType === "buyer") {
-        score += 30;
-        reasons.push("tagged buyer");
+        icpScore += 30;
+        icpReasons.push("tagged buyer");
       } else if (c.relationshipType === "practitioner") {
-        score += 16;
-        reasons.push("tagged practitioner");
+        icpScore += 16;
+        icpReasons.push("tagged practitioner");
       } else if (c.relationshipType === "ecosystem") {
-        score += 12;
+        icpScore += 12;
         connector = true;
-        reasons.push("tagged ecosystem");
+        icpReasons.push("tagged ecosystem");
       }
 
-      if (c.email) score += 3; // reachable
+      if (c.email) icpScore += 3; // reachable
 
-      return { ...c, score, reasons, connector };
+      const w = warmth(c, opts.profile);
+
+      return {
+        ...c,
+        score: icpScore + w.score,
+        icpScore,
+        warmthScore: w.score,
+        icpReasons,
+        warmthReasons: w.reasons,
+        reasons: [...icpReasons, ...w.reasons],
+        connector,
+      };
     })
     .sort((a, b) => b.score - a.score);
 }

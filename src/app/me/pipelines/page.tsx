@@ -6,16 +6,11 @@ export default async function MePipelines() {
   const userId = meUserEmail();
   await ensurePipelines(userId);
 
-  const [pipelines, entriesRaw, contacts] = await Promise.all([
+  const [pipelines, entriesRaw] = await Promise.all([
     prisma.mePipeline.findMany({ where: { userId }, orderBy: { order: "asc" } }),
     prisma.mePipelineEntry.findMany({
       where: { userId },
       include: { contact: { include: { memory: true } } },
-    }),
-    prisma.meContact.findMany({
-      where: { userId },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, firmName: true },
     }),
   ]);
 
@@ -49,7 +44,7 @@ export default async function MePipelines() {
           Track relationships by org. Cards go cold when untouched past each pipeline&rsquo;s cadence.
         </p>
       </div>
-      <Board pipelines={boardPipelines} entries={entries} contacts={contacts} />
+      <Board pipelines={boardPipelines} entries={entries} />
     </div>
   );
 }

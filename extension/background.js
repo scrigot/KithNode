@@ -28,21 +28,21 @@ async function importContact(baseUrl, contact) {
   if (!baseUrl) {
     return { ok: false, error: "Set your KithNode URL in the panel first." };
   }
-  const url = baseUrl.replace(/\/+$/, "") + "/api/import/linkedin";
+  const url = baseUrl.replace(/\/+$/, "") + "/api/me/discover/leads";
 
-  // Matches the CsvContact shape accepted by POST /api/import/linkedin.
+  // Matches the manual capture form accepted by POST /api/me/discover/leads.
   const payload = {
-    contacts: [
-      {
-        name: contact.name || "",
-        title: contact.title || "",
-        firmName: contact.firmName || "",
-        email: contact.email || "",
-        education: contact.education || "",
-        location: contact.location || "",
-        linkedInUrl: contact.linkedInUrl || "",
-      },
-    ],
+    name: contact.name || "",
+    title: contact.title || "",
+    firmName: contact.firmName || "",
+    email: contact.email || "",
+    education: contact.education || "",
+    location: contact.location || "",
+    linkedInUrl: contact.linkedInUrl || "",
+    industry: contact.industry || "",
+    notes: contact.notes || contact.headline || "",
+    sourceUrl: contact.linkedInUrl || "",
+    sourceQuery: "LinkedIn extension capture",
   };
 
   let res;
@@ -57,11 +57,12 @@ async function importContact(baseUrl, contact) {
     return { ok: false, error: "Network error. Is the URL right and are you signed in?" };
   }
 
-  if (res.status === 401) {
-    return { ok: false, error: "Not signed in to KithNode in this browser." };
+  if (res.status === 404) {
+    return { ok: false, error: "KithNode /me is not running. Start localhost with PERSONAL_MODE=1." };
   }
   if (!res.ok) {
-    return { ok: false, error: `KithNode returned ${res.status}.` };
+    const body = await res.json().catch(() => ({}));
+    return { ok: false, error: body.error || `KithNode returned ${res.status}.` };
   }
   const body = await res.json().catch(() => ({}));
   return { ok: true, body };

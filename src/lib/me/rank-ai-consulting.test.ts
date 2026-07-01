@@ -9,6 +9,9 @@ const mk = (p: Partial<RankInput>): RankInput => ({
   email: p.email ?? "",
   relationshipType: p.relationshipType ?? "",
   inPipeline: p.inPipeline ?? false,
+  education: p.education ?? "",
+  pastFirms: p.pastFirms ?? "",
+  location: p.location ?? "",
 });
 
 describe("rankAiConsulting", () => {
@@ -22,6 +25,7 @@ describe("rankAiConsulting", () => {
     const byName = Object.fromEntries(ranked.map((r) => [r.name, r]));
     expect(byName.Buyer.score).toBeGreaterThan(byName.Pract.score);
     expect(byName.Buyer.reasons).toContain("data leader · buyer");
+    expect(byName.Buyer.icpReasons).toContain("data leader · buyer");
     expect(byName.Pract.reasons).toContain("practitioner");
   });
 
@@ -49,5 +53,28 @@ describe("rankAiConsulting", () => {
     const b = mk({ name: "Fresh", title: "Head of Data", inPipeline: false });
     const list = reconnectList(rankAiConsulting([a, b]));
     expect(list[0].name).toBe("Fresh");
+  });
+});
+
+describe("warm-signal axis", () => {
+  const unc = mk({ name: "UNC Grad", title: "Data Scientist", education: "University of North Carolina at Chapel Hill", location: "Raleigh, NC" });
+
+  it("no profile → warmth 0 and score equals icp (back-compat)", () => {
+    const r = rankAiConsulting([unc])[0];
+    expect(r.warmthScore).toBe(0);
+    expect(r.score).toBe(r.icpScore);
+    expect(r.reasons).not.toContain("shared school");
+  });
+
+  it("with a profile, shared school adds warmth + a reason without changing icp", () => {
+    const base = rankAiConsulting([unc])[0];
+    const r = rankAiConsulting([unc], { profile: { schools: "University of North Carolina", location: "Raleigh" } })[0];
+    expect(r.icpScore).toBe(base.icpScore);
+    expect(r.warmthScore).toBeGreaterThan(0);
+    expect(r.reasons).toContain("shared school");
+    expect(r.warmthReasons).toContain("shared school");
+    expect(r.icpReasons).toContain("practitioner");
+    expect(r.reasons).toContain("same area");
+    expect(r.score).toBe(r.icpScore + r.warmthScore);
   });
 });

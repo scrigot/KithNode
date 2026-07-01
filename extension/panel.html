@@ -13,6 +13,10 @@
 
   <main>
     <button id="parse" class="btn primary">Read this profile</button>
+    <div id="loading" class="loading" hidden>
+      <span class="spinner"></span>
+      <span>Reading the active LinkedIn profile…</span>
+    </div>
     <p id="hint" class="hint">Open a linkedin.com/in/ profile, then click above.</p>
 
     <form id="form" hidden>
@@ -21,13 +25,35 @@
       <label>Firm <input name="firmName" autocomplete="off"></label>
       <label>Education <input name="education" autocomplete="off"></label>
       <label>Location <input name="location" autocomplete="off"></label>
+      <label>Industry
+        <select name="industry">
+          <option value="">Select industry…</option>
+          <option>AI Consulting</option>
+          <option>AI Engineering</option>
+          <option>Data Engineering</option>
+          <option>Data Analytics</option>
+          <option>Data Science</option>
+          <option>Data Services</option>
+          <option>ML Infrastructure</option>
+          <option>LLM / RAG</option>
+          <option>AI Product / Ops</option>
+          <option>Enterprise AI</option>
+          <option>Cloud / DevOps</option>
+          <option>Cybersecurity</option>
+          <option>Startup / Founder</option>
+          <option>Venture / Ecosystem</option>
+          <option>Consulting</option>
+          <option>Other</option>
+        </select>
+      </label>
       <label>Email <input name="email" type="email" autocomplete="off" placeholder="optional"></label>
       <label>LinkedIn URL <input name="linkedInUrl" autocomplete="off"></label>
+      <label>Notes <textarea name="notes" autocomplete="off" placeholder="why this person is useful to remember"></textarea></label>
 
       <div class="actions">
         <button type="button" id="copyJson" class="btn">Copy JSON</button>
         <button type="button" id="copyCsv" class="btn">Copy CSV row</button>
-        <button type="button" id="send" class="btn primary">Add to KithNode</button>
+        <button type="button" id="send" class="btn primary">Add to Discover</button>
       </div>
       <p id="status" class="status"></p>
     </form>
@@ -35,10 +61,9 @@
     <details class="settings">
       <summary>Settings</summary>
       <label>KithNode URL
-        <input id="baseUrl" placeholder="https://kithnode.ai" autocomplete="off">
+        <input id="baseUrl" placeholder="http://localhost:3051" autocomplete="off">
       </label>
-      <p class="hint">Used by "Add to KithNode". You must be signed in to KithNode in this
-        browser. Leave blank to use only the copy buttons.</p>
+      <p class="hint">Used by "Add to Discover". Keep the local /me dev server running.</p>
     </details>
   </main>
 
