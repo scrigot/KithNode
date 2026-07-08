@@ -33,6 +33,24 @@ export const authConfig: NextAuthConfig = {
     authorized: ({ auth, request }) => {
       const { pathname } = request.nextUrl;
       const isLoggedIn = !!auth?.user;
+      const isMeRoute = pathname === "/me" || pathname.startsWith("/me/") || pathname.startsWith("/api/me/");
+      const personalMode = process.env.PERSONAL_MODE === "true" || process.env.PERSONAL_MODE === "1";
+      const requireMeAuth = process.env.ME_REQUIRE_AUTH === "true" || process.env.ME_REQUIRE_AUTH === "1" || process.env.VERCEL_ENV === "production";
+
+      // /me is a single-owner personal workspace. It stays 404-gated in the
+      // route layer when PERSONAL_MODE is off. If PERSONAL_MODE is enabled in
+      // production, middleware must also protect both pages and APIs; otherwise
+      // the local-first APIs would be publicly callable.
+      if (isMeRoute && personalMode && requireMeAuth) {
+        const allowedEmail = process.env.ME_USER_EMAIL?.trim().toLowerCase();
+        const userEmail = auth?.user?.email?.trim().toLowerCase();
+        const allowed = Boolean(allowedEmail && userEmail && allowedEmail === userEmail);
+        if (allowed) return true;
+        if (pathname.startsWith("/api/me/")) {
+          return Response.json({ error: "Not found" }, { status: 404 });
+        }
+        return false;
+      }
 
       // Dashboard pages: require session, redirect to / on failure.
       if (pathname.startsWith("/dashboard")) {

@@ -8,7 +8,10 @@ export const config = {
   matcher: [
     // Dashboard pages
     "/dashboard/:path*",
+    // Single-owner personal workspace, gated in auth.config when enabled.
+    "/me/:path*",
     // Private API routes (auth, health, and Stripe webhook are excluded)
+    "/api/me/:path*",
     "/api/contacts/:path*",
     "/api/discover/:path*",
     "/api/pipeline/:path*",
