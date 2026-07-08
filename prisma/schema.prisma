@@ -389,6 +389,7 @@ model MeContact {
   enrichmentNotes MeContactNote[]
   discoveryLeads  MeDiscoveryLead[]
   activities      MeContactActivity[]
+  applicationLinks MeApplicationContact[]
 
   @@unique([userId, linkedInUrl]) // scoped dedup — normalized URL, per-user
   @@index([userId])
@@ -600,7 +601,75 @@ model MeResume {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
+  applications MeInternshipApplication[]
+
   @@index([userId, updatedAt])
+}
+
+// Internship/job application tracker for the /me workspace. Manual-first,
+// spreadsheet-like CRM rows with links to saved resumes and networking contacts.
+model MeInternshipApplication {
+  id              String    @id @default(cuid())
+  userId          String
+  company         String
+  role            String
+  location        String    @default("")
+  season          String    @default("")
+  jobUrl          String    @default("")
+  source          String    @default("")
+  deadline        DateTime?
+  status          String    @default("interested")
+  priority        String    @default("medium")
+  resumeId        String?
+  jobDescription  String    @default("")
+  notes           String    @default("")
+  nextAction      String    @default("")
+  nextActionDue   DateTime?
+  appliedAt       DateTime?
+  archived        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  resume  MeResume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  contacts MeApplicationContact[]
+  events   MeApplicationEvent[]
+
+  @@index([userId, status])
+  @@index([userId, deadline])
+  @@index([userId, nextActionDue])
+  @@index([userId, company])
+  @@index([userId, resumeId])
+}
+
+model MeApplicationContact {
+  id            String   @id @default(cuid())
+  userId        String
+  applicationId String
+  contactId     String
+  createdAt     DateTime @default(now())
+
+  application MeInternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  contact     MeContact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, applicationId, contactId])
+  @@index([userId, applicationId])
+  @@index([userId, contactId])
+}
+
+model MeApplicationEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  applicationId String
+  type          String   @default("note")
+  title         String
+  detail        String   @default("")
+  meta          Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  application MeInternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, applicationId, createdAt])
+  @@index([userId, type, createdAt])
 }
 
 // Reusable, user-scoped "evidence bank": the real things the user has done. AI

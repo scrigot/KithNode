@@ -23,7 +23,7 @@ export default async function MeHome() {
   const userId = meUserEmail();
   await ensurePipelines(userId);
 
-  const [leadCount, leads, savedContacts, coldEntries, pipelines, actionContacts] = await Promise.all([
+  const [leadCount, leads, savedContacts, coldEntries, pipelines, actionContacts, applications] = await Promise.all([
     prisma.meDiscoveryLead.count({ where: { userId, status: "researching" } }),
     prisma.meDiscoveryLead.findMany({
       where: { userId, status: "researching" },
@@ -53,6 +53,21 @@ export default async function MeHome() {
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
+    prisma.meInternshipApplication.findMany({
+      where: { userId, archived: false },
+      orderBy: [{ deadline: "asc" }, { updatedAt: "desc" }],
+      take: 50,
+      select: {
+        id: true,
+        company: true,
+        role: true,
+        status: true,
+        priority: true,
+        deadline: true,
+        nextAction: true,
+        nextActionDue: true,
+      },
+    }),
   ]);
 
   const goingCold = coldEntries
@@ -69,6 +84,11 @@ export default async function MeHome() {
       })),
     )
     .slice(0, 8);
+  const soon = Date.now() + 14 * 86_400_000;
+  const applicationActions = applications
+    .filter((app) => app.nextAction || app.nextActionDue || (app.deadline && app.deadline.getTime() <= soon))
+    .slice(0, 6);
+  const upcomingApplications = applications.filter((app) => app.deadline && app.deadline.getTime() <= soon).length;
 
   return (
     <div className="px-8 py-10">
@@ -99,6 +119,7 @@ export default async function MeHome() {
           <Metric label="Discovery candidates" value={leadCount} href="/me/discover" />
           <Metric label="Need pipeline" value={needsPipeline.length} href="/me/contacts?source=discover_lead&inPipeline=out" />
           <Metric label="Need memory" value={needsMemory.length} href="/me/contacts?source=discover_lead" />
+          <Metric label="Applications" value={upcomingApplications} href="/me/applications?deadline=upcoming" hot={upcomingApplications > 0} />
           <Metric label="Next steps" value={nextSteps.length} href="#next-steps" hot={nextSteps.length > 0} />
           <Metric label="Going cold" value={goingCold.length} href="/me/pipelines" hot={goingCold.length > 0} />
         </div>
@@ -122,6 +143,35 @@ export default async function MeHome() {
                       subtitle={[contact.title, contact.firmName].filter(Boolean).join(" · ")}
                       item={item}
                     />
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            <Panel
+              title="Applications"
+              action={<Link href="/me/applications" className="text-[12px] text-[#E8643C] hover:text-white">open tracker</Link>}
+            >
+              {applicationActions.length === 0 ? (
+                <Empty text="No application deadlines or next actions yet. Add internships in Applications." />
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {applicationActions.map((app) => (
+                    <Link key={app.id} href="/me/applications" className="rounded-lg border border-[#322E2B] bg-[#1C1A19] p-3 hover:border-[#E8643C]/50">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-medium text-white">{app.company}</p>
+                          <p className="mt-0.5 truncate text-[12px] text-[#9C948C]">{app.role}</p>
+                        </div>
+                        <span className="rounded-full border border-[#38332F] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#8A8077]">
+                          {app.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[12px] text-[#B7AFA7]">{app.nextAction || "No next action set"}</p>
+                      <p className="mt-1 text-[11px] text-[#8A8077]">
+                        {app.nextActionDue ? `next ${app.nextActionDue.toLocaleDateString()}` : app.deadline ? `deadline ${app.deadline.toLocaleDateString()}` : app.priority}
+                      </p>
+                    </Link>
                   ))}
                 </div>
               )}
