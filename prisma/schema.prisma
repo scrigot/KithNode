@@ -347,3 +347,344 @@ model EmailLog {
   @@index([toEmail])
   @@index([type, createdAt])
 }
+
+// ─── Personal Networking OS ("/me" workspace) — ADDITIVE, local-first ──────────
+// These Me* tables back the single-player /me workspace (see
+// ~/.claude/plans/...zesty-eich.md). They are PURELY ADDITIVE: no existing table
+// is altered. They are gated behind PERSONAL_MODE and accessed ONLY via Prisma
+// from src/lib/me/** — never the service-role Supabase client (ESLint-enforced).
+// userId is the owner's email (matches the rest of the app's userId convention).
+// Designed to run against a LOCAL Postgres (supabase start / dev project), never
+// prod, while dogfooding.
+
+// The personal contact. A dedicated table (NOT a reuse of AlumniContact) so
+// imported LinkedIn rows never need fake placeholder values, dedup is scoped
+// per-user (not global), and personal data never lands in the shared contact
+// table. `alumniContactId` optionally links a row imported from a prod
+// AlumniContact so we can trace provenance.
+model MeContact {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  firmName       String?
+  title          String?
+  linkedInUrl    String?
+  email          String?
+  location       String?
+  education      String?
+  industry       String?
+  seniorityLevel String?
+  pastFirms      String?
+  notes          String   @default("")
+  source         String   @default("manual") // manual | linkedin_csv | prod_import | apollo
+  alumniContactId String? // provenance link when imported from a prod AlumniContact row
+  connectedOn    DateTime? // LinkedIn "Connected On" date when known
+  lastSpokenAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  pipelineEntries MePipelineEntry[]
+  memory          MeContactMemory?
+  prepBriefs      MePrepBrief[]
+  enrichmentNotes MeContactNote[]
+  discoveryLeads  MeDiscoveryLead[]
+  activities      MeContactActivity[]
+  applicationLinks MeApplicationContact[]
+
+  @@unique([userId, linkedInUrl]) // scoped dedup — normalized URL, per-user
+  @@index([userId])
+  @@index([userId, source])
+  @@index([userId, industry])
+}
+
+// An org/purpose pipeline in the personal workspace. Seeded: Comfort, Anvil, UNC,
+// AI Consulting. `stages` mirrors the existing Pipeline.stages JSON shape
+// ([{ key, label, color, universalPhase }]) so the existing board components can
+// render it. cadenceDays drives the going-cold rail.
+model MePipeline {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  kind        String   @default("ORG") // ORG for now; future: PURPOSE, etc.
+  stages      Json     @default("[]")
+  cadenceDays Int?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  entries MePipelineEntry[]
+
+  @@index([userId])
+}
+
+// Per-contact-per-pipeline membership. UNIQUE on (userId, contactId, pipelineId)
+// gives multi-pipeline membership (one person can be in Comfort AND UNC) WITHOUT
+// touching the prod PipelineEntry table (which is unique on (contactId,userId)).
+model MePipelineEntry {
+  id          String    @id @default(cuid())
+  userId      String
+  contactId   String
+  pipelineId  String
+  stage       String    @default("identified")
+  notes       String    @default("")
+  lastTouchAt DateTime?
+  addedAt     DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  contact  MeContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipeline MePipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactId, pipelineId])
+  @@index([userId])
+  @@index([pipelineId])
+  @@index([userId, pipelineId, contactId])
+}
+
+// The personal memory layer over a contact (relationship type drives ICP ranking;
+// strategic value + action items + notes are free context for coffee-prep).
+model MeContactMemory {
+  id               String   @id @default(cuid())
+  userId           String
+  contactId        String   @unique
+  relationshipType String   @default("") // "" | buyer | practitioner | ecosystem
+  strategicValue   String   @default("")
+  actionItems      Json     @default("[]")
+  notes            String   @default("")
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, relationshipType])
+}
+
+// Cached coffee-chat prep brief. Cache key = contactId + promptVersion + memoryHash
+// + contextHash (the meeting/person context + refine instructions). contextHash is
+// what stops a stale brief being reused when the meeting context changes.
+model MePrepBrief {
+  id            String   @id @default(cuid())
+  userId        String
+  contactId     String
+  brief         Json
+  model         String   @default("")
+  promptVersion String   @default("v1")
+  memoryHash    String   @default("")
+  contextHash   String   @default("")
+  meta          Json? // { meeting: {purpose,time,location}, person, refine: [] }
+  createdAt     DateTime @default(now())
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId])
+  @@index([userId, contactId, promptVersion, memoryHash, contextHash, createdAt])
+}
+
+// Append-only enrichment log behind the Memory chatbot. Raw user/assistant turns
+// are stored verbatim; structured facts the extractor pulled go in `extracted`.
+// The rolled-up summary lives in MeContactMemory (deterministic merge, never a
+// direct model write). Keeping raw notes append-only + extraction structured is
+// the guard against poisoning memory (which feeds prep/draft/ranking).
+model MeContactNote {
+  id        String   @id @default(cuid())
+  userId    String
+  contactId String
+  author    String   @default("user") // user | assistant | extractor
+  kind      String   @default("chat") // chat | fact | meeting
+  content   String
+  extracted Json? // validated facts the extractor pulled from this turn
+  createdAt DateTime @default(now())
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId, createdAt])
+}
+
+// Append-only relationship activity timeline. This is the operational history:
+// connect request, LinkedIn message, email draft/copy, coffee chat, follow-up,
+// stage move, manual note, etc. Memory is "what to remember"; activity is "what
+// happened and when".
+model MeContactActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  contactId  String
+  type       String   @default("note")
+  title      String
+  detail     String   @default("")
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  meta       Json     @default("{}")
+
+  contact MeContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, contactId, occurredAt])
+  @@index([userId, type, occurredAt])
+}
+
+// The /me owner's own profile, used to compute warm-signal overlap against
+// contacts (shared school/club/employer/hometown/location). Seeded by the
+// prod-import script from prod User prefs; editable via a small settings form.
+model MeProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  schools         String   @default("")
+  clubs           String   @default("")
+  pastFirms       String   @default("")
+  hometown        String   @default("")
+  location        String   @default("")
+  currentWork     String   @default("")
+  goals           String   @default("")
+  targetRoles     String   @default("")
+  targetExpertise String   @default("")
+  targetCompanies String   @default("")
+  targetLocations String   @default("")
+  searchKeywords  String   @default("")
+  profileNotes    String   @default("")
+  outreachStyle   String   @default("")
+  outreachLength  String   @default("")
+  outreachSignoff String   @default("")
+  outreachPositioning String @default("")
+  outreachGoals   String   @default("")
+  preferredEmailClient String @default("")
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+// People found during /me discovery before they become real contacts. This is a
+// local-only staging table: Sam can research, dismiss, or save into MeContact +
+// a pipeline when the person is worth tracking.
+model MeDiscoveryLead {
+  id             String   @id @default(cuid())
+  userId         String
+  status         String   @default("researching") // researching | saved | dismissed
+  name           String
+  firmName       String?
+  title          String?
+  linkedInUrl    String?
+  email          String?
+  location       String?
+  education      String?
+  industry       String?
+  notes          String   @default("")
+  sourceQuery    String   @default("")
+  sourceUrl      String   @default("")
+  score          Int      @default(0)
+  reasons        Json     @default("[]")
+  savedContactId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  savedContact MeContact? @relation(fields: [savedContactId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, linkedInUrl])
+  @@index([userId, status])
+  @@index([userId, score])
+}
+
+// A user's resume draft in the /me builder, plus its most recent recruiter grade.
+// content is the structured, editable sections; score/dimensions/notes are the
+// last gradeResume() result (the grade is recomputed live as the user edits, and
+// persisted on save). Mirrors MeDiscoveryLead's score Int + Json-reasons shape.
+//
+// RLS: /me runs against a LOCAL Postgres (see src/lib/me/db.ts), so there is no
+// prod exposure today. Before this table ever runs against a shared/prod DB, add
+// a Supabase RLS policy filtering on userId (per repo convention).
+model MeResume {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String   @default("Untitled resume")
+  track      String   @default("ai-consulting") // ai-consulting | ai-engineering | ai-generalist
+  templateId String   @default("dense")
+  content    Json     @default("{}") // structured editable sections (ResumeContent)
+  score       Int      @default(0)
+  dimensions  Json     @default("[]") // last GradedResume.dimensions
+  notes       Json     @default("[]") // LLM qualitative notes / bullet rewrites
+  docVersion  Int      @default(1)    // schema version of `content` (1=fixed fields, 2=sections[])
+  userContext String   @default("")   // free-text "what I've done / who I am" for tailored rewrites
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  applications MeInternshipApplication[]
+
+  @@index([userId, updatedAt])
+}
+
+// Internship/job application tracker for the /me workspace. Manual-first,
+// spreadsheet-like CRM rows with links to saved resumes and networking contacts.
+model MeInternshipApplication {
+  id              String    @id @default(cuid())
+  userId          String
+  company         String
+  role            String
+  location        String    @default("")
+  season          String    @default("")
+  jobUrl          String    @default("")
+  source          String    @default("")
+  deadline        DateTime?
+  status          String    @default("interested")
+  priority        String    @default("medium")
+  resumeId        String?
+  jobDescription  String    @default("")
+  notes           String    @default("")
+  nextAction      String    @default("")
+  nextActionDue   DateTime?
+  appliedAt       DateTime?
+  archived        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  resume  MeResume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  contacts MeApplicationContact[]
+  events   MeApplicationEvent[]
+
+  @@index([userId, status])
+  @@index([userId, deadline])
+  @@index([userId, nextActionDue])
+  @@index([userId, company])
+  @@index([userId, resumeId])
+}
+
+model MeApplicationContact {
+  id            String   @id @default(cuid())
+  userId        String
+  applicationId String
+  contactId     String
+  createdAt     DateTime @default(now())
+
+  application MeInternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  contact     MeContact               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, applicationId, contactId])
+  @@index([userId, applicationId])
+  @@index([userId, contactId])
+}
+
+model MeApplicationEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  applicationId String
+  type          String   @default("note")
+  title         String
+  detail        String   @default("")
+  meta          Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  application MeInternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, applicationId, createdAt])
+  @@index([userId, type, createdAt])
+}
+
+// Reusable, user-scoped "evidence bank": the real things the user has done. AI
+// bullet rewrites must CITE evidence by id and may not fabricate beyond it. Shared
+// across all of a user's resumes (not per-resume) so the bank is built once.
+model MeEvidence {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   @default("project") // project | class | work | leadership | metric | skill
+  title     String
+  detail    String   @default("")
+  metric    String   @default("") // quantified outcome, if any
+  proofUrl  String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([userId, kind])
+}

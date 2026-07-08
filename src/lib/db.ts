@@ -16,13 +16,17 @@ function createPrismaClient() {
 
   if (match) {
     const [, user, password, host, port, database] = match;
+    // Local Postgres (e.g. the supabase local stack for the /me workspace) does
+    // NOT speak SSL — forcing it throws "server does not support SSL connections".
+    // Prod/Supabase hosts are never localhost, so they keep SSL.
+    const isLocal = /^(127\.0\.0\.1|localhost|::1|0\.0\.0\.0)$/.test(host);
     const adapter = new PrismaPg({
       host,
       port: parseInt(port),
       user: decodeURIComponent(user),
       password: decodeURIComponent(password),
       database,
-      ssl: { rejectUnauthorized: false },
+      ssl: isLocal ? false : { rejectUnauthorized: false },
     });
     return new PrismaClient({ adapter });
   }
