@@ -399,7 +399,13 @@ function TagListField({ label, value, onChange }: { label: string; value: string
   return (
     <label className="block">
       <span className="text-[10px] uppercase tracking-wide" style={{ color: c.dim }}>{label}</span>
-      <input value={raw} onChange={(e) => setRaw(e.target.value)} onBlur={commit} className="w-full mt-1 rounded-md px-2 py-1.5 text-[12px] outline-none" style={inputStyle} />
+      <input
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        onBlur={commit}
+        className="mt-1 w-full rounded-md px-2 py-1.5 text-[12px] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E8643C]"
+        style={inputStyle}
+      />
     </label>
   );
 }
