@@ -15,9 +15,18 @@ describe("authConfig authorized", () => {
     vi.unstubAllEnvs();
   });
 
-  it("lets /me fall through to the route 404 when PERSONAL_MODE is off", async () => {
+  it("owner-gates /me in production even when PERSONAL_MODE is off", async () => {
     vi.stubEnv("PERSONAL_MODE", "0");
     vi.stubEnv("VERCEL_ENV", "production");
+
+    expect(await authorized({ auth: null, request: request("/me") })).toBe(false);
+    expect(await authorized({ auth: { user: { email: "samrigot@kithnode.ai" } }, request: request("/me") })).toBe(true);
+    expect(await authorized({ auth: { user: { email: "other@kithnode.ai" } }, request: request("/me") })).toBe(false);
+  });
+
+  it("lets /me fall through to the route 404 outside production when PERSONAL_MODE is off", async () => {
+    vi.stubEnv("PERSONAL_MODE", "0");
+    vi.stubEnv("VERCEL_ENV", "development");
 
     expect(await authorized({ auth: null, request: request("/me") })).toBe(true);
   });
