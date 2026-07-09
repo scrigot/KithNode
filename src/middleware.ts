@@ -9,6 +9,7 @@ export const config = {
     // Dashboard pages
     "/dashboard/:path*",
     // Single-owner personal workspace, gated in auth.config when enabled.
+    "/me",
     "/me/:path*",
     // Private API routes (auth, health, and Stripe webhook are excluded)
     "/api/me/:path*",

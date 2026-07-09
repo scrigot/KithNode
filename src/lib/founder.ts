@@ -13,7 +13,17 @@ export const FOUNDER_EMAIL = (
   process.env.FOUNDER_EMAIL || "samrigot31@gmail.com"
 ).toLowerCase();
 
+function founderEmails() {
+  return [FOUNDER_EMAIL, process.env.ME_USER_EMAIL || "samrigot@kithnode.ai"]
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isFounderEmail(email: string | null | undefined): boolean {
+  const normalized = email?.trim().toLowerCase();
+  return !!normalized && founderEmails().includes(normalized);
+}
+
 export function isFounder(session: Session | null | undefined): boolean {
-  const email = session?.user?.email?.toLowerCase();
-  return !!email && email === FOUNDER_EMAIL;
+  return isFounderEmail(session?.user?.email);
 }
