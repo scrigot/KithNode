@@ -75,7 +75,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   const [tailorLoading, setTailorLoading] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [resumes, setResumes] = useState<(SavedResume & { score?: number })[]>([]);
-  const [zoom, setZoom] = useState(0.8);
+  const [zoom, setZoom] = useState(0.5);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutosave = useRef(true);
@@ -259,6 +259,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
     setDoc({ ...doc, sections: [...doc.sections, s] });
     setSelectedSection(s.id);
   };
+  const paperFrame = { width: 816 * zoom, minHeight: 1056 * zoom };
 
   return (
     <div className="min-h-screen" style={{ background: "#1C1A19", color: c.text }}>
@@ -293,7 +294,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
         <button onClick={exportPdf} className="text-[12px] rounded-md px-3 py-1.5 font-semibold" style={{ background: c.accent, color: "#fff" }}>Export PDF</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "minmax(0,1fr) 380px minmax(0,1fr)" }}>
+      <div className="grid min-[1180px]:grid-cols-[280px_320px_minmax(420px,1fr)]">
         {/* LEFT — editor */}
         <div className="p-5 space-y-3 overflow-auto" style={{ borderRight: `1px solid ${c.border}`, maxHeight: "calc(100vh - 52px)" }}>
           <HeaderEditor doc={doc} setDoc={setDoc} />
@@ -334,13 +335,15 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
         <div className="overflow-auto" style={{ background: "#15110F", maxHeight: "calc(100vh - 52px)" }}>
           <div className="sticky top-0 z-10 flex items-center justify-center gap-1.5 px-3 py-2" style={{ background: "#15110F", borderBottom: `1px solid ${c.border}` }}>
             <button onClick={() => setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))} className="text-[13px] rounded px-2 py-0.5 leading-none" style={inputStyle} title="Zoom out">−</button>
-            <button onClick={() => setZoom(0.8)} className="text-[11px] rounded px-2 py-1 leading-none tabular-nums" style={{ ...inputStyle, minWidth: 52 }} title="Reset zoom">{Math.round(zoom * 100)}%</button>
+            <button onClick={() => setZoom(0.5)} className="text-[11px] rounded px-2 py-1 leading-none tabular-nums" style={{ ...inputStyle, minWidth: 52 }} title="Reset zoom">{Math.round(zoom * 100)}%</button>
             <button onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.1) * 10) / 10))} className="text-[13px] rounded px-2 py-0.5 leading-none" style={inputStyle} title="Zoom in">+</button>
             <button onClick={() => setZoom(1)} className="text-[11px] rounded px-2 py-1 leading-none ml-1" style={inputStyle} title="Actual size (100%)">1:1</button>
           </div>
-          <div className="p-6">
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: "top center", transition: "transform 120ms" }}>
-              <ResumePaper doc={doc} templateId={templateId} />
+          <div className="p-4">
+            <div style={{ ...paperFrame, margin: "0 auto" }}>
+              <div style={{ transform: `scale(${zoom})`, transformOrigin: "top left", transition: "transform 120ms" }}>
+                <ResumePaper doc={doc} templateId={templateId} />
+              </div>
             </div>
           </div>
         </div>
