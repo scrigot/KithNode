@@ -33,6 +33,10 @@ describe("isFounder (simulation — no NextAuth runtime import)", () => {
     expect(isFounder(session("samrigot31@gmail.com"))).toBe(true);
   });
 
+  it("returns true for the personal owner email", () => {
+    expect(isFounder(session("samrigot@kithnode.ai"))).toBe(true);
+  });
+
   it("is case-insensitive", () => {
     expect(isFounder(session("SamRigot31@Gmail.com"))).toBe(true);
   });
