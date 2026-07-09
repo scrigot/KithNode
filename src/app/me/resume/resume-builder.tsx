@@ -68,7 +68,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   const [scoring, setScoring] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [jd, setJd] = useState("");
   const [tailor, setTailor] = useState<TailorResult | null>(null);
@@ -77,6 +77,9 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   const [resumes, setResumes] = useState<(SavedResume & { score?: number })[]>([]);
   const [zoom, setZoom] = useState(0.8);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipAutosave = useRef(true);
+  const lastSavedSnapshot = useRef(JSON.stringify({ title, track, templateId, userContext, doc }));
 
   // Load the reusable evidence bank once.
   useEffect(() => {
@@ -113,6 +116,24 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
       if (debounce.current) clearTimeout(debounce.current);
     };
   }, [doc, track, rescore]);
+
+  // Debounced autosave. Skips mount and resume-switch loads via skipAutosave + snapshot diff.
+  useEffect(() => {
+    const snapshot = JSON.stringify({ title, track, templateId, userContext, doc });
+    if (snapshot === lastSavedSnapshot.current) return;
+    if (skipAutosave.current) {
+      skipAutosave.current = false;
+      lastSavedSnapshot.current = snapshot;
+      return;
+    }
+    if (autosaveDebounce.current) clearTimeout(autosaveDebounce.current);
+    autosaveDebounce.current = setTimeout(() => {
+      save(); // save() itself updates lastSavedSnapshot on success
+    }, 1400);
+    return () => {
+      if (autosaveDebounce.current) clearTimeout(autosaveDebounce.current);
+    };
+  }, [doc, title, track, templateId, userContext]);
 
   async function getFeedback() {
     setFeedbackLoading(true);
@@ -173,16 +194,19 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   }
 
   async function save(): Promise<string | null> {
+    if (autosaveDebounce.current) clearTimeout(autosaveDebounce.current);
+    setSaveStatus("saving");
     const res = await fetch("/api/me/resume", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, title, track, templateId, content: doc, docVersion: 2, userContext, score: grade?.overall ?? 0, dimensions: grade?.dimensions ?? [], notes }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) { setSaveStatus("idle"); return null; }
     const { resume } = await res.json();
     setId(resume.id);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    lastSavedSnapshot.current = JSON.stringify({ title, track, templateId, userContext, doc });
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 1500);
     refreshResumes();
     return resume.id as string;
   }
@@ -196,6 +220,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   async function switchTo(r: SavedResume & { score?: number }) {
     if (r.id === id) return;
     await save();
+    skipAutosave.current = true;
     setId(r.id);
     setTitle(r.title);
     setTrack((r.track as Track) ?? "ai-consulting");
@@ -209,6 +234,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
 
   async function newResume() {
     await save();
+    skipAutosave.current = true;
     setId(null);
     setTitle("Untitled resume");
     setDoc(emptyDoc());
@@ -263,7 +289,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
           {uploading ? "Reading…" : "Upload PDF"}
           <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
         </label>
-        <button onClick={save} className="text-[12px] rounded-md px-3 py-1.5" style={{ ...inputStyle, color: "#fff" }}>{saved ? "Saved ✓" : "Save"}</button>
+        <button onClick={save} className="text-[12px] rounded-md px-3 py-1.5" style={{ ...inputStyle, color: "#fff" }}>{saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved ✓" : "Save"}</button>
         <button onClick={exportPdf} className="text-[12px] rounded-md px-3 py-1.5 font-semibold" style={{ background: c.accent, color: "#fff" }}>Export PDF</button>
       </div>
 
@@ -350,6 +376,31 @@ function Field({ label, value, onChange, area }: { label: string; value: string;
   );
 }
 
+// Tag-list input that holds raw string state locally so typing (incl. spaces) is never
+// clobbered mid-edit; commits the parsed comma-split array upstream only on blur.
+function TagListField({ label, value, onChange }: { label: string; value: string[]; onChange: (v: string[]) => void }) {
+  const [raw, setRaw] = useState(value.join(", "));
+  const lastCommitted = useRef<string[]>(value);
+  useEffect(() => {
+    if (value !== lastCommitted.current) {
+      lastCommitted.current = value;
+      setRaw(value.join(", "));
+    }
+  }, [value]);
+  const commit = () => {
+    const parsed = raw.split(",").map((x) => x.trim()).filter(Boolean);
+    lastCommitted.current = parsed;
+    onChange(parsed);
+    setRaw(parsed.join(", "));
+  };
+  return (
+    <label className="block">
+      <span className="text-[10px] uppercase tracking-wide" style={{ color: c.dim }}>{label}</span>
+      <input value={raw} onChange={(e) => setRaw(e.target.value)} onBlur={commit} className="w-full mt-1 rounded-md px-2 py-1.5 text-[12px] outline-none" style={inputStyle} />
+    </label>
+  );
+}
+
 function HeaderEditor({ doc, setDoc }: { doc: ResumeDoc; setDoc: (d: ResumeDoc) => void }) {
   const setH = (patch: Partial<ResumeDoc["header"]>) => setDoc({ ...doc, header: { ...doc.header, ...patch } });
   return (
@@ -361,7 +412,7 @@ function HeaderEditor({ doc, setDoc }: { doc: ResumeDoc; setDoc: (d: ResumeDoc) 
         <Field label="Location" value={doc.header.location} onChange={(v) => setH({ location: v })} />
         <Field label="Email" value={doc.header.email} onChange={(v) => setH({ email: v })} />
         <Field label="Phone" value={doc.header.phone} onChange={(v) => setH({ phone: v })} />
-        <Field label="Links (comma-sep)" value={doc.header.links.join(", ")} onChange={(v) => setH({ links: v.split(",").map((x) => x.trim()).filter(Boolean) })} />
+        <TagListField label="Links (comma-sep)" value={doc.header.links} onChange={(v) => setH({ links: v })} />
       </div>
     </div>
   );
@@ -482,7 +533,7 @@ function EntriesEditor({ section, onChange }: { section: EntriesSection; onChang
             {!isProjects && <Field label="Start" value={e.start} onChange={(v) => upd(i, { start: v })} />}
             {!isProjects && <Field label="End" value={e.end} onChange={(v) => upd(i, { end: v })} />}
           </div>
-          {isProjects && <Field label="Tech (comma-sep)" value={(e.tech ?? []).join(", ")} onChange={(v) => upd(i, { tech: v.split(",").map((x) => x.trim()).filter(Boolean) })} />}
+          {isProjects && <TagListField label="Tech (comma-sep)" value={e.tech ?? []} onChange={(v) => upd(i, { tech: v })} />}
           <Field label="Bullets (one per line)" value={e.bullets.join("\n")} onChange={(v) => upd(i, { bullets: v.split("\n") })} area />
           <RowControls
             onUp={() => onChange({ ...section, entries: moveInArray(section.entries, i, -1) })}
@@ -538,7 +589,7 @@ function SkillsEditor({ section, onChange }: { section: SkillsSection; onChange:
             </select>
             <input value={g.label} onChange={(e) => upd(i, { label: e.target.value })} placeholder="label" className="flex-1 text-[12px] rounded-md px-2 py-1 outline-none" style={inputStyle} />
           </div>
-          <Field label="Items (comma-sep)" value={g.items.join(", ")} onChange={(v) => upd(i, { items: v.split(",").map((x) => x.trim()).filter(Boolean) })} />
+          <TagListField label="Items (comma-sep)" value={g.items} onChange={(v) => upd(i, { items: v })} />
           {g.category === "interests" && <p className="text-[10px]" style={{ color: c.dim }}>Interests show on the resume but don&apos;t affect your score.</p>}
           <button onClick={() => onChange({ ...section, groups: section.groups.filter((_, j) => j !== i) })} className="text-[10px]" style={{ color: c.dim }}>Remove group</button>
         </div>

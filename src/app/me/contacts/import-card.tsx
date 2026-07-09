@@ -21,6 +21,7 @@ export default function ImportCard() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [rowCount, setRowCount] = useState<number | null>(null);
 
   async function handleFile(file: File) {
     setBusy(true);
@@ -28,6 +29,11 @@ export default function ImportCard() {
     setErrorMsg(null);
     try {
       const csv = await file.text();
+      const count = Math.max(
+        0,
+        csv.split("\n").filter((line) => line.trim().length > 0).length - 1
+      );
+      setRowCount(count);
       const res = await fetch("/api/me/import/linkedin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -44,6 +50,7 @@ export default function ImportCard() {
       setErrorMsg((e as Error).message);
     } finally {
       setBusy(false);
+      setRowCount(null);
     }
   }
 
@@ -76,6 +83,17 @@ export default function ImportCard() {
           }}
         />
       </div>
+
+      {busy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-[#38332F] bg-[#232020] p-6">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#38332F] border-t-[#E8643C]" />
+            <p className="text-[13px] text-[#C9C2BB]">
+              Importing{rowCount ? ` ~${rowCount} connections` : ""}…
+            </p>
+          </div>
+        </div>
+      )}
 
       {errorMsg && (
         <p className="mt-3 text-[13px] text-[#E8643C]">{errorMsg}</p>
