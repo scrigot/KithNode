@@ -45,29 +45,30 @@ export default function MeShell({
 
   return (
     <div
-      className="min-h-screen flex bg-[#1C1A19] text-white"
+      className="flex min-h-screen flex-col bg-[#1C1A19] text-white md:flex-row"
       style={{ fontFamily: "var(--font-sans)" }}
     >
       <aside
-        className={`shrink-0 border-r border-[#38332F] bg-[#232020] flex flex-col transition-[width] duration-200 ${
-          collapsed ? "w-[68px]" : "w-60"
+        className={`flex w-full shrink-0 flex-col border-b border-[#38332F] bg-[#232020] transition-[width] duration-200 md:min-h-screen md:border-b-0 md:border-r ${
+          collapsed ? "md:w-[68px]" : "md:w-60"
         }`}
       >
-        <div className={`border-b border-[#38332F] ${collapsed ? "px-3 py-4" : "px-5 py-5"}`}>
+        <div className={`border-b border-[#38332F] ${collapsed ? "md:px-3 md:py-4" : "md:px-5 md:py-5"} px-4 py-4`}>
           <div className="flex items-center justify-between gap-2">
             <Link
               href="/me"
-              className={`${wordmarkFont.className} leading-none text-white tracking-tight ${
-                collapsed ? "text-[17px]" : "text-[19px]"
+              className={`${wordmarkFont.className} leading-none tracking-tight text-white ${
+                collapsed ? "md:text-[17px]" : "md:text-[19px]"
               }`}
               title="KithNode"
             >
-              {collapsed ? "KN" : "KithNode"}
+              <span className="md:hidden">KithNode</span>
+              <span className="hidden md:inline">{collapsed ? "KN" : "KithNode"}</span>
             </Link>
             <button
               type="button"
               onClick={toggle}
-              className="rounded-md border border-[#38332F] px-1.5 py-1 text-[11px] text-[#8A8077] hover:border-[#E8643C] hover:text-white"
+              className="hidden rounded-md border border-[#38332F] px-1.5 py-1 text-[11px] text-[#8A8077] hover:border-[#E8643C] hover:text-white md:block"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? "›" : "‹"}
@@ -79,26 +80,27 @@ export default function MeShell({
             </p>
           )}
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex gap-1 overflow-x-auto px-3 py-2 md:flex-1 md:flex-col md:space-y-1 md:overflow-visible md:py-4">
           {NAV.map((n) => (
             <Link
               key={n.href}
               href={n.href}
               title={collapsed ? n.label : undefined}
-              className={`flex items-center rounded-lg px-3 py-2 text-sm text-[#C9C2BB] hover:bg-[#2E2A27] hover:text-white transition-colors ${
-                collapsed ? "justify-center" : "justify-between"
+              className={`flex shrink-0 items-center rounded-lg px-3 py-2 text-sm text-[#C9C2BB] transition-colors hover:bg-[#2E2A27] hover:text-white ${
+                collapsed ? "md:justify-center" : "md:justify-between"
               }`}
             >
-              <span>{collapsed ? n.short : n.label}</span>
+              <span className="md:hidden">{n.label}</span>
+              <span className="hidden md:inline">{collapsed ? n.short : n.label}</span>
               {!collapsed && !n.ready && (
-                <span className="text-[10px] uppercase tracking-wide text-[#6F665E] bg-[#2E2A27] rounded px-1.5 py-0.5">
+                <span className="rounded bg-[#2E2A27] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[#6F665E]">
                   soon
                 </span>
               )}
             </Link>
           ))}
         </nav>
-        <div className={`border-t border-[#38332F] text-[11px] text-[#6F665E] ${collapsed ? "px-3 py-4 text-center" : "px-5 py-4"}`}>
+        <div className={`hidden border-t border-[#38332F] text-[11px] text-[#6F665E] md:block ${collapsed ? "px-3 py-4 text-center" : "px-5 py-4"}`}>
           {collapsed ? "local" : "dogfood · isolated · local"}
         </div>
       </aside>
