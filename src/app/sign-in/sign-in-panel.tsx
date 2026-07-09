@@ -5,9 +5,29 @@ import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { LogoIcon } from "@/components/logo";
 
+function safeCallbackUrl(value: string | null) {
+  if (!value) return "/dashboard";
+
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+
+  try {
+    const url = new globalThis.URL(value);
+    if (url.origin === globalThis.location.origin) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    return "/dashboard";
+  }
+
+  return "/dashboard";
+}
+
 export function SignInPanel() {
   const searchParams = useSearchParams();
   const isAccessDenied = searchParams.get("error") === "AccessDenied";
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9]">
@@ -58,7 +78,7 @@ export function SignInPanel() {
 
           <button
             type="button"
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+            onClick={() => signIn("google", { callbackUrl })}
             className="mt-8 w-full rounded-lg bg-[#0369A1] px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-[#075985] hover:shadow-xl"
           >
             Continue with Google
@@ -67,7 +87,7 @@ export function SignInPanel() {
           {process.env.NEXT_PUBLIC_MICROSOFT_AUTH_ENABLED === "true" && (
             <button
               type="button"
-              onClick={() => signIn("microsoft-entra-id", { callbackUrl: "/dashboard" })}
+              onClick={() => signIn("microsoft-entra-id", { callbackUrl })}
               className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50"
             >
               Continue with Microsoft (UNC email)
