@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Dev entry point — runs the FastAPI server with auto-reload."""
+"""Backend entry point for local dev and Railway."""
 
+import os
 import uvicorn
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "8000"))
+    reload = os.environ.get("UVICORN_RELOAD") in {"1", "true", "True"}
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True,
+        port=port,
+        reload=reload,
     )
