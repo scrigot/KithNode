@@ -270,3 +270,60 @@
     opacity: 0;
   }
 }
+
+/* Resume Studio inherits the recruiting-workstation palette while the shared
+   builder remains compatible with the legacy /me route for one release. */
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div[style*="background:#1C1A19"] {
+  background: #0a1628 !important;
+  color: #cbd5e1 !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="background:#232020"] {
+  background: #111d2e !important;
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="background:#2E2A27"] {
+  background: #162337 !important;
+  border-color: rgba(125, 211, 252, 0.22) !important;
+  color: #dbeafe !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="background:#15110F"] {
+  background: #07111f !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="#38332F"] {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="color:#8A8077"] {
+  color: #8fa3bd !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="color:#C9C2BB"] {
+  color: #cbd5e1 !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="color:#E8643C"] {
+  color: #38bdf8 !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div [style*="background:#E8643C"] {
+  background: #0ea5e9 !important;
+}
+
+body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+  nav[aria-label="Career Toolkit"] + div :is(button, input, select, textarea, label):focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
