@@ -167,9 +167,13 @@ export default function DashboardPage() {
   // ─── LOADING ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="flex h-10 items-center gap-3 border-b border-white/[0.06] bg-card px-4">
-          <div className="h-3 w-24 animate-pulse bg-muted" />
+      <div className="flex h-full min-h-0 flex-col" aria-busy="true">
+        <div className="flex min-h-16 items-center justify-between gap-4 border-b border-white/[0.06] bg-card px-4 py-3 sm:px-5">
+          <div>
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-primary">Recruiting workstation</p>
+            <h1 className="mt-0.5 font-heading text-xl font-semibold text-foreground">Overview</h1>
+          </div>
+          <p role="status" className="text-sm text-muted-foreground">Updating your action plan…</p>
         </div>
         <div className="flex min-h-0 flex-1">
           <div className="hidden w-40 shrink-0 flex-col gap-2 border-r border-white/[0.06] p-3 md:flex">
