@@ -329,6 +329,14 @@ body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-curre
 }
 
 @media (max-width: 639px) {
+  main :is(button, select, input:not([type="hidden"]), textarea) {
+    min-height: 44px;
+  }
+
+  main button {
+    min-width: 44px;
+  }
+
   body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
     nav[aria-label="Career Toolkit"] + div > div:first-child {
     gap: 0.5rem;
