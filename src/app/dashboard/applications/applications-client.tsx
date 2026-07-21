@@ -261,8 +261,8 @@ export function ApplicationsClient() {
       <section className="border-b border-white/[0.08] bg-bg-secondary px-4 py-3 sm:px-6" aria-label="Application filters">
         <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(140px,auto))]">
           <label className="relative"><span className="sr-only">Search applications</span><Search className="absolute left-3 top-3.5 h-4 w-4 text-text-muted" /><input value={filters.q} onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))} placeholder="Search company, role, location" className={`${inputClass} pl-10`} /></label>
-          <FilterSelect label="Status" value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={OPPORTUNITY_STATUSES.map((status) => ({ value: status, label: statusLabel(status) }))} />
-          <FilterSelect label="Priority" value={filters.priority} onChange={(value) => setFilters((current) => ({ ...current, priority: value }))} options={OPPORTUNITY_PRIORITIES.map((priority) => ({ value: priority, label: statusLabel(priority) }))} />
+          <FilterSelect label="Status" allLabel="All statuses" value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={OPPORTUNITY_STATUSES.map((status) => ({ value: status, label: statusLabel(status) }))} />
+          <FilterSelect label="Priority" allLabel="All priorities" value={filters.priority} onChange={(value) => setFilters((current) => ({ ...current, priority: value }))} options={OPPORTUNITY_PRIORITIES.map((priority) => ({ value: priority, label: statusLabel(priority) }))} />
           <FilterSelect label="Deadline" value={filters.deadline} onChange={(value) => setFilters((current) => ({ ...current, deadline: value }))} options={[{ value: "upcoming", label: "Next 14 days" }, { value: "overdue", label: "Overdue" }, { value: "none", label: "No deadline" }]} />
           <FilterSelect label="Sort" value={filters.sort} onChange={(value) => setFilters((current) => ({ ...current, sort: value }))} showAll={false} options={[{ value: "activity_desc", label: "Recent activity" }, { value: "deadline_asc", label: "Deadline" }, { value: "fit_desc", label: "Best fit" }, { value: "company_asc", label: "Company" }]} />
         </div>
@@ -307,8 +307,8 @@ export function ApplicationsClient() {
   );
 }
 
-function FilterSelect({ label, value, onChange, options, showAll = true }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; showAll?: boolean }) {
-  return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>{showAll ? <option value="">All {label.toLowerCase()}s</option> : null}{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+function FilterSelect({ label, allLabel, value, onChange, options, showAll = true }: { label: string; allLabel?: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; showAll?: boolean }) {
+  return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>{showAll ? <option value="">{allLabel || `All ${label.toLowerCase()}s`}</option> : null}{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
