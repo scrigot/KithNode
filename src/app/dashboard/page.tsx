@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { trackEvent } from "@/lib/posthog";
-import { Upload, Compass, Zap, Users } from "lucide-react";
+import { ArrowRight, Upload, Compass, Zap, Users } from "lucide-react";
 import type { RankedContact } from "@/lib/api";
 import { OutreachSheet } from "./contacts/outreach-sheet";
 import {
@@ -41,6 +41,8 @@ interface OverviewData {
   weekly_goal_target: number;
   subscription_status: string;
   trial_days_left: number | null;
+  application_metrics: { active: number; deadlines_14d: number; interviews: number; offers: number; offer_conversion: number };
+  do_now: { kind: string; title: string; detail: string; href: string };
 }
 
 function todayLabel(): string {
@@ -214,7 +216,7 @@ export default function DashboardPage() {
   }
 
   const totalContacts = data?.stats.contacts ?? 0;
-  const isEmpty = totalContacts === 0;
+  const isEmpty = totalContacts === 0 && (data?.application_metrics.active ?? 0) === 0;
 
   // ─── EMPTY / COLD-START (guiding, not blank) ──────────────────────────
   if (isEmpty) {
@@ -299,6 +301,7 @@ export default function DashboardPage() {
       />
 
       <TopBar data={data} overdueCount={overdueCount} warmSignals={warmSignals} />
+      <CareerCommandStrip data={data} />
 
       {showDraftNudge && (
         <div className="flex shrink-0 items-center gap-3 border-b border-accent-teal/30 bg-accent-teal/[0.07] px-4 py-2.5">
@@ -477,6 +480,17 @@ export default function DashboardPage() {
   );
 }
 
+function CareerCommandStrip({ data }: { data: OverviewData | null }) {
+  const action = data?.do_now;
+  const metrics = data?.application_metrics;
+  if (!action || !metrics) return null;
+  return <section aria-label="Recommended recruiting action" className="grid shrink-0 border-b border-white/[0.08] bg-bg-secondary xl:grid-cols-[minmax(360px,1fr)_auto]"><div className="border-b border-white/[0.08] px-4 py-4 xl:border-b-0 xl:border-r"><p className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-accent-teal">Do now</p><div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-heading text-xl font-semibold text-text-primary">{action.title}</h2><p className="mt-1 text-base text-text-secondary">{action.detail} {data?.recruiting_date ? "This advances your primary recruiting deadline." : "Set a recruiting deadline in Goals to ground future recommendations."}</p></div><Link href={action.href} className="inline-flex min-h-11 shrink-0 items-center justify-center bg-accent-teal px-4 font-bold text-white">Open action<ArrowRight className="ml-2 h-4 w-4" /></Link></div></div><div className="grid grid-cols-4 divide-x divide-white/[0.08]"><CommandMetric label="Active" value={metrics.active} /><CommandMetric label="Due 14d" value={metrics.deadlines_14d} /><CommandMetric label="Interviews" value={metrics.interviews} /><CommandMetric label="Offers" value={metrics.offers} /></div></section>;
+}
+
+function CommandMetric({ label, value }: { label: string; value: number }) {
+  return <div className="min-w-[92px] px-3 py-4 text-center"><p className="font-mono text-xl font-bold tabular-nums text-text-primary">{value}</p><p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-text-muted">{label}</p></div>;
+}
+
 // ─── Top bar ──────────────────────────────────────────────────────────────
 function TopBar({
   data,
@@ -524,7 +538,7 @@ function TopBar({
           </span>
         ) : status === "trial" ? (
           <Link
-            href="/dashboard/billing"
+            href="/dashboard/settings/billing"
             className="flex items-center gap-1 border border-accent-teal/30 bg-accent-teal/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-accent-teal hover:bg-accent-teal/20"
           >
             <Zap className="h-3 w-3" />
@@ -534,7 +548,7 @@ function TopBar({
           </Link>
         ) : status ? (
           <Link
-            href="/dashboard/billing"
+            href="/dashboard/settings/billing"
             className="flex items-center gap-1 border border-accent-amber/30 bg-accent-amber/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-accent-amber hover:bg-accent-amber/20"
           >
             <Zap className="h-3 w-3" />

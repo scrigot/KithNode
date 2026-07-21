@@ -1,0 +1,2 @@
+-- Historical migration recorded in production.
+-- Its resulting schema is captured in supabase/baseline/20260711004756_public.sql.

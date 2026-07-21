@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
@@ -88,7 +90,7 @@ async function enrichOne(contact: {
 }): Promise<EnrichedFields | null> {
   try {
     const { text } = await generateText({
-      model: gateway("anthropic/claude-sonnet-4.5"),
+      model: gateway(AI_MODELS.default),
       prompt: buildPrompt(contact),
     });
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -135,7 +137,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const contactId: string | undefined = body.contactId;
+    const contactId: string | undefined = typeof body.contactId === "string" ? body.contactId : undefined;
+    const contactIds: string[] = Array.isArray(body.contactIds)
+      ? body.contactIds.filter((id: unknown): id is string => typeof id === "string" && id.length > 0).slice(0, 25)
+      : [];
 
     const prefs = await getUserPrefs(userEmail);
 
@@ -147,6 +152,8 @@ export async function POST(req: NextRequest) {
 
     if (contactId) {
       query = query.eq("id", contactId);
+    } else if (contactIds.length) {
+      query = query.in("id", contactIds);
     } else {
       query = query
         .is("enrichedAt", null)
@@ -315,6 +322,20 @@ export async function POST(req: NextRequest) {
       if (updateError) {
         failed++;
       } else {
+        const provenance = [
+          { field: "education", value: education, source: pdl?.education ? "pdl" : "model_inference", verified: Boolean(pdl?.education) },
+          { field: "graduationYear", value: graduationYear, source: pdl?.graduationYear ? "pdl" : "model_inference", verified: Boolean(pdl?.graduationYear) },
+          { field: "location", value: location, source: pdl?.location ? "pdl" : "model_inference", verified: Boolean(pdl?.location) },
+          { field: "skills", value: skills, source: pdl?.skills?.length ? "pdl" : "model_inference", verified: Boolean(pdl?.skills?.length) },
+          { field: "industry", value: fields.industry, source: "model_inference", verified: false },
+          { field: "seniorityLevel", value: fields.seniorityLevel, source: "model_inference", verified: false },
+        ].filter((item) => item.value !== "" && item.value !== 0)
+          .map((item) => ({ id: randomUUID(), userId, contactId: c.id, field: item.field, source: item.source, value: item.value, confidence: item.verified ? 0.95 : 0.55, verified: item.verified }));
+        try {
+          if (provenance.length) await supabase.from("ContactFieldProvenance").insert(provenance);
+        } catch {
+          // Provenance is additive audit data and never makes a paid enrichment look failed.
+        }
         enriched++;
       }
     }

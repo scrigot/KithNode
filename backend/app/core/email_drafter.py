@@ -4,8 +4,12 @@ v2: Research-then-write pipeline with signal context injection and
 dual-pass refinement (generate -> self-critique -> refine).
 """
 
+import os
+
 from config import USER_PROFILE, ANTHROPIC_API_KEY
 from company_researcher import research_company, format_research_brief
+
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
 # Jinja2 template fallback
 TEMPLATE = """Subject: {subject}
@@ -190,7 +194,7 @@ def _draft_with_claude_v2(contact: dict) -> dict:
         prompt = _build_enhanced_prompt(contact, research_text)
 
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -204,12 +208,12 @@ def _draft_with_claude_v2(contact: dict) -> dict:
             tokens_in=response.usage.input_tokens,
             tokens_out=response.usage.output_tokens,
             cost_usd=anthropic_cost(
-                "claude-sonnet-4-20250514",
+                ANTHROPIC_MODEL,
                 response.usage.input_tokens,
                 response.usage.output_tokens,
             ),
             meta={
-                "model": "claude-sonnet-4-20250514",
+                "model": ANTHROPIC_MODEL,
                 "stage": "generate",
                 "contact_id": contact.get("id"),
                 "source": "backend",
@@ -248,7 +252,7 @@ If the email is good enough to reply to, just say "APPROVED" and move on.
 Format: If rewriting, use SUBJECT: and BODY: format. If approving, just say APPROVED."""
 
         critique_response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=600,
             messages=[{"role": "user", "content": critique_prompt}],
         )
@@ -261,12 +265,12 @@ Format: If rewriting, use SUBJECT: and BODY: format. If approving, just say APPR
             tokens_in=critique_response.usage.input_tokens,
             tokens_out=critique_response.usage.output_tokens,
             cost_usd=anthropic_cost(
-                "claude-sonnet-4-20250514",
+                ANTHROPIC_MODEL,
                 critique_response.usage.input_tokens,
                 critique_response.usage.output_tokens,
             ),
             meta={
-                "model": "claude-sonnet-4-20250514",
+                "model": ANTHROPIC_MODEL,
                 "stage": "critique",
                 "contact_id": contact.get("id"),
                 "source": "backend",

@@ -13,6 +13,7 @@
 
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { z } from "zod";
 
 export type PersonType = "student" | "alum" | "professor";
@@ -84,7 +85,7 @@ export function heuristicPersonType(p: PersonInput): PersonTypeResult {
 export async function classifyPersonType(p: PersonInput): Promise<PersonTypeResult> {
   try {
     const { object } = await generateObject({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: gateway(AI_MODELS.fast),
       schema: Schema,
       system: SYSTEM_PROMPT,
       prompt: buildPrompt(p),

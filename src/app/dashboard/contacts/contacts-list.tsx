@@ -75,6 +75,17 @@ function loadSavedState(): SavedState | null {
   }
 }
 
+function loadQueryTier(): string | null {
+  try {
+    const tier = new URLSearchParams(window.location.search).get("tier");
+    return ["kith", "hot", "warm", "monitor", "cold"].includes(tier ?? "")
+      ? tier
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function ContactsList() {
   const [contacts, setContacts] = useState<RankedContact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +93,9 @@ export function ContactsList() {
 
   // Lazy-initialize each filter from sessionStorage; fall back to defaults.
   const saved = typeof window !== "undefined" ? loadSavedState() : null;
+  const queryTier = typeof window !== "undefined" ? loadQueryTier() : null;
   const [search, setSearch] = useState(saved?.search ?? "");
-  const [activeTier, setActiveTier] = useState(saved?.activeTier ?? "all");
+  const [activeTier, setActiveTier] = useState(queryTier ?? saved?.activeTier ?? "all");
   // Career-track tabs (ALL + the 5 tracks); a selected track reveals its role
   // sub-chips. "" = ALL. Filters the already-loaded contacts client-side.
   const [activeTrack, setActiveTrack] = useState<CareerTrack | "">(saved?.activeTrack ?? "");

@@ -688,3 +688,332 @@ model MeEvidence {
 
   @@index([userId, kind])
 }
+
+// ─── Agentic career copilot kernel ─────────────────────────────────────────
+// Server-only tables. The model proposes structured actions; deterministic
+// application code validates, approves, executes, and audits them.
+
+model CareerGoal {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  status    String   @default("active") // active | achieved | paused | archived
+  priority  Int      @default(0)
+  context   Json     @default("{}")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId, status, priority])
+}
+
+model AssistantConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId, updatedAt])
+}
+
+model AssistantMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  role           String // user | assistant | system | tool
+  content        String
+  meta           Json     @default("{}")
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model AssistantRun {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  status         String    @default("running") // running | completed | failed
+  model          String
+  inputTokens    Int       @default(0)
+  outputTokens   Int       @default(0)
+  error          String    @default("")
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  completedAt    DateTime? @db.Timestamptz(6)
+
+  @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+model AssistantToolCall {
+  id               String    @id @default(cuid())
+  runId            String
+  userId           String
+  toolName         String
+  input            Json
+  output           Json?
+  status           String    @default("proposed") // proposed | approved | denied | running | completed | failed
+  riskLevel        String    @default("read") // read | write | external | destructive
+  requiresApproval Boolean   @default(true)
+  error             String    @default("")
+  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
+  completedAt       DateTime? @db.Timestamptz(6)
+
+  @@index([userId, status, createdAt])
+  @@index([runId, createdAt])
+}
+
+model AssistantApproval {
+  id         String    @id @default(cuid())
+  toolCallId String    @unique
+  userId     String
+  status     String    @default("pending") // pending | approved | denied | expired
+  reason     String    @default("")
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  decidedAt  DateTime? @db.Timestamptz(6)
+
+  @@index([userId, status, createdAt])
+}
+
+model AssistantMemory {
+  id              String   @id @default(cuid())
+  userId          String
+  kind            String // preference | goal | relationship | outcome
+  content         Json
+  sourceMessageId String?
+  confidence      Float    @default(1)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId, kind, active, updatedAt])
+}
+
+model Recommendation {
+  id         String    @id @default(cuid())
+  userId     String
+  goalId     String?
+  kind       String
+  title      String
+  rationale  String
+  evidence   Json      @default("[]")
+  confidence Float     @default(0)
+  status     String    @default("open") // open | accepted | dismissed | completed
+  dueAt      DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  actedAt    DateTime? @db.Timestamptz(6)
+
+  @@index([userId, status, dueAt, createdAt])
+}
+
+model OutreachDraft {
+  id        String    @id @default(cuid())
+  userId    String
+  contactId String
+  subject   String
+  body      String
+  status    String    @default("draft") // draft | sent | responded | meeting_set | failed
+  channel   String    @default("email")
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  sentAt    DateTime? @db.Timestamptz(6)
+
+  @@index([userId, status, updatedAt])
+  @@index([userId, contactId, createdAt])
+}
+
+model IntegrationConnection {
+  id                    String    @id @default(cuid())
+  userId                String
+  provider              String // google | microsoft
+  providerAccountId     String    @default("")
+  email                 String    @default("")
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String    @default("")
+  expiresAt             DateTime? @db.Timestamptz(6)
+  scopes                 String    @default("")
+  status                 String    @default("connected") // connected | expired | revoked | error
+  lastCheckedAt          DateTime? @db.Timestamptz(6)
+  lastError              String    @default("")
+  createdAt              DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, provider])
+  @@index([userId, status, updatedAt])
+}
+
+// Private, user-owned copies of the user's LinkedIn profile. `content` is a
+// versioned document because LinkedIn exposes many optional/repeating sections
+// and adds new section types over time. Every save creates an immutable
+// LinkedInProfileRevision before the working copy changes.
+model LinkedInProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   @default("Untitled LinkedIn profile")
+  linkedInUrl String   @default("")
+  source      String   @default("manual") // manual | json_import | extension | duplicate | restored
+  status      String   @default("draft") // draft | current | archived
+  isPrimary   Boolean  @default(false)
+  docVersion  Int      @default(1)
+  content     Json     @default("{}")
+  audit       Json     @default("{}")
+  score       Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  revisions LinkedInProfileRevision[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, status, isPrimary])
+}
+
+model LinkedInProfileRevision {
+  id            String   @id @default(cuid())
+  profileId     String
+  userId        String
+  version       Int
+  content       Json
+  audit         Json     @default("{}")
+  score         Int      @default(0)
+  changeSummary String   @default("")
+  source        String   @default("save") // create | save | audit | restore | import
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  profile LinkedInProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, version])
+  @@index([userId, createdAt])
+  @@index([profileId, createdAt])
+}
+
+// Canonical, user-owned job opportunities. Discovery writes only reviewed
+// public listing data; application submission is deliberately out of scope.
+model Opportunity {
+  id             String    @id @default(cuid())
+  userId         String
+  company        String
+  companyKey     String
+  role           String
+  location       String    @default("")
+  workMode       String    @default("") // remote | hybrid | onsite | unknown
+  jobUrl         String
+  applyUrl       String    @default("")
+  source         String    @default("manual") // manual | greenhouse | lever | ashby | jsonld
+  externalId     String    @default("")
+  description    String    @default("")
+  status         String    @default("discovered") // discovered | saved | preparing | applied | assessment | interview | offer | accepted | rejected | withdrawn | archived
+  priority       String    @default("medium") // low | medium | high
+  season         String    @default("")
+  notes          String    @default("")
+  nextAction     String    @default("")
+  nextActionDue  DateTime? @db.Timestamptz(6)
+  appliedAt      DateTime? @db.Timestamptz(6)
+  archivedAt     DateTime? @db.Timestamptz(6)
+  lastActivityAt DateTime  @default(now()) @db.Timestamptz(6)
+  fitScore       Int       @default(0)
+  networkScore   Int       @default(0)
+  matchReasons   Json      @default("[]")
+  sourceFreshAt  DateTime? @db.Timestamptz(6)
+  postedAt       DateTime? @db.Timestamptz(6)
+  deadline       DateTime? @db.Timestamptz(6)
+  resumeId       String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+
+  contacts OpportunityContact[]
+  events   OpportunityEvent[]
+
+  @@unique([userId, jobUrl])
+  @@index([userId, status, fitScore])
+  @@index([userId, companyKey])
+  @@index([userId, source, externalId])
+  @@index([userId, priority, deadline])
+  @@index([userId, nextActionDue])
+  @@index([userId, lastActivityAt])
+}
+
+model OpportunityContact {
+  id            String      @id @default(cuid())
+  userId        String
+  opportunityId String
+  contactId     String
+  score         Int         @default(0)
+  reason        String      @default("")
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, opportunityId, contactId])
+  @@index([userId, contactId])
+}
+
+// Append-only activity history for the canonical application tracker.
+// Server routes scope every read and write by the authenticated UUID.
+model OpportunityEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  opportunityId String
+  type          String   @default("note")
+  title         String
+  detail        String   @default("")
+  meta          Json     @default("{}")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([userId, opportunityId, createdAt])
+  @@index([userId, type, createdAt])
+}
+
+// Per-user mapping from a target firm to its verified public careers source.
+model JobSource {
+  id            String    @id @default(cuid())
+  userId        String
+  company       String
+  companyKey    String
+  provider      String // greenhouse | lever | ashby | jsonld
+  boardToken    String    @default("")
+  careerUrl     String
+  feedUrl       String    @default("")
+  active        Boolean   @default(true)
+  lastCheckedAt DateTime? @db.Timestamptz(6)
+  lastError     String    @default("")
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, companyKey, provider])
+  @@index([userId, active, updatedAt])
+}
+
+// Revocable bearer credentials used by the unpacked browser extension. Only a
+// SHA-256 hash is stored; the raw token is returned once at creation.
+model ExtensionToken {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String    @default("Chrome extension")
+  tokenHash  String    @unique
+  scopes     String    @default("contacts:write profiles:write")
+  expiresAt  DateTime? @db.Timestamptz(6)
+  revokedAt  DateTime? @db.Timestamptz(6)
+  lastUsedAt DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([userId, revokedAt, createdAt])
+}
+
+// Append-only field provenance for contact enrichment and reviewed extension
+// captures. This keeps provider facts separate from inference and manual edits.
+model ContactFieldProvenance {
+  id         String   @id @default(cuid())
+  userId     String
+  contactId  String
+  field      String
+  source     String // pdl | model_inference | manual | linkedin_extension
+  value      Json
+  confidence Float    @default(1)
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([userId, contactId, field, createdAt])
+  @@index([userId, source, createdAt])
+}

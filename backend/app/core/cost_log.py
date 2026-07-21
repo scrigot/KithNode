@@ -12,9 +12,10 @@ roles). log_cost NEVER raises into the caller — a paid API call must not break
 because telemetry failed.
 
 Pricing constants mirror src/lib/ai-cost.ts — keep the two in sync. Anthropic
-rates verified via the `claude-api` skill (Anthropic pricing, cached
-2026-05-26): claude-sonnet-4-20250514 is Sonnet-tier — $3.00/MTok input,
-$15.00/MTok output. Hunter & Apollo are FREE tier → cost_usd 0, but calls are
+rates verified against Anthropic's model documentation on 2026-07-10. Sonnet 5
+list price is $3.00/MTok input and $15.00/MTok output. Temporary provider
+promotions are intentionally not baked into accounting. Hunter & Apollo are
+FREE tier → cost_usd 0, but calls are
 still logged (rows at $0) for credit-burn tracking.
 """
 
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 # model id -> (input_per_mtok, output_per_mtok) USD
 _ANTHROPIC_PRICES = {
+    "claude-sonnet-5": (3.00, 15.00),
     "claude-sonnet-4-20250514": (3.00, 15.00),
     "claude-sonnet-4-5": (3.00, 15.00),
     "claude-sonnet-4.5": (3.00, 15.00),

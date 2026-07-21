@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PERSONAL_MODE, meUserEmail } from "@/lib/me/config";
 import { prisma } from "@/lib/me/db";
 import type { Prisma } from "@/generated/prisma/client";
+import { careerWorkspaceEmail } from "@/lib/career-workspace-user";
 
 export const runtime = "nodejs";
 
 /** GET /api/me/resume — the user's most-recent resume draft (or null). */
 export async function GET() {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const resume = await prisma.meResume.findFirst({
     where: { userId },
     orderBy: { updatedAt: "desc" },
@@ -21,8 +21,8 @@ export async function GET() {
  * Body: { id?, title?, track?, templateId?, content?, score?, dimensions?, notes? }
  */
 export async function POST(req: NextRequest) {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
 
   const data = {

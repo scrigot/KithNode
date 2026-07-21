@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { z } from "zod";
-import { PERSONAL_MODE } from "@/lib/me/config";
+import { careerWorkspaceEmail } from "@/lib/career-workspace-user";
 import { gradeResume, type Track } from "@/lib/me/grade-resume";
 import {
   resumeSignalsSchema,
@@ -17,7 +18,7 @@ import { lintResume, type LintWarning } from "@/lib/me/resume-text";
 
 export const runtime = "nodejs";
 
-const MODEL = "anthropic/claude-sonnet-4.5";
+const MODEL = AI_MODELS.default;
 const TRACKS: Track[] = ["ai-consulting", "ai-engineering", "ai-generalist"];
 const asTrack = (t: unknown): Track => (TRACKS.includes(t as Track) ? (t as Track) : "ai-consulting");
 
@@ -51,7 +52,7 @@ type Notes = z.infer<typeof notesSchema>;
  * NEVER stored.
  */
 export async function POST(req: NextRequest) {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!await careerWorkspaceEmail()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const track = asTrack(body?.track);

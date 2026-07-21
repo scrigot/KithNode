@@ -10,6 +10,7 @@ import { CTASection } from "./_landing/cta-section";
 import { FAQ } from "./_landing/faq";
 import { MeshBg } from "./_landing/mesh-bg";
 import { ScoringMacDemo } from "./_landing/scoring-mac-demo";
+import Link from "next/link";
 
 export default async function Home({
   searchParams,
@@ -34,7 +35,7 @@ export default async function Home({
         </div>
       )}
       <HeroSection>
-        <SignInButton />
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row"><SignInButton /><Link href="/demo" className="inline-flex items-center justify-center rounded-[12px] border border-white/25 bg-white/[0.05] px-8 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/[0.1]">Explore demo</Link></div>
       </HeroSection>
       <SectionImportRank />
 
@@ -79,6 +80,7 @@ export default async function Home({
           {/* Product */}
           <div className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold text-white">Product</h4>
+            <a href="/demo" className="text-sm text-white/55 transition-colors hover:text-white">Interactive demo</a>
             <a
               href="/waitlist"
               className="text-sm text-white/55 transition-colors hover:text-white"

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { z } from "zod";
-import { PERSONAL_MODE, meUserEmail } from "@/lib/me/config";
 import { prisma } from "@/lib/me/db";
+import { careerWorkspaceEmail } from "@/lib/career-workspace-user";
 import { gradeResume, type Track } from "@/lib/me/grade-resume";
 import { normalizeDoc, type ResumeDoc, type EntriesSection } from "@/lib/me/resume-doc";
 import { signalsFromDoc } from "@/lib/me/resume-signals";
@@ -11,7 +12,7 @@ import { matchEvidence, validateCitations, missingKeywords, type Evidence } from
 
 export const runtime = "nodejs";
 
-const MODEL = "anthropic/claude-sonnet-4.5";
+const MODEL = AI_MODELS.default;
 const TRACKS: Track[] = ["ai-consulting", "ai-engineering", "ai-generalist"];
 const asTrack = (t: unknown): Track => (TRACKS.includes(t as Track) ? (t as Track) : "ai-consulting");
 
@@ -36,8 +37,8 @@ const docText = (doc: ResumeDoc) =>
  * citation guard drops fabrications); gaps are surfaced separately, never faked.
  */
 export async function POST(req: NextRequest) {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   const track = asTrack(body?.track);
   const jd = typeof body?.jobDescription === "string" ? body.jobDescription : "";

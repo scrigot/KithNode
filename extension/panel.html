@@ -53,6 +53,7 @@
       <div class="actions">
         <button type="button" id="copyJson" class="btn">Copy JSON</button>
         <button type="button" id="copyCsv" class="btn">Copy CSV row</button>
+        <button type="button" id="saveProfile" class="btn">Save profile copy</button>
         <button type="button" id="send" class="btn primary">Add to Discover</button>
       </div>
       <p id="status" class="status"></p>
@@ -61,9 +62,12 @@
     <details class="settings">
       <summary>Settings</summary>
       <label>KithNode URL
-        <input id="baseUrl" placeholder="http://localhost:3051" autocomplete="off">
+        <input id="baseUrl" placeholder="http://localhost:3000" autocomplete="off">
       </label>
-      <p class="hint">Used by "Add to Discover". Keep the local /me dev server running.</p>
+      <label>Pairing token
+        <input id="pairingToken" type="password" placeholder="knx_…" autocomplete="off">
+      </label>
+      <p class="hint">Create a revocable token in KithNode Integrations. The extension captures only the profile you open and review.</p>
     </details>
   </main>
 

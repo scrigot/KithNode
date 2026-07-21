@@ -210,6 +210,50 @@ function firstExperienceWithData() {
   return { title: "", company: "", location: "" };
 }
 
+function parsedExperiences() {
+  return experienceEntries().map((lines) => {
+    const parsed = parseExperience(lines);
+    const dates = lines.find((line) => /present|\b(19|20)\d{2}\b/i.test(line)) || "";
+    const [start = "", end = ""] = dates.split(/\s[-–—]\s/);
+    return { title: parsed.title, firm: parsed.company, start, end, location: parsed.location };
+  }).filter((item) => item.title || item.firm).slice(0, 30);
+}
+
+function parsedEducations() {
+  const section = sectionByAnchor("education") || sectionByHeading("education");
+  if (!section) return [];
+  return Array.from(section.querySelectorAll("li")).map((li) => uniqueLines(Array.from(li.querySelectorAll('span[aria-hidden="true"]')).map(text).filter(Boolean)))
+    .filter((lines) => lines.length)
+    .map((lines) => ({ school: lines[0] || "", degree: lines[1] || "", major: lines[2] || "", concentration: "" }))
+    .slice(0, 20);
+}
+
+function parsedSkills() {
+  const section = sectionByAnchor("skills") || sectionByHeading("skills");
+  if (!section) return [];
+  return uniqueLines(cleanLines(section.innerText || text(section)))
+    .filter((line) => !/^(skills|show all|endorse|endorsed)/i.test(line) && line.length < 100)
+    .slice(0, 50);
+}
+
+function parsedOrganizations() {
+  const section = sectionByAnchor("organizations") || sectionByHeading("organizations");
+  if (!section) return [];
+  return uniqueLines(cleanLines(section.innerText || text(section)))
+    .filter((line) => !/^(organizations|show all)/i.test(line) && line.length < 160)
+    .slice(0, 30)
+    .map((club) => ({ club, role: "" }));
+}
+
+function parsedMutuals() {
+  const section = sectionByHeading("mutual") || topCard();
+  return Array.from(section.querySelectorAll('a[href*="/in/"]'))
+    .map((anchor) => ({ name: text(anchor).replace(/\s+is a mutual connection.*$/i, "").trim(), slug: (anchor.getAttribute("href") || "").match(/\/in\/([^/?#]+)/)?.[1] || "" }))
+    .filter((item) => item.name && item.name.length < 120)
+    .filter((item, index, all) => all.findIndex((other) => other.slug === item.slug || other.name.toLowerCase() === item.name.toLowerCase()) === index)
+    .slice(0, 30);
+}
+
 function cleanUrl(href) {
   try {
     const u = new URL(href);
@@ -292,6 +336,13 @@ function parseProfile() {
     industry,
     headline, // raw, for the panel to show as a hint
     notes: about,
+    about,
+    experiences: parsedExperiences(),
+    educations: parsedEducations(),
+    skills: parsedSkills(),
+    organizations: parsedOrganizations(),
+    clubs: parsedOrganizations(),
+    mutuals: parsedMutuals(),
   };
 }
 

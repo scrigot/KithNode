@@ -1,14 +1,12 @@
 import Stripe from "stripe";
+import { requireServerEnv } from "@/lib/env/server";
 
 let _stripe: Stripe | null = null;
 
 /** Lazily initializes the Stripe client so builds don't fail without the key */
 export function getStripe(): Stripe {
   if (!_stripe) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) {
-      throw new Error("STRIPE_SECRET_KEY is not set");
-    }
+    const key = requireServerEnv("STRIPE_SECRET_KEY").STRIPE_SECRET_KEY;
     _stripe = new Stripe(key, {
       apiVersion: "2026-03-25.dahlia",
       typescript: true,

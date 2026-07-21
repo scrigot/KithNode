@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { requireSubscription } from "@/lib/subscription";
 import { requireCredits, grantCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { object, usage, response } = await generateObject({
-      model: gateway("anthropic/claude-sonnet-4.5"),
+      model: gateway(AI_MODELS.default),
       schema: resumeSchema,
       messages: [
         {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Fire-and-forget cost telemetry → api_cost_log (mirrors the draft route).
     // Best-effort: a telemetry insert failure MUST never break extraction.
-    const model = response?.modelId ?? "claude-sonnet-4.5";
+    const model = response?.modelId ?? AI_MODELS.default;
     try {
       void supabase
         .from("api_cost_log")

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
-import { auth } from "@/lib/auth";
+import { AI_MODELS } from "@/lib/ai-models";
+import { extensionIdentity } from "@/lib/extension-auth";
 import { supabase } from "@/lib/supabase";
 import { anthropicCost } from "@/lib/ai-cost";
 import {
@@ -18,8 +19,8 @@ import {
  * tool) — wire a credit charge here when this ships in-product.
  */
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  const identity = await extensionIdentity(request, "profiles:write");
+  if (!identity) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { object, usage, response } = await generateObject({
-      model: gateway("anthropic/claude-sonnet-4.5"),
+      model: gateway(AI_MODELS.default),
       schema: linkedinProfileSchema,
       messages: [
         { role: "user", content: [{ type: "text", text: buildLinkedInPrompt(valid.text) }] },
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Best-effort cost telemetry (never load-bearing), mirroring the resume route.
-    const model = response?.modelId ?? "claude-sonnet-4.5";
+    const model = response?.modelId ?? AI_MODELS.default;
     try {
       void supabase
         .from("api_cost_log")

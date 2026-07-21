@@ -11,9 +11,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: typecheck · lint · test
+  frontend:
+    name: typecheck · lint · test · build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -39,3 +51,52 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+
+      - name: Verify database baseline and forward migrations
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: npm run db:verify
+
+      # Block high/critical production advisories. Moderate advisories stay
+      # visible in Dependabot without forcing unsafe major-version downgrades.
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Extension syntax
+        run: |
+          node --check extension/background.js
+          node --check extension/content.js
+          node --check extension/panel.js
+
+  backend:
+    name: backend · test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --requirement requirements.txt
+
+      - name: Compile backend
+        run: python -m compileall -q app scripts run.py
+
+      - name: Test backend
+        run: python -m pytest -q

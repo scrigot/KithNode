@@ -47,9 +47,23 @@ git push -u origin feat/the-thing
 
 ## Before promoting anything to prod
 ```bash
+npm run db:history:check && npm run db:verify
 npm run typecheck && npm run lint && npm run test && npm run build
 ```
-All four green, locally, before you merge.
+Every check must be green locally before you merge.
+
+## Database rule: baseline plus forward-only migrations
+
+- `supabase/baseline/20260711004756_public.sql` is the reproducible schema
+  snapshot. Regenerate it only as an intentional reviewed maintenance change.
+- `scripts/db/production-migrations.json` mirrors the migration versions already
+  recorded in production. Historical marker files must not acquire new DDL.
+- Create schema changes with `supabase migration new <name>`, then write an
+  additive, idempotent, forward-only migration.
+- `npm run db:verify` restores the baseline into an ephemeral database, applies
+  newer migrations, and checks required tables, RLS, and grants.
+- Prisma describes application models. Supabase migrations are the only
+  production DDL mechanism.
 
 ## Branch naming
 - `feat/…` new feature · `fix/…` bugfix · `chore/…` cleanup/infra · `docs/…` docs only.

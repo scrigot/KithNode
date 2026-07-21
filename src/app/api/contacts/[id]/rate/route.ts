@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { rateContact } from "@/lib/api";
+import { isContactRating, saveContactRating } from "@/lib/discover/rating";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
+  if (!id || !isContactRating(body.rating)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
   try {
-    const result = await rateContact(
-      Number(id),
-      body.rating,
-    );
+    const result = await saveContactRating(session.user.id, id, body.rating);
     return NextResponse.json(result);
   } catch (error) {
-    const status = (error as { status?: number }).status || 500;
     return NextResponse.json(
       { error: "Failed to rate contact" },
-      { status },
+      { status: 500 },
     );
   }
 }

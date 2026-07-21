@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PERSONAL_MODE, meUserEmail } from "@/lib/me/config";
 import { prisma } from "@/lib/me/db";
+import { careerWorkspaceEmail } from "@/lib/career-workspace-user";
 
 export const runtime = "nodejs";
 
@@ -8,16 +8,16 @@ const KINDS = new Set(["project", "class", "work", "leadership", "metric", "skil
 
 /** GET /api/me/resume/evidence — the user's reusable evidence bank. */
 export async function GET() {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const evidence = await prisma.meEvidence.findMany({ where: { userId }, orderBy: { updatedAt: "desc" } });
   return NextResponse.json({ evidence });
 }
 
 /** POST /api/me/resume/evidence — create or update an evidence item. */
 export async function POST(req: NextRequest) {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const b = await req.json().catch(() => ({}));
   const data = {
     kind: KINDS.has(b?.kind) ? b.kind : "project",
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
 
 /** DELETE /api/me/resume/evidence?id=… */
 export async function DELETE(req: NextRequest) {
-  if (!PERSONAL_MODE) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const userId = meUserEmail();
+  const userId = await careerWorkspaceEmail();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   await prisma.meEvidence.deleteMany({ where: { id, userId } });

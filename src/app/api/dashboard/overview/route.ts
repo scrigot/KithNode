@@ -300,6 +300,39 @@ export async function GET() {
       .in("stage", ["EMAIL_SENT", "FOLLOW_UP", "RESPONDED", "MEETING_SET"])
       .gte("addedAt", weekStart.toISOString());
 
+    const { data: opportunities = [] } = await supabase
+      .from("Opportunity")
+      .select("id,company,role,status,deadline,nextAction,nextActionDue,updatedAt")
+      .eq("userId", userId)
+      .neq("status", "archived")
+      .order("updatedAt", { ascending: false })
+      .limit(300);
+    const terminalStatuses = new Set(["accepted", "rejected", "withdrawn"]);
+    const activeApplications = (opportunities || []).filter((item) => !terminalStatuses.has(item.status)).length;
+    const twoWeeksFromNow = Date.now() + 14 * 24 * 60 * 60 * 1000;
+    const applicationDeadlines = (opportunities || []).filter((item) => {
+      if (!item.deadline) return false;
+      const timestamp = new Date(item.deadline).getTime();
+      return timestamp >= Date.now() && timestamp <= twoWeeksFromNow;
+    }).length;
+    const interviews = (opportunities || []).filter((item) => item.status === "interview").length;
+    const offers = (opportunities || []).filter((item) => item.status === "offer" || item.status === "accepted").length;
+    const overdueApplication = (opportunities || [])
+      .filter((item) => item.nextAction && item.nextActionDue && new Date(item.nextActionDue).getTime() < Date.now())
+      .sort((a, b) => new Date(a.nextActionDue).getTime() - new Date(b.nextActionDue).getTime())[0];
+    const urgentDeadline = (opportunities || [])
+      .filter((item) => item.deadline && new Date(item.deadline).getTime() >= Date.now())
+      .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())[0];
+    const doNow = overdueApplication
+      ? { kind: "application_action", title: overdueApplication.nextAction, detail: `${overdueApplication.role} at ${overdueApplication.company} is overdue.`, href: `/dashboard/applications?opportunity=${encodeURIComponent(overdueApplication.id)}` }
+      : urgentDeadline
+        ? { kind: "application_deadline", title: `Advance ${urgentDeadline.company}`, detail: `${urgentDeadline.role} has the nearest application deadline.`, href: `/dashboard/applications?opportunity=${encodeURIComponent(urgentDeadline.id)}` }
+        : topOverdue[0]
+          ? { kind: "relationship_follow_up", title: `Follow up with ${topOverdue[0].contactName}`, detail: `${topOverdue[0].days} days since the last ${topOverdue[0].stage.toLowerCase()} action.`, href: "/dashboard/contacts" }
+          : activeApplications === 0
+            ? { kind: "find_jobs", title: "Find five matching roles", detail: "Start with official listings scored against your profile and network.", href: "/dashboard/assistant?skill=find-jobs" }
+            : { kind: "network", title: "Strengthen your next warm path", detail: "Review the three highest-value relationship actions below.", href: "/dashboard/contacts" };
+
     let referralCount = 0;
     const { data: waitlistRow } = await supabase
       .from("waitlist_signups")
@@ -343,6 +376,14 @@ export async function GET() {
       has_stripe_customer: hasStripeCustomer,
       trial_days_left: trialDaysLeft,
       referral_count: referralCount,
+      application_metrics: {
+        active: activeApplications,
+        deadlines_14d: applicationDeadlines,
+        interviews,
+        offers,
+        offer_conversion: activeApplications > 0 ? Math.round((offers / activeApplications) * 100) : 0,
+      },
+      do_now: doNow,
     });
   } catch {
     return NextResponse.json({
@@ -358,6 +399,8 @@ export async function GET() {
       recent_activity: [],
       tier_counts: { hot: 0, warm: 0, monitor: 0, cold: 0 },
       top_firms: [],
+      application_metrics: { active: 0, deadlines_14d: 0, interviews: 0, offers: 0, offer_conversion: 0 },
+      do_now: { kind: "recovery", title: "Review your recruiting workspace", detail: "Core actions remain available while live metrics recover.", href: "/dashboard/applications" },
     });
   }
 }

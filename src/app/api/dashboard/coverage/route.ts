@@ -1,21 +1,26 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-
-const FASTAPI_URL = process.env.FASTAPI_URL || "http://localhost:8000";
+import { getDashboardCoverage } from "@/lib/dashboard/coverage";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.email;
-
   try {
-    const res = await fetch(
-      `${FASTAPI_URL}/api/dashboard/coverage?userId=${encodeURIComponent(userId)}`,
-    );
-    return NextResponse.json(await res.json());
+    const data = await getDashboardCoverage(session.user.id, session.user.email);
+    return NextResponse.json({ ...data, degraded: false });
   } catch {
-    return NextResponse.json({ covered: [], uncovered: [], total_target: 0, total_covered: 0 });
+    return NextResponse.json(
+      {
+        covered: [],
+        uncovered: [],
+        total_target: 0,
+        total_covered: 0,
+        degraded: true,
+        error: "coverage_query_unavailable",
+      },
+      { status: 503 },
+    );
   }
 }

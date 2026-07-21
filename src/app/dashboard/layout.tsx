@@ -49,7 +49,7 @@ export default async function DashboardLayout({
           fixed bar; it lives on this non-scrolling wrapper, NOT on `main`. */}
       <div className="flex flex-1 min-h-0 pt-[49px] lg:pt-0">
         <Sidebar isFounderUser={founder} userName={userName} />
-        <main className="flex-1 min-w-0 overflow-auto">{children}</main>
+        <main className="flex-1 min-w-0 overflow-auto pb-[66px] lg:pb-0">{children}</main>
       </div>
       <UpgradeToast />
       <DashboardTour />

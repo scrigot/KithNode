@@ -6,15 +6,8 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
-  Users,
-  GitBranch,
-  Compass,
   Share2,
-  Target,
-  Upload,
   Settings,
-  CreditCard,
-  BarChart2,
   MessageSquare,
   HelpCircle,
   LogOut,
@@ -22,12 +15,13 @@ import {
   X,
   ChevronRight,
   Gauge,
-  Network,
-  UserPlus,
   PanelLeft,
   PanelLeftOpen,
   PanelLeftClose,
   Check,
+  Bot,
+  BriefcaseBusiness,
+  Wrench,
 } from "lucide-react";
 import {
   type SidebarMode,
@@ -36,42 +30,34 @@ import {
   SIDEBAR_MODE_KEY,
 } from "@/lib/sidebar-mode";
 
-const NAV_GROUPS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  tour?: string;
+  matches?: string[];
+};
+
+const PRIMARY_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, tour: "overview" },
+  { href: "/dashboard/assistant", label: "Career Copilot", icon: Bot },
+  { href: "/dashboard/applications", label: "Applications", icon: BriefcaseBusiness },
+  { href: "/dashboard/network", label: "Network", icon: Share2, matches: ["/dashboard/contacts", "/dashboard/discover", "/dashboard/pipeline", "/dashboard/edge"] },
+  { href: "/dashboard/toolkit", label: "Career Toolkit", icon: Wrench, matches: ["/dashboard/resume", "/dashboard/linkedin", "/dashboard/coffee-prep"] },
+];
+
+const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
-    label: "PAGES",
-    items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboard, tour: "overview" },
-      { href: "/dashboard/contacts", label: "Warm Signals", icon: Users, tour: "warm-signals" },
-      { href: "/dashboard/pipeline", label: "Pipeline", icon: GitBranch, tour: "pipeline" },
-      { href: "/dashboard/discover", label: "Discover", icon: Compass, tour: "discover" },
-      { href: "/dashboard/network", label: "Network", icon: Share2, tour: "network" },
-      { href: "/dashboard/edge", label: "The Edge", icon: Target, tour: undefined },
-    ],
-  },
-  {
-    label: "DATA",
-    items: [
-      { href: "/dashboard/import", label: "Import", icon: Upload, tour: "import" },
-    ],
+    label: "WORKSPACE",
+    items: PRIMARY_ITEMS,
   },
 ];
 
 // Founder-only nav group, appended in NavContent when isFounderUser is true.
-const FOUNDER_NAV_GROUP = {
+const FOUNDER_NAV_GROUP: { label: string; items: NavItem[] } = {
   label: "FOUNDER",
   items: [
     { href: "/dashboard/ops", label: "Ops", icon: Gauge, tour: undefined },
-  ],
-};
-
-// Kith & Nodes social layer — only shown when the feature flag is on.
-const KITH_NODES_ENABLED = process.env.NEXT_PUBLIC_ENABLE_KITH_NODES === "true";
-const KITH_NAV_GROUP = {
-  label: "KITH & NODES",
-  items: [
-    { href: "/dashboard/friends", label: "Kith", icon: UserPlus, tour: undefined },
-    { href: "/dashboard/nodes", label: "Nodes", icon: Network, tour: undefined },
-    { href: "/dashboard/messages", label: "Messages", icon: MessageSquare, tour: undefined },
   ],
 };
 
@@ -91,7 +77,6 @@ function NavContent({
 }) {
   const navGroups = [
     ...NAV_GROUPS,
-    ...(KITH_NODES_ENABLED ? [KITH_NAV_GROUP] : []),
     ...(isFounderUser ? [FOUNDER_NAV_GROUP] : []),
   ];
 
@@ -105,7 +90,7 @@ function NavContent({
             </p>
           )}
           {group.items.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || item.matches?.some((prefix) => pathname.startsWith(prefix));
             const Icon = item.icon;
             return (
               <Link
@@ -231,11 +216,7 @@ function MobileAccount({ userName, onNavClick }: { userName: string; onNavClick:
       .toUpperCase()
       .slice(0, 2) || "U";
 
-  const links = [
-    { href: "/dashboard/settings", label: "Settings", icon: Settings },
-    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
-    { href: "/dashboard/usage", label: "Usage", icon: BarChart2 },
-  ];
+  const links = [{ href: "/dashboard/settings", label: "Settings", icon: Settings }];
 
   return (
     <div className="border-t border-white/[0.06] px-4 py-3">
@@ -415,6 +396,19 @@ export function Sidebar({
         />
         <MobileAccount userName={userName} onNavClick={() => setOpen(false)} />
       </aside>
+
+      <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-40 grid h-[66px] grid-cols-5 border-t border-white/[0.08] bg-bg-secondary lg:hidden">
+        {PRIMARY_ITEMS.map((item) => {
+          const active = pathname === item.href || item.matches?.some((prefix) => pathname.startsWith(prefix));
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[10px] font-bold ${active ? "text-accent-teal" : "text-text-muted"}`}>
+              <Icon className="h-5 w-5" />
+              <span className="max-w-full truncate">{item.label === "Career Copilot" ? "Copilot" : item.label === "Career Toolkit" ? "Toolkit" : item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </>
   );
 }

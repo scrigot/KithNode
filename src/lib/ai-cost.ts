@@ -1,19 +1,19 @@
 /**
  * Anthropic token → USD cost estimation for the founder-ops cost-burn tile.
  *
- * Pure + unit-tested (see ai-cost.test.ts). Mirrors the backend pricing map in
- * backend/app/core/cost_log.py — keep the two in sync.
+ * Pure + unit-tested (see ai-cost.test.ts). This is the canonical application
+ * pricing map now that production AI execution lives in Next.js.
  *
- * Rates verified via the `claude-api` skill (Anthropic pricing, cached
- * 2026-05-26). The frontend outreach/draft path calls the AI Gateway with
- * `anthropic/claude-sonnet-4.5` and the backend drafter uses
- * `claude-sonnet-4-20250514` — both are Sonnet-tier: $3.00/MTok input,
- * $15.00/MTok output. Per-MTok = per 1,000,000 tokens.
+ * Rates verified against Anthropic's model documentation on 2026-07-10.
+ * Temporary provider promotions are intentionally not baked into accounting.
+ * Per-MTok = per 1,000,000 tokens.
  */
 
 // model id (as reported by response.modelId / gateway slug) → [inputPerMTok, outputPerMTok] USD
 const ANTHROPIC_PRICES: Record<string, [number, number]> = {
-  // Sonnet 4 / 4.5 family — the only models KithNode drafts with today.
+  "claude-sonnet-5": [3.0, 15.0],
+  "anthropic/claude-sonnet-5": [3.0, 15.0],
+  // Retained for historical telemetry rows.
   "claude-sonnet-4.5": [3.0, 15.0],
   "anthropic/claude-sonnet-4.5": [3.0, 15.0],
   "claude-sonnet-4-5": [3.0, 15.0],

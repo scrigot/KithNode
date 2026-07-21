@@ -115,7 +115,7 @@ export async function scrapeKenanNewsAlumni(
   // Classifier is opt-in and only runs if the env var is present.
   const useClassifier =
     opts.useClassifier !== false &&
-    !!(process.env.ANTHROPIC_API_KEY || process.env.FASTAPI_URL);
+    !!(process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY);
 
   // Phase 1: collect story URLs across pages.
   const storyUrls: string[] = [];

@@ -16,6 +16,26 @@ const nextConfig: NextConfig = {
         destination: "/waitlist",
         permanent: true,
       },
+      {
+        source: "/dashboard/integrations",
+        destination: "/dashboard/settings/integrations",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/import",
+        destination: "/dashboard/settings/data/import",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/billing",
+        destination: "/dashboard/settings/billing",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/usage",
+        destination: "/dashboard/settings/billing/usage",
+        permanent: false,
+      },
     ];
   },
   async headers() {

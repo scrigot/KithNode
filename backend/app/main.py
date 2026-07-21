@@ -14,10 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import contacts, dashboard, discover, import_contacts, outreach, pipeline, preferences, signals, stats, user
+from app.core.auth import require_internal_api
 
 
 @asynccontextmanager
@@ -43,16 +44,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(stats.router)
-app.include_router(contacts.router)
-app.include_router(signals.router)
-app.include_router(outreach.router)
-app.include_router(discover.router)
-app.include_router(import_contacts.router)
-app.include_router(preferences.router)
-app.include_router(user.router)
-app.include_router(pipeline.router)
-app.include_router(dashboard.router)
+internal_dependencies = [Depends(require_internal_api)]
+app.include_router(stats.router, dependencies=internal_dependencies)
+app.include_router(contacts.router, dependencies=internal_dependencies)
+app.include_router(signals.router, dependencies=internal_dependencies)
+app.include_router(outreach.router, dependencies=internal_dependencies)
+app.include_router(discover.router, dependencies=internal_dependencies)
+app.include_router(import_contacts.router, dependencies=internal_dependencies)
+app.include_router(preferences.router, dependencies=internal_dependencies)
+app.include_router(user.router, dependencies=internal_dependencies)
+app.include_router(pipeline.router, dependencies=internal_dependencies)
+app.include_router(dashboard.router, dependencies=internal_dependencies)
 
 
 @app.get("/api/health")

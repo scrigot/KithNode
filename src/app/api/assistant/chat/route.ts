@@ -1,0 +1,267 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { AI_MODELS } from "@/lib/ai-models";
+import { buildAssistantContext } from "@/lib/assistant/context";
+import { planAssistantResponse } from "@/lib/assistant/planner";
+import { assistantRequestSchema } from "@/lib/assistant/schemas";
+import { assistantToolPolicy } from "@/lib/assistant/tools";
+import { executeCareerSkill, inferCareerSkill, skillResultJson } from "@/lib/assistant/skill-engine";
+import { assistantErrorResponse, AssistantHttpError } from "@/lib/assistant/errors";
+import { serverEnv } from "@/lib/env/server";
+import { assistantRepository } from "@/lib/assistant/repository";
+import { isDeterministicCareerSkill, type CareerSkillId } from "@/lib/assistant/skills";
+
+export const runtime = "nodejs";
+
+export async function GET(request: NextRequest) {
+  try {
+    return await getAssistant(request);
+  } catch (error) {
+    return assistantErrorResponse(error);
+  }
+}
+
+async function getAssistant(request: NextRequest) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const conversationId = request.nextUrl.searchParams.get("conversationId");
+  if (!conversationId) {
+    const conversations = await assistantRepository.listConversations(userId);
+    return NextResponse.json({ conversations });
+  }
+
+  const conversation = await assistantRepository.conversation(conversationId, userId);
+  if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const runs = await assistantRepository.listRunIds(conversationId, userId);
+  const [messages, toolCalls] = await Promise.all([
+    assistantRepository.listMessages(conversationId, userId),
+    assistantRepository.listToolCalls(userId, runs.map((run) => String(run.id))),
+  ]);
+  return NextResponse.json({ conversation, messages, toolCalls });
+}
+
+export async function POST(request: NextRequest) {
+  if (request.headers.get("accept")?.includes("application/x-ndjson")) {
+    return streamAssistant(request);
+  }
+  try {
+    return await postAssistant(request);
+  } catch (error) {
+    return assistantErrorResponse(error);
+  }
+}
+
+type ProgressWriter = (message: string) => void | Promise<void>;
+
+async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const parsed = assistantRequestSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  let conversation = parsed.data.conversationId
+    ? await assistantRepository.conversation(parsed.data.conversationId, userId)
+    : null;
+  if (parsed.data.conversationId && !conversation) {
+    return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+  }
+  if (!conversation) {
+    conversation = await assistantRepository.createConversation(userId, parsed.data.message.slice(0, 80));
+  }
+
+  await assistantRepository.createMessage({ conversationId: String(conversation.id), userId, role: "user", content: parsed.data.message });
+  await onProgress?.("Loading your current KithNode evidence…");
+  const history = await assistantRepository.listMessages(String(conversation.id), userId, true, 12);
+  const run = await assistantRepository.createRun({ conversationId: String(conversation.id), userId, model: AI_MODELS.default });
+
+  const inferredSkill = parsed.data.skillId || inferCareerSkill(parsed.data.message);
+  if (inferredSkill && isDeterministicCareerSkill(inferredSkill) && serverEnv().ENABLE_CAREER_SKILLS !== "false") {
+    await onProgress?.(`Running ${inferredSkill.replaceAll("_", " ")} from verified data…`);
+    const parameters = skillParametersFromMessage(inferredSkill, parsed.data.message, parsed.data.parameters);
+    let skillResult;
+    try {
+      skillResult = await executeCareerSkill({
+        skillId: inferredSkill,
+        userId,
+        userEmail: session.user?.email || userId,
+        parameters,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.slice(0, 500) : "Skill execution failed";
+      await assistantRepository.updateRun(String(run.id), userId, { status: "failed", error: message, completedAt: new Date().toISOString() });
+      throw new AssistantHttpError(500, "persistence_failed", message, true);
+    }
+
+    const readToolCall = await assistantRepository.createToolCall({
+        runId: run.id,
+        userId,
+        toolName: `skill_${inferredSkill}`,
+        input: { message: parsed.data.message, parameters },
+        output: skillResultJson(skillResult),
+        status: "completed",
+        riskLevel: "read",
+        requiresApproval: false,
+        completedAt: new Date().toISOString(),
+    });
+    const assistantMessage = await assistantRepository.createMessage({
+        conversationId: conversation.id,
+        userId,
+        role: "assistant",
+        content: skillResult.summary,
+        meta: { runId: run.id, skillId: inferredSkill, toolCallId: readToolCall.id, freshness: skillResult.freshness },
+    });
+    await onProgress?.("Saving the result and its evidence…");
+    const proposedActions = await Promise.all(skillResult.proposedActions.map(async (action) => {
+      const policy = assistantToolPolicy(action.toolName);
+      const toolCall = await assistantRepository.createToolCall({ runId: run.id, userId, toolName: action.toolName, input: { ...action.input, label: action.label }, riskLevel: policy.riskLevel, requiresApproval: true });
+      await assistantRepository.createApproval(String(toolCall.id), userId);
+      return toolCall;
+    }));
+    await Promise.all([
+      assistantRepository.updateRun(String(run.id), userId, { status: "completed", model: "deterministic", completedAt: new Date().toISOString() }),
+      assistantRepository.touchConversation(String(conversation.id), userId),
+    ]);
+    return NextResponse.json({ conversationId: conversation.id, message: assistantMessage, recommendations: [], proposedActions, skillResult });
+  }
+
+  const context = await buildAssistantContext(userId);
+  await onProgress?.("Planning with bounded, read-only tools…");
+
+  let result;
+  try {
+    result = await planAssistantResponse({
+      message: parsed.data.message,
+      context,
+      history: history.reverse().map(({ role, content }) => ({ role, content })),
+      onProgress,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message.slice(0, 500) : "Planning failed";
+    await assistantRepository.updateRun(String(run.id), userId, { status: "failed", error: errorMessage, completedAt: new Date().toISOString() });
+    throw new AssistantHttpError(503, "model_unavailable", "The planning model is temporarily unavailable. Your message was saved; retry when AI Gateway is ready.", true);
+  }
+
+  const assistantMessage = await assistantRepository.createMessage({
+      conversationId: conversation.id,
+      userId,
+      role: "assistant",
+      content: result.plan.reply,
+      meta: { runId: run.id, degraded: false },
+  });
+  await onProgress?.("Saving the answer and approval-gated proposals…");
+
+  for (const traced of result.toolTrace) {
+    await assistantRepository.createToolCall({
+      runId: run.id,
+      userId,
+      toolName: "inspect_context",
+      input: { section: traced.section },
+      output: JSON.parse(JSON.stringify(traced.output ?? null)),
+      status: "completed",
+      riskLevel: "read",
+      requiresApproval: false,
+      completedAt: new Date().toISOString(),
+    });
+  }
+
+  const recommendations = await Promise.all(
+    result.plan.recommendations.map((item) =>
+      assistantRepository.createRecommendation({
+          userId,
+          kind: item.kind,
+          title: item.title,
+          rationale: item.rationale,
+          evidence: item.evidence,
+          confidence: item.confidence,
+          dueAt: item.dueAt,
+      }),
+    ),
+  );
+
+  const toolCalls = await Promise.all(
+    result.plan.proposedActions.map(async (action) => {
+      const policy = assistantToolPolicy(action.toolName);
+      const toolCall = await assistantRepository.createToolCall({
+          runId: run.id,
+          userId,
+          toolName: action.toolName,
+          input: { ...action.input, label: action.label },
+          riskLevel: policy.riskLevel,
+          requiresApproval: policy.requiresApproval,
+      });
+      await assistantRepository.createApproval(String(toolCall.id), userId);
+      return toolCall;
+    }),
+  );
+
+  await Promise.all([
+    assistantRepository.updateRun(String(run.id), userId, {
+        status: "completed",
+        model: result.model,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        error: "",
+        completedAt: new Date().toISOString(),
+    }),
+    assistantRepository.touchConversation(String(conversation.id), userId),
+  ]);
+
+  return NextResponse.json({
+    conversationId: conversation.id,
+    message: assistantMessage,
+    recommendations,
+    proposedActions: toolCalls,
+    degraded: false,
+  });
+}
+
+function streamAssistant(request: NextRequest) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const write = (event: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      write({ type: "status", message: "Starting Career Copilot…" });
+      try {
+        const response = await postAssistant(request, (message) => write({ type: "status", message }));
+        const data = await response.json();
+        write({ type: response.ok ? "result" : "error", status: response.status, data });
+      } catch (error) {
+        const response = assistantErrorResponse(error);
+        write({ type: "error", status: response.status, data: await response.json() });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+    },
+  });
+}
+
+function skillParametersFromMessage(
+  skillId: CareerSkillId,
+  message: string,
+  supplied: Record<string, unknown> | undefined,
+) {
+  const parameters: Record<string, unknown> = { ...(supplied || {}) };
+  if (skillId !== "find_jobs" || parameters.careerUrl) return parameters;
+
+  const urlMatch = message.match(/https?:\/\/[^\s]+/i);
+  if (!urlMatch) return parameters;
+  parameters.careerUrl = urlMatch[0].replace(/[),.;]+$/, "");
+
+  if (!parameters.company) {
+    const beforeUrl = message.slice(0, urlMatch.index).replace(/^\s*\/find-jobs\b/i, "").trim();
+    if (beforeUrl) parameters.company = beforeUrl.slice(0, 160);
+  }
+  return parameters;
+}

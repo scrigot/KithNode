@@ -1,41 +1,4 @@
-/**
- * Centralized API client for the FastAPI backend.
- *
- * All backend communication goes through this module.
- * Called from Next.js API routes (server-side proxy pattern).
- */
-
-const FASTAPI_URL =
-  process.env.FASTAPI_URL || "http://localhost:8000";
-
-export class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function request<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
-  const url = `${FASTAPI_URL}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(body.detail || res.statusText, res.status);
-  }
-
-  return res.json();
-}
+/** Shared response types for the canonical Next.js API routes. */
 
 // ─── Contacts ────────────────────────────────────────────────────────
 
@@ -137,14 +100,6 @@ export interface ContactDetail extends RankedContact {
   }[];
 }
 
-export function getContactsRanked(
-  minScore = 0,
-  limit = 100,
-  curated = false,
-): Promise<RankedContact[]> {
-  return request(`/api/contacts/ranked?min_score=${minScore}&limit=${limit}&curated=${curated}`);
-}
-
 // ─── Pipeline ────────────────────────────────────────────────────────
 
 export interface PipelineWarmPath {
@@ -201,35 +156,6 @@ export interface PipelineResponse {
   total: number;
 }
 
-export function getPipeline(): Promise<PipelineResponse> {
-  return request("/api/pipeline");
-}
-
-export function addToPipeline(
-  contactId: string,
-  stage = "researched",
-): Promise<{ contact_id: string; pipeline_id: string; stage: string }> {
-  return request(`/api/pipeline/${contactId}`, {
-    method: "POST",
-    body: JSON.stringify({ stage }),
-  });
-}
-
-export function updatePipelineStage(
-  contactId: string,
-  stage: string,
-  notes?: string,
-): Promise<{ contact_id: string; stage: string }> {
-  return request(`/api/pipeline/${contactId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ stage, notes }),
-  });
-}
-
-export function getContactDetail(id: number): Promise<ContactDetail> {
-  return request(`/api/contacts/${id}`);
-}
-
 // ─── Signals ─────────────────────────────────────────────────────────
 
 export interface CompanySignals {
@@ -250,10 +176,6 @@ export interface CompanySignals {
   };
 }
 
-export function getSignals(domain: string): Promise<CompanySignals> {
-  return request(`/api/signals/${domain}`);
-}
-
 // ─── Outreach ────────────────────────────────────────────────────────
 
 export interface DraftResult {
@@ -261,23 +183,6 @@ export interface DraftResult {
   subject: string;
   body: string;
   outreach_id: number;
-}
-
-export function draftOutreach(contactId: number): Promise<DraftResult> {
-  return request("/api/outreach/draft", {
-    method: "POST",
-    body: JSON.stringify({ contact_id: contactId }),
-  });
-}
-
-export function updateOutreachStatus(
-  outreachId: number,
-  status: string,
-): Promise<{ outreach_id: number; status: string; message: string }> {
-  return request(`/api/outreach/${outreachId}/status`, {
-    method: "POST",
-    body: JSON.stringify({ status }),
-  });
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────
@@ -290,10 +195,6 @@ export interface Stats {
   affiliations: number;
   emails_verified: number;
   outreach_drafted: number;
-}
-
-export function getStats(): Promise<Stats> {
-  return request("/api/stats");
 }
 
 // ─── Discover / Training ─────────────────────────────────────────────
@@ -334,26 +235,6 @@ export interface DiscoverResponse {
   ratings_progress: RatingsProgress;
 }
 
-export function getDiscover(limit = 10): Promise<DiscoverResponse> {
-  return request(`/api/discover?limit=${limit}`);
-}
-
-export function rateContact(
-  contactId: number,
-  rating: "high_value" | "skip" | "not_interested",
-): Promise<{
-  contact_id: number;
-  rating: string;
-  total_ratings: number;
-  learning_active: boolean;
-  message: string;
-}> {
-  return request(`/api/contacts/${contactId}/rate`, {
-    method: "POST",
-    body: JSON.stringify({ rating }),
-  });
-}
-
 // ─── Import ──────────────────────────────────────────────────────────
 
 export interface ImportResult {
@@ -373,13 +254,6 @@ export interface ImportResult {
   }[];
 }
 
-export function importLinkedIn(urls: string[]): Promise<ImportResult> {
-  return request("/api/import/linkedin", {
-    method: "POST",
-    body: JSON.stringify({ urls }),
-  });
-}
-
 // ─── Preferences ─────────────────────────────────────────────────────
 
 export interface Preferences {
@@ -391,17 +265,4 @@ export interface Preferences {
     sample_count: number;
   }[];
   learning_active: boolean;
-}
-
-export function getPreferences(): Promise<Preferences> {
-  return request("/api/preferences");
-}
-
-export function recalculatePreferences(): Promise<{
-  learning_active: boolean;
-  weights_updated: number;
-  contacts_rescored: number;
-  message: string;
-}> {
-  return request("/api/preferences/recalculate", { method: "POST" });
 }

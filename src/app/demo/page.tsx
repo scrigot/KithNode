@@ -6,11 +6,12 @@ import { PanelDiscover } from "./_components/panel-discover";
 import { PanelSignal } from "./_components/panel-signal";
 import { PanelScoring } from "./_components/panel-scoring";
 import { PanelOutreach } from "./_components/panel-outreach";
+import { RecruitingWorkstation } from "./_components/recruiting-workstation";
 
 export const metadata: Metadata = {
-  title: "Demo",
+  title: "KithNode Recruiting Workstation Demo",
   description:
-    "Click around the real KithNode sandbox with seeded alumni, warm paths, and pipeline data.",
+    "Explore an anonymized, read-only finance recruiting workflow built with KithNode.",
 };
 
 // Deterministic mesh for the hero background, mirroring the solutions section.
@@ -93,22 +94,22 @@ export default function DemoPage() {
         <div className="relative mx-auto flex max-w-[1200px] flex-col items-center px-6 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0EA5E9]" />
-            Live Sandbox. Seeded Data.
+            Kenan-Flagler portfolio showcase
           </span>
           <h1 className="mt-6 font-heading text-5xl font-bold tracking-tight text-white md:text-7xl">
-            Click around the real KithNode
+            One workspace for finance recruiting
           </h1>
           <p className="mt-5 max-w-2xl text-base text-white/70 sm:text-lg">
-            Try the sandbox dashboard with seeded alumni. Then sign up to build
-            your real warm-path network.
+            Follow an anonymized student from a long-term recruiting goal to a
+            matched role, warm path, tailored resume, and concrete next action.
           </p>
 
           <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
             <Link
-              href="/demo/sandbox"
+              href="#recruiting-workstation"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0EA5E9] px-6 py-3.5 text-base font-bold text-white shadow-lg shadow-[#0EA5E9]/30 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#0EA5E9]/40"
             >
-              Try the live sandbox
+              Explore the interactive workflow
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
@@ -121,9 +122,13 @@ export default function DemoPage() {
           </div>
 
           <p className="mt-4 font-mono text-[10px] uppercase tracking-widest text-white/40">
-            No login. No real people. Just the product.
+            No login. No real people. No live integrations.
           </p>
         </div>
+      </section>
+
+      <section id="recruiting-workstation" className="relative border-t border-white/[0.06] bg-black py-16 sm:py-24">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6"><div className="mb-8"><p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#38BDF8]">End-to-end product story</p><h2 className="mt-2 font-heading text-3xl font-semibold text-white sm:text-4xl">Goal → opportunity → relationship → materials → action</h2><p className="mt-3 max-w-3xl text-base leading-7 text-white/60">This is the core KithNode thesis: career progress becomes easier when job discovery, network intelligence, and application execution share one grounded source of truth.</p></div><RecruitingWorkstation /></div>
       </section>
 
       {/* Panel preview band */}

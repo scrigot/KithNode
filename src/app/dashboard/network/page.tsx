@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api-client";
 import type { RankedContact } from "@/lib/api";
 import { TIER_CHIP, TIER_LABEL, type Tier } from "@/app/dashboard/_components/home-feed";
 import { buildGraph, type NodeDetail } from "./graph-model";
+import { NetworkNav } from "@/components/network-nav";
 
 // react-force-graph-2d is canvas-only and touches window/document at module
 // load — it MUST be client-only. Load via next/dynamic with ssr:false.
@@ -121,7 +122,7 @@ export default function NetworkPage() {
 
   // ─── Graph view ───────────────────────────────────────────────────────
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col"><NetworkNav />
       {/* Top bar: title + live stats + tier filters + tier counts */}
       <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-y-1 border-b border-white/[0.06] bg-card px-4 py-2">
         <div className="flex items-center gap-4">

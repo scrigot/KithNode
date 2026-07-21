@@ -40,6 +40,7 @@ export function Navbar() {
             [
               { label: "How it works", href: "#how-it-works" },
               { label: "Why KithNode", href: "/manifesto" },
+              { label: "Demo", href: "/demo" },
             ] as const
           ).map(({ label, href }) => (
             <motion.a

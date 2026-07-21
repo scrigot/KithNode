@@ -74,7 +74,7 @@ function SubBadge({
     : "border-amber-500/30 bg-amber-500/10 text-amber-400";
   return (
     <Link
-      href="/dashboard/billing"
+      href="/dashboard/settings/billing"
       onClick={onClick}
       className={`mt-1 inline-flex w-fit items-center border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider transition-colors hover:opacity-80 ${className}`}
     >
@@ -531,7 +531,7 @@ export function TopBar({ userName, userEmail }: { userName: string; userEmail: s
                   Profile / Settings
                 </Link>
                 <Link
-                  href="/dashboard/billing"
+                  href="/dashboard/settings/billing"
                   onClick={() => setActivePanel(null)}
                   className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
                 >
@@ -539,7 +539,7 @@ export function TopBar({ userName, userEmail }: { userName: string; userEmail: s
                   Billing
                 </Link>
                 <Link
-                  href="/dashboard/usage"
+                  href="/dashboard/settings/billing"
                   onClick={() => setActivePanel(null)}
                   className="flex items-center gap-2 px-3 py-2 text-[11px] text-text-secondary hover:bg-white/[0.04] hover:text-foreground transition-colors"
                 >

@@ -45,7 +45,6 @@ export const DAILY_COST_BUDGET_USD = 2;
 export const FIXED_SUBSCRIPTIONS: ReadonlyArray<{ name: string; monthlyUsd: number }> = [
   { name: "Vercel", monthlyUsd: 0 },
   { name: "Supabase", monthlyUsd: 0 },
-  { name: "Railway", monthlyUsd: 0 },
   { name: "Domain", monthlyUsd: 0 },
   { name: "PostHog", monthlyUsd: 0 },
   { name: "Sentry", monthlyUsd: 0 },

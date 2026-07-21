@@ -2,13 +2,18 @@
 
 const $ = (sel) => document.querySelector(sel);
 const FIELDS = ["name", "title", "firmName", "education", "location", "industry", "email", "linkedInUrl", "notes"];
+let lastParsed = {};
 
 // Persist the KithNode base URL.
-chrome.storage.local.get("baseUrl").then(({ baseUrl }) => {
-  $("#baseUrl").value = baseUrl || "http://localhost:3051";
+chrome.storage.local.get(["baseUrl", "pairingToken"]).then(({ baseUrl, pairingToken }) => {
+  $("#baseUrl").value = baseUrl || "http://localhost:3000";
+  $("#pairingToken").value = pairingToken || "";
 });
 $("#baseUrl").addEventListener("change", (e) => {
   chrome.storage.local.set({ baseUrl: e.target.value.trim() });
+});
+$("#pairingToken").addEventListener("change", (e) => {
+  chrome.storage.local.set({ pairingToken: e.target.value.trim() });
 });
 
 function setStatus(msg, kind) {
@@ -24,7 +29,7 @@ function setLoading(isLoading, message) {
 }
 
 function collect() {
-  const c = {};
+  const c = { ...lastParsed };
   for (const f of FIELDS) c[f] = $(`[name="${f}"]`).value.trim();
   return c;
 }
@@ -58,6 +63,7 @@ $("#parse").addEventListener("click", async () => {
     return;
   }
   const d = resp.data;
+  lastParsed = d;
   for (const f of FIELDS) $(`[name="${f}"]`).value = d[f] || "";
   $(`[name="notes"]`).value = d.notes || "";
   $("#form").hidden = false;
@@ -79,6 +85,23 @@ $("#copyCsv").addEventListener("click", async () => {
   setStatus("Copied CSV row to clipboard.", "ok");
 });
 
+$("#saveProfile").addEventListener("click", async () => {
+  const contact = collect();
+  if (!contact.name) {
+    setStatus("Name is required.", "err");
+    return;
+  }
+  const baseUrl = $("#baseUrl").value.trim();
+  const token = $("#pairingToken").value.trim();
+  setStatus("Saving private profile copy...");
+  const result = await chrome.runtime.sendMessage({ type: "KITHNODE_PROFILE_COPY", baseUrl, token, contact });
+  if (!result || !result.ok) {
+    setStatus(result?.error || "Failed to save profile copy.", "err");
+    return;
+  }
+  setStatus("Saved to LinkedIn Studio. Review every section in KithNode.", "ok");
+});
+
 $("#send").addEventListener("click", async () => {
   const contact = collect();
   if (!contact.name) {
@@ -86,13 +109,15 @@ $("#send").addEventListener("click", async () => {
     return;
   }
   const baseUrl = $("#baseUrl").value.trim();
+  const token = $("#pairingToken").value.trim();
   setStatus("Sending...");
-  const result = await chrome.runtime.sendMessage({ type: "KITHNODE_IMPORT", baseUrl, contact });
+  const result = await chrome.runtime.sendMessage({ type: "KITHNODE_IMPORT", baseUrl, token, contact });
   if (!result || !result.ok) {
     setStatus(result?.error || "Failed to add contact.", "err");
     return;
   }
   const b = result.body || {};
-  const score = b.lead && typeof b.lead.score === "number" ? ` · score ${b.lead.score}` : "";
-  setStatus(`Added to Discover${score}.`, "ok");
+  const score = b.contact?.score?.total_score;
+  const scoreLabel = typeof score === "number" ? ` · score ${Math.round(score)}` : "";
+  setStatus(`Added to KithNode${scoreLabel}.`, "ok");
 });

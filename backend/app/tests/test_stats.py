@@ -5,6 +5,11 @@ def test_health(client):
     assert data["status"] == "ok"
 
 
+def test_internal_routes_reject_missing_service_credential(client):
+    r = client.get("/api/stats", headers={"Authorization": ""})
+    assert r.status_code == 401
+
+
 def test_stats_returns_all_fields(client):
     r = client.get("/api/stats")
     assert r.status_code == 200

@@ -1,8 +1,7 @@
 /**
  * AutoGuard kill-switch utilities (pure functions, no DB).
  *
- * The actual state machine lives in the FastAPI backend.
- * These helpers are for frontend display logic.
+ * This is the canonical status guard shared by Next.js UI and route logic.
  */
 
 export type OutreachStatus = "drafted" | "sent" | "replied" | "bounced";

@@ -18,12 +18,12 @@ describe("POST /api/contacts/score", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns message that scoring is handled by backend", async () => {
+  it("directs callers to the canonical rescore endpoint", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user@unc.edu" } });
     const response = await POST();
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.message).toContain("backend");
+    expect(response.status).toBe(410);
+    expect(body.replacement).toBe("/api/contacts/rescore");
   });
 });

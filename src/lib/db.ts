@@ -1,11 +1,11 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { databaseUrl } from "@/lib/env/server";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createPrismaClient() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
+  const url = databaseUrl();
 
   // Parse the connection string to extract components
   // Supabase pooler URLs have dots in the username (e.g., postgres.projectref)

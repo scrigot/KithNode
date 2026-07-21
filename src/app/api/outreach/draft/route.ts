@@ -9,6 +9,8 @@ import { requireCredits, CREDIT_COSTS } from "@/lib/credits";
 import { anthropicCost } from "@/lib/ai-cost";
 import { formatExperiencePeriod } from "@/lib/educations";
 import { buildDraftStyle } from "@/lib/draft-style";
+import { AI_MODELS } from "@/lib/ai-models";
+import { randomUUID } from "node:crypto";
 
 function shortSchoolName(university: string): string {
   const u = university.toLowerCase();
@@ -248,7 +250,7 @@ Return ONLY valid JSON with exactly two keys:
 The subject should be ${style.subjectRule}. The body should feel like a real person wrote it, not AI.`;
 
     const { text, usage, response } = await generateText({
-      model: gateway("anthropic/claude-sonnet-4.5"),
+      model: gateway(AI_MODELS.default),
       prompt,
     });
 
@@ -256,7 +258,7 @@ The subject should be ${style.subjectRule}. The body should feel like a real per
     // Best-effort: insert failure MUST never break a draft, so it's voided +
     // .catch'd. service-role supabase client (already imported) bypasses the
     // deny-all RLS on api_cost_log.
-    const model = response?.modelId ?? "claude-sonnet-4.5";
+    const model = response?.modelId ?? AI_MODELS.default;
     // Bulletproof: even a synchronous client error must never break a draft.
     try {
       void supabase
@@ -319,7 +321,21 @@ The subject should be ${style.subjectRule}. The body should feel like a real per
       ),
     ];
 
+    const outreachId = randomUUID();
+    const { error: draftError } = await supabase.from("OutreachDraft").insert({
+      id: outreachId,
+      userId,
+      contactId,
+      subject,
+      body: draft,
+      status: "draft",
+    });
+    if (draftError) {
+      throw new Error(`outreach_draft_persist_failed:${draftError.code || "unknown"}`);
+    }
+
     return NextResponse.json({
+      outreachId,
       draft,
       subject,
       signals,

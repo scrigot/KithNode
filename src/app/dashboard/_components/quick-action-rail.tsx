@@ -25,6 +25,14 @@ const TIER_COLOR: Record<string, string> = {
 const TIERS = ["kith", "hot", "warm", "monitor", "cold"] as const;
 type Tier = (typeof TIERS)[number];
 
+export function contactsFilterHref(tier: Tier): string {
+  return `/dashboard/contacts?tier=${encodeURIComponent(tier)}`;
+}
+
+export function clampWeeklyGoal(value: number): number {
+  return Math.max(1, Math.min(20, Math.round(value)));
+}
+
 interface OverviewData {
   tier_counts: Partial<Record<Tier, number>>;
   top_unrated: Array<{
@@ -41,11 +49,10 @@ interface OverviewData {
 export function QuickActionRail() {
   const router = useRouter();
   const [data, setData] = useState<OverviewData | null>(null);
-  const [selectedTiers, setSelectedTiers] = useState<Set<Tier>>(
-    new Set(["hot", "warm"]),
-  );
+  const [selectedTier, setSelectedTier] = useState<Tier>("hot");
   const [localTarget, setLocalTarget] = useState<number | null>(null);
   const [saveHint, setSaveHint] = useState<string | null>(null);
+  const [savingTarget, setSavingTarget] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,22 +77,37 @@ export function QuickActionRail() {
   const done = data?.weekly_goal_done ?? 0;
 
   function toggleTier(t: Tier) {
-    setSelectedTiers((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      return next;
-    });
+    setSelectedTier(t);
   }
 
-  function updateTarget(delta: number) {
-    const next = Math.max(1, Math.min(20, target + delta));
+  async function updateTarget(delta: number) {
+    if (savingTarget) return;
+    const previous = target;
+    const next = clampWeeklyGoal(target + delta);
     setLocalTarget(next);
-    setSaveHint("Local only — persistence coming soon");
+    setSaveHint("Saving…");
+    setSavingTarget(true);
+    try {
+      const response = await apiFetch("/api/user/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekly_goal_target: next }),
+      });
+      if (!response.ok) throw new Error("Unable to save weekly goal");
+      setSaveHint("Saved");
+      setData((current) =>
+        current ? { ...current, weekly_goal_target: next } : current,
+      );
+    } catch {
+      setLocalTarget(previous);
+      setSaveHint("Could not save — try again");
+    } finally {
+      setSavingTarget(false);
+    }
   }
 
   function applyFilter() {
-    router.push("/dashboard/contacts");
+    router.push(contactsFilterHref(selectedTier));
   }
 
   return (
@@ -144,7 +166,7 @@ export function QuickActionRail() {
           {TIERS.map((t) => {
             const count = data?.tier_counts[t] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-            const active = selectedTiers.has(t);
+            const active = selectedTier === t;
             return (
               <button
                 key={t}
@@ -221,6 +243,7 @@ export function QuickActionRail() {
               <button
                 onClick={() => updateTarget(-1)}
                 aria-label="Decrease target"
+                disabled={savingTarget || target <= 1}
                 className="border border-white/[0.06] bg-background p-1 hover:bg-white/[0.04]"
               >
                 <Minus size={10} />
@@ -231,6 +254,7 @@ export function QuickActionRail() {
               <button
                 onClick={() => updateTarget(1)}
                 aria-label="Increase target"
+                disabled={savingTarget || target >= 20}
                 className="border border-white/[0.06] bg-background p-1 hover:bg-white/[0.04]"
               >
                 <Plus size={10} />

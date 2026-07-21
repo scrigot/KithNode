@@ -15,6 +15,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Next replaces this marker at build time. Unit tests run outside Next,
+      // so map it to a no-op while preserving the production server boundary.
+      "server-only": path.resolve(__dirname, "./src/test/server-only.ts"),
     },
   },
 });

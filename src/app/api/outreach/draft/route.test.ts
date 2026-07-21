@@ -163,6 +163,7 @@ describe("POST /api/outreach/draft", () => {
     expect(response.status).toBe(200);
     expect(body.subject).toBe("Test Subject");
     expect(body.draft).toBe("Test body");
+    expect(typeof body.outreachId).toBe("string");
     // Popup fields: highlight signals (from prefs/contact) + recipient email.
     expect(Array.isArray(body.signals)).toBe(true);
     expect(body.signals).toContain("Chi Phi");

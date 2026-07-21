@@ -54,7 +54,17 @@ interface Evidence { id: string; kind: string; title: string; detail: string; me
 interface TailorResult { before: number; after: number; gain: number; rewrites: { before: string; after: string; ok: boolean; reason?: string }[]; missingEvidence: string[] }
 interface SavedResume { id: string; title: string; track: string; templateId: string; content: unknown; userContext?: string }
 
-export default function ResumeBuilder({ initial }: { initial: SavedResume | null }) {
+export default function ResumeBuilder({
+  initial,
+  apiBase = "/api/me/resume",
+  printBase = "/me/resume/print",
+  embedded = false,
+}: {
+  initial: SavedResume | null;
+  apiBase?: string;
+  printBase?: string;
+  embedded?: boolean;
+}) {
   const [id, setId] = useState<string | null>(initial?.id ?? null);
   const [title, setTitle] = useState(initial?.title ?? "Untitled resume");
   const [track, setTrack] = useState<Track>((initial?.track as Track) ?? "ai-consulting");
@@ -83,18 +93,18 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
 
   // Load the reusable evidence bank once.
   useEffect(() => {
-    fetch("/api/me/resume/evidence").then((r) => (r.ok ? r.json() : { evidence: [] })).then((d) => setEvidence(d.evidence ?? [])).catch(() => {});
-  }, []);
+    fetch(`${apiBase}/evidence`).then((r) => (r.ok ? r.json() : { evidence: [] })).then((d) => setEvidence(d.evidence ?? [])).catch(() => {});
+  }, [apiBase]);
 
   const refreshResumes = useCallback(() => {
-    fetch("/api/me/resume/list").then((r) => (r.ok ? r.json() : { resumes: [] })).then((d) => setResumes(d.resumes ?? [])).catch(() => {});
-  }, []);
+    fetch(`${apiBase}/list`).then((r) => (r.ok ? r.json() : { resumes: [] })).then((d) => setResumes(d.resumes ?? [])).catch(() => {});
+  }, [apiBase]);
   useEffect(() => { refreshResumes(); }, [refreshResumes]);
 
   const rescore = useCallback(async (nextDoc: ResumeDoc, nextTrack: Track) => {
     setScoring(true);
     try {
-      const res = await fetch("/api/me/resume/grade", {
+      const res = await fetch(`${apiBase}/grade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: nextDoc, track: nextTrack, withNotes: false }),
@@ -107,7 +117,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
     } finally {
       setScoring(false);
     }
-  }, []);
+  }, [apiBase]);
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
@@ -138,7 +148,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   async function getFeedback() {
     setFeedbackLoading(true);
     try {
-      const res = await fetch("/api/me/resume/grade", {
+      const res = await fetch(`${apiBase}/grade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: doc, track, userContext, withNotes: true }),
@@ -158,7 +168,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
     if (!jd.trim()) return;
     setTailorLoading(true);
     try {
-      const res = await fetch("/api/me/resume/tailor", {
+      const res = await fetch(`${apiBase}/tailor`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: doc, track, jobDescription: jd }),
@@ -174,7 +184,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
     try {
       const buf = await file.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      const res = await fetch("/api/me/resume/grade", {
+      const res = await fetch(`${apiBase}/grade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pdf: base64, track, withNotes: true }),
@@ -196,7 +206,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   async function save(): Promise<string | null> {
     if (autosaveDebounce.current) clearTimeout(autosaveDebounce.current);
     setSaveStatus("saving");
-    const res = await fetch("/api/me/resume", {
+    const res = await fetch(apiBase, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, title, track, templateId, content: doc, docVersion: 2, userContext, score: grade?.overall ?? 0, dimensions: grade?.dimensions ?? [], notes }),
@@ -213,7 +223,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
 
   async function exportPdf() {
     const savedId = id ?? (await save());
-    if (savedId) window.open(`/me/resume/print/${savedId}`, "_blank");
+    if (savedId) window.open(`${printBase}/${savedId}`, "_blank");
   }
 
   // Load a saved resume into the editor, saving the current one first (no data loss).
@@ -262,7 +272,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
   const paperFrame = { width: 816 * zoom, minHeight: 1056 * zoom };
 
   return (
-    <div className="min-h-screen" style={{ background: "#1C1A19", color: c.text }}>
+    <div className={embedded ? "min-h-[calc(100vh-52px)]" : "min-h-screen"} style={{ background: "#1C1A19", color: c.text }}>
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 border-b" style={{ borderColor: c.border, background: c.panel }}>
         <select
@@ -299,7 +309,7 @@ export default function ResumeBuilder({ initial }: { initial: SavedResume | null
         <div className="p-5 space-y-3 overflow-auto" style={{ borderRight: `1px solid ${c.border}`, maxHeight: "calc(100vh - 52px)" }}>
           <HeaderEditor doc={doc} setDoc={setDoc} />
           <ContextEditor userContext={userContext} setUserContext={setUserContext} />
-          <EvidenceBank evidence={evidence} setEvidence={setEvidence} />
+          <EvidenceBank evidence={evidence} setEvidence={setEvidence} apiBase={apiBase} />
 
           <div className="flex items-center justify-between pt-2">
             <h3 className="text-[12px] font-semibold" style={{ color: "#fff" }}>Sections</h3>
@@ -440,16 +450,16 @@ function ContextEditor({ userContext, setUserContext }: { userContext: string; s
 }
 
 // ── Evidence bank ────────────────────────────────────────────────────────────
-function EvidenceBank({ evidence, setEvidence }: { evidence: Evidence[]; setEvidence: (e: Evidence[]) => void }) {
+function EvidenceBank({ evidence, setEvidence, apiBase }: { evidence: Evidence[]; setEvidence: (e: Evidence[]) => void; apiBase: string }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ kind: "project", title: "", detail: "", metric: "" });
   async function add() {
     if (!draft.title.trim()) return;
-    const res = await fetch("/api/me/resume/evidence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
+    const res = await fetch(`${apiBase}/evidence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft) });
     if (res.ok) { const { evidence: ev } = await res.json(); setEvidence([ev, ...evidence]); setDraft({ kind: "project", title: "", detail: "", metric: "" }); }
   }
   async function del(id: string) {
-    await fetch(`/api/me/resume/evidence?id=${id}`, { method: "DELETE" });
+    await fetch(`${apiBase}/evidence?id=${id}`, { method: "DELETE" });
     setEvidence(evidence.filter((e) => e.id !== id));
   }
   return (

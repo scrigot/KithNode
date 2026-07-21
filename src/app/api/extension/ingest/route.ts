@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { randomUUID } from "node:crypto";
+import { extensionIdentity } from "@/lib/extension-auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import { rescoreContact, loadContactTags } from "@/lib/rescore-contact";
@@ -75,12 +76,12 @@ const prefer = (captured: string, existing: unknown): string =>
   captured.trim() || (typeof existing === "string" ? existing : "");
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.email) {
+  const identity = await extensionIdentity(request, "contacts:write");
+  if (!identity) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const userId = session.user.id;
-  const userEmail = session.user.email;
+  const userId = identity.userId;
+  const userEmail = identity.email;
 
   const body = (await request.json().catch(() => ({}))) as CapturedProfile;
   const linkedInUrl = (body.linkedInUrl || "").trim();
@@ -285,6 +286,22 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error } = await supabase.from("AlumniContact").insert(record).select("id").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     contactId = inserted.id as string;
+  }
+
+  // Append the exact reviewed capture provenance. This is best-effort and never
+  // changes the contact save outcome.
+  try {
+    const capturedValues: Array<[string, unknown]> = [
+      ["name", body.name], ["title", body.headline], ["firmName", body.company],
+      ["location", body.location], ["skills", body.skills], ["experiences", body.experiences],
+      ["educations", body.educations], ["clubMemberships", body.clubs], ["mutuals", body.mutuals],
+      ["notes", body.notes],
+    ];
+    const rows = capturedValues.filter(([, value]) => value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0))
+      .map(([field, value]) => ({ id: randomUUID(), userId, contactId, field, source: "linkedin_extension", value, confidence: 0.9, verified: false }));
+    if (rows.length) await supabase.from("ContactFieldProvenance").upsert(rows, { onConflict: "id" });
+  } catch {
+    // Provenance is additive telemetry; the reviewed contact remains saved.
   }
 
   // ── Mutual-connection edges. Wrapped so a failure here NEVER fails the ingest:

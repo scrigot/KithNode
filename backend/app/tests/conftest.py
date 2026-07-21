@@ -9,6 +9,7 @@ import pytest
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _tmp.close()
 os.environ["KITHNODE_DB_PATH"] = _tmp.name
+os.environ["INTERNAL_API_SECRET"] = "test-internal-secret"
 
 
 @pytest.fixture(scope="session")
@@ -79,7 +80,10 @@ def client(seeded_ids):
     # Use httpx directly for sync testing
     from starlette.testclient import TestClient
 
-    return TestClient(app)
+    return TestClient(
+        app,
+        headers={"Authorization": "Bearer test-internal-secret"},
+    )
 
 
 def pytest_sessionfinish():

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "AI-driven recruitment networking intelligence platform",
   "scripts": {
-    "dev": "next dev",
+    "dev": "bash scripts/dev/start-local.sh",
     "dev:me": "DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/kithnode_me' PERSONAL_MODE=1 ME_USER_EMAIL='samrigot@kithnode.ai' NEXT_PUBLIC_SUPABASE_URL='http://127.0.0.1:54321' next dev -p 3030",
     "me:up": "bash scripts/me/up.sh",
     "me:db:push": "prisma db push --url 'postgresql://postgres:postgres@127.0.0.1:54322/kithnode_me'",
@@ -19,6 +19,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:professors": "tsx prisma/seed-professors.ts",
     "db:generate": "prisma generate",
+    "db:verify": "bash scripts/db/verify-migrations.sh",
+    "db:history:check": "node scripts/db/materialize-production-history.mjs --check",
     "db:roadmap-sync": "tsx prisma/sync-roadmap.ts",
     "dev:test-user": "tsx scripts/dev/make-test-user.ts",
     "groupme:pull": "tsx scripts/dev/groupme-pull-once.ts",
@@ -27,7 +29,6 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.91",
-    "@anthropic-ai/sdk": "^0.82.0",
     "@base-ui/react": "^1.3.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.4.2",
@@ -58,12 +59,14 @@
     "react-force-graph-2d": "^1.29.1",
     "recharts": "^3.8.1",
     "resend": "^6.11.0",
+    "server-only": "0.0.1",
     "shadcn": "^4.1.2",
     "stripe": "^22.0.0",
     "svix": "^1.95.2",
     "tailwind-merge": "^3.5.0",
     "three": "^0.184.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

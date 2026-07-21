@@ -4,8 +4,9 @@
 // deterministic, non-AI result rather than erroring.
 import { generateText } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 
-const MODEL = "anthropic/claude-sonnet-4.5";
+const MODEL = AI_MODELS.default;
 
 export interface GenResult {
   text: string;

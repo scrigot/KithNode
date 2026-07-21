@@ -1,5 +1,6 @@
 import { generateObject } from "ai";
 import { gateway } from "@ai-sdk/gateway";
+import { AI_MODELS } from "@/lib/ai-models";
 import { z } from "zod";
 
 export interface ProfessorInput {
@@ -45,7 +46,7 @@ const DEFAULT_FALLBACK = (prof: ProfessorInput): ClassifierOutput => ({
 export async function classifyProfessor(prof: ProfessorInput): Promise<ClassifierOutput> {
   try {
     const { object } = await generateObject({
-      model: gateway("anthropic/claude-haiku-4.5"),
+      model: gateway(AI_MODELS.fast),
       schema: ClassifierSchema,
       system: SYSTEM_PROMPT,
       prompt: buildPrompt(prof),

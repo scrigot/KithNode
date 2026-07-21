@@ -31,7 +31,7 @@ export function OutreachSheet({
   const [subject, setSubject] = useState("");
   const [signals, setSignals] = useState<string[]>([]);
   const [recipientEmail, setRecipientEmail] = useState("");
-  const [outreachId, setOutreachId] = useState<number | null>(null);
+  const [outreachId, setOutreachId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -79,7 +79,7 @@ export function OutreachSheet({
       setError(
         msg === "402"
           ? "Drafting is a Pro feature. Upgrade to use it."
-          : "Could not generate draft. Check that the backend is running.",
+          : "Could not generate and save the draft. Try again in a moment.",
       );
     } finally {
       setLoading(false);

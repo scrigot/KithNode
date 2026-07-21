@@ -8,10 +8,8 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Scoring is handled by the FastAPI backend (scoring.py).
-  // This endpoint is a no-op now — scores are computed during pipeline runs.
-  return NextResponse.json({
-    scored: 0,
-    message: "Scoring is handled by the backend pipeline. Run the seed script to re-score.",
-  });
+  return NextResponse.json(
+    { error: "Deprecated endpoint", replacement: "/api/contacts/rescore" },
+    { status: 410 },
+  );
 }
