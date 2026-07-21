@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 
 async function scopedOpportunity(id: string, userId: string) {
-  return supabase.from("Opportunity").select("*,contacts:OpportunityContact(*),events:OpportunityEvent(*)").eq("id", id).eq("userId", userId).maybeSingle();
+  return supabase.from("Opportunity").select("*").eq("id", id).eq("userId", userId).maybeSingle();
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +22,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { data, error } = await scopedOpportunity(id, userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 503 });
   if (!data) return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
-  return NextResponse.json({ opportunity: data });
+  const [{ data: contacts = [], error: contactsError }, { data: events = [], error: eventsError }] = await Promise.all([
+    supabase.from("OpportunityContact").select("*").eq("opportunityId", id).eq("userId", userId),
+    supabase.from("OpportunityEvent").select("*").eq("opportunityId", id).eq("userId", userId),
+  ]);
+  if (contactsError || eventsError) {
+    return NextResponse.json(
+      { error: "This application is temporarily unavailable. Please retry in a moment.", code: "application_unavailable" },
+      { status: 503 },
+    );
+  }
+  const recentEvents = [...(events || [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
+  return NextResponse.json({ opportunity: { ...data, contacts, events: recentEvents } });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

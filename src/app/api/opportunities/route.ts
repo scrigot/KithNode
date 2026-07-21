@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from("Opportunity")
-    .select("*,contacts:OpportunityContact(*),events:OpportunityEvent(*)")
+    .select("*")
     .eq("userId", userId);
 
   if (OPPORTUNITY_STATUSES.includes(status as (typeof OPPORTUNITY_STATUSES)[number])) query = query.eq("status", status);
@@ -59,17 +59,41 @@ export async function GET(request: NextRequest) {
     .limit(300);
   if (error) return NextResponse.json({ error: error.message }, { status: 503 });
 
-  const contactIds = Array.from(new Set((opportunities || []).flatMap((opportunity) =>
-    ((opportunity.contacts || []) as Array<{ contactId?: string }>).map((contact) => contact.contactId).filter(Boolean),
-  ))) as string[];
+  const opportunityIds = (opportunities || []).map((opportunity) => opportunity.id);
+  const [{ data: contactLinks = [], error: contactLinksError }, { data: eventRows = [], error: eventsError }] = opportunityIds.length
+    ? await Promise.all([
+        supabase.from("OpportunityContact").select("*").eq("userId", userId).in("opportunityId", opportunityIds),
+        supabase.from("OpportunityEvent").select("*").eq("userId", userId).in("opportunityId", opportunityIds),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
+  if (contactLinksError || eventsError) {
+    return NextResponse.json(
+      { error: "Applications are temporarily unavailable. Please retry in a moment.", code: "applications_unavailable" },
+      { status: 503 },
+    );
+  }
+
+  const contactIds = Array.from(new Set((contactLinks || []).map((contact) => contact.contactId).filter(Boolean))) as string[];
   const { data: contactRows = [] } = contactIds.length
     ? await supabase.from("AlumniContact").select("id,firstName,lastName,firmName,title,linkedinUrl,tier,warmthScore").eq("importedByUserId", userId).in("id", contactIds)
     : { data: [] };
   const contactsById = new Map((contactRows || []).map((contact) => [contact.id, contact]));
+  const linksByOpportunity = new Map<string, typeof contactLinks>();
+  for (const link of contactLinks || []) {
+    const links = linksByOpportunity.get(link.opportunityId) || [];
+    links.push(link);
+    linksByOpportunity.set(link.opportunityId, links);
+  }
+  const eventsByOpportunity = new Map<string, typeof eventRows>();
+  for (const event of eventRows || []) {
+    const events = eventsByOpportunity.get(event.opportunityId) || [];
+    events.push(event);
+    eventsByOpportunity.set(event.opportunityId, events);
+  }
   const hydrated = (opportunities || []).map((opportunity) => ({
     ...opportunity,
-    contacts: ((opportunity.contacts || []) as Array<{ contactId: string }>).map((link) => ({ ...link, contact: contactsById.get(link.contactId) || null })),
-    events: ((opportunity.events || []) as Array<{ createdAt: string }>).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20),
+    contacts: (linksByOpportunity.get(opportunity.id) || []).map((link) => ({ ...link, contact: contactsById.get(link.contactId) || null })),
+    events: (eventsByOpportunity.get(opportunity.id) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20),
   }));
   return NextResponse.json({ opportunities: hydrated });
 }
