@@ -199,7 +199,7 @@ export default function NetworkPage() {
           />
 
           {/* Top-left overlay: title + legend */}
-          <div className="pointer-events-none absolute left-4 top-3 flex flex-col gap-1.5">
+          <div className="pointer-events-none absolute left-4 top-3 hidden flex-col gap-1.5 sm:flex">
             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-foreground">
               {youName}&apos;s Network
             </span>
