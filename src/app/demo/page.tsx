@@ -173,16 +173,16 @@ export default function DemoPage() {
                 Ready to build your warm network?
               </h2>
               <p className="mt-2 max-w-xl text-sm text-white/70">
-                Start your sandbox or request access. Same product, your real
-                alumni graph.
+                Replay the recruiting workflow or request access to use the
+                same workspace with your own goals and network.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/demo/sandbox"
+                href="#recruiting-workstation"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0EA5E9] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#0EA5E9]/30 transition-all hover:-translate-y-0.5"
               >
-                Start your sandbox
+                Review the workflow
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
