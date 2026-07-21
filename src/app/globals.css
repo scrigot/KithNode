@@ -327,3 +327,87 @@ body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-curre
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
 }
+
+@media (max-width: 639px) {
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:first-child {
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.5rem 0.75rem;
+    scrollbar-width: thin;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:first-child > * {
+    min-height: 44px;
+    flex: 0 0 auto;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:first-child > input {
+    width: 12rem;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) {
+    display: flex !important;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) > div {
+    min-width: 100%;
+    max-height: calc(100vh - 156px) !important;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) > div::before {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-family: var(--font-mono), monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #7dd3fc;
+    text-transform: uppercase;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) > div:nth-child(1)::before {
+    content: "Editor · swipe for score and preview →";
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) > div:nth-child(2)::before {
+    content: "Recruiter score · swipe for preview →";
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div > div:nth-child(2) > div:nth-child(3)::before {
+    content: "Live resume preview";
+    padding: 0.75rem 1rem 0;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div :is(button, select, input, textarea, label[style]) {
+    min-height: 44px;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div button {
+    min-width: 44px;
+  }
+
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div button[title^="Move"],
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div button[title*="section"],
+  body:has(nav[aria-label="Career Toolkit"] a[href="/dashboard/resume"][aria-current="page"])
+    nav[aria-label="Career Toolkit"] + div button[title*="Zoom"] {
+    min-width: 44px;
+  }
+}
