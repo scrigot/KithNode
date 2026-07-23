@@ -8,9 +8,6 @@ import { GRAD_DEGREES } from "@/lib/data/preference-options";
 
 const LINKEDIN_URL_REGEX = /^https:\/\/(www\.)?linkedin\.com\/in\/([\w-]+)\/?$/;
 
-const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
 export interface LinkedInMeta {
   name: string;
   education: string;
@@ -100,81 +97,6 @@ interface ScoreResult {
   tier: "hot" | "warm" | "monitor" | "cold";
 }
 
-// ── Scraping ──────────────────────────────────────────────────────────────────
-
-export async function scrapeLinkedInMeta(url: string): Promise<LinkedInMeta> {
-  const match = url.match(LINKEDIN_URL_REGEX);
-  if (!match) throw new Error("Invalid LinkedIn URL");
-
-  const slug = match[2];
-  const fallbackName = slug
-    .split("-")
-    .filter((p) => p.length > 0 && !/^\d+$/.test(p))
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
-
-  // Build a canonical URL from the validated slug and fetch THAT, never the
-  // raw input. Prevents SSRF via crafted hosts/paths and disables redirects.
-  const canonicalUrl = `https://www.linkedin.com/in/${slug}`;
-
-  try {
-    const res = await fetch(canonicalUrl, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
-      redirect: "error",
-    });
-
-    if (!res.ok) {
-      return { name: fallbackName, education: "", location: "", experience: "", title: "" };
-    }
-
-    const html = await res.text();
-
-    // Extract meta description
-    const metaMatch = html.match(
-      /<meta\s+(?:name="description"\s+content="([^"]*?)"|content="([^"]*?)"\s+name="description")/i
-    );
-    const description = metaMatch?.[1] || metaMatch?.[2] || "";
-
-    // Extract og:title for headline/title
-    const ogTitleMatch = html.match(
-      /<meta\s+(?:property="og:title"\s+content="([^"]*?)"|content="([^"]*?)"\s+property="og:title")/i
-    );
-    const ogTitle = ogTitleMatch?.[1] || ogTitleMatch?.[2] || "";
-
-    // Parse structured fields from meta description
-    // Format: "experience · education · location" or similar
-    let education = "";
-    let location = "";
-    let experience = "";
-
-    const eduMatch = description.match(/education:\s*([^·]+)/i);
-    if (eduMatch) education = eduMatch[1].trim();
-
-    const locMatch = description.match(/location:\s*([^·]+)/i);
-    if (locMatch) location = locMatch[1].trim();
-
-    const expMatch = description.match(/experience:\s*([^·]+)/i);
-    if (expMatch) experience = expMatch[1].trim();
-
-    // Extract name from og:title (format: "FirstName LastName - Title | LinkedIn")
-    let name = fallbackName;
-    if (ogTitle) {
-      const namePart = ogTitle.split(" - ")[0]?.split(" | ")[0]?.trim();
-      if (namePart && namePart.length > 1) name = namePart;
-    }
-
-    // Extract title from og:title
-    let title = "";
-    if (ogTitle.includes(" - ")) {
-      const titlePart = ogTitle.split(" - ").slice(1).join(" - ").split(" | ")[0]?.trim();
-      if (titlePart) title = titlePart;
-    }
-
-    return { name, education, location, experience, title };
-  } catch {
-    return { name: fallbackName, education: "", location: "", experience: "", title: "" };
-  }
-}
 
 // ── Affiliation Detection ─────────────────────────────────────────────────────
 

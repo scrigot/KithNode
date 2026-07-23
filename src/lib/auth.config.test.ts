@@ -3,11 +3,11 @@ import { authConfig } from "./auth.config";
 
 const authorized = authConfig.callbacks?.authorized as (args: {
   auth: { user?: { email?: string | null } } | null;
-  request: { nextUrl: globalThis.URL };
+  request: { nextUrl: globalThis.URL; method: string };
 }) => boolean | Response | Promise<boolean | Response>;
 
-function request(pathname: string) {
-  return { nextUrl: new globalThis.URL(`https://kithnode.ai${pathname}`) };
+function request(pathname: string, method = "GET") {
+  return { nextUrl: new globalThis.URL(`https://kithnode.ai${pathname}`), method };
 }
 
 describe("authConfig authorized", () => {
@@ -60,5 +60,17 @@ describe("authConfig authorized", () => {
     vi.stubEnv("ME_REQUIRE_AUTH", "0");
 
     expect(await authorized({ auth: null, request: request("/me/resume") })).toBe(true);
+  });
+
+  it("lets only extension draft creation reach route-level token authentication", async () => {
+    expect(await authorized({ auth: null, request: request("/api/research/drafts", "POST") })).toBe(true);
+
+    const listResponse = await authorized({ auth: null, request: request("/api/research/drafts") });
+    expect(listResponse).toBeInstanceOf(Response);
+    expect((listResponse as Response).status).toBe(401);
+
+    const commitResponse = await authorized({ auth: null, request: request("/api/research/drafts/draft-1/commit", "POST") });
+    expect(commitResponse).toBeInstanceOf(Response);
+    expect((commitResponse as Response).status).toBe(401);
   });
 });

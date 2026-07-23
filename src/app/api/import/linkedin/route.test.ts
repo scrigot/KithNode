@@ -5,7 +5,6 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
 vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
 vi.mock("@/lib/linkedin-import", () => ({
-  scrapeLinkedInMeta: vi.fn(),
   detectAffiliations: vi.fn(() => []),
   computeWarmthScore: vi.fn(() => ({ score: 0, tier: "cold" })),
   isValidLinkedInUrl: vi.fn(() => true),
@@ -15,7 +14,7 @@ import { POST } from "./route";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
-import { scrapeLinkedInMeta, isValidLinkedInUrl } from "@/lib/linkedin-import";
+import { isValidLinkedInUrl } from "@/lib/linkedin-import";
 
 const TARGET_URL = "https://www.linkedin.com/in/target";
 const TARGET_EMAIL = "target@x.com";
@@ -152,13 +151,6 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
     // here so the override never leaks (clearAllMocks keeps implementations).
     (isValidLinkedInUrl as Mock).mockReturnValue(true);
     (getUserPrefs as Mock).mockResolvedValue({});
-    (scrapeLinkedInMeta as Mock).mockResolvedValue({
-      name: "Target Person",
-      title: "Analyst",
-      experience: "Goldman Sachs",
-      education: "UNC Chapel Hill",
-      location: "New York, NY",
-    });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -303,40 +295,32 @@ describe("POST /api/import/linkedin — shared-pool isolation + link-on-match", 
     expect(body.contacts[0].error).not.toMatch(/constraint|duplicate key/i);
   });
 
-  // ── URL (scrape) path ───────────────────────────────────────────────────────
-  it("URL: User B importing A's pooled contact LINKS to it (no overwrite)", async () => {
+  // ── URL-only path: disabled because a URL is not reviewed evidence ─────────
+  it("rejects URL-only import without reading or mutating a pooled contact", async () => {
     (auth as Mock).mockResolvedValue({ user: { id: "bob@x.com", email: "bob@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(makePost({ urls: [TARGET_URL] }));
     const body = await res.json();
 
+    expect(res.status).toBe(410);
+    expect(body.error).toBe("source_not_allowed");
     expect(captured.updates).toHaveLength(0);
     expect(captured.inserts).toHaveLength(0);
-    const scoped = captured.lookups.filter((f) => f.importedByUserId !== undefined);
-    const unscoped = captured.lookups.filter((f) => f.importedByUserId === undefined);
-    expect(scoped.length).toBeGreaterThan(0);
-    for (const f of scoped) expect(f.importedByUserId).toBe("bob@x.com");
-    expect(unscoped.length).toBeGreaterThan(0);
-    expect(captured.links).toEqual([LINK]);
-    expect(body.imported).toBe(1);
-    expect(body.linked).toBe(1);
-    expect(body.contacts[0].name).toBe("Alice's John");
-    expect(body.contacts[0].id).toBe("alice-row");
+    expect(captured.links).toHaveLength(0);
   });
 
-  it("URL: the owner CAN still update their own contact", async () => {
+  it("also rejects URL-only import for the contact owner", async () => {
     (auth as Mock).mockResolvedValue({ user: { id: "alice@x.com", email: "alice@x.com" } });
     const captured = mockSupabase({ ownerEmail: "alice@x.com" });
 
     const res = await POST(makePost({ urls: [TARGET_URL] }));
     const body = await res.json();
 
-    expect(captured.updates).toHaveLength(1);
-    expect(captured.updates[0].id).toBe("alice-row");
-    expect(captured.updates[0].record.importedByUserId).toBe("alice@x.com");
+    expect(res.status).toBe(410);
+    expect(body.error).toBe("source_not_allowed");
+    expect(captured.updates).toHaveLength(0);
     expect(captured.inserts).toHaveLength(0);
     expect(captured.links).toHaveLength(0);
-    expect(body.imported).toBe(1);
   });
 });

@@ -6,6 +6,7 @@ import { assertPublicHttpUrl } from "@/lib/jobs/fetch";
 import {
   OPPORTUNITY_PRIORITIES,
   OPPORTUNITY_STATUSES,
+  OPPORTUNITY_TYPES,
   escapePostgrestSearch,
   isExternalOpportunityUrl,
   opportunityCompanyKey,
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const status = params.get("status") || "";
   const priority = params.get("priority") || "";
+  const opportunityType = params.get("opportunityType") || "";
   const deadline = params.get("deadline") || "";
   const actions = params.get("actions") || "";
   const archived = params.get("archived") === "true";
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
   else if (archived) query = query.eq("status", "archived");
   else query = query.neq("status", "archived");
   if (OPPORTUNITY_PRIORITIES.includes(priority as (typeof OPPORTUNITY_PRIORITIES)[number])) query = query.eq("priority", priority);
+  if (OPPORTUNITY_TYPES.includes(opportunityType as (typeof OPPORTUNITY_TYPES)[number])) query = query.eq("opportunityType", opportunityType);
   if (q) query = query.or(`company.ilike.%${q}%,role.ilike.%${q}%,location.ilike.%${q}%`);
 
   const now = new Date();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   OPPORTUNITY_STATUSES,
+  OPPORTUNITY_TYPES,
   escapePostgrestSearch,
   isExternalOpportunityUrl,
   opportunityCompanyKey,
@@ -8,6 +9,7 @@ import {
   opportunityEventSchema,
   opportunityPatchSchema,
   statusLabel,
+  opportunityTypeLabel,
 } from "./opportunities";
 
 describe("opportunity contracts", () => {
@@ -27,12 +29,14 @@ describe("opportunity contracts", () => {
       priority: "medium",
       source: "manual",
       jobUrl: "",
+      opportunityType: "job",
     });
   });
 
   it("rejects unknown stages and unsafe scores", () => {
     expect(opportunityCreateSchema.safeParse({ company: "Firm", role: "Role", status: "hired" }).success).toBe(false);
     expect(opportunityPatchSchema.safeParse({ fitScore: 101 }).success).toBe(false);
+    expect(opportunityPatchSchema.safeParse({ opportunityType: "fellowship" }).success).toBe(false);
   });
 
   it("accepts null dates and bounded timeline notes", () => {
@@ -46,5 +50,7 @@ describe("opportunity contracts", () => {
     expect(escapePostgrestSearch("Goldman,(Analyst)%")).toBe("Goldman  Analyst");
     expect(isExternalOpportunityUrl("https://example.com/job")).toBe(true);
     expect(isExternalOpportunityUrl("manual://opportunity/1")).toBe(false);
+    expect(OPPORTUNITY_TYPES).toContain("summer_analyst");
+    expect(opportunityTypeLabel("co_op")).toBe("Co-op");
   });
 });

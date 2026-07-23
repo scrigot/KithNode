@@ -1,14 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/linkedin-import", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/linkedin-import")>();
-  return {
-    ...actual,
-    scrapeLinkedInMeta: vi.fn(),
-  };
-});
-
-import { scrapeLinkedInMeta } from "@/lib/linkedin-import";
 import {
   classifyAffiliation,
   detectSignals,
@@ -58,10 +49,6 @@ const LINKEDIN_CONTACT: ContactCandidate = {
   source: "linkedin_search",
   sourceUrl: "https://linkedin.com/in/alice-j",
 };
-
-beforeEach(() => {
-  vi.mocked(scrapeLinkedInMeta).mockReset();
-});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -117,7 +104,6 @@ describe("detectSignals: synthetic-meta path (no LinkedIn URL)", () => {
       expect(s.sourceUrl).toBe("https://gs.com/team");
       expect(s.confidence).toBe(0.85);
     }
-    expect(scrapeLinkedInMeta).not.toHaveBeenCalled();
   });
 
   it("returns empty array for a contact with no matching signals", async () => {
@@ -129,51 +115,14 @@ describe("detectSignals: synthetic-meta path (no LinkedIn URL)", () => {
   });
 });
 
-describe("detectSignals: LinkedIn verified path", () => {
-  it("uses scraped meta when scraped name matches the candidate name", async () => {
-    vi.mocked(scrapeLinkedInMeta).mockResolvedValueOnce({
-      name: "Alice Johnson",
-      title: "Investment Banking Analyst",
-      experience: "Goldman Sachs",
-      education: "University of North Carolina at Chapel Hill",
-      location: "New York, NY",
-    });
-
-    const signals = await detectSignals(LINKEDIN_CONTACT, PREFS);
-    expect(scrapeLinkedInMeta).toHaveBeenCalledWith("https://linkedin.com/in/alice-j");
-    for (const s of signals) {
-      expect(s.sourceUrl).toBe("https://linkedin.com/in/alice-j");
-      expect(s.confidence).toBe(0.95);
-    }
-    const labels = signals.map((s) => s.label);
-    expect(labels).toContain("Same School");
-    expect(labels).toContain("Target Location");
-  });
-
-  it("falls back to synthetic meta when scraped profile is the wrong person", async () => {
-    vi.mocked(scrapeLinkedInMeta).mockResolvedValueOnce({
-      name: "Bob Builder",
-      title: "Mechanical Engineer",
-      experience: "Different Co",
-      education: "",
-      location: "",
-    });
-
-    const signals = await detectSignals(LINKEDIN_CONTACT, PREFS);
-    // Confidence should be the linkedin_search fallback (0.70), not 0.95
-    for (const s of signals) {
-      expect(s.confidence).toBe(0.7);
-      expect(s.sourceUrl).toBe("https://linkedin.com/in/alice-j");
-    }
-    // Synthetic meta uses contact.company = "Goldman Sachs", so we still
-    // get the firm tier + target firm signals.
-    expect(signals.map((s) => s.label)).toContain("Bulge Bracket");
-  });
-
-  it("falls back to synthetic meta on scrape network failure", async () => {
-    vi.mocked(scrapeLinkedInMeta).mockRejectedValueOnce(new Error("network"));
+describe("detectSignals: LinkedIn navigation-only policy", () => {
+  it("uses only candidate facts and preserves the reviewed source URL", async () => {
     const signals = await detectSignals(LINKEDIN_CONTACT, PREFS);
     expect(signals.length).toBeGreaterThan(0);
-    for (const s of signals) expect(s.confidence).toBe(0.7);
+    for (const signal of signals) {
+      expect(signal.sourceUrl).toBe("https://linkedin.com/in/alice-j");
+      expect(signal.confidence).toBe(0.7);
+    }
+    expect(signals.map((signal) => signal.label)).toContain("Bulge Bracket");
   });
 });

@@ -356,13 +356,13 @@ export function Sidebar({
 
       {/* Mobile top bar: visible below lg */}
       <div className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-white/[0.06] bg-bg-secondary px-4 py-3 lg:hidden">
-        <h1 className="font-heading text-lg font-bold tracking-tight text-white">
+        <div className="font-heading text-lg font-bold tracking-tight text-white" aria-label="KithNode">
           Kith<span className="text-accent-teal">Node</span>
-        </h1>
+        </div>
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation"
-          className="text-text-secondary transition-colors duration-150 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center text-text-secondary transition-colors duration-150 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <Menu size={22} />
         </button>
@@ -383,7 +383,7 @@ export function Sidebar({
           <button
             onClick={() => setOpen(false)}
             aria-label="Close navigation"
-            className="text-text-secondary transition-colors duration-150 hover:text-white"
+            className="flex h-11 w-11 items-center justify-center text-text-secondary transition-colors duration-150 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <X size={20} />
           </button>

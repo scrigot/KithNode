@@ -15,9 +15,20 @@ export const OPPORTUNITY_STATUSES = [
 ] as const;
 
 export const OPPORTUNITY_PRIORITIES = ["low", "medium", "high"] as const;
+export const OPPORTUNITY_TYPES = [
+  "job",
+  "internship",
+  "co_op",
+  "externship",
+  "off_cycle",
+  "summer_analyst",
+  "insight_program",
+  "leadership_program",
+] as const;
 
 export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number];
 export type OpportunityPriority = (typeof OPPORTUNITY_PRIORITIES)[number];
+export type OpportunityType = (typeof OPPORTUNITY_TYPES)[number];
 
 const optionalDate = z
   .union([z.string().datetime(), z.literal(""), z.null()])
@@ -40,6 +51,7 @@ const opportunityFields = {
   description: z.string().max(50_000),
   status: z.enum(OPPORTUNITY_STATUSES),
   priority: z.enum(OPPORTUNITY_PRIORITIES),
+  opportunityType: z.enum(OPPORTUNITY_TYPES),
   season: z.string().trim().max(120),
   notes: z.string().max(20_000),
   nextAction: z.string().trim().max(500),
@@ -66,6 +78,7 @@ export const opportunityCreateSchema = z.object({
   description: opportunityFields.description.default(""),
   status: opportunityFields.status.default("saved"),
   priority: opportunityFields.priority.default("medium"),
+  opportunityType: opportunityFields.opportunityType.default("job"),
   season: opportunityFields.season.default(""),
   notes: opportunityFields.notes.default(""),
   nextAction: opportunityFields.nextAction.default(""),
@@ -109,4 +122,18 @@ export function escapePostgrestSearch(value: string) {
 
 export function statusLabel(status: OpportunityStatus | string) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function opportunityTypeLabel(type: OpportunityType | string) {
+  const labels: Record<string, string> = {
+    job: "Full-time",
+    internship: "Internship",
+    co_op: "Co-op",
+    externship: "Externship",
+    off_cycle: "Off-cycle",
+    summer_analyst: "Summer analyst",
+    insight_program: "Insight program",
+    leadership_program: "Leadership program",
+  };
+  return labels[type] || statusLabel(type);
 }

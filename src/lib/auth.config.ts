@@ -33,6 +33,12 @@ export const authConfig: NextAuthConfig = {
     authorized: ({ auth, request }) => {
       const { pathname } = request.nextUrl;
       const isLoggedIn = !!auth?.user;
+      // The private Chrome companion cannot rely on a same-origin NextAuth
+      // cookie while the user is browsing LinkedIn. Let only the draft-create
+      // request reach its route-level bearer-token validator. GET, review,
+      // commit, and every other research endpoint remain session protected.
+      const isExtensionDraftCreate =
+        pathname === "/api/research/drafts" && request.method === "POST";
       const isMeRoute = pathname === "/me" || pathname.startsWith("/me/") || pathname.startsWith("/api/me/");
       const personalMode =
         process.env.PERSONAL_MODE === "true" ||
@@ -71,6 +77,8 @@ export const authConfig: NextAuthConfig = {
       ) {
         return true;
       }
+
+      if (isExtensionDraftCreate) return true;
 
       // All other API routes covered by the matcher require a session.
       // Return a 401 instead of the default redirect so client fetches can

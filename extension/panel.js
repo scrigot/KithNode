@@ -1,123 +1,198 @@
-// Side panel: ask the content script to parse, show the editable form, copy or send.
+const $ = (selector) => document.querySelector(selector);
+const fields = ["targetCompany", "targetRole", "name", "title", "firmName", "education", "location", "linkedInUrl", "whyRelevant", "notes"];
+let positions = [];
+let skills = [];
 
-const $ = (sel) => document.querySelector(sel);
-const FIELDS = ["name", "title", "firmName", "education", "location", "industry", "email", "linkedInUrl", "notes"];
-let lastParsed = {};
-
-// Persist the KithNode base URL.
-chrome.storage.local.get(["baseUrl", "pairingToken"]).then(({ baseUrl, pairingToken }) => {
+chrome.storage.local.get(["baseUrl", "pairingToken", "researchDraft"]).then(({ baseUrl, pairingToken, researchDraft }) => {
   $("#baseUrl").value = baseUrl || "http://localhost:3000";
   $("#pairingToken").value = pairingToken || "";
-});
-$("#baseUrl").addEventListener("change", (e) => {
-  chrome.storage.local.set({ baseUrl: e.target.value.trim() });
-});
-$("#pairingToken").addEventListener("change", (e) => {
-  chrome.storage.local.set({ pairingToken: e.target.value.trim() });
+  if (researchDraft) for (const field of fields) $(`[name="${field}"]`).value = researchDraft[field] || "";
+  positions = Array.isArray(researchDraft?.positions) ? researchDraft.positions.slice(0, 8) : [];
+  skills = normalizeSkills(Array.isArray(researchDraft?.skills) ? researchDraft.skills : [researchDraft?.skills || ""]);
+  renderPositions();
+  renderSkills();
 });
 
-function setStatus(msg, kind) {
-  const el = $("#status");
-  el.textContent = msg || "";
-  el.className = "status" + (kind ? " " + kind : "");
-}
-
-function setLoading(isLoading, message) {
-  $("#loading").hidden = !isLoading;
-  $("#parse").disabled = isLoading;
-  if (message) $("#hint").textContent = message;
-}
+$("#baseUrl").addEventListener("change", (event) => chrome.storage.local.set({ baseUrl: event.target.value.trim() }));
+$("#pairingToken").addEventListener("change", (event) => chrome.storage.local.set({ pairingToken: event.target.value.trim() }));
 
 function collect() {
-  const c = { ...lastParsed };
-  for (const f of FIELDS) c[f] = $(`[name="${f}"]`).value.trim();
-  return c;
+  return {
+    ...Object.fromEntries(fields.map((field) => [field, $(`[name="${field}"]`).value.trim()])),
+    positions: positions
+      .map((position) => ({
+        title: (position.title || "").trim(),
+        firm: (position.firm || "").trim(),
+        employmentType: (position.employmentType || "").trim(),
+        start: (position.start || "").trim(),
+        end: "Present",
+      }))
+      .filter((position) => position.title || position.firm),
+    skills,
+  };
 }
 
-async function activeTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab;
+function normalizeSkills(values) {
+  const seen = new Set();
+  return values
+    .flatMap((value) => String(value || "").split(/[\n,;•]+/))
+    .map((skill) => skill.trim())
+    .filter((skill) => {
+      const key = skill.toLocaleLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 100);
 }
 
-$("#parse").addEventListener("click", async () => {
-  setStatus("");
-  setLoading(true, "Reading the active LinkedIn profile...");
-  const tab = await activeTab();
-  if (!tab || !/^https:\/\/www\.linkedin\.com\/in\//.test(tab.url || "")) {
-    $("#hint").textContent = "This is not a LinkedIn profile tab. Open a /in/ profile first.";
-    setLoading(false);
+function addSkills(raw) {
+  skills = normalizeSkills([...skills, raw]);
+  $("#skillInput").value = "";
+  renderSkills();
+  void persistDraft();
+}
+
+function renderSkills() {
+  const list = $("#skillList");
+  list.replaceChildren();
+  $("#skillCount").textContent = `${skills.length} / 100`;
+  for (const skill of skills) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "skill-chip";
+    chip.setAttribute("aria-label", `Remove ${skill}`);
+    chip.textContent = `${skill} ×`;
+    chip.addEventListener("click", () => {
+      skills = skills.filter((item) => item !== skill);
+      renderSkills();
+      void persistDraft();
+    });
+    list.appendChild(chip);
+  }
+}
+
+function persistDraft() {
+  return chrome.storage.local.set({ researchDraft: collect() });
+}
+
+function positionField(index, key, label, placeholder = "") {
+  const wrapper = document.createElement("label");
+  wrapper.textContent = label;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.autocomplete = "off";
+  input.placeholder = placeholder;
+  input.value = positions[index][key] || "";
+  input.addEventListener("input", () => {
+    positions[index][key] = input.value;
+    void persistDraft();
+  });
+  wrapper.appendChild(input);
+  return wrapper;
+}
+
+function renderPositions() {
+  const list = $("#positionList");
+  list.replaceChildren();
+  $("#positionEmpty").hidden = positions.length > 0;
+  positions.forEach((position, index) => {
+    const row = document.createElement("div");
+    row.className = "position-row";
+    const title = document.createElement("div");
+    title.className = "position-row-title";
+    title.textContent = `Position ${index + 1} · Present`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "position-remove";
+    remove.setAttribute("aria-label", `Remove position ${index + 1}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      positions.splice(index, 1);
+      renderPositions();
+      void persistDraft();
+    });
+    row.append(title, remove);
+    row.append(
+      positionField(index, "title", "Role", "e.g. Solutions Architect"),
+      positionField(index, "firm", "Organization", "e.g. Red Hat"),
+      positionField(index, "employmentType", "Work type", "Full-time, freelance"),
+      positionField(index, "start", "Started", "e.g. Jun 2026"),
+    );
+    list.appendChild(row);
+  });
+}
+function status(message, kind = "") {
+  $("#status").textContent = message;
+  $("#status").className = `status ${kind}`;
+}
+function searchUrl(draft) {
+  const keywords = [draft.targetRole, draft.targetCompany].filter(Boolean).join(" ");
+  return `https://www.linkedin.com/search/results/people/?${new URLSearchParams({ keywords })}`;
+}
+
+for (const field of fields) {
+  $(`[name="${field}"]`).addEventListener("input", () => void persistDraft());
+}
+
+$("#addPosition").addEventListener("click", () => {
+  if (positions.length >= 8) {
+    status("You can record up to eight positions.", "err");
     return;
   }
-  let resp;
-  try {
-    resp = await chrome.tabs.sendMessage(tab.id, { type: "KITHNODE_PARSE" });
-  } catch {
-    $("#hint").textContent = "Injecting profile reader...";
-    // content script may not be injected yet (e.g. installed after the tab loaded)
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
-    resp = await chrome.tabs.sendMessage(tab.id, { type: "KITHNODE_PARSE" });
-  }
-  if (!resp || !resp.ok) {
-    $("#hint").textContent = "Could not read this profile. Try reloading the page.";
-    setLoading(false);
-    return;
-  }
-  const d = resp.data;
-  lastParsed = d;
-  for (const f of FIELDS) $(`[name="${f}"]`).value = d[f] || "";
-  $(`[name="notes"]`).value = d.notes || "";
-  $("#form").hidden = false;
-  $("#hint").textContent = d.headline ? `Headline: ${d.headline}` : "Review and edit, then add.";
-  setLoading(false);
+  positions.push({
+    title: positions.length ? "" : $("[name=title]").value.trim(),
+    firm: positions.length ? "" : $("[name=firmName]").value.trim(),
+    employmentType: "",
+    start: "",
+    end: "Present",
+  });
+  renderPositions();
+  void persistDraft();
 });
 
-$("#copyJson").addEventListener("click", async () => {
-  await navigator.clipboard.writeText(JSON.stringify({ contacts: [collect()] }, null, 2));
-  setStatus("Copied JSON to clipboard.", "ok");
+$("#addSkill").addEventListener("click", () => addSkills($("#skillInput").value));
+$("#skillInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault();
+    addSkills(event.currentTarget.value);
+  }
+});
+$("#skillInput").addEventListener("paste", (event) => {
+  const text = event.clipboardData?.getData("text") || "";
+  if (/[\n,;•]/.test(text)) {
+    event.preventDefault();
+    addSkills(text);
+  }
+});
+$("#skillInput").addEventListener("blur", (event) => {
+  if (event.currentTarget.value.trim()) addSkills(event.currentTarget.value);
 });
 
-$("#copyCsv").addEventListener("click", async () => {
-  const c = collect();
-  const header = FIELDS.join(",");
-  const esc = (v) => `"${(v || "").replace(/"/g, '""')}"`;
-  const row = FIELDS.map((f) => esc(c[f])).join(",");
-  await navigator.clipboard.writeText(header + "\n" + row);
-  setStatus("Copied CSV row to clipboard.", "ok");
+$("#openSearch").addEventListener("click", async () => {
+  await chrome.tabs.create({ url: searchUrl(collect()) });
 });
 
-$("#saveProfile").addEventListener("click", async () => {
-  const contact = collect();
-  if (!contact.name) {
-    setStatus("Name is required.", "err");
+$("#saveDraft").addEventListener("click", async () => {
+  const draft = collect();
+  if (!draft.name || !draft.linkedInUrl) {
+    status("Add a name and LinkedIn profile URL first.", "err");
     return;
   }
-  const baseUrl = $("#baseUrl").value.trim();
-  const token = $("#pairingToken").value.trim();
-  setStatus("Saving private profile copy...");
-  const result = await chrome.runtime.sendMessage({ type: "KITHNODE_PROFILE_COPY", baseUrl, token, contact });
-  if (!result || !result.ok) {
-    setStatus(result?.error || "Failed to save profile copy.", "err");
+  const button = $("#saveDraft");
+  button.disabled = true;
+  status("Creating a private review draft…");
+  const result = await chrome.runtime.sendMessage({
+    type: "KITHNODE_RESEARCH_DRAFT",
+    baseUrl: $("#baseUrl").value.trim(),
+    token: $("#pairingToken").value.trim(),
+    draft,
+  });
+  button.disabled = false;
+  if (!result?.ok) {
+    status(result?.error || "Could not create the draft.", "err");
     return;
   }
-  setStatus("Saved to LinkedIn Studio. Review every section in KithNode.", "ok");
-});
-
-$("#send").addEventListener("click", async () => {
-  const contact = collect();
-  if (!contact.name) {
-    setStatus("Name is required.", "err");
-    return;
-  }
-  const baseUrl = $("#baseUrl").value.trim();
-  const token = $("#pairingToken").value.trim();
-  setStatus("Sending...");
-  const result = await chrome.runtime.sendMessage({ type: "KITHNODE_IMPORT", baseUrl, token, contact });
-  if (!result || !result.ok) {
-    setStatus(result?.error || "Failed to add contact.", "err");
-    return;
-  }
-  const b = result.body || {};
-  const score = b.contact?.score?.total_score;
-  const scoreLabel = typeof score === "number" ? ` · score ${Math.round(score)}` : "";
-  setStatus(`Added to KithNode${scoreLabel}.`, "ok");
+  status("Draft ready. Finish the field review in KithNode.", "ok");
+  await chrome.tabs.create({ url: result.reviewUrl });
 });

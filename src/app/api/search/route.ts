@@ -16,7 +16,7 @@ export interface SearchResult {
  * Exported for unit testing without importing next-auth.
  */
 export function buildSearchFilter(q: string): string {
-  return `name.ilike.%${q}%,firmName.ilike.%${q}%,title.ilike.%${q}%,education.ilike.%${q}%`;
+  return `name.ilike.%${q}%,firmName.ilike.%${q}%,title.ilike.%${q}%,education.ilike.%${q}%,skills.ilike.%${q}%`;
 }
 
 export async function GET(request: NextRequest) {

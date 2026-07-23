@@ -38,6 +38,24 @@ export function countByTrack(
   return counts;
 }
 
+export function matchesContactSearch(
+  contact: Pick<RankedContact, "name" | "title" | "skills"> & {
+    company: Pick<RankedContact["company"], "name" | "location" | "industry_tags">;
+  },
+  search: string,
+): boolean {
+  if (!search.trim()) return true;
+  const searchable = [
+    contact.name,
+    contact.title,
+    contact.skills || "",
+    contact.company.name,
+    contact.company.location,
+    ...contact.company.industry_tags,
+  ].join(" ").toLocaleLowerCase();
+  return searchable.includes(search.trim().toLocaleLowerCase());
+}
+
 const SORT_OPTIONS: SortOption[] = ["score", "name", "company", "new"];
 const SESSION_KEY = "warm-signals-state";
 
@@ -149,19 +167,7 @@ export function ContactsList() {
   const filtered = contacts.filter((c) => {
     if (!matchesTrackRole(c, activeTrack, activeRole)) return false;
     if (activeTier !== "all" && c.score.tier !== activeTier) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const searchable = [
-        c.name,
-        c.title,
-        c.company.name,
-        c.company.location,
-        ...c.company.industry_tags,
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!searchable.includes(q)) return false;
-    }
+    if (!matchesContactSearch(c, search)) return false;
     return true;
   });
 

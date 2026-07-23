@@ -147,6 +147,7 @@ export async function GET() {
           linkedin_location: c.location || "",
           track: c.track || "",
           role: c.role || "",
+          skills: c.skills || "",
           why_now: affiliationNames.join(", "),
           warm_path: c.university || "",
           affiliations: affiliationNames.map((name: string) => ({ name, boost: 10 })),
@@ -288,4 +289,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ id: inserted?.id, name, firmName, title, tier, warmthScore: score });
 }
-

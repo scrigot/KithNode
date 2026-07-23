@@ -1,105 +1,186 @@
-# Design System -- KithNode Dashboard
+# KithNode Authenticated Product
 
-> Landing page has its own brand doc: brand/landing.md (dark, Cluely-derived). This file governs the DASHBOARD only.
+> `DESIGN.md` is the product-level source of truth. This file translates the approved Quiet Intelligence direction into dashboard implementation rules.
 
-## Product Context
-- **What this is:** AI-powered warm-path networking platform for college recruiting
-- **Who it's for:** Ambitious college students targeting IB, PE, Consulting
-- **Space/industry:** Recruiting intelligence, professional networking
-- **Project type:** Data-dense dashboard / web app
+## Core posture
 
-## Aesthetic Direction
-- **Direction:** Industrial/Utilitarian
-- **Decoration level:** Minimal -- typography and data density do the work
-- **Mood:** Bloomberg terminal meets modern data viz. Precision instrument, not consumer app. Users should feel like operators with intelligence at their fingertips.
-- **Reference:** Bloomberg Terminal, Datadog dark mode, Linear's data density
+KithNode is a private recruiting intelligence workspace, not an enterprise dashboard.
 
-## Typography
-- **Display/Hero:** Space Grotesk (`--font-heading`) -- clean geometric grotesk, built for dark UIs and dense headings
-- **Body:** DM Sans (`--font-sans`) -- excellent legibility at small sizes, the default applied on `html`
-- **UI/Labels:** system monospace (`ui-monospace, SF Mono, Menlo, Consolas`, via `--font-mono`) uppercase tracking-wider at 10px -- terminal micro-labels
-- **Data/Tables:** system monospace (`--font-mono`) with tabular-nums -- scores and numbers align perfectly
-- **Warm path chains:** system monospace (`--font-mono`) -- intelligence-briefing feel, monospace for connection chains
-- **Code/Annotations:** system monospace (`--font-mono`)
-- **Font stack source of truth:** `src/app/globals.css` `@theme inline` block -- `--font-heading: var(--font-heading)`, `--font-sans: var(--font-sans)`, `--font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace`
-- **Scale:** 10px (micro-labels) / 12px (body small) / 14px (body) / 16px (body large) / 20px (heading) / 24px (page title)
+- Light-first canvas
+- Slim persistent sidebar
+- Chat-first Home
+- Editorial headings
+- Comfortable spacing
+- Restrained blue action color
+- Dedicated Memory and Knowledge Center
+- Data density only where the task requires it
 
-## Color
-- **Approach:** Restrained -- one accent does all the work
-- **Source of truth:** `src/app/globals.css` `@theme` tokens
-- **Background:** `--color-bg-primary` #0A1628 (deep navy-black)
-- **Secondary background:** `--color-bg-secondary` #0F1A2E (popovers, sidebar)
-- **Surface/Card:** `--color-bg-card` #111D2E with `--color-border` border (glassmorphism)
-- **Primary accent:** `--color-accent-teal` #0EA5E9 (teal) -- sole accent. Actions, links, active states, value indicators
-- **Primary text:** `--color-text-primary` #F8FAFC (near-white on dark)
-- **Muted text:** `--color-text-secondary` #94A3B8
-- **Micro-labels:** text-secondary at reduced opacity for the faintest tier
-- **Tier system (data classification only):**
-  - HOT: `--color-tier-hot` #EF4444 (red) on red tint bg, red border
-  - WARM: `--color-tier-warm` #3B82F6 (blue) on blue tint bg, blue border
-  - MONITOR: `--color-tier-monitor` #F59E0B (amber) on amber tint bg, amber border
-  - COLD: `--color-tier-cold` #64748B (slate) on slate tint bg, slate border
-- **Semantic:** success `--color-accent-green` #22C55E, warning `--color-accent-amber` #F59E0B, error `--color-accent-red` #EF4444, info `--color-accent-blue` #3B82F6
-- **Border:** `--color-border` rgba(255, 255, 255, 0.08) for cards and dividers
-- **Dark mode:** Default and only mode. No light mode for dashboard.
+The approved working reference is:
 
-## Spacing
-- **Base unit:** 4px
-- **Density:** Compact -- Bloomberg density, no wasted pixels
-- **Scale:** 2xs(2px) xs(4px) sm(8px) md(16px) lg(24px) xl(32px) 2xl(48px) 3xl(64px)
-- **Card padding:** px-5 py-4 (20px/16px) for content cards, px-6 py-4 (24px/16px) for browse cards
-- **Section spacing:** mb-4 (16px) between sections, h-px bg-border dividers
+`~/.gstack/projects/scrigot-KithNode/designs/dashboard-actual-data-20260723/kithnode-quiet-intelligence.html`
 
-## Layout
-- **Approach:** Grid-disciplined
-- **Structure:** Fixed sidebar (collapsed on mobile) + full-width content area
-- **Card grid:** sm:grid-cols-2 lg:grid-cols-3 for search results, single column for browse
-- **Max content width:** None (full width, sidebar constrains)
-- **Border radius:** 0px everywhere -- sharp corners are the dashboard signature. The Tailwind `@theme` sets `--radius-{sm..4xl}: 0px` globally in `globals.css`, so `rounded-*` utilities resolve to 0px by design. No exceptions in dashboard.
-- **Borders:** border with `--color-border` (rgba(255,255,255,0.08)) for cards, border-b with the same for dividers
+## Fonts
 
-## Motion
-- **Approach:** Minimal-functional
-- **Easing:** enter(ease-out) exit(ease-in)
-- **Duration:** micro(150ms for hover) short(300ms for card slides)
-- **Patterns:**
-  - Card slide-out on Discover rate (left=skip, right=high-value)
-  - Card slide-in on next contact
-  - Hover lift on interactive cards (translate-y or opacity)
-  - Progress bar animation on Discover pipeline modal
-- **No decorative animation in dashboard.** Every motion communicates a state change.
+- Display and page titles: Newsreader 500–600
+- Body, navigation, controls, and data: DM Sans 400–600
+- Code and identifiers only: Geist Mono or platform monospace
 
-## Component Patterns
-- **Action buttons:** Primary: bg-primary text-white uppercase text-[12px] font-bold tracking-wider. Secondary: border with `--color-border` text-muted-foreground uppercase.
-- **Badges/chips:** variant="outline" with tier-specific colors. text-[8px] or text-[10px] font-bold.
-- **Section headers:** text-sm font-bold uppercase tracking-wider text-primary. Subtitle: text-[10px] text-muted-foreground.
-- **Dividers:** h-px bg-border between sections.
-- **Empty states:** Centered icon + heading + muted description + primary action button.
-- **Modals:** Fixed overlay bg-black/80 backdrop-blur-sm. Content: border border-primary/30 bg-card shadow-2xl. Sharp corners.
-- **Slide-overs:** Sheet component, right-aligned, dark bg matching cards.
+Do not use monospace for ordinary labels, recommendation explanations, contact lists, or application tables.
 
-## Warm Path Chain Display
-- **Font:** system monospace (`--font-mono`), text-[11px]
-- **Color:** text-primary (teal) for names, text-muted-foreground for arrows/connectors
-- **Format:** "Via {name} ({affiliation}) -> {title} at {firm}"
-- **Position:** Between name/title and affiliation chips on contact cards
-- **Label:** "WARM PATH" in micro-label style (text-[9px] font-bold uppercase tracking-wider text-muted-foreground at reduced opacity)
+## Tokens
 
-## Anti-Patterns (never do these)
-- Rounded corners in dashboard (0px is the signature)
-- Purple/violet accents (teal only)
-- Centered-everything layouts (left-aligned, data-dense)
-- Decorative blobs, gradients, or floating shapes in dashboard
-- Generic card grids with icons in colored circles
-- Hero sections in dashboard (that's landing page territory)
-- Light mode in dashboard (dark is the only mode)
-- Inter/Roboto fonts (Space Grotesk for headings + DM Sans for body + system monospace for data)
+```css
+--canvas: #ffffff;
+--sidebar: #f7f7f6;
+--surface-soft: #fafafa;
+--surface-selected: #efefee;
+--text-primary: #171717;
+--text-secondary: #767676;
+--text-faint: #a8a8a8;
+--border: #e5e5e3;
+--border-soft: #eeeeec;
+--action: #2768e8;
+--action-soft: #eef3ff;
+--identity-blue: #5b9ed1;
+--success: #12966a;
+--success-soft: #e7f8f1;
+--warning: #d47b16;
+--warning-soft: #fff4e5;
+--error: #d84c72;
+--error-soft: #fff0f4;
+```
 
-## Decisions Log
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-04-16 | Initial design system created | Extracted from existing codebase patterns by /design-consultation. Bloomberg/industrial aesthetic. |
-| 2026-04-16 | 0px border radius as visual signature | Sharp corners differentiate from every rounded-corner SaaS app. Deliberate creative risk. |
-| 2026-04-16 | Teal as sole accent | Restrained palette forces intentionality. When teal appears, it means action or value. |
-| 2026-06-16 | Split DESIGN.md into brand/dashboard.md + brand/landing.md; corrected font stack to Space Grotesk + DM Sans | DESIGN.md had drifted. Real stack is Space Grotesk headings + DM Sans body + system monospace for data. Landing page is a separate context with its own doc. |
-| 2026-06-16 | Settings/feature pages use a centered, roomier "console" tier; data pages stay Bloomberg-dense | Settings + Import are configuration/feature surfaces, not data. They get a centered max-w column (max-w-2xl/3xl mx-auto), ~14px body, ~24px card padding, bigger labels. This is a deliberate, approved exception to "Centered-everything layouts" + "Max content width: None" above — it applies ONLY to non-data pages (Settings, Import). Discover/Contacts/Ops stay dense. |
+## Shell
+
+- Desktop sidebar width: 240px
+- Sidebar background: `--sidebar`
+- Sidebar border: `--border-soft`
+- Navigation item: 42–44px tall, 8px radius
+- Active navigation: neutral selected surface plus a thin blue left indicator
+- Recent work sits below primary navigation
+- Memory, Knowledge Center, and Settings stay anchored at the bottom
+- Main canvas is white
+- Focused page width: 1,120px
+- Home composer width: 790px
+
+Do not add a persistent dark top bar. Page-level controls belong in a quiet header inside the main canvas.
+
+## Home
+
+Home is a conversation, not an Overview dashboard.
+
+Required composition:
+
+1. “New conversation” utility header
+2. Personal, time-aware greeting
+3. Large Career Copilot composer
+4. Up to four prompt suggestions
+5. Up to two continuation items
+6. Recent work in the sidebar
+
+Do not add global metrics to Home. Applications, Network, and Founder Ops own their metrics.
+
+## Domain pages
+
+### Career Copilot
+
+- Use a conversation list or a small skill launcher.
+- Keep the composer available.
+- Structured results should feel like documents or lists, not stacked alert boxes.
+- Errors use plain-language recovery states.
+
+### Applications
+
+- Up to four top-level metrics are acceptable.
+- Default to a quiet table/list with one visible row action.
+- Selecting a record opens a side sheet.
+- Board view is optional, not the visual default.
+- Preserve filters and drafts through retry states.
+
+### Network
+
+- Use a quiet list with person, why now, next step, and signal.
+- The reason for ranking is more prominent than the numeric score.
+- Scores use subtle semantic pills.
+- Contact detail opens as a focused page or sheet.
+- Graph views are secondary explorations.
+
+### Career Toolkit
+
+- A two-column tool library is acceptable.
+- Each card describes a real tool and its current state.
+- Resume, LinkedIn, Coffee Prep, and Outreach retain stable routes.
+
+### Memory
+
+- Separate recruiting identity, relationship memory, and recruiting timeline.
+- Show counts, provenance, and correction paths.
+- Make “What KithNode learned” visible and editable.
+
+### Knowledge Center
+
+- Show approved sources and connector readiness.
+- Label provenance and freshness.
+- Avoid backend-engine terminology unless the user explicitly opens technical details.
+
+### Settings
+
+- Use a centered two- or three-column section index.
+- A single readiness strip may summarize connected systems.
+- Settings pages preserve unsaved values when a connector or model request fails.
+
+## Components
+
+- Corners: 8px controls, 12px compact objects, 16px cards, 24px composer
+- Borders: one neutral border per object
+- Shadows: composer, dialogs, sheets, menus only
+- Buttons: sentence case, 40–44px tall
+- Primary buttons: solid blue
+- Secondary buttons: white with neutral border
+- Pills: compact semantic status only
+- Empty states: one icon, one sentence, one primary action
+- Loading: quiet skeletons that preserve page geometry
+- Errors: explanation, preserved work, retry, and setup/recovery link
+
+## Approval behavior
+
+Every consequential action preview includes:
+
+- What KithNode proposes
+- Which records or external systems are affected
+- Evidence used
+- Cost, if any
+- Whether it is reversible
+- The exact result of approval
+
+KithNode never automatically sends, submits, publishes, enriches with paid credits, or deletes.
+
+## Responsive behavior
+
+- Mobile uses five bottom destinations: Home, Copilot, Applications, Network, Toolkit.
+- Recent work, Memory, Knowledge Center, Settings, and account controls move into a secondary sheet.
+- Lists become vertical records.
+- Sheets become full-screen.
+- Composer controls retain 44px touch targets.
+
+## Never do
+
+- Dark-only product UI
+- Dark top bars framing a white page
+- Seven-column metric strips
+- Terminal-style labels
+- Zero-radius components
+- Full-width dense dashboards on every page
+- Decorative gradients or glassmorphism
+- Nested cards without a real object hierarchy
+- Raw JSON, stack traces, or provider errors
+- Recommendations without visible evidence or correction paths
+
+## Decision history
+
+| Date | Decision | Status |
+|---|---|---|
+| 2026-04-16 | Dark Bloomberg-style terminal | Superseded |
+| 2026-04-16 | Zero-radius dashboard signature | Superseded |
+| 2026-06-16 | Dense data pages with roomier settings | Superseded by task-specific density |
+| 2026-07-23 | Quiet Intelligence: light, chat-first, editorial, memory-aware | Approved |

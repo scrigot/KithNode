@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
 import {
-  scrapeLinkedInMeta,
   detectAffiliations,
   computeWarmthScore,
   isValidLinkedInUrl,
@@ -268,151 +267,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── URL-based import (existing scraping flow) ─────────────────────────
+  // A URL by itself is not evidence. KithNode no longer fetches LinkedIn
+  // profiles; use an official LinkedIn CSV export or Guided Research and enter
+  // the facts you personally reviewed.
   if (hasUrls) {
-    for (const url of body.urls) {
-      if (!isValidLinkedInUrl(url)) {
-        results.push({
-          name: "",
-          title: "",
-          linkedin_url: url,
-          company_name: "",
-          affiliations: [],
-          total_score: 0,
-          tier: "cold",
-          error: "Invalid LinkedIn URL format",
-        });
-        failed++;
-        continue;
-      }
-
-      try {
-        const meta = await scrapeLinkedInMeta(url);
-        const affiliations = detectAffiliations(meta, prefs);
-        const { score, tier } = computeWarmthScore(affiliations);
-        // Classify the Discover pool at import time (see CSV path) — cheap
-        // heuristic, synchronous, never throws; the backfill upgrades it later.
-        const { personType } = heuristicPersonType({
-          name: meta.name,
-          title: meta.title,
-          firmName: meta.experience,
-          education: meta.education,
-        });
-
-        // Existing-contact lookup, SCOPED TO THE CALLER (see CSV path above): the
-        // importedByUserId filter prevents overwriting another user's pool row.
-        const { data: existing } = await supabase
-          .from("AlumniContact")
-          .select("id")
-          .eq("linkedInUrl", url)
-          .eq("importedByUserId", userId)
-          .single();
-
-        let contactId: string | undefined;
-
-        if (existing) {
-          contactId = existing.id;
-          await supabase
-            .from("AlumniContact")
-            .update({
-              name: meta.name,
-              title: meta.title,
-              firmName: meta.experience,
-              university: meta.education,
-              education: meta.education,
-              location: meta.location,
-              affiliations: affiliations.map((a) => a.name).join(","),
-              warmthScore: score,
-              tier,
-              source: "linkedin_import",
-              personType,
-              importedByUserId: userId,
-            })
-            .eq("id", existing.id);
-        } else {
-          // Already in the shared pool (another user's)? Link, don't overwrite —
-          // see the CSV path. Read-only access via a high_value Discover link.
-          const pooled = await findPoolRow(url, "");
-          if (pooled) {
-            await linkToPool(userId, pooled.id);
-            results.push({
-              id: pooled.id,
-              name: pooled.name,
-              title: pooled.title,
-              linkedin_url: url,
-              company_name: pooled.firmName,
-              affiliations: pooled.affiliations
-                ? pooled.affiliations.split(",").filter(Boolean)
-                : [],
-              total_score: pooled.warmthScore,
-              tier: pooled.tier,
-            });
-            imported++;
-            linked++;
-            continue;
-          }
-
-          const { data: inserted, error: insertError } = await supabase
-            .from("AlumniContact")
-            .insert({
-              name: meta.name,
-              title: meta.title,
-              firmName: meta.experience,
-              linkedInUrl: url,
-              university: meta.education,
-              graduationYear: 0,
-              education: meta.education,
-              location: meta.location,
-              affiliations: affiliations.map((a) => a.name).join(","),
-              warmthScore: score,
-              tier,
-              source: "linkedin_import",
-              personType,
-              importedByUserId: userId,
-            })
-            .select("id")
-            .single();
-
-          if (insertError) {
-            // A unique-constraint hit (SQLSTATE 23505) means this person is
-            // already in the shared pool — possibly owned by another user. Don't
-            // echo the raw DB error: it leaks the constraint name and confirms
-            // the value. Return a generic message instead. (Existence stays
-            // distinguishable until the data model goes per-user — parked.)
-            throw new Error(
-              insertError.code === "23505"
-                ? "This contact is already in the network"
-                : "Import failed",
-            );
-          }
-          contactId = inserted?.id;
-        }
-
-        results.push({
-          id: contactId,
-          name: meta.name,
-          title: meta.title,
-          linkedin_url: url,
-          company_name: meta.experience,
-          affiliations: affiliations.map((a) => a.name),
-          total_score: score,
-          tier,
-        });
-        imported++;
-      } catch (err) {
-        results.push({
-          name: "",
-          title: "",
-          linkedin_url: url,
-          company_name: "",
-          affiliations: [],
-          total_score: 0,
-          tier: "cold",
-          error: err instanceof Error ? err.message : "Import failed",
-        });
-        failed++;
-      }
-    }
+    return NextResponse.json(
+      {
+        error: "source_not_allowed",
+        message:
+          "KithNode does not read LinkedIn profiles from a URL. Import your official CSV export or use Network → Discover → Research a target.",
+      },
+      { status: 410 },
+    );
   }
 
   return NextResponse.json({ imported, failed, linked, contacts: results });

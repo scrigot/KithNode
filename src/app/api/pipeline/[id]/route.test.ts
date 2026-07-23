@@ -4,7 +4,7 @@ import type { Mock } from "vitest";
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
 
-import { DELETE, POST } from "./route";
+import { DELETE, GET, POST } from "./route";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
@@ -23,6 +23,68 @@ function makeParams(id: string) {
 }
 
 const UUID = "11111111-1111-1111-1111-111111111111";
+
+describe("GET /api/pipeline/[id] — contact pipeline status", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns only the signed-in user's pipeline choices and current membership", async () => {
+    (auth as Mock).mockResolvedValue({ user: { id: UUID, email: "sam@example.com" } });
+
+    const pipelineBuilder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          {
+            id: "pl1",
+            name: "AI recruiting",
+            kind: "RECRUITING",
+            stages: [{ key: "researched", label: "Researched", color: "zinc" }],
+          },
+        ],
+        error: null,
+      }),
+    };
+    const entryBuilder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { id: "pe1", pipelineId: "pl1", stage: "researched" },
+        error: null,
+      }),
+    };
+    (supabase as unknown as Record<string, unknown>).from = vi
+      .fn()
+      .mockReturnValueOnce(pipelineBuilder)
+      .mockReturnValueOnce(entryBuilder);
+
+    const res = await GET(
+      new Request("http://localhost/api/pipeline/c1") as import("next/server").NextRequest,
+      makeParams("c1"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pipelines).toEqual([
+      {
+        id: "pl1",
+        name: "AI recruiting",
+        kind: "RECRUITING",
+        firstStage: "researched",
+      },
+    ]);
+    expect(body.membership).toEqual({
+      id: "pe1",
+      pipelineId: "pl1",
+      stage: "researched",
+    });
+    expect(pipelineBuilder.eq).toHaveBeenCalledWith("userId", UUID);
+    expect(entryBuilder.eq).toHaveBeenCalledWith("userId", UUID);
+    expect(entryBuilder.eq).toHaveBeenCalledWith("contactId", "c1");
+  });
+});
 
 describe("POST /api/pipeline/[id] — add a contact to a pipeline (idempotent)", () => {
   beforeEach(() => {

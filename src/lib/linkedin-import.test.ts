@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   isValidLinkedInUrl,
-  scrapeLinkedInMeta,
   detectAffiliations,
   resolveAutoPersonType,
   type ContactMeta,
@@ -70,33 +69,6 @@ describe("isValidLinkedInUrl", () => {
   });
 });
 
-describe("scrapeLinkedInMeta", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("throws on a SSRF payload and never fetches", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    await expect(
-      scrapeLinkedInMeta("https://attacker.test/?u=https://linkedin.com/in/bar")
-    ).rejects.toThrow("Invalid LinkedIn URL");
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("fetches the canonical URL with redirect disabled for a clean URL", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("<html></html>", { status: 200 })
-    );
-
-    const meta = await scrapeLinkedInMeta("https://www.linkedin.com/in/jane-doe");
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const [calledUrl, init] = fetchSpy.mock.calls[0];
-    expect(calledUrl).toBe("https://www.linkedin.com/in/jane-doe");
-    expect((init as RequestInit).redirect).toBe("error");
-    expect(meta.name).toBe("Jane Doe");
-  });
-});
 
 describe("detectAffiliations: manual tags", () => {
   it("Same Greek Org fires when greekOrg matches a manual tag", () => {

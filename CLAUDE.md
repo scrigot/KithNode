@@ -85,11 +85,12 @@ npm run db:seed      # Seed test data
 - **Ralph autonomous loop:** `scripts/ralph/` — PRD at `prd.json`, prompt at `CLAUDE.md`, log at `progress.txt`.
 
 ## Design System
-Landing/marketing UI -> read brand/landing.md (dark, Cluely-derived).
-Dashboard/app UI -> read brand/dashboard.md (Bloomberg-dense, 0px sharp, teal).
-All font choices, colors, spacing, and aesthetic direction are defined there.
+Always read `DESIGN.md` before making visual or UI decisions.
+Authenticated product UI -> read `brand/dashboard.md` (Quiet Intelligence: light, chat-first, editorial, spacious, memory-aware).
+Landing/marketing UI -> read `brand/landing.md`.
+`DESIGN.md` is the product-level source of truth and wins if brand documents conflict.
 Do not deviate without explicit user approval.
-In QA mode, flag landing code against brand/landing.md and dashboard code against brand/dashboard.md.
+In QA mode, flag product code against `DESIGN.md` plus the relevant brand document.
 
 ## What to do FIRST in any session here
 0. **Read `ops/tasks.md`** (what's next) + the tail of `ops/build-log.md` (recent context). Work from tasks.md Now/Next and update it before you finish. End any substantive session with one line: `OPS_LOG: built ... | learned ... | decided ...` — the Stop hook appends it to `ops/build-log.md`. See `ops/README.md`.

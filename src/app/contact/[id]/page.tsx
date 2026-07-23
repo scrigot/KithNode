@@ -14,6 +14,7 @@ import { CareerTimeline } from "@/components/career-timeline";
 import { TagEditor } from "./tag-editor";
 import { FieldEditor } from "./field-editor";
 import { EditProfileModal } from "./edit-profile-modal";
+import { PipelineAction } from "./pipeline-action";
 import { trackEvent } from "@/lib/posthog";
 import { ALL_TRACKS, CAREER_TRACKS, roleToTrack } from "@/lib/data/career-tracks";
 import { resolveAutoPersonType } from "@/lib/linkedin-import";
@@ -666,27 +667,30 @@ export default function ContactDetailPage() {
             </p>
           )}
         </div>
-        {/* Outreach is a per-user action gated by network membership (owner or
-            high_value). A non-owner browsing a Discover contact adds it to their
-            network first; the draft route would 403 otherwise. */}
-        {inNetwork &&
-          (contact.outreach_history.some((o) => o.status === "replied") ? (
-            <Badge
-              variant="outline"
-              className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs"
-            >
-              AUTOGUARD ACTIVE
-            </Badge>
-          ) : (
-            <Button
-              variant="outline"
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setShowOutreach(true)}
-            >
-              DRAFT OUTREACH
-              <CreditCost action="draft" />
-            </Button>
-          ))}
+        {/* Pipeline + outreach are per-user actions gated by network membership
+            (owner or high_value). A browse-only contact must be claimed first. */}
+        {inNetwork && (
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-start">
+            <PipelineAction contactId={contact.id} contactName={contact.name} />
+            {contact.outreach_history.some((o) => o.status === "replied") ? (
+              <Badge
+                variant="outline"
+                className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs"
+              >
+                AUTOGUARD ACTIVE
+              </Badge>
+            ) : (
+              <Button
+                variant="outline"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:bg-primary hover:text-primary-foreground"
+                onClick={() => setShowOutreach(true)}
+              >
+                DRAFT OUTREACH
+                <CreditCost action="draft" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <OutreachSheet

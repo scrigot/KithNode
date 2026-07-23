@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesTrackRole, countByTrack } from "./contacts-list";
+import { matchesContactSearch, matchesTrackRole, countByTrack } from "./contacts-list";
 
 // Minimal contact shapes — the helpers only read track + role.
 const c = (track: string, role: string) => ({ track, role });
@@ -38,5 +38,19 @@ describe("countByTrack — tab label counts", () => {
 
   it("returns an empty map for no contacts", () => {
     expect(countByTrack([])).toEqual({});
+  });
+});
+
+describe("matchesContactSearch", () => {
+  const contact = {
+    name: "Arth Vijaywargia",
+    title: "Junior Solutions Architect",
+    skills: "Artificial Intelligence (AI), Generative AI, Financial Modeling",
+    company: { name: "Red Hat", location: "Raleigh", industry_tags: [] },
+  };
+
+  it("finds contacts by AI and finance skills", () => {
+    expect(matchesContactSearch(contact, "generative ai")).toBe(true);
+    expect(matchesContactSearch(contact, "financial modeling")).toBe(true);
   });
 });

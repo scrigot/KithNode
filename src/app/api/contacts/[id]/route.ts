@@ -9,6 +9,7 @@ import { normalizeDegrees } from "@/lib/normalize-degrees";
 import {
   parseEducations,
   parseExperiences,
+  mergePrimaryExperience,
   flatFromEducations,
   firmsFromExperiences,
   educationsFromFlat,
@@ -357,13 +358,17 @@ export async function GET(
     : membershipsFromFlat(view.clubs as string | null);
 
   // Synthesize experience rows from flat pastFirms when column is empty.
-  const contactExperiences = view.experiences
+  const storedExperiences = view.experiences
     ? parseExperiences(view.experiences as string)
     : (view.pastFirms as string | null)
         ?.split(",")
         .map((f: string) => f.trim())
         .filter(Boolean)
         .map((firm: string) => ({ title: "", firm, start: "", end: "" })) ?? [];
+  const contactExperiences = mergePrimaryExperience(storedExperiences, {
+    title: view.title as string | null,
+    firm: view.firmName as string | null,
+  });
 
   // Two-axis score: fit IS the stored affiliation warmth (0..100); the
   // relationship (friend / proven pipeline stage / recent contact) promotes
@@ -418,7 +423,7 @@ export async function GET(
     passions: (view.passions as string | null) || "",
     notes: (view.notes as string | null) || "",
     // Contact attributes OUTSIDE the Discover poolSafe allowlist (greek_org,
-    // clubs, major, minor, skills, pastFirms, structured rows, personType): shown
+    // clubs, major, minor, pastFirms, structured rows, personType): shown
     // to the owner and to in-network (high_value) viewers — matching the
     // contacts list — but hidden from a pure browse view, so the detail page
     // never exposes more of a pool contact than the Discover deck already does.

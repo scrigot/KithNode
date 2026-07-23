@@ -59,7 +59,7 @@ begin
     ('CareerGoal'), ('AssistantConversation'), ('AssistantRun'),
     ('AssistantToolCall'), ('AssistantApproval'), ('Recommendation'),
     ('OutreachDraft'), ('IntegrationConnection'), ('LinkedInProfile'), ('LinkedInProfileRevision'),
-    ('Opportunity'), ('OpportunityContact'), ('OpportunityEvent')
+    ('Opportunity'), ('OpportunityContact'), ('OpportunityEvent'), ('ResearchDraft')
   ) as required(name)
   where to_regclass(format('public.%I', required.name)) is null;
 

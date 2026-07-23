@@ -37,7 +37,7 @@ export function FilterBar({
       {/* Search + Sort row */}
       <div className="flex items-center gap-2">
         <Input
-          placeholder="Search name, title, company..."
+          placeholder="Search name, title, company, skills..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="h-8 flex-1 bg-muted text-xs placeholder:text-muted-foreground"

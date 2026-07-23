@@ -58,6 +58,7 @@ const STEP_ICONS = [GraduationCap, MapPin, Target, Building2, CheckCircle2];
 
 interface Preferences {
   university: string;
+  graduationYear: string;
   highSchool: string;
   greekLifeEnabled: boolean;
   greekOrganization: string;
@@ -87,6 +88,7 @@ const STORAGE_KEY = "kithnode_preferences";
 function getDefaults(): Preferences {
   return {
     university: "",
+    graduationYear: "",
     highSchool: "",
     greekLifeEnabled: false,
     greekOrganization: "",
@@ -150,6 +152,7 @@ async function syncToAPI(prefs: Preferences) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         current_university: prefs.university || null,
+        graduation_year: prefs.graduationYear ? Number(prefs.graduationYear) : null,
         high_school: prefs.highSchool || null,
         hometown: prefs.hometown || null,
         target_locations:
@@ -674,6 +677,16 @@ function EditPanel({
         };
 
         fillStr("university", data.university);
+        if (
+          !next.graduationYear &&
+          (typeof data.graduationYear === "number" || typeof data.graduationYear === "string")
+        ) {
+          const graduationYear = String(data.graduationYear).trim();
+          if (/^\d{4}$/.test(graduationYear)) {
+            next.graduationYear = graduationYear;
+            filled.add("graduationYear");
+          }
+        }
         fillStr("highSchool", data.highSchool);
         fillStr("hometown", data.hometown);
         if (!next.greekOrganization.trim() && typeof data.greekOrg === "string" && data.greekOrg.trim()) {
@@ -1094,6 +1107,28 @@ function EditPanel({
                 ariaLabel="University"
                 matchAcronyms
               />
+            </div>
+
+            <div className={resumeFilled.has("graduationYear") ? "rounded-sm ring-1 ring-accent-teal/60" : ""}>
+              <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Graduation year
+              </label>
+              <Input
+                type="number"
+                min={2000}
+                max={2100}
+                inputMode="numeric"
+                placeholder="2029"
+                value={local.graduationYear}
+                onChange={(event) =>
+                  setLocal({ ...local, graduationYear: event.target.value.slice(0, 4) })
+                }
+                className="bg-muted text-sm"
+                aria-label="Graduation year"
+              />
+              <p className="mt-1.5 text-[10px] leading-4 text-text-muted">
+                Used to confirm internship class-year and recruiting-season eligibility.
+              </p>
             </div>
 
             {/* Education rows editor (up to 4) */}
@@ -1583,6 +1618,27 @@ function Wizard({
                     className="bg-muted text-sm"
                   />
                 </div>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Graduation year
+                  </label>
+                  <Input
+                    type="number"
+                    min={2000}
+                    max={2100}
+                    inputMode="numeric"
+                    placeholder="2029"
+                    value={prefs.graduationYear}
+                    onChange={(event) =>
+                      setPrefs({ ...prefs, graduationYear: event.target.value.slice(0, 4) })
+                    }
+                    className="bg-muted text-sm"
+                    aria-label="Graduation year"
+                  />
+                  <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground">
+                    Helps KithNode show only programs open to your class year.
+                  </p>
+                </div>
                 {/* Education rows in wizard step 0 */}
                 <div>
                   <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1848,9 +1904,10 @@ export default function SettingsPage() {
         const res = await fetch("/api/user/preferences");
         if (res.ok) {
           const data = await res.json();
-          if (data && (data.university || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length || data.recruitingDate)) {
+          if (data && (data.university || data.graduationYear || data.hometown || data.greekOrg || data.targetIndustries?.length || data.targetFirms?.length || data.recruitingDate)) {
             const merged: Preferences = {
               university: data.university || "",
+              graduationYear: data.graduationYear ? String(data.graduationYear) : "",
               highSchool: data.highSchool || "",
               greekLifeEnabled: !!data.greekOrg,
               greekOrganization: data.greekOrg || "",

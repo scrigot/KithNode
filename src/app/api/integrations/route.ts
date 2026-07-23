@@ -47,6 +47,13 @@ export async function GET() {
         configured: Boolean(process.env.PDL_API_KEY || process.env.HUNTER_API_KEY || process.env.APOLLO_API_KEY),
         validation: "Validated when enrichment is requested",
       },
+      {
+        id: "search",
+        label: "Job source discovery",
+        configured: Boolean(process.env.BRAVE_SEARCH_API_KEY),
+        optional: true,
+        validation: "Optional; verified catalog and manual official URLs remain available",
+      },
     ],
     integrations: INTEGRATION_PROVIDERS.map((provider) => ({
       provider,

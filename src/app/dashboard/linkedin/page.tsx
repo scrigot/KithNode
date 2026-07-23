@@ -77,6 +77,7 @@ export default function LinkedInWorkspacePage() {
   const [changeSummary, setChangeSummary] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importJson, setImportJson] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const loadProfiles = useCallback(async (preferredId?: string) => {
     const response = await apiFetch("/api/linkedin-profiles");
@@ -189,12 +190,42 @@ export default function LinkedInWorkspacePage() {
   async function archiveProfile() {
     if (!selected) return;
     setBusy("archive");
+    setError("");
     try {
-      const response = await apiFetch(`/api/linkedin-profiles/${selected.id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Could not archive profile");
+      const response = await apiFetch(`/api/linkedin-profiles/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "archived",
+          isPrimary: false,
+          content,
+          changeSummary: "Archived profile",
+        }),
+      });
+      const data = await jsonResponse(response);
+      if (!response.ok) throw new Error(String(data.error || "Could not archive profile"));
       await loadProfiles();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not archive profile"); }
     finally { setBusy(""); }
+  }
+
+  async function deleteProfile() {
+    if (!selected) return;
+    setBusy("delete");
+    setError("");
+    try {
+      const response = await apiFetch(`/api/linkedin-profiles/${selected.id}`, { method: "DELETE" });
+      const data = await jsonResponse(response);
+      if (!response.ok) throw new Error(String(data.error || "Could not delete profile"));
+      setDeleteOpen(false);
+      const promotedProfileId = typeof data.promotedProfileId === "string" ? data.promotedProfileId : undefined;
+      await loadProfiles(promotedProfileId);
+      setSaved("Profile deleted permanently");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete profile");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function setPrimaryProfile() {
@@ -297,7 +328,7 @@ export default function LinkedInWorkspacePage() {
           <div className="mx-auto max-w-7xl">
             <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div><div className="flex items-center gap-2"><h1 className="text-xl font-bold">{selected.name}</h1>{selected.isPrimary && <span className="bg-accent-green/10 px-2 py-1 text-[10px] font-bold uppercase text-accent-green">Primary</span>}</div><p className="mt-1 text-xs text-muted-foreground">Last saved {new Date(selected.updatedAt).toLocaleString()} · score {selected.score}/100</p></div>
-              <div className="flex flex-wrap gap-2">{!selected.isPrimary && <button onClick={setPrimaryProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-accent-green/30 px-3 py-2 text-xs text-accent-green"><CheckCircle2 size={13} /> Set primary</button>}<button onClick={copyProfileJson} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs"><FileJson size={13} /> Copy JSON</button><button onClick={duplicateProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs"><Copy size={13} /> Duplicate</button><button onClick={archiveProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs text-muted-foreground"><Archive size={13} /> Archive</button><button onClick={saveProfile} disabled={Boolean(busy)} className="flex items-center gap-1 bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy === "save" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save revision</button></div>
+              <div className="flex flex-wrap gap-2">{!selected.isPrimary && <button onClick={setPrimaryProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-accent-green/30 px-3 py-2 text-xs text-accent-green"><CheckCircle2 size={13} /> Set primary</button>}<button onClick={copyProfileJson} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs"><FileJson size={13} /> Copy JSON</button><button onClick={duplicateProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs"><Copy size={13} /> Duplicate</button><button onClick={archiveProfile} disabled={Boolean(busy)} className="flex items-center gap-1 border border-white/10 px-3 py-2 text-xs text-muted-foreground"><Archive size={13} /> Archive</button><button onClick={() => setDeleteOpen(true)} disabled={Boolean(busy)} className="flex items-center gap-1 border border-accent-red/30 px-3 py-2 text-xs text-accent-red disabled:opacity-50"><Trash2 size={13} /> Delete</button><button onClick={saveProfile} disabled={Boolean(busy)} className="flex items-center gap-1 bg-primary px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{busy === "save" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save revision</button></div>
             </header>
             {(error || saved) && <div className={`mb-4 border p-3 text-sm ${error ? "border-accent-red/30 bg-accent-red/10 text-accent-red" : "border-accent-green/30 bg-accent-green/10 text-accent-green"}`}>{error || saved}</div>}
             <div className="mb-4 flex border-b border-white/[0.08]">
@@ -367,6 +398,32 @@ export default function LinkedInWorkspacePage() {
         )}
       </main>
       </div>
+      {deleteOpen && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="presentation">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-linkedin-profile-title"
+            className="w-full max-w-md border border-accent-red/30 bg-card shadow-2xl"
+          >
+            <div className="border-b border-white/[0.08] p-5">
+              <div className="flex h-10 w-10 items-center justify-center border border-accent-red/30 bg-accent-red/10 text-accent-red"><Trash2 size={18} /></div>
+              <h2 id="delete-linkedin-profile-title" className="mt-4 text-lg font-bold">Delete this profile permanently?</h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">{selected.name}</span> and its {selected.revisions?.length || selected._count?.revisions || 0} saved revision{(selected.revisions?.length || selected._count?.revisions || 0) === 1 ? "" : "s"} will be deleted. This cannot be undone.
+              </p>
+              {selected.isPrimary && <p className="mt-3 border border-primary/20 bg-primary/10 p-3 text-xs text-primary">This is your primary profile. KithNode will promote the most recently updated remaining profile.</p>}
+            </div>
+            <div className="flex justify-end gap-2 p-4">
+              <button type="button" onClick={() => setDeleteOpen(false)} disabled={busy === "delete"} className="border border-white/10 px-4 py-2 text-sm disabled:opacity-50">Cancel</button>
+              <button type="button" onClick={deleteProfile} disabled={busy === "delete"} className="flex items-center gap-2 bg-accent-red px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                {busy === "delete" ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Delete permanently
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

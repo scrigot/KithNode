@@ -2,9 +2,9 @@
 //
 // Ported from backend/app/core/contact_finder.py. For each candidate
 // company, walks the well-known team / about / leadership page paths and
-// scrapes person cards with cheerio. Falls back to a DDG LinkedIn dork
-// (`site:linkedin.com/in "Company Name" analyst`) when the team page
-// returns nothing useful. Every extracted name flows through
+// scrapes person cards with cheerio. It deliberately does not search or fetch
+// LinkedIn; the Guided Research workspace generates links the user may open.
+// Every extracted name flows through
 // isValidPersonName() before it can become a ContactCandidate.
 //
 // Identity anchoring: every candidate carries a `sourceUrl` that points
@@ -15,12 +15,10 @@
 
 import * as cheerio from "cheerio";
 import { isLikelyPersonName } from "./name-validator";
-import { decodeDdgHref } from "./entity-finder";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-const DDG_HTML_URL = "https://html.duckduckgo.com/html/";
 
 // Common path conventions for company "team / about / leadership" pages.
 // Lifted from contact_finder.py:TEAM_PATHS, ordered most-likely-first
@@ -217,69 +215,10 @@ export function extractPeopleFromHtml(
  * fix for the Python bot's v1 false-attribution bug.
  */
 export async function searchLinkedInContacts(
-  companyName: string,
-  companyDomain: string,
+  _companyName: string,
+  _companyDomain: string,
 ): Promise<ContactCandidate[]> {
-  const query = `site:linkedin.com/in "${companyName}" analyst OR associate OR founder OR CEO OR "managing director"`;
-  const params = new URLSearchParams({ q: query });
-  let html: string;
-  try {
-    const res = await fetch(`${DDG_HTML_URL}?${params}`, {
-      headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
-      redirect: "follow",
-    });
-    if (!res.ok) return [];
-    html = await res.text();
-  } catch {
-    return [];
-  }
-
-  const $ = cheerio.load(html);
-  const out: ContactCandidate[] = [];
-  const seen = new Set<string>();
-  const companyLower = companyName.toLowerCase();
-  const domainStem = companyDomain.split(".")[0]?.toLowerCase() || "";
-
-  $(".result").each((_, el) => {
-    const $el = $(el);
-    const linkEl = $el.find("a.result__a").first();
-    const titleText = linkEl.text().trim();
-    const url = decodeDdgHref(linkEl.attr("href") || "");
-    if (!url.includes("linkedin.com/in/")) return;
-
-    // LinkedIn result titles look like: "Name - Title - Company | LinkedIn"
-    const cleaned = titleText.replace(" | LinkedIn", "").trim();
-    const parts = cleaned.split(" - ").map((p) => p.trim());
-    const name = parts[0] || "";
-    const role = parts[1] || "Unknown";
-
-    // Identity anchoring: the company name must appear in the LinkedIn
-    // title's company segment(s) — not anywhere in the snippet. The
-    // snippet is summary text and frequently says "...has nothing to do
-    // with Acme..." which would false-positive a substring check.
-    const companySegments = parts.slice(2).map((p) => p.toLowerCase()).join(" ");
-    const anchored =
-      companySegments.includes(companyLower) ||
-      (!!domainStem && companySegments.includes(domainStem));
-    if (!anchored) return;
-
-    if (!isLikelyPersonName(name)) return;
-    const key = name.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-
-    out.push({
-      name,
-      title: role,
-      company: companyName,
-      companyDomain,
-      linkedinUrl: url,
-      source: "linkedin_search",
-      sourceUrl: url,
-    });
-  });
-
-  return out;
+  return [];
 }
 
 // ── Orchestration ─────────────────────────────────────────────────────
@@ -291,7 +230,7 @@ export async function findContacts(
   const {
     maxPerCompany = 3,
     throttleMs = 1000,
-    skipLinkedInFallback = false,
+    skipLinkedInFallback = true,
     onProgress,
     signal,
   } = options;

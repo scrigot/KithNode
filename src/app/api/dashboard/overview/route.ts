@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { redactName } from "@/lib/redact";
 import { isUnlocked } from "@/lib/contact-access";
 import { selectOverdueLeads } from "@/lib/leads/overdue";
+import { isCurrentUndergraduateProfile } from "@/lib/jobs/matching";
 
 interface RecentActivity {
   type: "rate" | "pipeline_add" | "pipeline_move";
@@ -257,11 +258,12 @@ export async function GET() {
 
     const { data: userRow } = await supabase
       .from("User")
-      .select("recruitingDate, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
+      .select("recruitingDate, graduationYear, university, major, degrees, educations, weeklyGoalTarget, subscriptionStatus, subscriptionPlan, trialEndsAt, subscriptionEndsAt, stripeCustomerId")
       .eq("email", userEmail)
       .maybeSingle();
 
     const recruitingDate: string | null = userRow?.recruitingDate ?? null;
+    const isCurrentUndergraduate = isCurrentUndergraduateProfile(userRow || {}, now);
     const weeklyGoalTarget: number = userRow?.weeklyGoalTarget ?? 3;
     let subscriptionStatus: string = userRow?.subscriptionStatus ?? "trial";
     const subscriptionPlan: string | null = userRow?.subscriptionPlan ?? null;
@@ -330,7 +332,9 @@ export async function GET() {
         : topOverdue[0]
           ? { kind: "relationship_follow_up", title: `Follow up with ${topOverdue[0].contactName}`, detail: `${topOverdue[0].days} days since the last ${topOverdue[0].stage.toLowerCase()} action.`, href: "/dashboard/contacts" }
           : activeApplications === 0
-            ? { kind: "find_jobs", title: "Find five matching roles", detail: "Start with official listings scored against your profile and network.", href: "/dashboard/assistant?skill=find-jobs" }
+            ? isCurrentUndergraduate
+              ? { kind: "find_internships", title: "Find five student opportunities", detail: "Search official internship and undergraduate-program listings scored against your profile and network.", href: "/dashboard/assistant?skill=find-internships" }
+              : { kind: "find_jobs", title: "Find five matching roles", detail: "Start with official listings scored against your profile and network.", href: "/dashboard/assistant?skill=find-jobs" }
             : { kind: "network", title: "Strengthen your next warm path", detail: "Review the three highest-value relationship actions below.", href: "/dashboard/contacts" };
 
     let referralCount = 0;

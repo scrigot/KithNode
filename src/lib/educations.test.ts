@@ -6,6 +6,7 @@ import {
   flatFromEducations,
   firmsFromExperiences,
   formatExperiencePeriod,
+  mergePrimaryExperience,
   MAX_EDUCATIONS,
   MAX_EXPERIENCES,
 } from "./educations";
@@ -73,6 +74,18 @@ describe("formatExperiencePeriod", () => {
     expect(formatExperiencePeriod({ start: "Jun 2025", end: "Present" })).toBe("Jun 2025 - Present");
     expect(formatExperiencePeriod({ start: "Summer 2026", end: "" })).toBe("Summer 2026");
     expect(formatExperiencePeriod({ start: "", end: "" })).toBe("");
+  });
+});
+
+describe("mergePrimaryExperience", () => {
+  it("repairs legacy timelines that omitted the headline role", () => {
+    expect(mergePrimaryExperience(
+      [{ title: "Claude Partner", firm: "Anthropic", start: "Jun 2026", end: "Present" }],
+      { title: "Junior Solutions Architect", firm: "Red Hat" },
+    )).toEqual([
+      { title: "Junior Solutions Architect", firm: "Red Hat", start: "", end: "Present" },
+      { title: "Claude Partner", firm: "Anthropic", start: "Jun 2026", end: "Present" },
+    ]);
   });
 });
 

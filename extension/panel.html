@@ -4,57 +4,61 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="panel.css">
-<title>KithNode Clipper</title>
+<title>KithNode Research Companion</title>
 </head>
 <body>
   <header>
-    <span class="mark">Kith<b>Node</b> clipper</span>
+    <span class="mark">Kith<b>Node</b> research</span>
   </header>
 
   <main>
-    <button id="parse" class="btn primary">Read this profile</button>
-    <div id="loading" class="loading" hidden>
-      <span class="spinner"></span>
-      <span>Reading the active LinkedIn profile…</span>
-    </div>
-    <p id="hint" class="hint">Open a linkedin.com/in/ profile, then click above.</p>
+    <section class="boundary">
+      <b>Private companion</b>
+      <p>No page reading, scrolling, crawling, cookies, messages, or automatic saves. You choose what to open and what to record.</p>
+    </section>
 
-    <form id="form" hidden>
-      <label>Name <input name="name" autocomplete="off"></label>
-      <label>Title <input name="title" autocomplete="off"></label>
-      <label>Firm <input name="firmName" autocomplete="off"></label>
+    <form id="form">
+      <label>Research company <input name="targetCompany" autocomplete="off" placeholder="e.g. Deloitte"></label>
+      <label>Target role <input name="targetRole" autocomplete="off" placeholder="e.g. Strategy analyst"></label>
+      <button type="button" id="openSearch" class="btn">Open focused LinkedIn search ↗</button>
+
+      <div class="divider"><span>Facts you reviewed</span></div>
+      <label>Name <input name="name" autocomplete="off" placeholder="required"></label>
+      <label>Profile headline <input name="title" autocomplete="off"></label>
+      <label>Primary firm <input name="firmName" autocomplete="off"></label>
+      <section class="positions" aria-labelledby="positions-title">
+        <div class="positions-head">
+          <div>
+            <h2 id="positions-title">Current positions</h2>
+            <p>Keep simultaneous roles separate.</p>
+          </div>
+          <button type="button" id="addPosition" class="mini-btn">+ Add</button>
+        </div>
+        <div id="positionList" class="position-list"></div>
+        <p id="positionEmpty" class="empty-note">No structured positions yet.</p>
+      </section>
       <label>Education <input name="education" autocomplete="off"></label>
+      <section class="skills" aria-labelledby="skills-title">
+        <div class="skills-head">
+          <div>
+            <h2 id="skills-title">Professional skills</h2>
+            <p>Paste the full LinkedIn list. AI and finance skills become searchable.</p>
+          </div>
+          <span id="skillCount">0 / 100</span>
+        </div>
+        <div id="skillList" class="skill-list"></div>
+        <div class="skill-entry">
+          <input id="skillInput" autocomplete="off" placeholder="Paste skills, or type one and press Enter">
+          <button type="button" id="addSkill" class="mini-btn">Add</button>
+        </div>
+      </section>
       <label>Location <input name="location" autocomplete="off"></label>
-      <label>Industry
-        <select name="industry">
-          <option value="">Select industry…</option>
-          <option>AI Consulting</option>
-          <option>AI Engineering</option>
-          <option>Data Engineering</option>
-          <option>Data Analytics</option>
-          <option>Data Science</option>
-          <option>Data Services</option>
-          <option>ML Infrastructure</option>
-          <option>LLM / RAG</option>
-          <option>AI Product / Ops</option>
-          <option>Enterprise AI</option>
-          <option>Cloud / DevOps</option>
-          <option>Cybersecurity</option>
-          <option>Startup / Founder</option>
-          <option>Venture / Ecosystem</option>
-          <option>Consulting</option>
-          <option>Other</option>
-        </select>
-      </label>
-      <label>Email <input name="email" type="email" autocomplete="off" placeholder="optional"></label>
-      <label>LinkedIn URL <input name="linkedInUrl" autocomplete="off"></label>
-      <label>Notes <textarea name="notes" autocomplete="off" placeholder="why this person is useful to remember"></textarea></label>
+      <label>LinkedIn profile URL <input name="linkedInUrl" autocomplete="off" placeholder="https://www.linkedin.com/in/..."></label>
+      <label>Why relevant <textarea name="whyRelevant" autocomplete="off" placeholder="connection hypothesis or recruiting value"></textarea></label>
+      <label>Private notes <textarea name="notes" autocomplete="off" placeholder="questions, follow-up context, caveats"></textarea></label>
 
       <div class="actions">
-        <button type="button" id="copyJson" class="btn">Copy JSON</button>
-        <button type="button" id="copyCsv" class="btn">Copy CSV row</button>
-        <button type="button" id="saveProfile" class="btn">Save profile copy</button>
-        <button type="button" id="send" class="btn primary">Add to Discover</button>
+        <button type="button" id="saveDraft" class="btn primary">Send to KithNode review</button>
       </div>
       <p id="status" class="status"></p>
     </form>
@@ -67,7 +71,7 @@
       <label>Pairing token
         <input id="pairingToken" type="password" placeholder="knx_…" autocomplete="off">
       </label>
-      <p class="hint">Create a revocable token in KithNode Integrations. The extension captures only the profile you open and review.</p>
+      <p class="hint">Create a revocable 90-day token in KithNode Settings → Integrations. The token can create research drafts only.</p>
     </details>
   </main>
 

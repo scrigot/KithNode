@@ -16,7 +16,13 @@
 ## Blocked
 - (none)
 
+## Later / demand-gated
+- [ ] [Product/Eng][G1] Complete legal/privacy review before distributing the private no-DOM research companion beyond the owner.
+- [ ] [Product/Eng][G1] Add persisted cross-device research sessions only if local drafts and same-device handoff prove insufficient.
+- [ ] [Product/Eng][G1] Evaluate LinkedIn OIDC beyond basic identity only after product access is approved.
+
 ## Done (recent; see build-log.md for detail)
+- [x] [Product/Eng][G0] Guided Network Research release zero: intent-first Discover desk, private draft queue, transactional field-level commits with provenance, owner-safe shared overlays, removal of automated LinkedIn reads, and an owner-only no-DOM Chrome companion (2026-07-21; 1,191 tests, migration verification, lint, production build, and authenticated desktop/mobile visual QA passed)
 - [x] [Product/Eng][G0] Recruiting workstation: canonical Applications + timeline APIs, five-hub navigation, nested Settings, action-first Overview, Career Toolkit, responsive mobile pipeline, DESIGN.md, and fixture-only `/demo` (2026-07-20; 1,191 tests, migration verification, lint, and production build passed locally)
 - [x] KN-FU1: GET privacy-blanking regression tests (0907d5b)
 - [x] KN-FU2: findPoolRow `.single()` to `.maybeSingle()` (5182b5f)

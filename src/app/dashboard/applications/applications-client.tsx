@@ -21,9 +21,12 @@ import { apiFetch } from "@/lib/api-client";
 import {
   OPPORTUNITY_PRIORITIES,
   OPPORTUNITY_STATUSES,
+  OPPORTUNITY_TYPES,
+  opportunityTypeLabel,
   statusLabel,
   type OpportunityPriority,
   type OpportunityStatus,
+  type OpportunityType,
 } from "@/lib/opportunities";
 import { MetricStrip, StatusBadge, WorkspaceError, WorkspaceHeader, WorkspaceLoading } from "@/components/workspace-ui";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -51,6 +54,7 @@ type Opportunity = {
   sourceFreshAt: string | null;
   status: OpportunityStatus;
   priority: OpportunityPriority;
+  opportunityType: OpportunityType;
   season: string;
   notes: string;
   nextAction: string;
@@ -69,7 +73,7 @@ type Opportunity = {
 };
 
 type View = "table" | "board";
-type Filters = { q: string; status: string; priority: string; deadline: string; sort: string };
+type Filters = { q: string; status: string; priority: string; opportunityType: string; deadline: string; sort: string };
 
 const ACTIVE_BOARD_STATUSES: OpportunityStatus[] = ["discovered", "saved", "preparing", "applied", "assessment", "interview", "offer"];
 const TERMINAL = new Set<OpportunityStatus>(["accepted", "rejected", "withdrawn", "archived"]);
@@ -102,7 +106,7 @@ export function ApplicationsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("table");
-  const [filters, setFilters] = useState<Filters>({ q: "", status: "", priority: "", deadline: "", sort: "activity_desc" });
+  const [filters, setFilters] = useState<Filters>({ q: "", status: "", priority: "", opportunityType: "", deadline: "", sort: "activity_desc" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -188,6 +192,7 @@ export function ApplicationsClient() {
           company: form.get("company"), role: form.get("role"), location: form.get("location"),
           jobUrl: form.get("jobUrl"), deadline: isoOrNull(String(form.get("deadline") || "")),
           status: form.get("status"), priority: form.get("priority"), source: "manual",
+          opportunityType: form.get("opportunityType"),
           nextAction: form.get("nextAction"),
         }),
       });
@@ -207,7 +212,7 @@ export function ApplicationsClient() {
     if (!selected) return;
     const form = new FormData(event.currentTarget);
     await updateOpportunity(selected.id, {
-      status: form.get("status"), priority: form.get("priority"), season: form.get("season"),
+      status: form.get("status"), priority: form.get("priority"), opportunityType: form.get("opportunityType"), season: form.get("season"),
       deadline: isoOrNull(String(form.get("deadline") || "")), nextAction: form.get("nextAction"),
       nextActionDue: isoOrNull(String(form.get("nextActionDue") || "")), notes: form.get("notes"),
       description: form.get("description"),
@@ -259,10 +264,11 @@ export function ApplicationsClient() {
       {undo ? <div className="fixed bottom-20 right-4 z-40 flex items-center gap-3 border border-white/[0.14] bg-bg-secondary p-3 shadow-2xl lg:bottom-4"><span className="text-sm text-text-primary">Application moved</span><button type="button" onClick={() => { const item = items.find((row) => row.id === undo.id); if (item) void moveStatus(item, undo.status, false); setUndo(null); }} className="min-h-11 px-3 font-bold text-accent-teal"><Undo2 className="mr-2 inline h-4 w-4" />Undo</button></div> : null}
 
       <section className="border-b border-white/[0.08] bg-bg-secondary px-4 py-3 sm:px-6" aria-label="Application filters">
-        <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(140px,auto))]">
+        <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(132px,auto))]">
           <label className="relative"><span className="sr-only">Search applications</span><Search className="absolute left-3 top-3.5 h-4 w-4 text-text-muted" /><input value={filters.q} onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))} placeholder="Search company, role, location" className={`${inputClass} pl-10`} /></label>
           <FilterSelect label="Status" allLabel="All statuses" value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={OPPORTUNITY_STATUSES.map((status) => ({ value: status, label: statusLabel(status) }))} />
           <FilterSelect label="Priority" allLabel="All priorities" value={filters.priority} onChange={(value) => setFilters((current) => ({ ...current, priority: value }))} options={OPPORTUNITY_PRIORITIES.map((priority) => ({ value: priority, label: statusLabel(priority) }))} />
+          <FilterSelect label="Type" allLabel="All types" value={filters.opportunityType} onChange={(value) => setFilters((current) => ({ ...current, opportunityType: value }))} options={OPPORTUNITY_TYPES.map((type) => ({ value: type, label: opportunityTypeLabel(type) }))} />
           <FilterSelect label="Deadline" value={filters.deadline} onChange={(value) => setFilters((current) => ({ ...current, deadline: value }))} options={[{ value: "upcoming", label: "Next 14 days" }, { value: "overdue", label: "Overdue" }, { value: "none", label: "No deadline" }]} />
           <FilterSelect label="Sort" value={filters.sort} onChange={(value) => setFilters((current) => ({ ...current, sort: value }))} showAll={false} options={[{ value: "activity_desc", label: "Recent activity" }, { value: "deadline_asc", label: "Deadline" }, { value: "fit_desc", label: "Best fit" }, { value: "company_asc", label: "Company" }]} />
         </div>
@@ -277,7 +283,7 @@ export function ApplicationsClient() {
           <form onSubmit={addApplication} className="space-y-4 px-5 pb-8">
             <Field label="Company" name="company" required /><Field label="Role" name="role" required /><Field label="Location" name="location" />
             <Field label="Official listing URL" name="jobUrl" type="url" placeholder="Optional" /><Field label="Deadline" name="deadline" type="date" />
-            <div className="grid gap-3 sm:grid-cols-2"><SelectField label="Status" name="status" defaultValue="saved" options={OPPORTUNITY_STATUSES} /><SelectField label="Priority" name="priority" defaultValue="medium" options={OPPORTUNITY_PRIORITIES} /></div>
+            <div className="grid gap-3 sm:grid-cols-3"><SelectField label="Status" name="status" defaultValue="saved" options={OPPORTUNITY_STATUSES} /><SelectField label="Priority" name="priority" defaultValue="medium" options={OPPORTUNITY_PRIORITIES} /><TypeSelectField label="Type" name="opportunityType" defaultValue="job" /></div>
             <Field label="Next action" name="nextAction" placeholder="Ask Alex for an introduction" />
             <button disabled={saving} className="min-h-11 w-full bg-accent-teal px-4 font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Add to Applications"}</button>
           </form>
@@ -288,10 +294,10 @@ export function ApplicationsClient() {
         <SheetContent className="w-full overflow-y-auto border-white/[0.1] bg-bg-secondary sm:max-w-2xl">
           {selected ? <>
             <SheetHeader className="border-b border-white/[0.08] px-5 py-5 pr-14"><SheetTitle className="text-xl">{selected.role}</SheetTitle><SheetDescription>{selected.company}{selected.location ? ` · ${selected.location}` : ""}</SheetDescription></SheetHeader>
-            <div className="flex flex-wrap gap-2 px-5"><StatusBadge tone={statusTone(selected.status)}>{statusLabel(selected.status)}</StatusBadge><StatusBadge>{statusLabel(selected.priority)} priority</StatusBadge>{selected.fitScore ? <StatusBadge tone="info">{selected.fitScore}% fit</StatusBadge> : null}{selected.networkScore ? <StatusBadge tone="success">{selected.networkScore}% network</StatusBadge> : null}</div>
+            <div className="flex flex-wrap gap-2 px-5"><StatusBadge tone={statusTone(selected.status)}>{statusLabel(selected.status)}</StatusBadge><StatusBadge tone="info">{opportunityTypeLabel(selected.opportunityType)}</StatusBadge><StatusBadge>{statusLabel(selected.priority)} priority</StatusBadge>{selected.fitScore ? <StatusBadge tone="info">{selected.fitScore}% fit</StatusBadge> : null}{selected.networkScore ? <StatusBadge tone="success">{selected.networkScore}% network</StatusBadge> : null}</div>
             <div className="flex flex-wrap gap-2 px-5"><ExternalListing opportunity={selected} /><button type="button" disabled={saving} onClick={generateResume} className="min-h-11 border border-sky-400/30 bg-sky-400/10 px-3 font-bold text-sky-200"><FilePlus2 className="mr-2 inline h-4 w-4" />Create resume variant</button></div>
             <form onSubmit={saveDetails} className="space-y-4 border-y border-white/[0.08] px-5 py-5">
-              <div className="grid gap-3 sm:grid-cols-2"><SelectField label="Status" name="status" defaultValue={selected.status} options={OPPORTUNITY_STATUSES} /><SelectField label="Priority" name="priority" defaultValue={selected.priority} options={OPPORTUNITY_PRIORITIES} /></div>
+              <div className="grid gap-3 sm:grid-cols-3"><SelectField label="Status" name="status" defaultValue={selected.status} options={OPPORTUNITY_STATUSES} /><SelectField label="Priority" name="priority" defaultValue={selected.priority} options={OPPORTUNITY_PRIORITIES} /><TypeSelectField label="Type" name="opportunityType" defaultValue={selected.opportunityType} /></div>
               <div className="grid gap-3 sm:grid-cols-3"><Field label="Season" name="season" defaultValue={selected.season} /><Field label="Deadline" name="deadline" type="date" defaultValue={dateInput(selected.deadline)} /><Field label="Next action due" name="nextActionDue" type="date" defaultValue={dateInput(selected.nextActionDue)} /></div>
               <Field label="Next action" name="nextAction" defaultValue={selected.nextAction} />
               <TextArea label="Notes" name="notes" defaultValue={selected.notes} rows={4} /><TextArea label="Job description" name="description" defaultValue={selected.description} rows={7} />
@@ -323,6 +329,10 @@ function SelectField({ label, options, ...props }: React.SelectHTMLAttributes<HT
   return <label><span className={labelClass}>{label}</span><select {...props} className={inputClass}>{options.map((option) => <option key={option} value={option}>{statusLabel(option)}</option>)}</select></label>;
 }
 
+function TypeSelectField({ label, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+  return <label><span className={labelClass}>{label}</span><select {...props} className={inputClass}>{OPPORTUNITY_TYPES.map((type) => <option key={type} value={type}>{opportunityTypeLabel(type)}</option>)}</select></label>;
+}
+
 function ExternalListing({ opportunity }: { opportunity: Opportunity }) {
   const href = opportunity.applyUrl || opportunity.jobUrl;
   if (!href?.startsWith("http")) return null;
@@ -330,11 +340,11 @@ function ExternalListing({ opportunity }: { opportunity: Opportunity }) {
 }
 
 function EmptyApplications({ onAdd }: { onAdd: () => void }) {
-  return <div className="mx-auto flex min-h-[430px] max-w-2xl items-center px-5"><div className="w-full border-y border-white/[0.1] py-10 text-left"><BriefcaseBusiness className="h-8 w-8 text-accent-teal" /><h2 className="mt-4 font-heading text-2xl font-semibold text-text-primary">Start your recruiting pipeline</h2><p className="mt-2 max-w-xl text-base leading-6 text-text-secondary">Add a role you are considering or ask Career Copilot to find five evidence-backed matches. Every saved role will appear here with its deadline, contacts, resume, and next action.</p><div className="mt-6 flex flex-wrap gap-2"><button type="button" onClick={onAdd} className="min-h-11 bg-accent-teal px-4 font-bold text-white"><Plus className="mr-2 inline h-4 w-4" />Add application</button><Link href="/dashboard/assistant?skill=find-jobs" className="inline-flex min-h-11 items-center border border-white/[0.14] px-4 font-bold text-text-primary"><Sparkles className="mr-2 h-4 w-4 text-accent-teal" />Find matching jobs</Link></div></div></div>;
+  return <div className="mx-auto flex min-h-[430px] max-w-2xl items-center px-5"><div className="w-full border-y border-white/[0.1] py-10 text-left"><BriefcaseBusiness className="h-8 w-8 text-accent-teal" /><h2 className="mt-4 font-heading text-2xl font-semibold text-text-primary">Start your recruiting pipeline</h2><p className="mt-2 max-w-xl text-base leading-6 text-text-secondary">Add a role you are considering or ask Career Copilot to find five student-eligible internships. Every saved opportunity will appear here with its season, deadline, contacts, resume, and next action.</p><div className="mt-6 flex flex-wrap gap-2"><button type="button" onClick={onAdd} className="min-h-11 bg-accent-teal px-4 font-bold text-white"><Plus className="mr-2 inline h-4 w-4" />Add application</button><Link href="/dashboard/assistant?skill=find-internships" className="inline-flex min-h-11 items-center border border-white/[0.14] px-4 font-bold text-text-primary"><Sparkles className="mr-2 h-4 w-4 text-accent-teal" />Find internships</Link></div></div></div>;
 }
 
 function ApplicationTable({ items, onOpen, onStatus }: { items: Opportunity[]; onOpen: (id: string) => void; onStatus: (item: Opportunity, status: OpportunityStatus) => void }) {
-  return <div className="p-3 sm:p-5"><div className="hidden overflow-x-auto border border-white/[0.08] md:block"><table className="w-full min-w-[1050px] border-collapse text-left"><thead className="bg-bg-secondary"><tr>{["Company / role", "Status", "Priority", "Deadline", "Fit / network", "Resume", "Next action", "Contacts", "Updated"].map((label) => <th key={label} className="border-b border-white/[0.08] px-3 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-text-muted">{label}</th>)}</tr></thead><tbody>{items.map((item) => <tr key={item.id} onClick={() => onOpen(item.id)} className="cursor-pointer border-b border-white/[0.06] hover:bg-white/[0.025]"><td className="px-3 py-3"><p className="text-base font-semibold text-text-primary">{item.company}</p><p className="text-sm text-text-secondary">{item.role}{item.location ? ` · ${item.location}` : ""}</p></td><td className="px-3 py-3" onClick={(event) => event.stopPropagation()}><select aria-label={`Status for ${item.company}`} value={item.status} onChange={(event) => void onStatus(item, event.target.value as OpportunityStatus)} className="min-h-11 border border-white/[0.1] bg-bg-primary px-2 text-sm text-text-primary">{OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td><td className="px-3 py-3"><StatusBadge>{item.priority}</StatusBadge></td><td className="px-3 py-3 font-mono text-sm text-text-secondary">{displayDate(item.deadline)}</td><td className="px-3 py-3 font-mono text-sm"><span className="text-sky-300">{item.fitScore || "—"}</span><span className="text-text-muted"> / </span><span className="text-emerald-300">{item.networkScore || "—"}</span></td><td className="px-3 py-3 text-sm text-text-secondary">{item.resumeId ? "Attached" : "—"}</td><td className="max-w-[220px] px-3 py-3 text-sm text-text-secondary"><span className="line-clamp-2">{item.nextAction || "Add next action"}</span></td><td className="px-3 py-3 font-mono text-sm text-text-secondary">{item.contacts?.length || 0}</td><td className="px-3 py-3 font-mono text-[12px] text-text-muted">{displayDate(item.lastActivityAt)}</td></tr>)}</tbody></table></div><div className="space-y-2 md:hidden">{items.map((item) => <button key={item.id} type="button" onClick={() => onOpen(item.id)} className="w-full border border-white/[0.08] bg-card p-4 text-left"><div className="flex items-start justify-between gap-3"><div><p className="text-base font-semibold text-text-primary">{item.company}</p><p className="text-sm text-text-secondary">{item.role}</p></div><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge></div><div className="mt-4 grid grid-cols-2 gap-3 text-sm text-text-secondary"><span><CalendarClock className="mr-1 inline h-4 w-4" />{displayDate(item.deadline)}</span><span><Users className="mr-1 inline h-4 w-4" />{item.contacts?.length || 0} contacts</span></div>{item.nextAction ? <p className="mt-3 border-t border-white/[0.08] pt-3 text-sm text-text-primary">Next: {item.nextAction}</p> : null}</button>)}</div></div>;
+  return <div className="p-3 sm:p-5"><div className="hidden overflow-x-auto border border-white/[0.08] md:block"><table className="w-full min-w-[1050px] border-collapse text-left"><thead className="bg-bg-secondary"><tr>{["Company / role", "Status", "Priority", "Deadline", "Fit / network", "Resume", "Next action", "Contacts", "Updated"].map((label) => <th key={label} className="border-b border-white/[0.08] px-3 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-text-muted">{label}</th>)}</tr></thead><tbody>{items.map((item) => <tr key={item.id} onClick={() => onOpen(item.id)} className="cursor-pointer border-b border-white/[0.06] hover:bg-white/[0.025]"><td className="px-3 py-3"><div className="mb-1"><StatusBadge tone="info">{opportunityTypeLabel(item.opportunityType || "job")}</StatusBadge></div><p className="text-base font-semibold text-text-primary">{item.company}</p><p className="text-sm text-text-secondary">{item.role}{item.location ? ` · ${item.location}` : ""}</p></td><td className="px-3 py-3" onClick={(event) => event.stopPropagation()}><select aria-label={`Status for ${item.company}`} value={item.status} onChange={(event) => void onStatus(item, event.target.value as OpportunityStatus)} className="min-h-11 border border-white/[0.1] bg-bg-primary px-2 text-sm text-text-primary">{OPPORTUNITY_STATUSES.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td><td className="px-3 py-3"><StatusBadge>{item.priority}</StatusBadge></td><td className="px-3 py-3 font-mono text-sm text-text-secondary">{displayDate(item.deadline)}</td><td className="px-3 py-3 font-mono text-sm"><span className="text-sky-300">{item.fitScore || "—"}</span><span className="text-text-muted"> / </span><span className="text-emerald-300">{item.networkScore || "—"}</span></td><td className="px-3 py-3 text-sm text-text-secondary">{item.resumeId ? "Attached" : "—"}</td><td className="max-w-[220px] px-3 py-3 text-sm text-text-secondary"><span className="line-clamp-2">{item.nextAction || "Add next action"}</span></td><td className="px-3 py-3 font-mono text-sm text-text-secondary">{item.contacts?.length || 0}</td><td className="px-3 py-3 font-mono text-[12px] text-text-muted">{displayDate(item.lastActivityAt)}</td></tr>)}</tbody></table></div><div className="space-y-2 md:hidden">{items.map((item) => <button key={item.id} type="button" onClick={() => onOpen(item.id)} className="w-full border border-white/[0.08] bg-card p-4 text-left"><div className="flex items-start justify-between gap-3"><div><div className="mb-1"><StatusBadge tone="info">{opportunityTypeLabel(item.opportunityType || "job")}</StatusBadge></div><p className="text-base font-semibold text-text-primary">{item.company}</p><p className="text-sm text-text-secondary">{item.role}</p></div><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge></div><div className="mt-4 grid grid-cols-2 gap-3 text-sm text-text-secondary"><span><CalendarClock className="mr-1 inline h-4 w-4" />{displayDate(item.deadline)}</span><span><Users className="mr-1 inline h-4 w-4" />{item.contacts?.length || 0} contacts</span></div>{item.nextAction ? <p className="mt-3 border-t border-white/[0.08] pt-3 text-sm text-text-primary">Next: {item.nextAction}</p> : null}</button>)}</div></div>;
 }
 
 function ApplicationBoard({ items, onOpen, onMove }: { items: Opportunity[]; onOpen: (id: string) => void; onMove: (item: Opportunity, status: OpportunityStatus) => void }) {

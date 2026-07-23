@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { normalizeFirmName } from "@/lib/normalize-firm";
+
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
+vi.mock("@/lib/user-prefs", () => ({ getUserPrefs: vi.fn() }));
+
+import { buildDiscoverSearchFilter } from "./route";
 
 // The discover route imports NextAuth (@/lib/auth), which can't be imported in
 // Vitest (it depends on next/server). The PostgREST filter sanitizer in
@@ -65,6 +71,13 @@ describe("discover q sanitization", () => {
 
   it("caps length at 100 characters", () => {
     expect(sanitize("a".repeat(250)).length).toBe(100);
+  });
+});
+
+describe("discover skill search", () => {
+  it("matches AI and finance keywords against reviewed skills", () => {
+    expect(buildDiscoverSearchFilter("Generative AI")).toContain("skills.ilike.%Generative AI%");
+    expect(buildDiscoverSearchFilter("Financial Modeling")).toContain("skills.ilike.%Financial Modeling%");
   });
 });
 

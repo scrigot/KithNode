@@ -95,44 +95,10 @@ describe("rankByRole", () => {
 });
 
 describe("searchLinkedInContacts", () => {
-  function mockHtml(html: string) {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(html, { status: 200, headers: { "content-type": "text/html" } }),
-    );
-  }
-
-  it("requires the company name (or domain stem) to appear in the snippet — identity anchoring", async () => {
-    mockHtml(`
-      <div class="result">
-        <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flinkedin.com%2Fin%2Falice">Alice Johnson - Analyst - Acme Capital | LinkedIn</a>
-        <a class="result__snippet">Analyst at Acme Capital. Based in NYC.</a>
-      </div>
-      <div class="result">
-        <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flinkedin.com%2Fin%2Fbob">Bob Builder - Director - Different Co | LinkedIn</a>
-        <a class="result__snippet">Director at Different Co. Has nothing to do with Acme.</a>
-      </div>
-    `);
-    const out = await searchLinkedInContacts("Acme Capital", "acme.com");
-    expect(out.map((p) => p.name)).toEqual(["Alice Johnson"]);
-    expect(out[0].sourceUrl).toBe("https://linkedin.com/in/alice");
-    expect(out[0].source).toBe("linkedin_search");
-  });
-
-  it("returns empty on fetch failure", async () => {
-    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("network"));
-    const out = await searchLinkedInContacts("Acme", "acme.com");
-    expect(out).toEqual([]);
-  });
-
-  it("rejects junk names that pass DDG but fail isValidPersonName", async () => {
-    mockHtml(`
-      <div class="result">
-        <a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Flinkedin.com%2Fin%2Fvp">VP Marketing - VP - Acme | LinkedIn</a>
-        <a class="result__snippet">VP at Acme</a>
-      </div>
-    `);
-    const out = await searchLinkedInContacts("Acme", "acme.com");
-    expect(out).toEqual([]);
+  it("is disabled and never makes an automated LinkedIn discovery request", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await expect(searchLinkedInContacts("Acme Capital", "acme.com")).resolves.toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

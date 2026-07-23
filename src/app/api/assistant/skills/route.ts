@@ -9,6 +9,8 @@ export async function GET() {
 
   return NextResponse.json({
     enabled: serverEnv().ENABLE_CAREER_SKILLS !== "false",
+    discoveryEnabled: serverEnv().ENABLE_JOB_DISCOVERY !== "false",
+    searchConfigured: Boolean(serverEnv().BRAVE_SEARCH_API_KEY),
     skills: CAREER_SKILLS,
   });
 }

@@ -21,6 +21,7 @@
 // streaming reader. Anything past validation is streamed.
 
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { getUserPrefs } from "@/lib/user-prefs";
@@ -301,31 +302,81 @@ export async function POST(request: NextRequest) {
             };
 
             let existingId: string | undefined;
+            let existingOwner: string | undefined;
             if (record.linkedInUrl) {
               const { data } = await supabase
                 .from("AlumniContact")
-                .select("id")
+                .select("id,importedByUserId")
                 .eq("linkedInUrl", record.linkedInUrl)
                 .maybeSingle();
               existingId = data?.id;
+              existingOwner = data?.importedByUserId;
             }
             if (!existingId) {
               const { data } = await supabase
                 .from("AlumniContact")
-                .select("id")
+                .select("id,importedByUserId")
                 .eq("name", record.name)
                 .eq("firmName", record.firmName)
                 .eq("importedByUserId", userId)
                 .maybeSingle();
               existingId = data?.id;
+              existingOwner = data?.importedByUserId;
             }
 
             if (existingId) {
-              const { error } = await supabase
-                .from("AlumniContact")
-                .update(record)
-                .eq("id", existingId);
-              if (error) throw new Error(error.message);
+              if (!existingOwner || existingOwner === userId) {
+                const { error } = await supabase
+                  .from("AlumniContact")
+                  .update(record)
+                  .eq("id", existingId)
+                  .eq("importedByUserId", existingOwner || "");
+                if (error) throw new Error(error.message);
+              } else {
+                // The canonical profile belongs to another user. Link it into
+                // this user's network and keep this user's facts in their
+                // private overlay; never transfer or rewrite ownership.
+                const { data: existingLink } = await supabase
+                  .from("UserDiscover")
+                  .select("id")
+                  .eq("userId", userId)
+                  .eq("contactId", existingId)
+                  .maybeSingle();
+                if (existingLink) {
+                  await supabase
+                    .from("UserDiscover")
+                    .update({ rating: "high_value" })
+                    .eq("id", existingLink.id)
+                    .eq("userId", userId);
+                } else {
+                  await supabase.from("UserDiscover").insert({
+                    id: randomUUID(),
+                    userId,
+                    contactId: existingId,
+                    rating: "high_value",
+                  });
+                }
+                const { data: priorOverlay } = await supabase
+                  .from("contact_override")
+                  .select("overrides")
+                  .eq("user_id", userId)
+                  .eq("contact_id", existingId)
+                  .maybeSingle();
+                await supabase.from("contact_override").upsert(
+                  {
+                    user_id: userId,
+                    contact_id: existingId,
+                    overrides: {
+                      ...((priorOverlay?.overrides as Record<string, unknown>) ?? {}),
+                      name: record.name,
+                      title: record.title,
+                      firmName: record.firmName,
+                    },
+                    updated_at: new Date().toISOString(),
+                  },
+                  { onConflict: "user_id,contact_id" },
+                );
+              }
               updated++;
             } else {
               const { error } = await supabase

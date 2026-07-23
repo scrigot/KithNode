@@ -37,6 +37,7 @@ const POOL_CONTACT = {
   tier: "hot",
   graduationYear: 2018,
   industry: "Investment Banking",
+  skills: "Financial Modeling, Generative AI",
   // Owner's private relationship data — all of this must be stripped.
   importedByUserId: "owner@example.com",
   isFriend: true,
@@ -187,6 +188,7 @@ describe("poolSafeContact (high_value unlock shape)", () => {
     expect(r.linkedInUrl).toBe("https://linkedin.com/in/jacob-goldstein");
     expect(r.location).toBe("New York, NY");
     expect(r.education).toBe("UNC 2018");
+    expect(r.skills).toBe("Financial Modeling, Generative AI");
   });
 });
 

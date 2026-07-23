@@ -1,11 +1,13 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import { supabase } from "@/lib/supabase";
 import { CareerSkillId, getCareerSkill, parseSlashSkill } from "@/lib/assistant/skills";
-import { detectJobSource, fetchPublicJobs } from "@/lib/jobs/adapters";
-import { resolveOfficialJobSource } from "@/lib/jobs/brave";
+import { fetchPublicJobDetails, fetchPublicJobs, type PublicJob } from "@/lib/jobs/adapters";
+import { adjacentCuratedJobSources, canonicalCompanyKey, CURATED_JOB_SOURCES, findCuratedJobSource } from "@/lib/jobs/catalog";
+import { listJobSources, resolveJobSources, saveJobSource, type JobSourceRecord } from "@/lib/jobs/source-service";
 import { serverEnv } from "@/lib/env/server";
 import { AssistantDatabaseError } from "@/lib/assistant/repository";
+import { normalizeLinkedInProfile } from "@/lib/linkedin-profile/schema";
+import { classifyInternshipListing, extractJobConcepts, type InternshipEligibility } from "@/lib/jobs/matching";
 
 type LooseRow = Record<string, any>;
 
@@ -36,10 +38,42 @@ export interface SkillResult {
   warnings: string[];
   freshness: string;
   proposedActions: SkillAction[];
+  status?: "complete" | "partial" | "needs_setup";
+  sourceStatus?: Array<{
+    company: string;
+    state: "ready" | "needs_setup" | "failed";
+    provider?: string;
+    careerUrl?: string;
+    detail?: string;
+  }>;
+  setup?: {
+    kind: "job_sources";
+    unresolvedFirms: string[];
+    suggestedFirms: string[];
+    searchConfigured: boolean;
+    parameters: Record<string, unknown>;
+  };
 }
 
 const splitTerms = (value: string) => value.toLowerCase().split(/[^a-z0-9+#.]+/).filter((term) => term.length > 2);
-const companyKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+function parameterList(parameters: Record<string, unknown>, ...keys: string[]) {
+  return keys.flatMap((key) => {
+    const value = parameters[key];
+    if (Array.isArray(value)) return value.map(String);
+    return typeof value === "string" ? parseStoredList(value) : [];
+  }).map((item) => item.trim()).filter(Boolean);
+}
+
+function uniqueCompanies(values: string[], limit = 12) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = canonicalCompanyKey(value);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
+}
 function parseStoredList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean);
   const raw = String(value || "").trim();
@@ -69,18 +103,13 @@ async function contactsWithPipeline(userId: string, limit: number): Promise<Arra
   return contacts.map((contact) => ({ ...contact, pipelineEntries: grouped.get(String(contact.id)) || [] }));
 }
 
-async function upsertJobSource(userId: string, source: { company: string; provider: string; boardToken: string; careerUrl: string }) {
-  const now = new Date().toISOString();
-  const key = companyKey(source.company);
-  const existing = dataOrThrow<Record<string, any> | null>("find job source", await supabase.from("JobSource").select("id,createdAt").eq("userId", userId).eq("companyKey", key).eq("provider", source.provider).maybeSingle());
-  const result = await supabase.from("JobSource").upsert({ id: existing?.id || randomUUID(), userId, company: source.company, companyKey: key, provider: source.provider, boardToken: source.boardToken, careerUrl: source.careerUrl, active: true, lastError: "", createdAt: existing?.createdAt || now, updatedAt: now }, { onConflict: "userId,companyKey,provider" });
-  dataOrThrow("save job source", result);
-}
-
-export function inferCareerSkill(message: string): CareerSkillId | undefined {
+export function inferCareerSkill(message: string, context: { isCurrentUndergraduate?: boolean } = {}): CareerSkillId | undefined {
   const slash = parseSlashSkill(message);
   if (slash) return slash.id;
   const text = message.toLowerCase();
+  if (/\b(?:internships?|co[- ]?ops?|externships?|off[- ]cycle|summer analyst|insight weeks?|sophomore (?:leadership|program))\b/.test(text)) return "find_internships";
+  if (/\b(?:full[- ]?time|fte|experienced hire)\b/.test(text) && /find|match|show|opportunit|roles?|jobs?/.test(text)) return "find_jobs";
+  if (context.isCurrentUndergraduate && /find|match|show|recommend/.test(text) && /opportunit(?:y|ies)|roles?|positions?|openings?/.test(text)) return "find_internships";
   if (/find|match|show/.test(text) && /jobs?|roles?|offers?/.test(text)) return "find_jobs";
   if (/enrich|missing (data|info|fields)|needs? more info/.test(text)) return "enrichment_gaps";
   if (/firm|compan/.test(text) && /coverage|meet more|network gap|know more/.test(text)) return "firm_coverage";
@@ -93,89 +122,224 @@ function cleanParameters(parameters: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(parameters).filter(([, value]) => typeof value === "string" || typeof value === "number" || typeof value === "boolean" || Array.isArray(value)));
 }
 
-async function findJobs(userId: string, userEmail: string, parameters: Record<string, unknown>): Promise<SkillResult> {
+type DiscoveryMode = "internship" | "full_time";
+
+function discoveryCopy(mode: DiscoveryMode) {
+  return mode === "internship"
+    ? { skillId: "find_internships" as const, noun: "internships", title: "Find internships", resultTitle: "Top internship matches" }
+    : { skillId: "find_jobs" as const, noun: "jobs", title: "Find jobs", resultTitle: "Top job matches" };
+}
+
+async function hydrateInternshipShortlist(
+  jobs: PublicJob[],
+  sources: JobSourceRecord[],
+  onProgress?: (message: string) => void | Promise<void>,
+) {
+  const titleShortlist = jobs.filter((job) => classifyInternshipListing(job.role).eligible).slice(0, 40);
+  const sourceByCompany = new Map(sources.map((source) => [canonicalCompanyKey(source.company), source]));
+  const hydrated: PublicJob[] = [];
+  const warnings: string[] = [];
+  for (let index = 0; index < titleShortlist.length; index += 4) {
+    const batch = titleShortlist.slice(index, index + 4);
+    const results = await Promise.allSettled(batch.map(async (job) => {
+      const source = sourceByCompany.get(canonicalCompanyKey(job.company));
+      if (!source) return job;
+      if (!job.description) await onProgress?.(`Confirming student eligibility for ${job.role} at ${job.company}…`);
+      return fetchPublicJobDetails({
+        provider: source.provider as Parameters<typeof fetchPublicJobs>[0]["provider"],
+        boardToken: source.boardToken,
+        careerUrl: source.careerUrl,
+        company: source.company,
+      }, job);
+    }));
+    results.forEach((result, resultIndex) => {
+      if (result.status === "fulfilled") hydrated.push(result.value);
+      else {
+        const job = batch[resultIndex];
+        hydrated.push(job);
+        warnings.push(`${job.company}: eligibility details could not be refreshed; the official student-program title was retained.`);
+      }
+    });
+  }
+  return { jobs: hydrated, warnings };
+}
+
+async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEmail: string, parameters: Record<string, unknown>, onProgress?: (message: string) => void | Promise<void>): Promise<SkillResult> {
   const now = new Date();
+  const copy = discoveryCopy(mode);
+  if (serverEnv().ENABLE_JOB_DISCOVERY === "false") {
+    return { skillId: copy.skillId, title: "Opportunity discovery is disabled", summary: "Opportunity discovery is currently turned off for this environment.", cards: [], warnings: ["Enable job discovery in the server configuration, then retry."], freshness: now.toISOString(), proposedActions: [], status: "needs_setup" };
+  }
   const manualUrl = typeof parameters.careerUrl === "string" ? parameters.careerUrl.trim() : "";
   const manualCompany = typeof parameters.company === "string" ? parameters.company.trim() : "";
   if (manualUrl) {
-    const detected = detectJobSource(manualUrl);
     if (!manualCompany) throw new Error("Add a company name with the career URL");
-    await upsertJobSource(userId, { company: manualCompany, ...detected, careerUrl: manualUrl });
+    await saveJobSource(userId, { company: manualCompany, careerUrl: manualUrl });
   }
 
-  const [sourceResult, userResult, profileResult, resumeResult] = await Promise.all([
-    supabase.from("JobSource").select("*").eq("userId", userId).eq("active", true).order("updatedAt", { ascending: false }).limit(20),
+  const [userResult, profileResult, resumeResult, opportunityResult, contactResult, savedSources] = await Promise.all([
     supabase.from("User").select("*").eq("id", userId).maybeSingle(),
-    supabase.from("LinkedInProfile").select("*").eq("userId", userId).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("LinkedInProfile").select("*").eq("userId", userId).order("isPrimary", { ascending: false }).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("MeResume").select("*").eq("userId", userEmail).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("Opportunity").select("company,role,status,location").eq("userId", userId).neq("status", "archived").order("updatedAt", { ascending: false }).limit(50),
+    supabase.from("AlumniContact").select("firmName,title,skills,warmthScore").eq("importedByUserId", userId).order("warmthScore", { ascending: false }).limit(300),
+    listJobSources(userId, true),
   ]);
-  let sources = dataOrThrow<Record<string, any>[]>("load job sources", sourceResult) || [];
   const user = dataOrThrow<Record<string, any> | null>("load user profile", userResult);
   const profile = dataOrThrow<Record<string, any> | null>("load LinkedIn profile", profileResult);
   const resume = dataOrThrow<Record<string, any> | null>("load resume", resumeResult);
-
-  if (sources.length === 0 && serverEnv().BRAVE_SEARCH_API_KEY && user?.targetFirms) {
-    const firms = parseStoredList(user.targetFirms).slice(0, 8);
-    const resolved = (await Promise.all(firms.map((firm) => resolveOfficialJobSource(firm, serverEnv().BRAVE_SEARCH_API_KEY!).catch(() => null)))).filter((item) => item !== null);
-    await Promise.all(resolved.map((source) => upsertJobSource(userId, source)));
-    sources = dataOrThrow<Record<string, any>[]>("reload job sources", await supabase.from("JobSource").select("*").eq("userId", userId).eq("active", true).order("updatedAt", { ascending: false }).limit(20)) || [];
-  }
+  const opportunities = dataOrThrow<Record<string, any>[]>("load opportunities", opportunityResult) || [];
+  const networkContacts = dataOrThrow<Record<string, any>[]>("load network firms", contactResult) || [];
 
   if (!profile && !resume) {
-    return { skillId: "find_jobs", title: "Find jobs", summary: "I need a primary resume or LinkedIn profile before I can score jobs without inventing evidence.", cards: [],
+    return { skillId: copy.skillId, title: copy.title, summary: `I need a primary resume or LinkedIn profile before I can score ${copy.noun} without inventing evidence.`, cards: [],
       warnings: ["Create a resume in Resume Studio or import a LinkedIn profile, then run this skill again."], freshness: now.toISOString(), proposedActions: [] };
   }
+
+  let linkedIn: ReturnType<typeof normalizeLinkedInProfile> | null = null;
+  if (profile) {
+    try { linkedIn = normalizeLinkedInProfile(profile.content); } catch { linkedIn = null; }
+  }
+  const evidenceText = [
+    user?.skills, user?.experiences, user?.educations, user?.major, user?.targetIndustries, user?.targetFirms, user?.targetLocations,
+    linkedIn ? JSON.stringify(linkedIn) : "",
+    resume ? JSON.stringify(resume.content) : "",
+    opportunities.map((item) => `${item.role} ${item.company} ${item.location}`).join(" "),
+    networkContacts.map((item) => `${item.title} ${item.firmName} ${item.skills}`).join(" "),
+  ].join(" ");
+  const explicitCompanies = uniqueCompanies([manualCompany, ...parameterList(parameters, "companies")].filter(Boolean));
+  const targetFirms = parseStoredList(user?.targetFirms);
+  const includeAdjacent = parameters.includeAdjacent !== false && explicitCompanies.length === 0;
+  const prioritizedTargets = [...targetFirms.filter((firm) => findCuratedJobSource(firm)), ...targetFirms.filter((firm) => !findCuratedJobSource(firm))];
+  const baseCompanies = explicitCompanies.length
+    ? explicitCompanies
+    : uniqueCompanies([
+        ...savedSources.map((source) => source.company),
+        ...prioritizedTargets,
+        ...opportunities.map((item) => String(item.company || "")),
+        ...networkContacts.filter((item) => Number(item.warmthScore || 0) >= 60).map((item) => String(item.firmName || "")),
+      ], 50);
+  const adjacent = includeAdjacent ? adjacentCuratedJobSources(evidenceText, baseCompanies, 5).map((source) => source.company) : [];
+  const requestedCompanies = explicitCompanies.length ? explicitCompanies : uniqueCompanies([...baseCompanies.slice(0, 7), ...adjacent]);
+  const fallbackSuggestions = adjacentCuratedJobSources(evidenceText, requestedCompanies, 6).map((source) => source.company);
+
+  await onProgress?.(`Resolving official sources for ${requestedCompanies.length || "your target"} employer${requestedCompanies.length === 1 ? "" : "s"}…`);
+  const resolution = requestedCompanies.length
+    ? await resolveJobSources(userId, requestedCompanies, serverEnv().BRAVE_SEARCH_API_KEY)
+    : { resolved: [] as JobSourceRecord[], unresolved: [] as string[], searchConfigured: Boolean(serverEnv().BRAVE_SEARCH_API_KEY) };
+  const sources = resolution.resolved.filter((source) => source.active).slice(0, 12);
+  const setup = resolution.unresolved.length || sources.length === 0 ? {
+    kind: "job_sources" as const,
+    unresolvedFirms: resolution.unresolved.length ? resolution.unresolved : uniqueCompanies([...targetFirms, ...fallbackSuggestions]).slice(0, 6),
+    suggestedFirms: uniqueCompanies([...fallbackSuggestions, ...CURATED_JOB_SOURCES.slice(0, 6).map((source) => source.company)]).slice(0, 6),
+    searchConfigured: resolution.searchConfigured,
+    parameters: { ...parameters, companies: requestedCompanies, includeAdjacent },
+  } : undefined;
+
   if (sources.length === 0) {
-    return { skillId: "find_jobs", title: "Find jobs", summary: "No verified official career sources are configured yet.", cards: [],
-      warnings: ["Run /find-jobs with a company and its official careers URL. Search-based source discovery becomes available when BRAVE_SEARCH_API_KEY is configured."], freshness: now.toISOString(), proposedActions: [] };
+    return {
+      skillId: copy.skillId, title: "Choose where to search", summary: `Select a target firm or confirm its official careers page, then KithNode will search for ${copy.noun} here.`, cards: [],
+      warnings: resolution.searchConfigured ? [] : ["Automatic search is optional. Known AI and finance employers work without a search key; custom firms may need an official careers URL."],
+      freshness: now.toISOString(), proposedActions: [], status: "needs_setup", setup,
+      sourceStatus: setup?.unresolvedFirms.map((company) => ({ company, state: "needs_setup" as const, detail: "Official source needed" })) || [],
+    };
   }
 
-  const settled = await Promise.allSettled(sources.map(async (source) => {
-    const jobs = await fetchPublicJobs({ provider: source.provider as Parameters<typeof fetchPublicJobs>[0]["provider"], boardToken: source.boardToken, careerUrl: source.careerUrl, company: source.company });
-    dataOrThrow("update job source health", await supabase.from("JobSource").update({ lastCheckedAt: now.toISOString(), lastError: "", updatedAt: now.toISOString() }).eq("id", source.id).eq("userId", userId));
-    return jobs;
-  }));
-  const jobs = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+  const settled: PromiseSettledResult<Awaited<ReturnType<typeof fetchPublicJobs>>>[] = [];
+  for (let index = 0; index < sources.length; index += 3) {
+    const batch = sources.slice(index, index + 3);
+    settled.push(...await Promise.allSettled(batch.map(async (source) => {
+      await onProgress?.(`Checking ${source.company}…`);
+      const jobs = await fetchPublicJobs({ provider: source.provider as Parameters<typeof fetchPublicJobs>[0]["provider"], boardToken: source.boardToken, careerUrl: source.careerUrl, company: source.company });
+      dataOrThrow("update job source health", await supabase.from("JobSource").update({ lastCheckedAt: now.toISOString(), lastError: "", updatedAt: now.toISOString() }).eq("id", source.id).eq("userId", userId));
+      return jobs;
+    })));
+  }
+  const fetchedJobs = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
   const warnings = settled.flatMap((result, index) => result.status === "rejected" ? [`${sources[index].company}: ${result.reason instanceof Error ? result.reason.message : "source failed"}`] : []);
   await Promise.all(settled.map((result, index) => result.status === "rejected"
     ? supabase.from("JobSource").update({ lastCheckedAt: now.toISOString(), lastError: String(result.reason).slice(0, 500), updatedAt: now.toISOString() }).eq("id", sources[index].id).eq("userId", userId).then(() => undefined)
     : Promise.resolve()));
 
-  const profileText = [user?.skills, user?.experiences, user?.major, user?.targetIndustries, user?.targetFirms, user?.targetLocations,
-    profile ? JSON.stringify(profile) : "", resume ? JSON.stringify(resume.content) : ""].join(" ");
-  const profileTerms = new Set(splitTerms(profileText));
-  const targetLocations = splitTerms(user?.targetLocations || "");
-  const uniqueJobs = [...new Map(jobs.map((job) => [job.externalId || job.jobUrl, job])).values()];
-  const contacts = (await contactsWithPipeline(userId, 2_000)).filter((contact) => uniqueJobs.some((job) => companyKey(contact.firmName || "") === companyKey(job.company)));
+  const profileTerms = new Set(splitTerms(evidenceText));
+  const profileConcepts = new Set(extractJobConcepts(evidenceText));
+  const roleTerms = splitTerms([...parseStoredList(user?.targetIndustries), ...(linkedIn?.positioning.targetRoles || []), ...parameterList(parameters, "roleKeywords", "roles")].join(" "));
+  const targetLocations = splitTerms([...parseStoredList(user?.targetLocations), ...parameterList(parameters, "locations")].join(" "));
+  const uniqueFetchedJobs = [...new Map(fetchedJobs.map((job) => [`${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`, job])).values()];
+  const hydrated = mode === "internship"
+    ? await hydrateInternshipShortlist(uniqueFetchedJobs, sources, onProgress)
+    : { jobs: uniqueFetchedJobs.filter((job) => !classifyInternshipListing(job.role).eligible), warnings: [] as string[] };
+  warnings.push(...hydrated.warnings);
+  const recruitingDate = user?.recruitingDate ? new Date(user.recruitingDate) : now;
+  const graduationYear = Number(user?.graduationYear) || null;
+  const internshipEligibility = new Map<string, InternshipEligibility>();
+  const uniqueJobs = hydrated.jobs.filter((job) => {
+    if (mode !== "internship") return true;
+    const eligibility = classifyInternshipListing(job.role, job.description, { graduationYear, recruitingDate });
+    internshipEligibility.set(`${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`, eligibility);
+    return eligibility.eligible;
+  });
+  const contacts = (await contactsWithPipeline(userId, 2_000)).filter((contact) => uniqueJobs.some((job) => canonicalCompanyKey(contact.firmName || "") === canonicalCompanyKey(job.company)));
+  const requestedSeasons = parameterList(parameters, "seasons").map((season) => season.toLowerCase());
+  const requestedProgramTypes = new Set(parameterList(parameters, "programTypes", "program_types").map((type) => type.toLowerCase().replaceAll("-", "_")));
 
   const ranked = uniqueJobs.map((job) => {
+    const jobKey = `${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`;
+    const eligibility = internshipEligibility.get(jobKey);
     const jobTerms = new Set(splitTerms(`${job.role} ${job.description}`));
     const overlap = [...jobTerms].filter((term) => profileTerms.has(term)).slice(0, 12);
-    const fit = Math.min(45, Math.round(12 + overlap.length * 3));
-    const companyContacts = contacts.filter((contact) => companyKey(contact.firmName) === companyKey(job.company));
+    const jobConcepts = extractJobConcepts(`${job.role} ${job.description}`);
+    const conceptMatches = jobConcepts.filter((concept) => profileConcepts.has(concept));
+    const missingConcepts = jobConcepts.filter((concept) => !profileConcepts.has(concept)).slice(0, 4);
+    const roleMatches = roleTerms.filter((term) => jobTerms.has(term)).slice(0, 6);
+    const fitCap = mode === "internship" ? 40 : 45;
+    const fit = Math.min(fitCap, Math.round(5 + conceptMatches.length * 4 + overlap.length * 1.5 + roleMatches.length * 2));
+    const companyContacts = contacts.filter((contact) => canonicalCompanyKey(contact.firmName) === canonicalCompanyKey(job.company));
     const strongest = Math.max(0, ...companyContacts.map((contact) => Math.max(contact.warmthScore, contact.tier === "warm" ? 70 : 0)));
-    const network = Math.min(30, Math.round(companyContacts.length * 5 + strongest * 0.15));
+    const networkCap = mode === "internship" ? 25 : 30;
+    const network = Math.min(networkCap, Math.round(companyContacts.length * 5 + strongest * (mode === "internship" ? 0.12 : 0.15)));
     const locationText = `${job.location} ${job.workMode}`.toLowerCase();
-    const location = targetLocations.length === 0 ? 8 : targetLocations.some((term) => locationText.includes(term)) ? 15 : /remote/.test(locationText) ? 12 : 3;
+    const locationCap = mode === "internship" ? 10 : 15;
+    const location = targetLocations.length === 0 ? Math.round(locationCap * 0.55) : targetLocations.some((term) => locationText.includes(term)) ? locationCap : /remote/.test(locationText) ? Math.round(locationCap * 0.8) : 2;
     const age = daysSince(job.postedAt);
     const freshness = age <= 7 ? 10 : age <= 21 ? 7 : age <= 45 ? 4 : 1;
-    const score = fit + network + location + freshness;
+    const seasonText = `${eligibility?.season || ""} ${job.role}`.toLowerCase();
+    const programTypeMatches = !requestedProgramTypes.size || Boolean(eligibility?.programType && requestedProgramTypes.has(eligibility.programType));
+    const seasonMatches = !requestedSeasons.length || requestedSeasons.some((season) => seasonText.includes(season));
+    const studentFit = mode === "internship"
+      ? Math.max(0, Math.min(15,
+          (eligibility?.classYearStatus === "verified" ? 9 : 5)
+          + (seasonMatches ? 3 : 0)
+          + (programTypeMatches ? 3 : 0)))
+      : 0;
+    const score = fit + network + studentFit + location + freshness;
     const reasons = [
-      overlap.length ? `${overlap.slice(0, 4).join(", ")} match your recorded evidence` : "Limited direct skill overlap was found",
+      ...(mode === "internship" ? (eligibility?.evidence || []) : []),
+      conceptMatches.length || overlap.length ? `${[...conceptMatches, ...overlap].slice(0, 5).join(", ")} match your recorded evidence` : "Limited direct skill overlap was found",
+      missingConcepts.length ? `Missing recorded evidence: ${missingConcepts.join(", ")}` : "No additional tracked skill gap was identified",
       companyContacts.length ? `${companyContacts.length} saved contact${companyContacts.length === 1 ? "" : "s"} at ${job.company}` : `No saved contacts at ${job.company}`,
       age < 9_999 ? `Listing is about ${Math.round(age)} days old` : "Listing date was not supplied",
     ];
-    return { job, score, network, reasons, companyContacts };
-  }).sort((a, b) => b.score - a.score).slice(0, 5);
+    return { job, score, network, reasons, companyContacts, eligibility, programTypeMatches, seasonMatches };
+  }).filter((item) => mode !== "internship" || (item.programTypeMatches && item.seasonMatches))
+    .sort((a, b) => b.score - a.score).slice(0, 5);
 
   return {
-    skillId: "find_jobs", title: "Top job matches", summary: ranked.length === 5 ? "Here are your five strongest current matches from verified public sources." : `I found ${ranked.length} current match${ranked.length === 1 ? "" : "es"} from the configured official sources.`,
-    cards: ranked.map(({ job, score, network, reasons, companyContacts }) => ({
-      id: job.externalId || job.jobUrl, title: job.role, subtitle: `${job.company}${job.location ? ` · ${job.location}` : ""}`, score, confidence: Math.min(0.95, 0.5 + score / 200),
-      evidence: reasons, sourceDate: (job.postedAt || now).toISOString(), links: [{ label: "Open official listing", href: job.jobUrl }],
-      data: { opportunity: { company: job.company, role: job.role, location: job.location, workMode: job.workMode, jobUrl: job.jobUrl, applyUrl: job.applyUrl, source: job.provider, externalId: job.externalId, description: job.description, fitScore: score, networkScore: network, matchReasons: reasons, postedAt: job.postedAt?.toISOString() || null }, contacts: companyContacts },
+    skillId: copy.skillId, title: copy.resultTitle, summary: ranked.length === 5 ? `Here are your five strongest current ${mode === "internship" ? "student-opportunity" : "full-time"} matches from verified public sources.` : `I found ${ranked.length} legitimate ${mode === "internship" ? `student opportunit${ranked.length === 1 ? "y" : "ies"}` : `full-time match${ranked.length === 1 ? "" : "es"}`} from the configured official sources.`,
+    cards: ranked.map(({ job, score, network, reasons, companyContacts, eligibility }) => ({
+      id: `${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`, title: job.role, subtitle: `${job.company}${job.location ? ` · ${job.location}` : ""}`, score, confidence: Math.min(0.95, 0.5 + score / 200),
+      evidence: reasons, warning: eligibility?.warning, sourceDate: (job.postedAt || now).toISOString(), links: [{ label: "Open official listing", href: job.jobUrl }],
+      data: { programType: eligibility?.programType, season: eligibility?.season, classYearStatus: eligibility?.classYearStatus, opportunity: { company: job.company, role: job.role, location: job.location, workMode: job.workMode, jobUrl: job.jobUrl, applyUrl: job.applyUrl, source: job.provider, externalId: job.externalId, description: job.description, fitScore: score, networkScore: network, matchReasons: reasons, postedAt: job.postedAt?.toISOString() || null, opportunityType: eligibility?.programType || "job", season: eligibility?.season || "" }, contacts: companyContacts },
     })),
-    warnings: [...warnings, ...(ranked.length < 5 ? ["Fewer than five valid listings were available; no results were fabricated."] : [])], freshness: now.toISOString(), proposedActions: [],
+    warnings: [...warnings, ...(mode === "internship" && !graduationYear ? ["Add your graduation year in Settings → Profile & Education to verify class-year eligibility."] : []), ...(ranked.length < 5 ? [`Fewer than five legitimate ${mode === "internship" ? "student opportunities" : "listings"} were available; no results were fabricated.`] : [])], freshness: now.toISOString(), proposedActions: [],
+    status: warnings.length || resolution.unresolved.length || ranked.length < 5 ? "partial" : "complete",
+    setup,
+    sourceStatus: [
+      ...sources.map((source, index) => settled[index].status === "fulfilled"
+        ? { company: source.company, state: "ready" as const, provider: source.provider, careerUrl: source.careerUrl, detail: `${settled[index].value.length} open listings checked` }
+        : { company: source.company, state: "failed" as const, provider: source.provider, careerUrl: source.careerUrl, detail: warnings.find((warning) => warning.startsWith(`${source.company}:`)) || "Source failed" }),
+      ...resolution.unresolved.map((company) => ({ company, state: "needs_setup" as const, detail: "Official source needed" })),
+    ],
   };
 }
 
@@ -208,7 +372,7 @@ async function firmCoverage(userId: string): Promise<SkillResult> {
   const targetFirms = parseStoredList(user?.targetFirms);
   const contacts = await contactsWithPipeline(userId, 2_000);
   const cards = targetFirms.map((firm) => {
-    const matches = contacts.filter((contact) => companyKey(contact.firmName) === companyKey(firm));
+    const matches = contacts.filter((contact) => canonicalCompanyKey(contact.firmName) === canonicalCompanyKey(firm));
     const warm = matches.filter((contact) => contact.tier === "warm" || contact.warmthScore >= 60);
     const senior = matches.filter((contact) => /director|partner|vp|vice president|head|recruit|talent|manager/i.test(`${contact.title} ${contact.seniorityLevel}`));
     const functions = new Set(matches.map((contact) => contact.role || contact.title).filter(Boolean).map((value) => value.toLowerCase().split(/\s+/).slice(-2).join(" ")));
@@ -217,7 +381,7 @@ async function firmCoverage(userId: string): Promise<SkillResult> {
     const score = Math.min(100, matches.length * 12 + warm.length * 12 + senior.length * 12 + functions.size * 5 + active.length * 5 + recent.length * 8);
     const gap = matches.length === 0 ? "No saved contacts" : warm.length === 0 ? "Only cold contacts" : senior.length === 0 ? "No senior or recruiting contact" : recent.length === 0 ? "Relationships are stale" : functions.size < 2 ? "Low functional diversity" : "Coverage is healthy";
     const firmQuery = encodeURIComponent(firm);
-    return { id: companyKey(firm), title: firm, subtitle: gap, score, confidence: 0.9, evidence: [`${matches.length} contacts · ${warm.length} warm · ${senior.length} senior/recruiting`, `${functions.size} represented functions`, `${active.length} active in pipeline · ${recent.length} touched in 90 days`], sourceDate: now.toISOString(),
+    return { id: canonicalCompanyKey(firm), title: firm, subtitle: gap, score, confidence: 0.9, evidence: [`${matches.length} contacts · ${warm.length} warm · ${senior.length} senior/recruiting`, `${functions.size} represented functions`, `${active.length} active in pipeline · ${recent.length} touched in 90 days`], sourceDate: now.toISOString(),
       links: [
         { label: "Discover contacts", href: `/dashboard/discover?company=${firmQuery}` },
         ...(matches.length ? [{ label: "Review contacts", href: `/dashboard/contacts?company=${firmQuery}` }] : []),
@@ -240,10 +404,11 @@ async function whoToContact(userId: string, overdueOnly = false): Promise<SkillR
       evidence: [`Warmth score ${Math.round(contact.warmthScore)}`, `${contact.pipelineEntries.length} active pipeline placement${contact.pipelineEntries.length === 1 ? "" : "s"}`, age > 9_000 ? "No interaction date recorded" : `Last interaction about ${Math.round(age)} days ago`], sourceDate: new Date(contact.lastSpokenAt || contact.createdAt).toISOString(), links: contact.linkedInUrl ? [{ label: "Open LinkedIn", href: contact.linkedInUrl }] : undefined })), warnings: [], freshness: now.toISOString(), proposedActions: [] };
 }
 
-export async function executeCareerSkill(input: { skillId: CareerSkillId; userId: string; userEmail: string; parameters?: Record<string, unknown> }): Promise<SkillResult> {
+export async function executeCareerSkill(input: { skillId: CareerSkillId; userId: string; userEmail: string; parameters?: Record<string, unknown>; onProgress?: (message: string) => void | Promise<void> }): Promise<SkillResult> {
   const parameters = cleanParameters(input.parameters || {});
   switch (input.skillId) {
-    case "find_jobs": return findJobs(input.userId, input.userEmail, parameters);
+    case "find_internships": return discoverOpportunities("internship", input.userId, input.userEmail, parameters, input.onProgress);
+    case "find_jobs": return discoverOpportunities("full_time", input.userId, input.userEmail, parameters, input.onProgress);
     case "enrichment_gaps": return enrichmentGaps(input.userId);
     case "firm_coverage": return firmCoverage(input.userId);
     case "who_to_contact": return whoToContact(input.userId);

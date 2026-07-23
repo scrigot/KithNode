@@ -903,6 +903,7 @@ model Opportunity {
   description    String    @default("")
   status         String    @default("discovered") // discovered | saved | preparing | applied | assessment | interview | offer | accepted | rejected | withdrawn | archived
   priority       String    @default("medium") // low | medium | high
+  opportunityType String  @default("job") // job | internship | co_op | externship | off_cycle | summer_analyst | insight_program | leadership_program
   season         String    @default("")
   notes          String    @default("")
   nextAction     String    @default("")
@@ -925,6 +926,7 @@ model Opportunity {
 
   @@unique([userId, jobUrl])
   @@index([userId, status, fitScore])
+  @@index([userId, opportunityType, status])
   @@index([userId, companyKey])
   @@index([userId, source, externalId])
   @@index([userId, priority, deadline])
@@ -999,6 +1001,27 @@ model ExtensionToken {
   createdAt  DateTime  @default(now()) @db.Timestamptz(6)
 
   @@index([userId, revokedAt, createdAt])
+}
+
+// A private, user-owned research handoff. The web research desk and the
+// unpacked companion both write the same source-neutral draft shape; only the
+// signed-in web workspace may commit it into the network.
+model ResearchDraft {
+  id             String    @id @default(cuid())
+  userId         String
+  status         String    @default("draft") // draft | ready | committed | discarded
+  sourceType     String    @default("manual") // manual | linkedin_manual | company_page | conversation
+  sourceUrl      String    @default("")
+  target         Json      @default("{}")
+  payload        Json      @default("{}")
+  selectedFields Json      @default("[]")
+  contactId      String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+  committedAt    DateTime? @db.Timestamptz(6)
+
+  @@index([userId, status, updatedAt])
+  @@index([userId, contactId])
 }
 
 // Append-only field provenance for contact enrichment and reviewed extension

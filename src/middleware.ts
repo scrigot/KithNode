@@ -27,6 +27,8 @@ export const config = {
     "/api/integrations/:path*",
     "/api/linkedin-profiles/:path*",
     "/api/opportunities/:path*",
+    "/api/job-sources/:path*",
+    "/api/research/:path*",
     "/api/professors/:path*",
     "/api/user/:path*",
   ],

@@ -45,6 +45,10 @@ function normalizeNameFirm(
   return `${n}|${f}`;
 }
 
+export function buildDiscoverSearchFilter(query: string): string {
+  return `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%,skills.ilike.%${query}%`;
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -133,9 +137,7 @@ export async function GET(request: NextRequest) {
       .neq("importedByUserId", "");
 
     if (query) {
-      builder = builder.or(
-        `name.ilike.%${query}%,firmName.ilike.%${query}%,title.ilike.%${query}%,education.ilike.%${query}%,location.ilike.%${query}%`,
-      );
+      builder = builder.or(buildDiscoverSearchFilter(query));
     }
     if (tier) {
       builder = builder.eq("tier", tier);

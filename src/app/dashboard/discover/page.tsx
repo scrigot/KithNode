@@ -10,6 +10,7 @@ import { IntroModal } from "./intro-modal";
 import { DeckCard, type DeckContact, type WarmPath } from "./deck-card";
 import { ALL_TRACKS, type CareerTrack } from "@/lib/data/career-tracks";
 import { CreditCost } from "@/components/credit-cost";
+import { DiscoverIntentNav, GuidedResearchWorkspace } from "./guided-research-workspace";
 
 const TIERS = ["KITH", "HOT", "WARM", "MONITOR", "COLD"] as const;
 
@@ -53,6 +54,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 export default function DiscoverPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activeView = searchParams.get("view") || "research";
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(() => {
     const s = searchParams.get("source");
     if (s === "professor" || s === "student") return s;
@@ -609,10 +611,21 @@ export default function DiscoverPage() {
     };
   }, [seedLoading]);
 
+  if (activeView === "research" || activeView === "queue") {
+    return (
+      <GuidedResearchWorkspace
+        initialView={activeView}
+        activeDraftId={searchParams.get("draft")}
+      />
+    );
+  }
+
   // Empty state: no contacts imported at all
   if (!loading && !hasAnyContacts) {
     return (
-      <div className="flex min-h-full items-center justify-center p-5">
+      <div className="min-h-full">
+        <DiscoverIntentNav active="suggested" />
+        <div className="flex items-center justify-center p-5 pt-16">
         <div className="max-w-sm border border-white/[0.06] bg-card p-10 text-center">
           <svg
             className="mx-auto mb-4 h-10 w-10 text-muted-foreground"
@@ -638,6 +651,7 @@ export default function DiscoverPage() {
             GO TO IMPORT
           </a>
         </div>
+        </div>
       </div>
     );
   }
@@ -647,6 +661,9 @@ export default function DiscoverPage() {
 
   return (
     <div className="flex min-h-full flex-col p-5">
+      <div className="-mx-5 -mt-5 mb-5">
+        <DiscoverIntentNav active="suggested" />
+      </div>
       {/* ─── Header: title + source filter (left) · primary action (right) ─── */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-end gap-4">
@@ -777,7 +794,7 @@ export default function DiscoverPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, company, title, education, location..."
+            placeholder="Search name, company, title, skills, education, location..."
             className="w-full border border-input bg-muted py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
         </div>

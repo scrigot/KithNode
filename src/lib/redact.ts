@@ -60,6 +60,7 @@ const POOL_SAFE_FIELDS = [
   "concentration",
   "track",
   "role",
+  "skills",
 ] as const;
 
 export interface RedactedContact {

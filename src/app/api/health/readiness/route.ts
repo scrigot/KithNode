@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-const EXPECTED_MIGRATION = "20260720140555";
+const EXPECTED_MIGRATION = "20260721200000";
 
 function projectRef(value: string | undefined) {
   if (!value) return null;
@@ -21,7 +21,7 @@ export async function GET() {
   const env = serverEnv();
   const checks: Record<string, { ready: boolean; detail: string }> = {};
   try {
-    const requiredTables = ["AssistantConversation", "IntegrationConnection", "LinkedInProfile", "Opportunity", "ContactFieldProvenance"];
+    const requiredTables = ["AssistantConversation", "IntegrationConnection", "LinkedInProfile", "Opportunity", "ContactFieldProvenance", "ResearchDraft"];
     const results = await Promise.all(requiredTables.map((table) => supabase.from(table).select("id", { head: true, count: "exact" })));
     if (results.some((result) => result.error)) throw new Error("required table unavailable");
     checks.database = { ready: true, detail: "reachable" };

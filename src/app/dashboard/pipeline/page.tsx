@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { GitBranch, ArrowRight, ArrowLeft, Mail, Loader2, X, Copy, Check, AlertTriangle, Plus, Trash2 } from "lucide-react";
 import * as Sentry from "@sentry/nextjs";
 import { trackEvent } from "@/lib/posthog";
@@ -413,8 +414,11 @@ function PipelineCard({ contact, isAll, isFirst, isLast, onMove, onDraft, onRemo
 }
 
 export default function PipelinePage() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<PipelineResponse | null>(null);
-  const [active, setActive] = useState<string>("all");
+  const [active, setActive] = useState<string>(
+    () => searchParams.get("pipeline") || "all",
+  );
   const [loading, setLoading] = useState(true);
   const [draftTarget, setDraftTarget] = useState<PipelineContact | null>(null);
   const [addingTo, setAddingTo] = useState<{ id: string; name: string } | null>(null);

@@ -3,7 +3,9 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import { URL } from "node:url";
 
-const MAX_BYTES = 2_000_000;
+// Some official Ashby boards return every posting description in one response.
+// Keep a hard ceiling while allowing large, legitimate public boards.
+const MAX_BYTES = 16_000_000;
 const TIMEOUT_MS = 8_000;
 
 function isPrivateIp(address: string) {

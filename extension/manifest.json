@@ -1,26 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "KithNode Contact Clipper",
-  "version": "0.1.0",
-  "description": "Capture the LinkedIn profile you are viewing and pre-fill a KithNode contact. Personal use, one profile at a time.",
-  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "name": "KithNode Research Companion",
+  "version": "0.4.0",
+  "description": "A private research notebook that hands reviewed facts to KithNode for final approval.",
+  "permissions": ["storage", "sidePanel", "tabs"],
   "host_permissions": [
-    "https://www.linkedin.com/*",
     "https://kithnode.ai/*",
     "https://*.kithnode.ai/*",
-    "http://localhost:3000/*",
-    "http://localhost:3030/*",
-    "http://localhost:3001/*",
-    "http://localhost:3051/*"
+    "http://localhost:3000/*"
   ],
   "background": { "service_worker": "background.js" },
   "side_panel": { "default_path": "panel.html" },
-  "action": { "default_title": "Clip this LinkedIn profile to KithNode" },
-  "content_scripts": [
-    {
-      "matches": ["https://www.linkedin.com/in/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "action": { "default_title": "Open KithNode Research Companion" }
 }

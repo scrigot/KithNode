@@ -9,7 +9,10 @@ import { executeCareerSkill, inferCareerSkill, skillResultJson } from "@/lib/ass
 import { assistantErrorResponse, AssistantHttpError } from "@/lib/assistant/errors";
 import { serverEnv } from "@/lib/env/server";
 import { assistantRepository } from "@/lib/assistant/repository";
-import { isDeterministicCareerSkill, type CareerSkillId } from "@/lib/assistant/skills";
+import { isDeterministicCareerSkill } from "@/lib/assistant/skills";
+import { skillParametersFromMessage } from "@/lib/assistant/skill-parameters";
+import { supabase } from "@/lib/supabase";
+import { isCurrentUndergraduateProfile } from "@/lib/jobs/matching";
 
 export const runtime = "nodejs";
 
@@ -80,7 +83,12 @@ async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) 
   const history = await assistantRepository.listMessages(String(conversation.id), userId, true, 12);
   const run = await assistantRepository.createRun({ conversationId: String(conversation.id), userId, model: AI_MODELS.default });
 
-  const inferredSkill = parsed.data.skillId || inferCareerSkill(parsed.data.message);
+  let isCurrentUndergraduate = false;
+  if (!parsed.data.skillId && !parsed.data.message.trim().startsWith("/")) {
+    const { data: profile } = await supabase.from("User").select("graduationYear,university,major,degrees,educations").eq("id", userId).maybeSingle();
+    isCurrentUndergraduate = isCurrentUndergraduateProfile(profile || {});
+  }
+  const inferredSkill = parsed.data.skillId || inferCareerSkill(parsed.data.message, { isCurrentUndergraduate });
   if (inferredSkill && isDeterministicCareerSkill(inferredSkill) && serverEnv().ENABLE_CAREER_SKILLS !== "false") {
     await onProgress?.(`Running ${inferredSkill.replaceAll("_", " ")} from verified data…`);
     const parameters = skillParametersFromMessage(inferredSkill, parsed.data.message, parsed.data.parameters);
@@ -91,6 +99,7 @@ async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) 
         userId,
         userEmail: session.user?.email || userId,
         parameters,
+        onProgress,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : "Skill execution failed";
@@ -245,23 +254,4 @@ function streamAssistant(request: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
     },
   });
-}
-
-function skillParametersFromMessage(
-  skillId: CareerSkillId,
-  message: string,
-  supplied: Record<string, unknown> | undefined,
-) {
-  const parameters: Record<string, unknown> = { ...(supplied || {}) };
-  if (skillId !== "find_jobs" || parameters.careerUrl) return parameters;
-
-  const urlMatch = message.match(/https?:\/\/[^\s]+/i);
-  if (!urlMatch) return parameters;
-  parameters.careerUrl = urlMatch[0].replace(/[),.;]+$/, "");
-
-  if (!parameters.company) {
-    const beforeUrl = message.slice(0, urlMatch.index).replace(/^\s*\/find-jobs\b/i, "").trim();
-    if (beforeUrl) parameters.company = beforeUrl.slice(0, 160);
-  }
-  return parameters;
 }

@@ -9,7 +9,7 @@ export function WorkspaceHeader({ eyebrow, title, description, actions }: { eyeb
         <h1 className="mt-1 font-heading text-2xl font-semibold text-text-primary">{title}</h1>
         <p className="mt-1 max-w-3xl text-base leading-6 text-text-secondary">{description}</p>
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div> : null}
     </header>
   );
 }

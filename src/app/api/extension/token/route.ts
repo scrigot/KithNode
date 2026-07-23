@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { hashExtensionToken } from "@/lib/extension-auth";
 
-const createSchema = z.object({ name: z.string().trim().min(1).max(100).default("Chrome extension") });
+const createSchema = z.object({ name: z.string().trim().min(1).max(100).default("Private research companion") });
 const revokeSchema = z.object({ id: z.string().min(1) });
 
 export async function GET() {
@@ -24,7 +24,9 @@ export async function POST(request: NextRequest) {
   const parsed = createSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Invalid token name" }, { status: 400 });
   const raw = `knx_${randomBytes(32).toString("base64url")}`;
-  const { data: token, error } = await supabase.from("ExtensionToken").insert({ id: randomBytes(16).toString("hex"), userId, name: parsed.data.name, tokenHash: hashExtensionToken(raw), scopes: "contacts:write profiles:write", createdAt: new Date().toISOString() }).select("*").single();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const { data: token, error } = await supabase.from("ExtensionToken").insert({ id: randomBytes(16).toString("hex"), userId, name: parsed.data.name, tokenHash: hashExtensionToken(raw), scopes: "research:draft", expiresAt: expiresAt.toISOString(), createdAt: now.toISOString() }).select("*").single();
   if (error || !token) return NextResponse.json({ error: error?.message || "Could not create token" }, { status: 503 });
   return NextResponse.json({ id: token.id, token: raw, name: token.name, scopes: token.scopes, warning: "Copy this token now. KithNode stores only its hash and cannot show it again." }, { status: 201 });
 }

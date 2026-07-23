@@ -21,6 +21,8 @@ export interface EducationEntry {
 export interface ExperienceEntry {
   title: string;
   firm: string;
+  /** Employment arrangement when the source states it (e.g. Full-time). */
+  employmentType?: string;
   /** Period start, free text e.g. "Jun 2025". */
   start: string;
   /** Period end, free text e.g. "Aug 2025", or "Present" when ongoing. */
@@ -79,19 +81,45 @@ export function parseExperiences(val: string | null | undefined): ExperienceEntr
     const parsed: unknown = JSON.parse(val);
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .map((e: Record<string, unknown>) => ({
-        title: clean(e?.title, 160),
-        firm: clean(e?.firm, 160),
-        // Legacy rows stored a single `dates` string — fold it into `start` so
-        // existing experiences keep rendering after the start/end split.
-        start: clean(e?.start, 40) || clean(e?.dates, 40),
-        end: clean(e?.end, 40),
-      }))
+      .map((e: Record<string, unknown>) => {
+        const employmentType = clean(e?.employmentType, 80);
+        return {
+          title: clean(e?.title, 160),
+          firm: clean(e?.firm, 160),
+          ...(employmentType ? { employmentType } : {}),
+          // Legacy rows stored a single `dates` string — fold it into `start` so
+          // existing experiences keep rendering after the start/end split.
+          start: clean(e?.start, 40) || clean(e?.dates, 40),
+          end: clean(e?.end, 40),
+        };
+      })
       .filter((e) => e.title || e.firm)
       .slice(0, MAX_EXPERIENCES);
   } catch {
     return [];
   }
+}
+
+/** Keep the canonical headline role in the structured timeline. Older guided
+ * research drafts stored only additional positions, so this also repairs those
+ * contacts at read time without rewriting their reviewed source data. */
+export function mergePrimaryExperience(
+  rows: ExperienceEntry[],
+  primary: { title?: string | null; firm?: string | null },
+): ExperienceEntry[] {
+  const title = clean(primary.title, 160);
+  const firm = clean(primary.firm, 160);
+  if (!title && !firm) return rows.slice(0, MAX_EXPERIENCES);
+
+  const key = `${title.toLocaleLowerCase()}|${firm.toLocaleLowerCase()}`;
+  const matchingIndex = rows.findIndex((row) =>
+    `${row.title.trim().toLocaleLowerCase()}|${row.firm.trim().toLocaleLowerCase()}` === key,
+  );
+  const headline = matchingIndex >= 0
+    ? rows[matchingIndex]
+    : { title, firm, start: "", end: "Present" };
+  const rest = rows.filter((_, index) => index !== matchingIndex);
+  return [headline, ...rest].slice(0, MAX_EXPERIENCES);
 }
 
 /** Render an experience period for display: "Jun 2025 - Aug 2025", or a single

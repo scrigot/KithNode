@@ -7,10 +7,10 @@ vi.mock("@/lib/supabase", () => ({ supabase: { from: vi.fn() } }));
 import { buildSearchFilter } from "./route";
 
 describe("buildSearchFilter", () => {
-  it("wraps q in ilike patterns for all four fields", () => {
+  it("includes reviewed skills in global contact search", () => {
     const filter = buildSearchFilter("goldman");
     expect(filter).toBe(
-      "name.ilike.%goldman%,firmName.ilike.%goldman%,title.ilike.%goldman%,education.ilike.%goldman%",
+      "name.ilike.%goldman%,firmName.ilike.%goldman%,title.ilike.%goldman%,education.ilike.%goldman%,skills.ilike.%goldman%",
     );
   });
 

@@ -81,7 +81,7 @@ export function HelpWidget() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Help and feedback"
-        className="fixed bottom-4 right-4 z-40 flex h-9 w-9 items-center justify-center border border-white/[0.12] bg-bg-card text-text-muted shadow-lg hover:border-accent-teal/50 hover:text-accent-teal"
+        className="fixed bottom-[78px] right-4 z-40 flex h-11 w-11 items-center justify-center border border-white/[0.12] bg-bg-card text-text-muted shadow-lg hover:border-accent-teal/50 hover:text-accent-teal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:bottom-4"
       >
         {open ? <X size={16} /> : <HelpCircle size={16} />}
       </button>

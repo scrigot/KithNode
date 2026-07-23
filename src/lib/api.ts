@@ -15,6 +15,8 @@ export interface RankedContact {
   // values. Both "" when unclassified. Drives the Warm Signals + Discover tabs.
   track: string;
   role: string;
+  /** Comma-joined public professional skills captured from reviewed sources. */
+  skills?: string;
   why_now: string;
   warm_path: string;
   affiliations: { name: string; boost: number }[];

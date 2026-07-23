@@ -27,6 +27,15 @@ const greenhouseSchema = z.object({ jobs: z.array(z.object({
   updated_at: z.string().optional(),
 })).max(5_000) });
 
+const greenhouseDetailSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  title: z.string(),
+  absolute_url: z.url(),
+  location: z.object({ name: z.string().default("") }).default({ name: "" }),
+  content: z.string().default(""),
+  updated_at: z.string().optional(),
+});
+
 const leverSchema = z.array(z.object({
   id: z.string(),
   text: z.string(),
@@ -42,12 +51,36 @@ const ashbySchema = z.object({ jobs: z.array(z.object({
   id: z.string().optional(),
   title: z.string(),
   location: z.string().optional(),
-  workplaceType: z.string().optional(),
+  // Ashby includes this key on every job, but uses null when the employer
+  // has not classified the role. Optional alone does not accept explicit null.
+  workplaceType: z.string().nullish(),
   jobUrl: z.url(),
   applyUrl: z.url().optional(),
   descriptionPlain: z.string().optional(),
   publishedAt: z.string().optional(),
 })).max(5_000) });
+
+function parseProviderPayload<T>(provider: string, schema: z.ZodType<T>, raw: string): T {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    throw new Error(`${provider} returned malformed job data.`);
+  }
+
+  const parsed = schema.safeParse(payload);
+  if (parsed.success) return parsed.data;
+
+  const fields = [...new Set(parsed.error.issues
+    .slice(0, 3)
+    .map((issue) => {
+      const path = issue.path.filter((part) => typeof part === "string");
+      return (path[0] === "jobs" ? path.slice(1) : path).join(".");
+    })
+    .filter(Boolean))];
+  const fieldSummary = fields.length ? ` (${fields.join(", ")})` : "";
+  throw new Error(`${provider} returned an unsupported job format${fieldSummary}. The source was skipped.`);
+}
 
 function dateOrNull(value: string | number | undefined) {
   if (value === undefined) return null;
@@ -66,8 +99,10 @@ export function detectJobSource(careerUrl: string): { provider: JobProvider; boa
 
 export async function fetchPublicJobs(input: { provider: JobProvider; boardToken: string; careerUrl: string; company: string }): Promise<PublicJob[]> {
   if (input.provider === "greenhouse") {
-    const raw = await safeFetchText(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(input.boardToken)}/jobs?content=true`);
-    return greenhouseSchema.parse(JSON.parse(raw)).jobs.map((job) => ({
+    // The list endpoint is enough for discovery and is dramatically smaller
+    // than content=true on large boards. The official listing remains linked.
+    const raw = await safeFetchText(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(input.boardToken)}/jobs`);
+    return parseProviderPayload("Greenhouse", greenhouseSchema, raw).jobs.map((job) => ({
       provider: "greenhouse", externalId: String(job.id), company: input.company, role: job.title,
       location: job.location.name, workMode: /remote/i.test(job.location.name) ? "remote" : "unknown",
       jobUrl: job.absolute_url, applyUrl: job.absolute_url, description: textOnly(job.content), postedAt: dateOrNull(job.updated_at),
@@ -75,7 +110,7 @@ export async function fetchPublicJobs(input: { provider: JobProvider; boardToken
   }
   if (input.provider === "lever") {
     const raw = await safeFetchText(`https://api.lever.co/v0/postings/${encodeURIComponent(input.boardToken)}?mode=json`);
-    return leverSchema.parse(JSON.parse(raw)).map((job) => ({
+    return parseProviderPayload("Lever", leverSchema, raw).map((job) => ({
       provider: "lever", externalId: job.id, company: input.company, role: job.text,
       location: job.categories.location || "", workMode: /remote/i.test(job.categories.location || "") ? "remote" : "unknown",
       jobUrl: job.hostedUrl, applyUrl: job.applyUrl || job.hostedUrl,
@@ -84,7 +119,7 @@ export async function fetchPublicJobs(input: { provider: JobProvider; boardToken
   }
   if (input.provider === "ashby") {
     const raw = await safeFetchText(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(input.boardToken)}`);
-    return ashbySchema.parse(JSON.parse(raw)).jobs.map((job) => ({
+    return parseProviderPayload("Ashby", ashbySchema, raw).jobs.map((job) => ({
       provider: "ashby", externalId: job.id || job.jobUrl, company: input.company, role: job.title,
       location: job.location || "", workMode: (job.workplaceType || "unknown").toLowerCase(),
       jobUrl: job.jobUrl, applyUrl: job.applyUrl || job.jobUrl,
@@ -112,4 +147,30 @@ export async function fetchPublicJobs(input: { provider: JobProvider; boardToken
       location, workMode: /remote/i.test(location) ? "remote" : "unknown", jobUrl: url, applyUrl: url,
       description: textOnly(String(job.description || "")), postedAt: dateOrNull(String(job.datePosted || "")) }];
   });
+}
+
+/**
+ * Hydrate only a title-shortlisted listing. Most ATS feeds already include a
+ * description; Greenhouse intentionally requires a bounded detail request so
+ * large boards are not downloaded with full HTML in the first pass.
+ */
+export async function fetchPublicJobDetails(
+  input: { provider: JobProvider; boardToken: string; careerUrl: string; company: string },
+  job: PublicJob,
+): Promise<PublicJob> {
+  if (input.provider !== "greenhouse" || job.description) return job;
+  const raw = await safeFetchText(
+    `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(input.boardToken)}/jobs/${encodeURIComponent(job.externalId)}`,
+  );
+  const detail = parseProviderPayload("Greenhouse", greenhouseDetailSchema, raw);
+  return {
+    ...job,
+    role: detail.title,
+    location: detail.location.name,
+    workMode: /remote/i.test(detail.location.name) ? "remote" : job.workMode,
+    jobUrl: detail.absolute_url,
+    applyUrl: detail.absolute_url,
+    description: textOnly(detail.content),
+    postedAt: dateOrNull(detail.updated_at) || job.postedAt,
+  };
 }

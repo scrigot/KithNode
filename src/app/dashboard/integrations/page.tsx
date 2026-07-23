@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, CheckCircle2, Copy, KeyRound, Loader2, Mail, Plug, RefreshCw, Unplug } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { JobSourceSettings } from "./job-source-settings";
 
 type Provider = "google" | "microsoft";
 interface IntegrationState {
@@ -25,6 +26,7 @@ interface ServiceState {
   label: string;
   configured: boolean;
   validation: string;
+  optional?: boolean;
 }
 interface ExtensionToken { id: string; name: string; revokedAt: string | null; lastUsedAt: string | null; createdAt: string }
 
@@ -141,6 +143,7 @@ export default function IntegrationsPage() {
         <p className="mt-1 text-sm text-muted-foreground">Read-only email and calendar access. Tokens are encrypted server-side and never sent to the browser or model.</p>
       </header>
       {error && <div className="mb-4 border border-accent-red/30 bg-accent-red/10 p-3 text-sm text-accent-red">{error}</div>}
+      <JobSourceSettings />
       <section className="mb-5 border border-white/[0.08] bg-card p-4">
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Server credential readiness</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -151,7 +154,7 @@ export default function IntegrationsPage() {
                 {service.label}
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                {service.configured ? service.validation : "Missing required environment variable"}
+                {service.configured || service.optional ? service.validation : "Missing required environment variable"}
               </p>
             </div>
           ))}

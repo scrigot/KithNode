@@ -34,6 +34,55 @@ async function loadPipeline(userId: string, pipelineId: string) {
   return { ...data, stages: parseStages(data.stages) as StageMeta[] };
 }
 
+/** GET: load the signed-in user's pipeline choices and this contact's current
+ * membership. This is intentionally contact-specific so profile pages do not
+ * have to load every pipeline card (and its warm-path lookups) just to render
+ * one action button. Every returned row is userId-scoped. */
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await requireUser();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id: contactId } = await params;
+
+  try {
+    const [{ data: pipelineRows, error: pipelineError }, { data: membership, error: entryError }] =
+      await Promise.all([
+        scopedSelect("Pipeline", userId, "id,name,kind,stages").order("createdAt", {
+          ascending: true,
+        }),
+        scopedSelect("PipelineEntry", userId, "id,pipelineId,stage")
+          .eq("contactId", contactId)
+          .maybeSingle(),
+      ]);
+
+    if (pipelineError) throw new Error(pipelineError.message);
+    if (entryError) throw new Error(entryError.message);
+
+    return NextResponse.json({
+      pipelines: (pipelineRows || []).map((pipeline) => ({
+        id: pipeline.id,
+        name: pipeline.name,
+        kind: pipeline.kind,
+        firstStage: parseStages(pipeline.stages)[0]?.key || "researched",
+      })),
+      membership: membership
+        ? {
+            id: membership.id,
+            pipelineId: membership.pipelineId,
+            stage: membership.stage,
+          }
+        : null,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Failed to load pipeline options" },
+      { status: 500 },
+    );
+  }
+}
+
 /** POST: add an existing contact to a specific pipeline (idempotent per pipeline). */
 export async function POST(
   request: NextRequest,
