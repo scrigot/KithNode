@@ -1,5 +1,5 @@
-import { supabase } from "@/lib/supabase";
-import { normalizeFirmName } from "@/lib/normalize-firm";
+import "server-only";
+import { relationshipsAtCompanies } from "@/lib/relationships/repository";
 
 export interface WarmPath {
   intermediaryName: string;
@@ -7,42 +7,29 @@ export interface WarmPath {
   intermediaryLinkedInUrl: string;
   firmName: string;
   title: string;
+  evidence: string[];
 }
 
 /**
- * Find warm paths to a contact's firm via other users' imported contacts.
- * Queries the shared AlumniContact pool for contacts at the same normalized firm
- * that were imported by a different user.
+ * Find verified warm paths to a contact's firm.
+ *
+ * Simply importing a profile or sharing a school/company does not qualify.
+ * Potential paths remain visible in research results, but this API only returns
+ * relationships backed by user confirmation or a recorded interaction.
  */
 export async function findWarmPaths(
   userId: string,
   contactFirmName: string,
 ): Promise<WarmPath[]> {
   if (!contactFirmName) return [];
-
-  const normalizedTarget = normalizeFirmName(contactFirmName);
-  if (!normalizedTarget) return [];
-
-  // Fetch contacts imported by the CURRENT user that work at the same firm.
-  // These are the user's own connections who can provide a warm intro.
-  const { data, error } = await supabase
-    .from("AlumniContact")
-    .select("name, title, firmName, affiliations, linkedInUrl, importedByUserId")
-    .eq("importedByUserId", userId)
-    .limit(500);
-
-  if (error || !data) return [];
-
-  // Filter by normalized firm name match
-  const matches = data.filter(
-    (c) => normalizeFirmName(c.firmName) === normalizedTarget,
-  );
-
-  return matches.map((c) => ({
-    intermediaryName: c.name,
-    intermediaryRelation: c.affiliations || "Connection",
-    intermediaryLinkedInUrl: c.linkedInUrl || "",
-    firmName: c.firmName,
-    title: c.title,
+  const grouped = await relationshipsAtCompanies(userId, [contactFirmName]);
+  const relationships = [...grouped.values()].flat().filter((relationship) => relationship.state === "verified");
+  return relationships.map((relationship) => ({
+    intermediaryName: relationship.name,
+    intermediaryRelation: relationship.relationshipType,
+    intermediaryLinkedInUrl: relationship.linkedInUrl,
+    firmName: relationship.firmName,
+    title: relationship.title,
+    evidence: relationship.evidence,
   }));
 }

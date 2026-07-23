@@ -58,21 +58,21 @@ max_client_conn = 100
 
 [db.migrations]
 # If disabled, migrations will be skipped during a db push or reset.
-# DISABLED locally: the repo's prod migrations ALTER Prisma-managed tables that
-# don't exist on a fresh local DB, so applying them crashes `supabase start`.
-# The /me workspace's schema lives in the kithnode_me DB, managed by `prisma db
-# push` (see scripts/me/up.sh). Local-only config; never affects prod.
+# This repository reconstructs the application schema from a production
+# baseline plus every later additive migration. `npm run dev:reset` performs
+# that sequence explicitly after Supabase resets its platform-owned schemas.
 enabled = false
 # Specifies an ordered list of schema files that describe your database.
 # Supports glob patterns relative to supabase directory: "./schemas/*.sql"
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Fixture data is seeded by `npm run dev:reset` after the baseline and additive
+# migrations exist. Supabase must not look for a missing or destructive seed.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+sql_paths = []
 
 [db.network_restrictions]
 # Enable management of network restrictions.

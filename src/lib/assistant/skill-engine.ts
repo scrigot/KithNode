@@ -8,6 +8,7 @@ import { serverEnv } from "@/lib/env/server";
 import { AssistantDatabaseError } from "@/lib/assistant/repository";
 import { normalizeLinkedInProfile } from "@/lib/linkedin-profile/schema";
 import { classifyInternshipListing, extractJobConcepts, type InternshipEligibility } from "@/lib/jobs/matching";
+import { relationshipsAtCompanies } from "@/lib/relationships/repository";
 
 type LooseRow = Record<string, any>;
 
@@ -182,7 +183,7 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
     supabase.from("LinkedInProfile").select("*").eq("userId", userId).order("isPrimary", { ascending: false }).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("MeResume").select("*").eq("userId", userEmail).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("Opportunity").select("company,role,status,location").eq("userId", userId).neq("status", "archived").order("updatedAt", { ascending: false }).limit(50),
-    supabase.from("AlumniContact").select("firmName,title,skills,warmthScore").eq("importedByUserId", userId).order("warmthScore", { ascending: false }).limit(300),
+    supabase.from("AlumniContact").select("id,firmName,title,skills").eq("importedByUserId", userId).order("updatedAt", { ascending: false }).limit(300),
     listJobSources(userId, true),
   ]);
   const user = dataOrThrow<Record<string, any> | null>("load user profile", userResult);
@@ -190,6 +191,14 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
   const resume = dataOrThrow<Record<string, any> | null>("load resume", resumeResult);
   const opportunities = dataOrThrow<Record<string, any>[]>("load opportunities", opportunityResult) || [];
   const networkContacts = dataOrThrow<Record<string, any>[]>("load network firms", contactResult) || [];
+  const networkRelationships = await relationshipsAtCompanies(
+    userId,
+    uniqueCompanies(networkContacts.map((contact) => String(contact.firmName || "")), 300),
+  );
+  const verifiedNetworkFirms = [...networkRelationships.entries()]
+    .filter(([, relationships]) => relationships.some((relationship) => relationship.state === "verified"))
+    .map(([companyKey]) => networkContacts.find((contact) => canonicalCompanyKey(contact.firmName) === companyKey)?.firmName || "")
+    .filter(Boolean);
 
   if (!profile && !resume) {
     return { skillId: copy.skillId, title: copy.title, summary: `I need a primary resume or LinkedIn profile before I can score ${copy.noun} without inventing evidence.`, cards: [],
@@ -217,7 +226,7 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
         ...savedSources.map((source) => source.company),
         ...prioritizedTargets,
         ...opportunities.map((item) => String(item.company || "")),
-        ...networkContacts.filter((item) => Number(item.warmthScore || 0) >= 60).map((item) => String(item.firmName || "")),
+        ...verifiedNetworkFirms,
       ], 50);
   const adjacent = includeAdjacent ? adjacentCuratedJobSources(evidenceText, baseCompanies, 5).map((source) => source.company) : [];
   const requestedCompanies = explicitCompanies.length ? explicitCompanies : uniqueCompanies([...baseCompanies.slice(0, 7), ...adjacent]);
@@ -279,7 +288,10 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
     internshipEligibility.set(`${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`, eligibility);
     return eligibility.eligible;
   });
-  const contacts = (await contactsWithPipeline(userId, 2_000)).filter((contact) => uniqueJobs.some((job) => canonicalCompanyKey(contact.firmName || "") === canonicalCompanyKey(job.company)));
+  const relationshipsByCompany = await relationshipsAtCompanies(
+    userId,
+    uniqueJobs.map((job) => job.company),
+  );
   const requestedSeasons = parameterList(parameters, "seasons").map((season) => season.toLowerCase());
   const requestedProgramTypes = new Set(parameterList(parameters, "programTypes", "program_types").map((type) => type.toLowerCase().replaceAll("-", "_")));
 
@@ -294,10 +306,14 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
     const roleMatches = roleTerms.filter((term) => jobTerms.has(term)).slice(0, 6);
     const fitCap = mode === "internship" ? 40 : 45;
     const fit = Math.min(fitCap, Math.round(5 + conceptMatches.length * 4 + overlap.length * 1.5 + roleMatches.length * 2));
-    const companyContacts = contacts.filter((contact) => canonicalCompanyKey(contact.firmName) === canonicalCompanyKey(job.company));
-    const strongest = Math.max(0, ...companyContacts.map((contact) => Math.max(contact.warmthScore, contact.tier === "warm" ? 70 : 0)));
+    const companyRelationships = relationshipsByCompany.get(canonicalCompanyKey(job.company)) || [];
+    const verifiedRelationships = companyRelationships.filter((relationship) => relationship.state === "verified");
+    const potentialRelationships = companyRelationships.filter((relationship) => relationship.state === "potential");
     const networkCap = mode === "internship" ? 25 : 30;
-    const network = Math.min(networkCap, Math.round(companyContacts.length * 5 + strongest * (mode === "internship" ? 0.12 : 0.15)));
+    const network = Math.min(
+      networkCap,
+      verifiedRelationships.length * 14 + potentialRelationships.length * 3,
+    );
     const locationText = `${job.location} ${job.workMode}`.toLowerCase();
     const locationCap = mode === "internship" ? 10 : 15;
     const location = targetLocations.length === 0 ? Math.round(locationCap * 0.55) : targetLocations.some((term) => locationText.includes(term)) ? locationCap : /remote/.test(locationText) ? Math.round(locationCap * 0.8) : 2;
@@ -317,19 +333,59 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
       ...(mode === "internship" ? (eligibility?.evidence || []) : []),
       conceptMatches.length || overlap.length ? `${[...conceptMatches, ...overlap].slice(0, 5).join(", ")} match your recorded evidence` : "Limited direct skill overlap was found",
       missingConcepts.length ? `Missing recorded evidence: ${missingConcepts.join(", ")}` : "No additional tracked skill gap was identified",
-      companyContacts.length ? `${companyContacts.length} saved contact${companyContacts.length === 1 ? "" : "s"} at ${job.company}` : `No saved contacts at ${job.company}`,
+      verifiedRelationships.length
+        ? `${verifiedRelationships.length} verified relationship${verifiedRelationships.length === 1 ? "" : "s"} at ${job.company}`
+        : potentialRelationships.length
+          ? `${potentialRelationships.length} potential path${potentialRelationships.length === 1 ? "" : "s"} at ${job.company}; none verified`
+          : `No relationship path recorded at ${job.company}`,
       age < 9_999 ? `Listing is about ${Math.round(age)} days old` : "Listing date was not supplied",
     ];
-    return { job, score, network, reasons, companyContacts, eligibility, programTypeMatches, seasonMatches };
+    return {
+      job,
+      score,
+      network,
+      reasons,
+      companyRelationships,
+      eligibility,
+      programTypeMatches,
+      seasonMatches,
+    };
   }).filter((item) => mode !== "internship" || (item.programTypeMatches && item.seasonMatches))
     .sort((a, b) => b.score - a.score).slice(0, 5);
 
   return {
     skillId: copy.skillId, title: copy.resultTitle, summary: ranked.length === 5 ? `Here are your five strongest current ${mode === "internship" ? "student-opportunity" : "full-time"} matches from verified public sources.` : `I found ${ranked.length} legitimate ${mode === "internship" ? `student opportunit${ranked.length === 1 ? "y" : "ies"}` : `full-time match${ranked.length === 1 ? "" : "es"}`} from the configured official sources.`,
-    cards: ranked.map(({ job, score, network, reasons, companyContacts, eligibility }) => ({
+    cards: ranked.map(({ job, score, network, reasons, companyRelationships, eligibility }) => ({
       id: `${job.provider}:${canonicalCompanyKey(job.company)}:${job.externalId || job.jobUrl}`, title: job.role, subtitle: `${job.company}${job.location ? ` · ${job.location}` : ""}`, score, confidence: Math.min(0.95, 0.5 + score / 200),
       evidence: reasons, warning: eligibility?.warning, sourceDate: (job.postedAt || now).toISOString(), links: [{ label: "Open official listing", href: job.jobUrl }],
-      data: { programType: eligibility?.programType, season: eligibility?.season, classYearStatus: eligibility?.classYearStatus, opportunity: { company: job.company, role: job.role, location: job.location, workMode: job.workMode, jobUrl: job.jobUrl, applyUrl: job.applyUrl, source: job.provider, externalId: job.externalId, description: job.description, fitScore: score, networkScore: network, matchReasons: reasons, postedAt: job.postedAt?.toISOString() || null, opportunityType: eligibility?.programType || "job", season: eligibility?.season || "" }, contacts: companyContacts },
+      data: {
+        programType: eligibility?.programType,
+        season: eligibility?.season,
+        classYearStatus: eligibility?.classYearStatus,
+        relationshipState: companyRelationships.some((relationship) => relationship.state === "verified")
+          ? "verified"
+          : companyRelationships.length
+            ? "potential"
+            : "none",
+        opportunity: {
+          company: job.company,
+          role: job.role,
+          location: job.location,
+          workMode: job.workMode,
+          jobUrl: job.jobUrl,
+          applyUrl: job.applyUrl,
+          source: job.provider,
+          externalId: job.externalId,
+          description: job.description,
+          fitScore: score,
+          networkScore: network,
+          matchReasons: reasons,
+          postedAt: job.postedAt?.toISOString() || null,
+          opportunityType: eligibility?.programType || "job",
+          season: eligibility?.season || "",
+        },
+        relationships: companyRelationships,
+      },
     })),
     warnings: [...warnings, ...(mode === "internship" && !graduationYear ? ["Add your graduation year in Settings → Profile & Education to verify class-year eligibility."] : []), ...(ranked.length < 5 ? [`Fewer than five legitimate ${mode === "internship" ? "student opportunities" : "listings"} were available; no results were fabricated.`] : [])], freshness: now.toISOString(), proposedActions: [],
     status: warnings.length || resolution.unresolved.length || ranked.length < 5 ? "partial" : "complete",
@@ -346,22 +402,28 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
 async function enrichmentGaps(userId: string): Promise<SkillResult> {
   const now = new Date();
   const user = dataOrThrow<Record<string, any> | null>("load target firms", await supabase.from("User").select("targetFirms").eq("id", userId).maybeSingle());
-  const targets = splitTerms(user?.targetFirms || "");
+  const targets = parseStoredList(user?.targetFirms).map(canonicalCompanyKey);
   const contacts = await contactsWithPipeline(userId, 1_000);
+  const relationships = await relationshipsAtCompanies(userId, contacts.map((contact) => String(contact.firmName || "")));
+  const relationshipsByContact = new Map(
+    [...relationships.values()].flat().map((relationship) => [relationship.contactId, relationship]),
+  );
   const fields = ["email", "linkedInUrl", "title", "firmName", "location", "education", "skills", "seniorityLevel"] as const;
   const ranked = contacts.map((contact) => {
     const missing = fields.filter((field) => !String(contact[field] || "").trim());
-    const target = targets.some((term) => contact.firmName.toLowerCase().includes(term));
+    const target = targets.includes(canonicalCompanyKey(contact.firmName));
+    const relationship = relationshipsByContact.get(String(contact.id));
     const staleDays = daysSince(contact.enrichedAt || contact.createdAt);
-    const score = missing.length * 8 + (target ? 24 : 0) + Math.min(20, contact.pipelineEntries.length * 10) + Math.min(15, contact.warmthScore / 7) + Math.min(15, staleDays / 30);
-    return { contact, missing, score, staleDays, target };
+    const relationshipImpact = relationship?.state === "verified" ? 15 : relationship ? 5 : 0;
+    const score = missing.length * 8 + (target ? 24 : 0) + Math.min(20, contact.pipelineEntries.length * 10) + relationshipImpact + Math.min(15, staleDays / 30);
+    return { contact, missing, score, staleDays, target, relationship };
   }).filter((item) => item.missing.length > 0).sort((a, b) => b.score - a.score).slice(0, 10);
   const contactIds = ranked.map((item) => item.contact.id);
   return { skillId: "enrichment_gaps", title: "Highest-impact enrichment gaps", summary: ranked.length ? `${ranked.length} contacts would benefit most from reviewed enrichment.` : "Your saved contacts have the core fields needed for current workflows.",
-    cards: ranked.map(({ contact, missing, score, staleDays, target }) => ({ id: contact.id, title: contact.name, subtitle: [contact.title, contact.firmName].filter(Boolean).join(" · "), score: Math.min(100, Math.round(score)), confidence: 0.9,
-      evidence: [`Missing: ${missing.join(", ")}`, target ? "Works at a target firm" : "Not currently at a target firm", `Last verified ${staleDays > 9_000 ? "never" : `${Math.round(staleDays)} days ago`}`],
+    cards: ranked.map(({ contact, missing, score, staleDays, target, relationship }) => ({ id: contact.id, title: contact.name, subtitle: [contact.title, contact.firmName].filter(Boolean).join(" · "), score: Math.min(100, Math.round(score)), confidence: 0.9,
+      evidence: [`Missing: ${missing.join(", ")}`, target ? "Works at a target firm" : "Not currently at a target firm", relationship?.state === "verified" ? `Verified relationship: ${relationship.evidence[0]}` : "No verified relationship evidence", `Last verified ${staleDays > 9_000 ? "never" : `${Math.round(staleDays)} days ago`}`],
       sourceDate: new Date(contact.enrichedAt || contact.createdAt).toISOString(), warning: !contact.linkedInUrl ? "Add a LinkedIn URL before using the extension capture flow." : undefined,
-      links: contact.linkedInUrl ? [{ label: "Open LinkedIn for reviewed capture", href: contact.linkedInUrl }] : undefined, data: { contactId: contact.id, missingFields: missing, estimatedCredits: 1 } })),
+      links: contact.linkedInUrl ? [{ label: "Open LinkedIn for reviewed capture", href: contact.linkedInUrl }] : undefined, data: { contactId: contact.id, missingFields: missing, estimatedCredits: 1, relationshipState: relationship?.state || "potential" } })),
     warnings: ["Provider data and extension captures remain labeled separately from manual edits and model inference."], freshness: now.toISOString(),
     proposedActions: contactIds.length ? [{ toolName: "enrich_contacts", label: `Enrich ${contactIds.length} selected contacts (estimated ${contactIds.length} credits)`, input: { contactIds, estimatedCredits: contactIds.length } }] : [] };
 }
@@ -371,22 +433,26 @@ async function firmCoverage(userId: string): Promise<SkillResult> {
   const user = dataOrThrow<Record<string, any> | null>("load target firms", await supabase.from("User").select("targetFirms").eq("id", userId).maybeSingle());
   const targetFirms = parseStoredList(user?.targetFirms);
   const contacts = await contactsWithPipeline(userId, 2_000);
+  const relationships = await relationshipsAtCompanies(userId, targetFirms);
   const cards = targetFirms.map((firm) => {
     const matches = contacts.filter((contact) => canonicalCompanyKey(contact.firmName) === canonicalCompanyKey(firm));
-    const warm = matches.filter((contact) => contact.tier === "warm" || contact.warmthScore >= 60);
-    const senior = matches.filter((contact) => /director|partner|vp|vice president|head|recruit|talent|manager/i.test(`${contact.title} ${contact.seniorityLevel}`));
+    const firmRelationships = relationships.get(canonicalCompanyKey(firm)) || [];
+    const verified = firmRelationships.filter((relationship) => relationship.state === "verified");
+    const potential = firmRelationships.filter((relationship) => relationship.state === "potential");
+    const verifiedIds = new Set(verified.map((relationship) => relationship.contactId));
+    const senior = matches.filter((contact) => verifiedIds.has(String(contact.id)) && /director|partner|vp|vice president|head|recruit|talent|manager/i.test(`${contact.title} ${contact.seniorityLevel}`));
     const functions = new Set(matches.map((contact) => contact.role || contact.title).filter(Boolean).map((value) => value.toLowerCase().split(/\s+/).slice(-2).join(" ")));
-    const recent = matches.filter((contact) => daysSince(contact.lastSpokenAt) <= 90);
+    const recent = matches.filter((contact) => verifiedIds.has(String(contact.id)) && daysSince(contact.lastSpokenAt) <= 90);
     const active = matches.filter((contact) => contact.pipelineEntries.length > 0);
-    const score = Math.min(100, matches.length * 12 + warm.length * 12 + senior.length * 12 + functions.size * 5 + active.length * 5 + recent.length * 8);
-    const gap = matches.length === 0 ? "No saved contacts" : warm.length === 0 ? "Only cold contacts" : senior.length === 0 ? "No senior or recruiting contact" : recent.length === 0 ? "Relationships are stale" : functions.size < 2 ? "Low functional diversity" : "Coverage is healthy";
+    const score = Math.min(100, verified.length * 22 + potential.length * 5 + senior.length * 12 + functions.size * 5 + active.length * 5 + recent.length * 8);
+    const gap = matches.length === 0 ? "No saved contacts" : verified.length === 0 ? "Potential paths only—none verified" : senior.length === 0 ? "No verified senior or recruiting contact" : recent.length === 0 ? "Verified relationships are stale" : functions.size < 2 ? "Low functional diversity" : "Coverage is healthy";
     const firmQuery = encodeURIComponent(firm);
-    return { id: canonicalCompanyKey(firm), title: firm, subtitle: gap, score, confidence: 0.9, evidence: [`${matches.length} contacts · ${warm.length} warm · ${senior.length} senior/recruiting`, `${functions.size} represented functions`, `${active.length} active in pipeline · ${recent.length} touched in 90 days`], sourceDate: now.toISOString(),
+    return { id: canonicalCompanyKey(firm), title: firm, subtitle: gap, score, confidence: 0.9, evidence: [`${verified.length} verified relationship${verified.length === 1 ? "" : "s"} · ${potential.length} potential path${potential.length === 1 ? "" : "s"}`, `${senior.length} verified senior/recruiting · ${functions.size} represented functions`, `${active.length} active in pipeline · ${recent.length} verified contacts touched in 90 days`], sourceDate: now.toISOString(),
       links: [
         { label: "Discover contacts", href: `/dashboard/discover?company=${firmQuery}` },
         ...(matches.length ? [{ label: "Review contacts", href: `/dashboard/contacts?company=${firmQuery}` }] : []),
       ],
-      data: { contactCount: matches.length, warmCount: warm.length, seniorCount: senior.length, functionalDiversity: functions.size, gap } };
+      data: { contactCount: matches.length, verifiedCount: verified.length, potentialCount: potential.length, seniorCount: senior.length, functionalDiversity: functions.size, gap } };
   }).sort((a, b) => a.score - b.score);
   return { skillId: "firm_coverage", title: "Target-firm coverage", summary: cards.length ? "Firms with the largest relationship gaps are ranked first." : "Add target firms to your profile to calculate coverage.", cards, warnings: [], freshness: now.toISOString(), proposedActions: [] };
 }
@@ -394,14 +460,21 @@ async function firmCoverage(userId: string): Promise<SkillResult> {
 async function whoToContact(userId: string, overdueOnly = false): Promise<SkillResult> {
   const now = new Date();
   const contacts = await contactsWithPipeline(userId, 1_000);
+  const relationships = await relationshipsAtCompanies(userId, contacts.map((contact) => String(contact.firmName || "")));
+  const relationshipsByContact = new Map(
+    [...relationships.values()].flat().map((relationship) => [relationship.contactId, relationship]),
+  );
   const ranked = contacts.map((contact) => {
+    const relationship = relationshipsByContact.get(String(contact.id));
     const age = daysSince(contact.lastSpokenAt);
-    const score = Math.min(100, contact.warmthScore * 0.45 + Math.min(35, age / 4) + contact.pipelineEntries.length * 12);
-    return { contact, score, age };
-  }).filter((item) => !overdueOnly || item.age >= 30).sort((a, b) => b.score - a.score).slice(0, 8);
-  return { skillId: overdueOnly ? "follow_ups" : "who_to_contact", title: overdueOnly ? "Follow-ups to make" : "Who to contact today", summary: ranked.length ? "Ranked from your saved relationship and pipeline evidence." : "No eligible saved contacts were found.",
-    cards: ranked.map(({ contact, score, age }) => ({ id: contact.id, title: contact.name, subtitle: [contact.title, contact.firmName].filter(Boolean).join(" · "), score: Math.round(score), confidence: 0.82,
-      evidence: [`Warmth score ${Math.round(contact.warmthScore)}`, `${contact.pipelineEntries.length} active pipeline placement${contact.pipelineEntries.length === 1 ? "" : "s"}`, age > 9_000 ? "No interaction date recorded" : `Last interaction about ${Math.round(age)} days ago`], sourceDate: new Date(contact.lastSpokenAt || contact.createdAt).toISOString(), links: contact.linkedInUrl ? [{ label: "Open LinkedIn", href: contact.linkedInUrl }] : undefined })), warnings: [], freshness: now.toISOString(), proposedActions: [] };
+    const score = Math.min(100, Number(relationship?.confidence || 0) * 55 + Math.min(30, age / 4) + contact.pipelineEntries.length * 12);
+    return { contact, relationship, score, age };
+  }).filter((item) => item.relationship?.state === "verified" && (!overdueOnly || item.age >= 30)).sort((a, b) => b.score - a.score).slice(0, 8);
+  const potentialCount = [...relationships.values()].flat().filter((relationship) => relationship.state === "potential").length;
+  return { skillId: overdueOnly ? "follow_ups" : "who_to_contact", title: overdueOnly ? "Follow-ups to make" : "Who to contact today", summary: ranked.length ? "Ranked only from user-confirmed relationships and recorded interactions." : "No verified relationship is ready for contact yet.",
+    cards: ranked.map(({ contact, relationship, score, age }) => ({ id: contact.id, title: contact.name, subtitle: [contact.title, contact.firmName].filter(Boolean).join(" · "), score: Math.round(score), confidence: relationship?.confidence || 0.8,
+      evidence: [`Verified ${relationship?.relationshipType}: ${relationship?.evidence[0] || "recorded interaction"}`, `${contact.pipelineEntries.length} active pipeline placement${contact.pipelineEntries.length === 1 ? "" : "s"}`, age > 9_000 ? "No interaction date recorded" : `Last interaction about ${Math.round(age)} days ago`], sourceDate: new Date(contact.lastSpokenAt || relationship?.effectiveAt || contact.createdAt).toISOString(), links: contact.linkedInUrl ? [{ label: "Open LinkedIn", href: contact.linkedInUrl }] : undefined, data: { relationshipState: "verified", contactId: contact.id } })),
+    warnings: potentialCount ? [`${potentialCount} imported or inferred path${potentialCount === 1 ? " is" : "s are"} excluded until you verify the relationship.`] : [], freshness: now.toISOString(), proposedActions: [] };
 }
 
 export async function executeCareerSkill(input: { skillId: CareerSkillId; userId: string; userEmail: string; parameters?: Record<string, unknown>; onProgress?: (message: string) => void | Promise<void> }): Promise<SkillResult> {

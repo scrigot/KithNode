@@ -57,7 +57,8 @@ begin
     ('User'), ('AlumniContact'), ('PipelineEntry'), ('Pipeline'),
     ('MeContact'), ('MeResume'), ('MeInternshipApplication'),
     ('CareerGoal'), ('AssistantConversation'), ('AssistantRun'),
-    ('AssistantToolCall'), ('AssistantApproval'), ('Recommendation'),
+    ('AssistantToolCall'), ('AssistantApproval'), ('AssistantResult'), ('AssistantAction'),
+    ('RelationshipEvidence'), ('Recommendation'),
     ('OutreachDraft'), ('IntegrationConnection'), ('LinkedInProfile'), ('LinkedInProfileRevision'),
     ('Opportunity'), ('OpportunityContact'), ('OpportunityEvent'), ('ResearchDraft')
   ) as required(name)
@@ -90,10 +91,149 @@ begin
   if not has_table_privilege('service_role', 'public."OpportunityEvent"', 'select') then
     raise exception 'service_role is missing OpportunityEvent select privilege';
   end if;
+  if to_regprocedure('public.execute_save_opportunity_action(text,text)') is null
+    or to_regprocedure('public.undo_assistant_action(text,text)') is null
+    or to_regprocedure('public.deny_assistant_action(text,text,text)') is null then
+    raise exception 'assistant action functions are missing';
+  end if;
+  if has_function_privilege('authenticated', 'public.execute_save_opportunity_action(text,text)', 'execute') then
+    raise exception 'authenticated unexpectedly can execute assistant actions';
+  end if;
+  if not has_function_privilege('service_role', 'public.execute_save_opportunity_action(text,text)', 'execute') then
+    raise exception 'service_role cannot execute assistant actions';
+  end if;
 end
 $verify$;
 select 'migration verification passed';
 SQL
+
+# Prove the golden-path mutation is server-owned, idempotent, and reversible.
+psql -d "$VERIFY_DB" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+begin;
+
+insert into public."AssistantResult" (
+  id, "runId", "userId", "skillId", status, payload, "sourceFreshAt", "expiresAt"
+) values (
+  'verify-result',
+  'verify-run',
+  'verify-user',
+  'find_internships',
+  'ready',
+  jsonb_build_object(
+    'cards',
+    jsonb_build_array(
+      jsonb_build_object(
+        'id', 'greenhouse:scale-ai:verify-job',
+        'data', jsonb_build_object(
+          'opportunity', jsonb_build_object(
+            'company', 'Scale AI',
+            'role', 'Applied AI Intern',
+            'location', 'San Francisco, CA',
+            'workMode', 'hybrid',
+            'jobUrl', 'https://job-boards.greenhouse.io/scaleai/jobs/verify-job',
+            'applyUrl', 'https://job-boards.greenhouse.io/scaleai/jobs/verify-job',
+            'source', 'greenhouse',
+            'externalId', 'verify-job',
+            'description', 'Fixture listing used only inside a rolled-back migration test.',
+            'fitScore', 91,
+            'networkScore', 14,
+            'matchReasons', jsonb_build_array('Applied AI matches approved evidence'),
+            'postedAt', now(),
+            'opportunityType', 'internship',
+            'season', 'Summer 2027'
+          )
+        )
+      )
+    )
+  ),
+  now(),
+  now() + interval '1 day'
+);
+
+insert into public."AssistantToolCall" (
+  id, "runId", "userId", "toolName", input, status, "riskLevel", "requiresApproval"
+) values (
+  'verify-tool',
+  'verify-run',
+  'verify-user',
+  'save_opportunity',
+  jsonb_build_object('resultId', 'verify-result', 'candidateId', 'greenhouse:scale-ai:verify-job'),
+  'proposed',
+  'write',
+  true
+);
+
+insert into public."AssistantApproval" (
+  id, "toolCallId", "userId", status
+) values (
+  'verify-approval',
+  'verify-tool',
+  'verify-user',
+  'pending'
+);
+
+insert into public."AssistantAction" (
+  id, "userId", "runId", "resultId", "toolCallId", "actionType",
+  status, "idempotencyKey", preview, input
+) values (
+  'verify-action',
+  'verify-user',
+  'verify-run',
+  'verify-result',
+  'verify-tool',
+  'save_opportunity',
+  'previewed',
+  'verify-run:save-opportunity:verify-job',
+  jsonb_build_object('consequence', 'Creates one Applications record.'),
+  jsonb_build_object('resultId', 'verify-result', 'candidateId', 'greenhouse:scale-ai:verify-job')
+);
+
+do $action_test$
+declare
+  first_receipt jsonb;
+  retry_receipt jsonb;
+  undo_receipt jsonb;
+  opportunity_count integer;
+  action_status text;
+begin
+  first_receipt := public.execute_save_opportunity_action('verify-user', 'verify-tool');
+  retry_receipt := public.execute_save_opportunity_action('verify-user', 'verify-tool');
+  if first_receipt <> retry_receipt then
+    raise exception 'save action retry returned a different receipt';
+  end if;
+
+  select count(*) into opportunity_count
+  from public."Opportunity"
+  where "userId" = 'verify-user';
+  if opportunity_count <> 1 then
+    raise exception 'save action created % opportunities, expected 1', opportunity_count;
+  end if;
+
+  undo_receipt := public.undo_assistant_action('verify-user', 'verify-action');
+  if coalesce((undo_receipt->>'undone')::boolean, false) is not true then
+    raise exception 'undo receipt is missing undone=true';
+  end if;
+  select count(*) into opportunity_count
+  from public."Opportunity"
+  where "userId" = 'verify-user';
+  if opportunity_count <> 0 then
+    raise exception 'undo left % opportunities, expected 0', opportunity_count;
+  end if;
+
+  perform public.undo_assistant_action('verify-user', 'verify-action');
+  perform public.execute_save_opportunity_action('verify-user', 'verify-tool');
+  select status into action_status
+  from public."AssistantAction"
+  where id = 'verify-action';
+  if action_status <> 'completed' then
+    raise exception 'save after undo ended in status %', action_status;
+  end if;
+end
+$action_test$;
+
+rollback;
+SQL
+echo "assistant action transaction passed"
 
 DRIFT_FILE="${TMPDIR:-/tmp}/kithnode-prisma-drift-${$}.sql"
 DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${VERIFY_DB}" \

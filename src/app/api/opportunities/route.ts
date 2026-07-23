@@ -13,6 +13,7 @@ import {
   opportunityCreateSchema,
 } from "@/lib/opportunities";
 import { organizationNameKey } from "@/lib/product-records";
+import { relationshipsAtCompanies } from "@/lib/relationships/repository";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -79,9 +80,16 @@ export async function GET(request: NextRequest) {
 
   const contactIds = Array.from(new Set((contactLinks || []).map((contact) => contact.contactId).filter(Boolean))) as string[];
   const { data: contactRows = [] } = contactIds.length
-    ? await supabase.from("AlumniContact").select("id,firstName,lastName,firmName,title,linkedinUrl,tier,warmthScore").eq("importedByUserId", userId).in("id", contactIds)
+    ? await supabase.from("AlumniContact").select("id,name,firmName,title,linkedInUrl").eq("importedByUserId", userId).in("id", contactIds)
     : { data: [] };
-  const contactsById = new Map((contactRows || []).map((contact) => [contact.id, contact]));
+  const contactsById = new Map((contactRows || []).map((contact) => [contact.id, {
+    ...contact,
+    // Keep the one-release response aliases consumed by the existing detail
+    // sheet while the UI moves fully to `name` and `linkedInUrl`.
+    firstName: contact.name,
+    lastName: "",
+    linkedinUrl: contact.linkedInUrl,
+  }]));
   const linksByOpportunity = new Map<string, typeof contactLinks>();
   for (const link of contactLinks || []) {
     const links = linksByOpportunity.get(link.opportunityId) || [];
@@ -183,8 +191,22 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { data: contacts = [] } = await supabase.from("AlumniContact").select("id,warmthScore,tier,title").eq("importedByUserId", userId).ilike("firmName", parsed.data.company).limit(25);
-  if (contacts?.length) await supabase.from("OpportunityContact").upsert(contacts.map((contact) => ({ id: randomUUID(), userId, opportunityId: opportunity.id, contactId: contact.id, score: Math.round(Math.max(contact.warmthScore, contact.tier === "warm" ? 70 : 0)), reason: contact.title || contact.tier, createdAt: now })), { onConflict: "userId,opportunityId,contactId" });
+  const relationships = await relationshipsAtCompanies(userId, [parsed.data.company]);
+  const verifiedContacts = [...relationships.values()].flat().filter((relationship) => relationship.state === "verified");
+  if (verifiedContacts.length) {
+    await supabase.from("OpportunityContact").upsert(
+      verifiedContacts.map((relationship) => ({
+        id: randomUUID(),
+        userId,
+        opportunityId: opportunity.id,
+        contactId: relationship.contactId,
+        score: Math.round(relationship.confidence * 100),
+        reason: `Verified ${relationship.relationshipType}: ${relationship.evidence[0] || "recorded relationship"}`,
+        createdAt: now,
+      })),
+      { onConflict: "userId,opportunityId,contactId" },
+    );
+  }
 
-  return NextResponse.json({ opportunity: { ...opportunity, contactCount: contacts?.length || 0 } }, { status: 201 });
+  return NextResponse.json({ opportunity: { ...opportunity, contactCount: verifiedContacts.length } }, { status: 201 });
 }

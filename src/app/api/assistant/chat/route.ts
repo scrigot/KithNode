@@ -38,11 +38,27 @@ async function getAssistant(request: NextRequest) {
   const conversation = await assistantRepository.conversation(conversationId, userId);
   if (!conversation) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const runs = await assistantRepository.listRunIds(conversationId, userId);
-  const [messages, toolCalls] = await Promise.all([
+  const runIds = runs.map((run) => String(run.id));
+  const [messages, toolCalls, actions] = await Promise.all([
     assistantRepository.listMessages(conversationId, userId),
-    assistantRepository.listToolCalls(userId, runs.map((run) => String(run.id))),
+    assistantRepository.listToolCalls(userId, runIds),
+    assistantRepository.listActions(userId, runIds),
   ]);
-  return NextResponse.json({ conversation, messages, toolCalls });
+  const actionsByToolCall = new Map(actions.map((action) => [String(action.toolCallId), action]));
+  return NextResponse.json({
+    conversation,
+    messages,
+    toolCalls: toolCalls.map((toolCall) => {
+      const action = actionsByToolCall.get(String(toolCall.id));
+      if (!action) return toolCall;
+      return {
+        ...toolCall,
+        actionId: action.id,
+        status: action.status === "previewed" ? toolCall.status : action.status,
+        output: action.output || toolCall.output,
+      };
+    }),
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -107,12 +123,21 @@ async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) 
       throw new AssistantHttpError(500, "persistence_failed", message, true);
     }
 
+    const storedResult = await assistantRepository.createResult({
+      runId: String(run.id),
+      userId,
+      skillId: inferredSkill,
+      status: skillResult.status === "complete" || !skillResult.status ? "ready" : skillResult.status,
+      payload: skillResultJson(skillResult),
+      sourceFreshAt: skillResult.freshness,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
+    });
     const readToolCall = await assistantRepository.createToolCall({
         runId: run.id,
         userId,
         toolName: `skill_${inferredSkill}`,
-        input: { message: parsed.data.message, parameters },
-        output: skillResultJson(skillResult),
+        input: { message: parsed.data.message, parameters, resultId: storedResult.id },
+        output: { resultId: storedResult.id, ...skillResultJson(skillResult) },
         status: "completed",
         riskLevel: "read",
         requiresApproval: false,
@@ -123,12 +148,53 @@ async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) 
         userId,
         role: "assistant",
         content: skillResult.summary,
-        meta: { runId: run.id, skillId: inferredSkill, toolCallId: readToolCall.id, freshness: skillResult.freshness },
+        meta: {
+          runId: run.id,
+          resultId: storedResult.id,
+          skillId: inferredSkill,
+          toolCallId: readToolCall.id,
+          freshness: skillResult.freshness,
+        },
     });
     await onProgress?.("Saving the result and its evidence…");
-    const proposedActions = await Promise.all(skillResult.proposedActions.map(async (action) => {
+    const candidateSaveActions = ["find_internships", "find_jobs"].includes(inferredSkill)
+      ? skillResult.cards
+          .filter((card) => Boolean(card.data?.opportunity))
+          .map((card) => ({
+            toolName: "save_opportunity" as const,
+            label: `Save ${card.title} at ${card.subtitle?.split(" · ")[0] || "this organization"} to Applications`,
+            input: { resultId: storedResult.id, candidateId: card.id },
+          }))
+      : [];
+    const actionPreviews = [...skillResult.proposedActions, ...candidateSaveActions];
+    const proposedActions = await Promise.all(actionPreviews.map(async (action, index) => {
       const policy = assistantToolPolicy(action.toolName);
-      const toolCall = await assistantRepository.createToolCall({ runId: run.id, userId, toolName: action.toolName, input: { ...action.input, label: action.label }, riskLevel: policy.riskLevel, requiresApproval: true });
+      const actionInput = { ...action.input, label: action.label };
+      const toolCall = await assistantRepository.createToolCall({
+        runId: run.id,
+        userId,
+        toolName: action.toolName,
+        input: actionInput,
+        riskLevel: policy.riskLevel,
+        requiresApproval: true,
+      });
+      await assistantRepository.createAction({
+        userId,
+        runId: String(run.id),
+        resultId: String(storedResult.id),
+        toolCallId: String(toolCall.id),
+        actionType: action.toolName,
+        idempotencyKey: `${run.id}:${action.toolName}:${String(action.input.candidateId || index)}`,
+        preview: {
+          label: action.label,
+          resultId: storedResult.id,
+          candidateId: action.input.candidateId || null,
+          consequence: action.toolName === "save_opportunity"
+            ? "Creates one saved Applications record. It does not apply or contact anyone."
+            : "Runs only after approval.",
+        },
+        actionInput,
+      });
       await assistantRepository.createApproval(String(toolCall.id), userId);
       return toolCall;
     }));
@@ -136,7 +202,14 @@ async function postAssistant(request: NextRequest, onProgress?: ProgressWriter) 
       assistantRepository.updateRun(String(run.id), userId, { status: "completed", model: "deterministic", completedAt: new Date().toISOString() }),
       assistantRepository.touchConversation(String(conversation.id), userId),
     ]);
-    return NextResponse.json({ conversationId: conversation.id, message: assistantMessage, recommendations: [], proposedActions, skillResult });
+    return NextResponse.json({
+      conversationId: conversation.id,
+      resultId: storedResult.id,
+      message: assistantMessage,
+      recommendations: [],
+      proposedActions,
+      skillResult,
+    });
   }
 
   const context = await buildAssistantContext(userId);

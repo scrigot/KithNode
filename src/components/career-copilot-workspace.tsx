@@ -25,6 +25,13 @@ interface ProposedAction {
   riskLevel: string;
   input: { label?: string; [key: string]: unknown };
   status: string;
+  output?: {
+    actionId?: string;
+    opportunityId?: string;
+    message?: string;
+    undone?: boolean;
+    [key: string]: unknown;
+  };
 }
 
 interface CareerSkill {
@@ -44,7 +51,19 @@ interface SkillCard {
   sourceDate: string;
   warning?: string;
   links?: Array<{ label: string; href: string }>;
-  data?: { opportunity?: Record<string, unknown>; programType?: string; season?: string; classYearStatus?: string };
+  data?: {
+    opportunity?: Record<string, unknown>;
+    programType?: string;
+    season?: string;
+    classYearStatus?: string;
+    relationshipState?: "verified" | "potential" | "none" | "unavailable";
+    relationships?: Array<{
+      contactId: string;
+      name: string;
+      state: "verified" | "potential";
+      summary: string;
+    }>;
+  };
 }
 
 interface SkillResult {
@@ -258,6 +277,7 @@ export function CareerCopilotWorkspace({
             riskLevel: String(item.riskLevel),
             input: (item.input && typeof item.input === "object" ? item.input : {}) as ProposedAction["input"],
             status: String(item.status || "proposed"),
+            output: item.output && typeof item.output === "object" ? item.output as ProposedAction["output"] : undefined,
           })),
         );
       })
@@ -337,28 +357,8 @@ export function CareerCopilotWorkspace({
     setContextOpen(false);
   }
 
-  async function saveOpportunity(card: SkillCard, tailor = false) {
-    if (!card.data?.opportunity || cardBusy) return;
-    setCardBusy(card.id);
-    setError("");
-    try {
-      const saveResponse = await apiFetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(card.data.opportunity) });
-      const saved = await responseBody(saveResponse);
-      if (!saveResponse.ok) throw new Error(String(saved.error || "Could not save opportunity"));
-      if (tailor) {
-        const resumeResponse = await apiFetch(`/api/applications/${encodeURIComponent(String((saved.opportunity as { id?: unknown })?.id))}/resume`, { method: "POST" });
-        const resume = await responseBody(resumeResponse);
-        if (!resumeResponse.ok) throw new Error(String(resume.error || "Could not prepare resume variant"));
-      }
-      setError(tailor ? "Resume variant prepared in Resume Studio." : "Opportunity saved.");
-    } catch (caught) {
-      recordIssue(caught, "Could not save opportunity", "opportunity_save_failed");
-    } finally {
-      setCardBusy(undefined);
-    }
-  }
-
   async function decide(action: ProposedAction, decision: "approve" | "deny") {
+    setCardBusy(`action:${action.id}`);
     setError("");
     try {
       const response = await apiFetch("/api/assistant/approve", {
@@ -367,12 +367,51 @@ export function CareerCopilotWorkspace({
         body: JSON.stringify({ toolCallId: action.id, decision }),
       });
       const data = await responseBody(response);
-      if (!response.ok) throw new Error(String(data.error || "Could not record decision"));
+      if (!response.ok) throw new Error(String(data.message || data.error || "Could not record decision"));
       setActions((current) => current.map((item) =>
-        item.id === action.id ? { ...item, status: String(data.status) } : item,
+        item.id === action.id
+          ? {
+              ...item,
+              status: String(data.status),
+              output: data.output && typeof data.output === "object"
+                ? data.output as ProposedAction["output"]
+                : item.output,
+            }
+          : item,
       ));
     } catch (caught) {
       recordIssue(caught, "Could not record decision", "approval_failed");
+    } finally {
+      setCardBusy(undefined);
+    }
+  }
+
+  async function undoAction(action: ProposedAction) {
+    const actionId = action.output?.actionId;
+    if (!actionId) return;
+    setCardBusy(`action:${action.id}`);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/assistant/actions/${encodeURIComponent(actionId)}/undo`, {
+        method: "POST",
+      });
+      const data = await responseBody(response);
+      if (!response.ok) throw new Error(String(data.message || data.error || "Could not undo this change"));
+      setActions((current) => current.map((item) =>
+        item.id === action.id
+          ? {
+              ...item,
+              status: String(data.status || "undone"),
+              output: data.output && typeof data.output === "object"
+                ? data.output as ProposedAction["output"]
+                : item.output,
+            }
+          : item,
+      ));
+    } catch (caught) {
+      recordIssue(caught, "Could not undo this change", "undo_failed");
+    } finally {
+      setCardBusy(undefined);
     }
   }
 
@@ -659,22 +698,82 @@ export function CareerCopilotWorkspace({
                 </section>
               ) : null}
               <div className="grid gap-3">
-                {skillResult.cards.map((card) => (
-                  <article key={card.id} className="rounded-2xl border border-border bg-white p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div><h3 className="text-sm font-semibold">{card.title}</h3>{card.subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{card.subtitle}</p>}</div>
-                      {typeof card.score === "number" && <span className="bg-primary/10 px-2 py-1 font-mono text-xs text-primary">{card.score}/100</span>}
-                    </div>
-                    {card.data?.programType ? <div className="mt-2 flex flex-wrap gap-1.5"><span className="border border-primary/25 bg-primary/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-primary">{card.data.programType.replaceAll("_", " ")}</span>{card.data.season ? <span className="border border-border px-2 py-1 font-mono text-[10px] text-text-secondary">{card.data.season}</span> : null}{card.data.classYearStatus ? <span className="border border-border px-2 py-1 font-mono text-[10px] text-text-secondary">Eligibility {card.data.classYearStatus}</span> : null}</div> : null}
-                    <ul className="mt-3 space-y-1 text-xs text-text-secondary">{card.evidence.map((item) => <li key={item}>• {item}</li>)}</ul>
-                    {card.warning && <p className="mt-2 text-xs text-accent-amber">{card.warning}</p>}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {card.links?.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className="flex items-center gap-1 border border-border px-2 py-1 text-[11px] text-primary"><ExternalLink size={11} />{link.label}</a>)}
-                      {card.data?.opportunity && <button type="button" disabled={cardBusy === card.id} onClick={() => saveOpportunity(card)} className="flex items-center gap-1 border border-border px-2 py-1 text-[11px]"><Save size={11} />Save</button>}
-                      {card.data?.opportunity && <button type="button" disabled={cardBusy === card.id} onClick={() => saveOpportunity(card, true)} className="flex items-center gap-1 bg-primary px-2 py-1 text-[11px] text-white"><BriefcaseBusiness size={11} />Resume variant</button>}
-                    </div>
-                  </article>
-                ))}
+                {skillResult.cards.map((card) => {
+                  const saveAction = actions.find((action) =>
+                    action.toolName === "save_opportunity"
+                    && String(action.input.candidateId || "") === card.id,
+                  );
+                  const actionBusy = saveAction ? cardBusy === `action:${saveAction.id}` : false;
+                  const relationshipState = card.data?.relationshipState;
+                  const savedOpportunityId = saveAction?.output?.opportunityId;
+                  return (
+                    <article key={card.id} className="rounded-2xl border border-border bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div><h3 className="text-sm font-semibold">{card.title}</h3>{card.subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{card.subtitle}</p>}</div>
+                        {typeof card.score === "number" && <span className="rounded-lg bg-primary/10 px-2 py-1 font-mono text-xs text-primary">{card.score}/100</span>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {card.data?.programType ? <span className="rounded-lg border border-primary/25 bg-primary/[0.06] px-2 py-1 text-[10px] font-medium text-primary">{card.data.programType.replaceAll("_", " ")}</span> : null}
+                        {card.data?.season ? <span className="rounded-lg border border-border px-2 py-1 text-[10px] text-text-secondary">{card.data.season}</span> : null}
+                        {card.data?.classYearStatus ? <span className="rounded-lg border border-border px-2 py-1 text-[10px] text-text-secondary">Eligibility {card.data.classYearStatus}</span> : null}
+                        {relationshipState ? (
+                          <span className={`rounded-lg border px-2 py-1 text-[10px] font-medium ${
+                            relationshipState === "verified"
+                              ? "border-success/25 bg-success-soft text-success"
+                              : relationshipState === "potential"
+                                ? "border-warning/25 bg-warning-soft text-warning"
+                                : "border-border bg-surface-soft text-text-secondary"
+                          }`}>
+                            {relationshipState === "verified" ? "Verified warm path" : relationshipState === "potential" ? "Potential path" : "No known path"}
+                          </span>
+                        ) : null}
+                      </div>
+                      <ul className="mt-3 space-y-1 text-xs text-text-secondary">{card.evidence.map((item) => <li key={item}>• {item}</li>)}</ul>
+                      {card.data?.relationships?.length ? (
+                        <div className="mt-3 rounded-xl border border-border-soft bg-surface-soft px-3 py-2 text-xs text-text-secondary">
+                          <p className="font-medium text-text-primary">Relationship evidence</p>
+                          {card.data.relationships.slice(0, 3).map((relationship) => (
+                            <p key={`${card.id}:${relationship.contactId}`} className="mt-1">
+                              {relationship.name}: {relationship.summary}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
+                      {card.warning && <p className="mt-2 text-xs text-warning">{card.warning}</p>}
+                      {saveAction?.status === "proposed" || saveAction?.status === "undone" ? (
+                        <p className="mt-3 text-xs leading-5 text-text-secondary">
+                          Saving creates one Applications record. It does not apply, message anyone, or generate a resume.
+                        </p>
+                      ) : null}
+                      {saveAction?.output?.message ? (
+                        <p className="mt-3 rounded-xl border border-success/20 bg-success-soft px-3 py-2 text-xs text-success" role="status">
+                          {saveAction.output.message}
+                        </p>
+                      ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {card.links?.map((link) => <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className="flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-xs text-primary"><ExternalLink size={12} />{link.label}</a>)}
+                        {saveAction && ["proposed", "undone"].includes(saveAction.status) ? (
+                          <button type="button" disabled={actionBusy} onClick={() => decide(saveAction, "approve")} className="flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-white disabled:opacity-50">
+                            {actionBusy ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
+                            {saveAction.status === "undone" ? "Save again" : "Save to Applications"}
+                          </button>
+                        ) : null}
+                        {saveAction?.status === "completed" && savedOpportunityId ? (
+                          <>
+                            <a href={`/dashboard/resume?opportunityId=${encodeURIComponent(savedOpportunityId)}`} className="flex min-h-10 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 text-xs font-semibold text-primary">
+                              <BriefcaseBusiness size={13} />Tailor resume
+                            </a>
+                            <button type="button" disabled={actionBusy} onClick={() => undoAction(saveAction)} className="min-h-10 rounded-lg border border-border bg-white px-3 text-xs font-medium text-text-secondary disabled:opacity-50">
+                              {actionBusy ? "Undoing…" : "Undo save"}
+                            </button>
+                          </>
+                        ) : null}
+                        {saveAction?.status === "denied" ? <span className="self-center text-xs text-text-secondary">Save dismissed</span> : null}
+                        {card.data?.opportunity && !saveAction ? <span className="self-center text-xs text-warning">Save preview unavailable—rerun this search.</span> : null}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -691,7 +790,7 @@ export function CareerCopilotWorkspace({
               </div>
             </article>
           ))}
-          {actions.map((action) => (
+          {actions.filter((action) => action.toolName !== "save_opportunity" || !action.input.candidateId).map((action) => (
             <article key={action.id} className="rounded-2xl border border-warning/25 bg-warning-soft p-4">
               <p className="text-xs font-semibold text-warning">Review before anything changes</p>
               <h3 className="mt-1 font-medium text-text-primary">{action.input?.label || action.toolName}</h3>
@@ -729,7 +828,14 @@ export function CareerCopilotWorkspace({
                   </button>
                 </div>
               ) : (
-                <p className="mt-3 text-xs font-semibold capitalize text-text-secondary">{action.status}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <p className="text-xs font-semibold capitalize text-text-secondary">{action.status}</p>
+                  {action.status === "completed" && action.output?.actionId ? (
+                    <button type="button" disabled={cardBusy === `action:${action.id}`} onClick={() => undoAction(action)} className="min-h-10 rounded-lg border border-border bg-white px-3 text-xs font-medium text-text-secondary disabled:opacity-50">
+                      Undo
+                    </button>
+                  ) : null}
+                </div>
               )}
             </article>
           ))}

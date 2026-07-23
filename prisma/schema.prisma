@@ -745,6 +745,28 @@ model AssistantRun {
   @@index([conversationId, createdAt])
 }
 
+// Durable, server-owned output from a deterministic assistant skill. The
+// browser receives result/candidate ids and display data, but never becomes the
+// source of truth for a later write.
+model AssistantResult {
+  id            String    @id @default(cuid())
+  runId         String
+  userId        String
+  skillId       String
+  status        String    @default("ready") // ready | partial | needs_setup | expired
+  payload       Json
+  sourceFreshAt DateTime? @db.Timestamptz(6)
+  expiresAt     DateTime? @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+
+  actions AssistantAction[]
+
+  @@unique([runId])
+  @@index([userId, skillId, createdAt])
+  @@index([userId, expiresAt])
+}
+
 model AssistantToolCall {
   id               String    @id @default(cuid())
   runId            String
@@ -773,6 +795,35 @@ model AssistantApproval {
   decidedAt  DateTime? @db.Timestamptz(6)
 
   @@index([userId, status, createdAt])
+}
+
+// One previewed consequential action, its immutable server-owned input, its
+// receipt, and the information needed to reverse it. idempotencyKey makes
+// retries safe across browser refreshes and concurrent approval requests.
+model AssistantAction {
+  id             String    @id @default(cuid())
+  userId         String
+  runId          String
+  resultId       String?
+  toolCallId     String?   @unique
+  actionType     String
+  status         String    @default("previewed") // previewed | approved | denied | running | completed | failed | undone
+  idempotencyKey String
+  preview        Json
+  input          Json
+  output         Json?
+  undoInput      Json?
+  error          String    @default("")
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  approvedAt     DateTime? @db.Timestamptz(6)
+  completedAt    DateTime? @db.Timestamptz(6)
+  undoneAt       DateTime? @db.Timestamptz(6)
+
+  result AssistantResult? @relation(fields: [resultId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status, createdAt])
+  @@index([runId, createdAt])
 }
 
 model AssistantMemory {
@@ -992,6 +1043,32 @@ model PersonOrganization {
   @@index([userId, organizationId, isCurrent])
 }
 
+// Provenance for claims about a user's relationship to a person. A shared
+// school, employer, or inferred similarity is only "potential"; only explicit
+// user review or recorded interaction can be "verified".
+model RelationshipEvidence {
+  id               String    @id @default(cuid())
+  userId           String
+  contactId        String
+  state            String    @default("potential") // verified | potential | unavailable
+  relationshipType String    @default("unknown")
+  source           String
+  sourceId         String    @default("")
+  sourceUrl        String    @default("")
+  summary          String
+  confidence       Float     @default(0)
+  verifiedByUser   Boolean   @default(false)
+  effectiveAt      DateTime? @db.Timestamptz(6)
+  expiresAt        DateTime? @db.Timestamptz(6)
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, contactId, source, sourceId, relationshipType])
+  @@index([userId, contactId, state])
+  @@index([userId, state, updatedAt])
+}
+
 // Unified catalog record over resumes, LinkedIn copies, essays, cover letters,
 // outreach, and meeting-prep briefs. Existing source records stay authoritative;
 // legacyType + legacyId allow a catalog record to point at them without copying
@@ -1015,7 +1092,9 @@ model CareerDocument {
   revisions CareerDocumentRevision[]
   links     CareerDocumentLink[]
 
-  @@unique([userId, legacyType, legacyId])
+  // SQL adds a partial unique index for non-empty legacy identifiers. Empty
+  // manually-created documents must remain independently creatable.
+  @@index([userId, legacyType, legacyId])
   @@index([userId, type, updatedAt])
   @@index([userId, status, updatedAt])
 }

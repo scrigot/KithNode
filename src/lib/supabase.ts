@@ -1,4 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
+import "server-only";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { supabaseServerEnv } from "@/lib/env/server";
 
 /**
  * Server-side Supabase client. Uses the SERVICE ROLE key so writes bypass RLS.
@@ -9,25 +11,31 @@ import { createClient } from "@supabase/supabase-js";
  * NEVER import this from a client component. Every caller in this repo is a
  * server route, server action, or server-only lib.
  */
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://jyjpitagxtdzedtooedw.supabase.co";
+let serviceClient: SupabaseClient | undefined;
 
-const SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  "";
-
-if (!SERVICE_ROLE_KEY) {
-  console.warn(
-    "SUPABASE_SERVICE_ROLE_KEY is not set. Server-side writes will fail under RLS."
-  );
+function getServiceClient() {
+  if (serviceClient) return serviceClient;
+  const env = supabaseServerEnv();
+  serviceClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return serviceClient;
 }
 
-export const supabase = createClient(
-  SUPABASE_URL,
-  SERVICE_ROLE_KEY || "missing-service-role-key",
-  {
-    auth: { persistSession: false, autoRefreshToken: false },
-  }
-);
+/**
+ * Lazily resolve the server client so build-time module discovery and unit
+ * tests can import route modules without silently connecting to a hosted
+ * project. The first real database operation requires explicit environment
+ * configuration and fails closed when it is missing.
+ */
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, property) {
+    const client = getServiceClient();
+    const value = Reflect.get(client, property, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
+
+export function resetSupabaseClientForTests() {
+  serviceClient = undefined;
+}

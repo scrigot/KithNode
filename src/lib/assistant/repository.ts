@@ -41,15 +41,103 @@ export const assistantRepository = {
   async updateRun(id: string, userId: string, input: Record<string, unknown>) {
     assertResult("update run", await supabase.from("AssistantRun").update(input).eq("id", id).eq("userId", userId));
   },
+  async createResult(input: {
+    runId: string;
+    userId: string;
+    skillId: string;
+    status: string;
+    payload: unknown;
+    sourceFreshAt?: string;
+    expiresAt?: string;
+  }) {
+    return assertResult(
+      "store assistant result",
+      await supabase
+        .from("AssistantResult")
+        .insert({
+          id: assistantId(),
+          ...input,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        .select("*")
+        .single(),
+    );
+  },
+  async result(id: string, userId: string) {
+    return assertResult(
+      "load assistant result",
+      await supabase
+        .from("AssistantResult")
+        .select("*")
+        .eq("id", id)
+        .eq("userId", userId)
+        .maybeSingle(),
+    );
+  },
   async listToolCalls(userId: string, runIds: string[]) {
     if (!runIds.length) return [];
-    return assertResult("list tool calls", await supabase.from("AssistantToolCall").select("*").eq("userId", userId).in("runId", runIds).order("createdAt", { ascending: true }));
+    return assertResult("list tool calls", await supabase.from("AssistantToolCall").select("*").eq("userId", userId).in("runId", runIds).order("createdAt", { ascending: true })) || [];
+  },
+  async listActions(userId: string, runIds: string[]) {
+    if (!runIds.length) return [];
+    return assertResult(
+      "list assistant actions",
+      await supabase
+        .from("AssistantAction")
+        .select("*")
+        .eq("userId", userId)
+        .in("runId", runIds)
+        .order("createdAt", { ascending: true }),
+    ) || [];
   },
   async createToolCall(input: Record<string, unknown>) {
     return assertResult("create tool call", await supabase.from("AssistantToolCall").insert({ id: assistantId(), status: "proposed", createdAt: new Date().toISOString(), ...input }).select("*").single());
   },
   async createApproval(toolCallId: string, userId: string) {
     return assertResult("create approval", await supabase.from("AssistantApproval").insert({ id: assistantId(), toolCallId, userId, status: "pending", createdAt: new Date().toISOString() }).select("*").single());
+  },
+  async createAction(input: {
+    userId: string;
+    runId: string;
+    resultId?: string;
+    toolCallId?: string;
+    actionType: string;
+    idempotencyKey: string;
+    preview: unknown;
+    actionInput: unknown;
+  }) {
+    const row = {
+      id: assistantId(),
+      userId: input.userId,
+      runId: input.runId,
+      resultId: input.resultId || null,
+      toolCallId: input.toolCallId || null,
+      actionType: input.actionType,
+      idempotencyKey: input.idempotencyKey,
+      preview: input.preview,
+      input: input.actionInput,
+      status: "previewed",
+      createdAt: new Date().toISOString(),
+    };
+    const created = await supabase
+      .from("AssistantAction")
+      .insert(row)
+      .select("*")
+      .maybeSingle();
+    if (!created.error && created.data) return created.data;
+    if (created.error?.code !== "23505") {
+      throw new AssistantDatabaseError("create assistant action", created.error?.message || "Action was not created");
+    }
+    return assertResult(
+      "load assistant action",
+      await supabase
+        .from("AssistantAction")
+        .select("*")
+        .eq("userId", input.userId)
+        .eq("idempotencyKey", input.idempotencyKey)
+        .single(),
+    );
   },
   async createRecommendation(input: Record<string, unknown>) {
     return assertResult("create recommendation", await supabase.from("Recommendation").insert({ id: assistantId(), status: "open", createdAt: new Date().toISOString(), ...input }).select("*").single());
