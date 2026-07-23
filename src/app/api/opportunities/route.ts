@@ -12,6 +12,7 @@ import {
   opportunityCompanyKey,
   opportunityCreateSchema,
 } from "@/lib/opportunities";
+import { organizationNameKey } from "@/lib/product-records";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -116,6 +117,46 @@ export async function POST(request: NextRequest) {
   const id = randomUUID();
   const companyKey = opportunityCompanyKey(parsed.data.company);
   const now = new Date().toISOString();
+  let organizationId = parsed.data.organizationId || null;
+  if (!organizationId) {
+    const nameKey = organizationNameKey(parsed.data.company);
+    const organizationType = ["mba", "undergraduate"].includes(parsed.data.opportunityType)
+      ? "school"
+      : parsed.data.opportunityType === "club"
+        ? "club"
+        : ["scholarship", "fellowship", "insight_program", "leadership_program"].includes(parsed.data.opportunityType)
+          ? "program"
+          : "company";
+    const { data: organization } = await supabase
+      .from("Organization")
+      .upsert(
+        {
+          id: randomUUID(),
+          userId,
+          name: parsed.data.company,
+          nameKey,
+          type: organizationType,
+          status: "active",
+          source: "application",
+          metadata: {},
+          createdAt: now,
+          updatedAt: now,
+        },
+        { onConflict: "userId,nameKey", ignoreDuplicates: true },
+      )
+      .select("id")
+      .maybeSingle();
+    if (organization?.id) organizationId = organization.id;
+    if (!organizationId) {
+      const { data: existingOrganization } = await supabase
+        .from("Organization")
+        .select("id")
+        .eq("userId", userId)
+        .eq("nameKey", nameKey)
+        .maybeSingle();
+      organizationId = existingOrganization?.id || null;
+    }
+  }
   const jobUrl = parsed.data.jobUrl || `manual://opportunity/${id}`;
   const { data: existing } = await supabase.from("Opportunity").select("id,createdAt").eq("userId", userId).eq("jobUrl", jobUrl).maybeSingle();
   const opportunityId = existing?.id || id;
@@ -124,6 +165,7 @@ export async function POST(request: NextRequest) {
     id: opportunityId,
     userId,
     companyKey,
+    organizationId,
     jobUrl,
     sourceFreshAt: parsed.data.sourceFreshAt || now,
     lastActivityAt: now,

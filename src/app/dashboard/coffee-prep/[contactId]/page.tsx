@@ -21,7 +21,7 @@ export default async function CoffeePrepDetail({ params }: { params: Promise<{ c
   return (
     <div className="mx-auto max-w-5xl p-5">
       <Link href="/dashboard/coffee-prep" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"><ArrowLeft size={13} />All contacts</Link>
-      <header className="mt-4 border-b border-white/[0.08] pb-4">
+      <header className="mt-4 border-b border-border-soft pb-4">
         <div className="flex flex-wrap items-center gap-3"><h1 className="text-xl font-bold">{name}</h1>{linkedInUrl && <a href={linkedInUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary">LinkedIn <ExternalLink size={11} /></a>}</div>
         <p className="mt-1 text-sm text-muted-foreground">{[contact.title, contact.firmName].filter(Boolean).map(String).join(" · ") || "No role recorded"}</p>
       </header>

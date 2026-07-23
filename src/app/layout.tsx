@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, DM_Sans } from "next/font/google";
+import { Space_Grotesk, DM_Sans, Newsreader } from "next/font/google";
 import { Providers } from "./providers";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -12,6 +12,11 @@ const spaceGrotesk = Space_Grotesk({
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
+});
+
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  variable: "--font-editorial",
 });
 
 export const metadata: Metadata = {
@@ -68,7 +73,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("dark", spaceGrotesk.variable, dmSans.variable)}
+      className={cn(spaceGrotesk.variable, dmSans.variable, newsreader.variable)}
     >
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <Providers>{children}</Providers>

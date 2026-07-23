@@ -15,17 +15,15 @@ export default function RootError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9] px-6">
-      <div className="max-w-md border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold text-slate-900">
-          Something went wrong
-        </h2>
-        <p className="mb-6 text-sm text-slate-500">
-          {error.message || "An unexpected error occurred."}
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
+      <div className="max-w-md rounded-2xl border border-border-soft bg-white p-8 text-center">
+        <h2 className="font-heading text-3xl font-semibold text-text-primary">KithNode hit a snag.</h2>
+        <p className="mt-3 text-base leading-7 text-text-secondary">
+          Nothing was sent or changed. Retry, then use <span className="font-medium text-text-primary">/feedback</span> from Home if the problem returns.
         </p>
         <button
           onClick={reset}
-          className="border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="mt-6 min-h-11 rounded-lg bg-primary px-5 text-sm font-semibold text-white hover:bg-primary/90"
         >
           Try again
         </button>

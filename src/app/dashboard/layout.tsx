@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "./sidebar";
-import { TopBar } from "./top-bar";
 import { UpgradeToast } from "./upgrade-toast";
 import { DashboardTour } from "@/components/dashboard-tour";
 import { HelpWidget } from "@/components/help-widget";
@@ -40,17 +39,11 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bg-primary">
-      {/* Full-width top bar (logo + search left, avatar dropdown right). */}
-      <TopBar userName={userName} userEmail={email ?? ""} />
-      {/* Row below the bar. `min-h-0` (not overflow-hidden) keeps `main` the scroll
-          container AND lets the sidebar's hover-overlay / control popover escape the
-          56px rail without being clipped. `pt-[49px]` clears the sidebar-owned mobile
-          fixed bar; it lives on this non-scrolling wrapper, NOT on `main`. */}
-      <div className="flex flex-1 min-h-0 pt-[49px] lg:pt-0">
-        <Sidebar isFounderUser={founder} userName={userName} />
-        <main className="flex-1 min-w-0 overflow-auto pb-[66px] lg:pb-0">{children}</main>
-      </div>
+    <div className="product-shell flex h-screen min-h-0 bg-canvas text-text-primary">
+      <Sidebar isFounderUser={founder} userName={userName} />
+      <main className="min-w-0 flex-1 overflow-auto bg-canvas pt-14 lg:pt-0">
+        {children}
+      </main>
       <UpgradeToast />
       <DashboardTour />
       <HelpWidget />

@@ -30,7 +30,7 @@ export function SignInPanel() {
   const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#F1F5F9]">
+    <main className="min-h-screen bg-canvas">
       <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-16">
         <Link
           href="/"
@@ -39,15 +39,15 @@ export function SignInPanel() {
           &larr; Back
         </Link>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+        <div className="rounded-2xl border border-border-soft bg-white p-8">
           <div className="flex items-center gap-2">
             <LogoIcon className="h-8 w-8 text-slate-900" />
-            <span className="font-heading text-lg font-bold tracking-tight text-slate-900">
-              Kith<span className="text-[#0EA5E9]">Node</span>
+            <span className="font-heading text-xl font-semibold tracking-tight text-text-primary">
+              Kith<span className="text-primary">Node</span>
             </span>
           </div>
-          <h1 className="mt-8 font-heading text-3xl font-bold tracking-tight text-slate-900">
-            Sign in
+          <h1 className="mt-8 font-heading text-4xl font-semibold tracking-tight text-text-primary">
+            Welcome back.
           </h1>
 
           {isAccessDenied ? (
@@ -72,14 +72,14 @@ export function SignInPanel() {
             </div>
           ) : (
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              Access is currently limited to approved alpha users and UNC emails.
+              Sign in to continue your recruiting work, conversations, and saved evidence.
             </p>
           )}
 
           <button
             type="button"
             onClick={() => signIn("google", { callbackUrl })}
-            className="mt-8 w-full rounded-lg bg-[#0369A1] px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-[#075985] hover:shadow-xl"
+            className="mt-8 min-h-12 w-full rounded-lg bg-primary px-6 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
           >
             Continue with Google
           </button>

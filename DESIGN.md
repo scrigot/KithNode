@@ -14,13 +14,14 @@ The signed-in product uses the **Quiet Intelligence** design direction approved 
 
 ## Product hierarchy
 
-The daily workspace has five primary destinations:
+The daily workspace has six primary destinations:
 
-1. **Home** — a conversational starting point, recent work, and one or two relevant continuations.
-2. **Career Copilot** — grounded skills, conversations, and approval-gated proposals.
-3. **Applications** — opportunities, materials, people, deadlines, and activity.
-4. **Network** — people, discovery, relationship pipeline, firm coverage, and graph.
-5. **Career Toolkit** — Resume Studio, LinkedIn Studio, Coffee Prep, and outreach drafts.
+1. **Home** — the full Career Copilot, recent work, grounded skills, and approval-gated proposals.
+2. **People** — relationship CRM, warm paths, follow-ups, outreach, and meeting preparation.
+3. **Companies** — employers, schools, clubs, programs, and organization coverage.
+4. **Applications** — typed opportunities, materials, people, deadlines, and activity.
+5. **Documents** — resumes, LinkedIn copies, essays, cover letters, outreach, and meeting briefs.
+6. **Research** — opportunity, person, and company discovery with user-reviewed browser handoff.
 
 Persistent utilities sit at the bottom of the desktop sidebar:
 
@@ -194,7 +195,7 @@ Additional rules:
 
 - **Desktop:** Persistent 240px sidebar.
 - **Tablet:** Collapsible sidebar and single-column workspaces when necessary.
-- **Mobile:** Five-item bottom navigation for Home, Copilot, Applications, Network, and Toolkit.
+- **Mobile:** A collapsible navigation drawer preserves the same six workspace destinations without creating a second information architecture.
 - Memory, Knowledge Center, Settings, account controls, and recent work move into a secondary menu.
 - Data tables become readable vertical records.
 - Sheets become full-screen.

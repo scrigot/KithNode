@@ -1,5 +1,7 @@
 "use client";
 
+// The settings hub organization adapts DeepTutor's quiet category-card pattern.
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { useRouter } from "next/navigation";
@@ -44,6 +46,9 @@ import {
   Upload,
   Loader2,
   Mail,
+  Search,
+  CreditCard,
+  Shield,
 } from "lucide-react";
 import { CreditCost } from "@/components/credit-cost";
 import { trackEvent } from "@/lib/posthog";
@@ -258,7 +263,7 @@ function CityAutocomplete({
         className={className}
       />
       {open && suggestions.length > 0 && (
-        <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto border border-white/[0.06] bg-bg-card shadow-lg">
+        <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto border border-white/[0.06] bg-bg-surface-soft shadow-lg">
           {suggestions.map((city, i) => (
             <li
               key={city}
@@ -269,7 +274,7 @@ function CityAutocomplete({
               onMouseEnter={() => setHighlighted(i)}
               className={`cursor-pointer px-3 py-2 text-sm ${
                 i === highlighted
-                  ? "bg-accent-teal/15 text-accent-teal"
+                  ? "bg-primary/15 text-primary"
                   : "text-text-secondary hover:bg-muted"
               }`}
             >
@@ -342,7 +347,7 @@ function EducationRowsEditor({
                 value={row.degree}
                 onChange={(e) => updateRow(i, { degree: e.target.value })}
                 aria-label="Degree"
-                className="h-9 border border-input bg-muted px-1.5 text-xs text-foreground focus:border-accent-teal focus:outline-none"
+                className="h-9 border border-input bg-muted px-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
               >
                 <option value="">Degree</option>
                 <optgroup label="Undergrad">
@@ -507,11 +512,11 @@ function CompletenessMeter({ prefs }: { prefs: Preferences }) {
         <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
           Profile completeness
         </span>
-        <span className="text-[13px] font-bold tabular-nums text-accent-teal">{percent}%</span>
+        <span className="text-[13px] font-bold tabular-nums text-primary">{percent}%</span>
       </div>
       <div className="h-1 w-full bg-white/[0.06]">
         <div
-          className="h-1 bg-accent-teal transition-all duration-300"
+          className="h-1 bg-primary transition-all duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -527,7 +532,7 @@ function CompletenessMeter({ prefs }: { prefs: Preferences }) {
               </span>
             </div>
             <div className="mt-1 h-px w-full bg-white/[0.06]">
-              <div className="h-px bg-accent-teal/60" style={{ width: `${c.percent}%` }} />
+              <div className="h-px bg-primary/60" style={{ width: `${c.percent}%` }} />
             </div>
           </div>
         ))}
@@ -757,7 +762,7 @@ function EditPanel({
 
   const saveButton = (
     <Button
-      className="w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+      className="w-full bg-primary py-5 text-sm font-bold text-white hover:bg-primary/90"
       onClick={handleSave}
       disabled={saving}
     >
@@ -801,7 +806,7 @@ function EditPanel({
                   onClick={() => setActiveSection(item.id)}
                   className={`shrink-0 whitespace-nowrap border-l-2 px-3 py-2 text-left text-[13px] font-medium transition-colors ${
                     active
-                      ? "border-accent-teal text-accent-teal"
+                      ? "border-accent-teal text-primary"
                       : "border-transparent text-text-muted hover:text-white"
                   }`}
                 >
@@ -819,16 +824,16 @@ function EditPanel({
               <CompletenessMeter prefs={local} />
 
       {/* Resume autofill — prefills empty fields only, never stored. */}
-      <div className="mb-6 border border-dashed border-accent-teal/30 bg-accent-teal/[0.04] p-3">
+      <div className="mb-6 border border-dashed border-accent-teal/30 bg-primary/[0.04] p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <FileText size={14} className="text-accent-teal" />
+            <FileText size={14} className="text-primary" />
             <span className="text-[11px] font-bold uppercase tracking-wider text-white">
               Autofill from resume (PDF)
             </span>
           </div>
           <label
-            className={`flex cursor-pointer items-center gap-1.5 border border-accent-teal/40 bg-accent-teal/10 px-3 py-1.5 text-[11px] font-bold text-accent-teal transition-colors hover:bg-accent-teal/20 ${
+            className={`flex cursor-pointer items-center gap-1.5 border border-accent-teal/40 bg-primary/10 px-3 py-1.5 text-[11px] font-bold text-primary transition-colors hover:bg-primary/20 ${
               resumeLoading ? "pointer-events-none opacity-60" : ""
             }`}
           >
@@ -866,9 +871,9 @@ function EditPanel({
       </div>
 
       {/* Recruiting timeline + weekly goal */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <CalendarDays size={16} className="text-accent-teal" />
+            <CalendarDays size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Recruiting
             </h3>
@@ -920,9 +925,9 @@ function EditPanel({
           {activeSection === "outreach" && (
             <>
         {/* Outreach drafting */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-3 flex items-center gap-2">
-            <Mail size={16} className="text-accent-teal" />
+            <Mail size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Outreach drafting
             </h3>
@@ -947,7 +952,7 @@ function EditPanel({
                     onClick={() => setLocal({ ...local, draftTone: val })}
                     className={`border px-4 py-2 text-xs font-bold transition-colors ${
                       local.draftTone === val
-                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        ? "border-accent-teal bg-primary/15 text-primary"
                         : "border-white/[0.06] text-text-muted hover:text-white"
                     }`}
                   >
@@ -972,7 +977,7 @@ function EditPanel({
                     onClick={() => setLocal({ ...local, draftLength: val })}
                     className={`flex flex-col items-start border px-4 py-2 transition-colors ${
                       local.draftLength === val
-                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        ? "border-accent-teal bg-primary/15 text-primary"
                         : "border-white/[0.06] text-text-muted hover:text-white"
                     }`}
                   >
@@ -997,7 +1002,7 @@ function EditPanel({
                     onClick={() => setLocal({ ...local, draftSubjectStyle: val })}
                     className={`border px-4 py-2 text-xs font-bold transition-colors ${
                       local.draftSubjectStyle === val
-                        ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                        ? "border-accent-teal bg-primary/15 text-primary"
                         : "border-white/[0.06] text-text-muted hover:text-white"
                     }`}
                   >
@@ -1019,7 +1024,7 @@ function EditPanel({
                 rows={3}
                 maxLength={200}
                 placeholder={"Best,\nSam Rigot\nUNC '29"}
-                className="w-full resize-none border border-white/[0.06] bg-muted px-3 py-2 text-sm text-white placeholder:text-text-muted focus:border-accent-teal focus:outline-none"
+                className="w-full resize-none border border-white/[0.06] bg-muted px-3 py-2 text-sm text-white placeholder:text-text-muted focus:border-primary focus:outline-none"
               />
               <p className="mt-1 text-[10px] text-text-muted">
                 When set, used verbatim as the sign-off instead of just your first name.{" "}
@@ -1035,9 +1040,9 @@ function EditPanel({
           {activeSection === "notifications" && (
             <>
         {/* Notifications */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Mail size={16} className="text-accent-teal" />
+            <Mail size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">
               Notifications
             </h3>
@@ -1068,12 +1073,12 @@ function EditPanel({
                     aria-label={labelText}
                     onClick={() => setLocal({ ...local, [key]: !on })}
                     className={`relative h-5 w-9 shrink-0 border transition-colors ${
-                      on ? "border-accent-teal bg-accent-teal/30" : "border-white/[0.06] bg-muted"
+                      on ? "border-accent-teal bg-primary/30" : "border-white/[0.06] bg-muted"
                     }`}
                   >
                     <span
                       className={`absolute top-0.5 h-3.5 w-3.5 transition-all ${
-                        on ? "left-[18px] bg-accent-teal" : "left-0.5 bg-text-muted"
+                        on ? "left-[18px] bg-primary" : "left-0.5 bg-text-muted"
                       }`}
                     />
                   </button>
@@ -1089,9 +1094,9 @@ function EditPanel({
           {activeSection === "profile" && (
             <>
         {/* School */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <GraduationCap size={16} className="text-accent-teal" />
+            <GraduationCap size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">School</h3>
           </div>
           <div className="space-y-3">
@@ -1156,12 +1161,12 @@ function EditPanel({
                   {local.minors.map((m) => (
                     <span
                       key={m}
-                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-accent-teal/10 px-2 py-1 text-[11px] font-bold text-accent-teal"
+                      className="flex items-center gap-1.5 border border-accent-teal/30 bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary"
                     >
                       {m}
                       <button
                         onClick={() => setLocal((p) => ({ ...p, minors: p.minors.filter((x) => x !== m) }))}
-                        className="text-accent-teal/60 hover:text-accent-teal"
+                        className="text-primary/60 hover:text-primary"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1205,7 +1210,7 @@ function EditPanel({
                   onClick={() => setLocal({ ...local, greekLifeEnabled: true })}
                   className={`border px-4 py-2 text-xs font-bold transition-colors ${
                     local.greekLifeEnabled
-                      ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                      ? "border-accent-teal bg-primary/15 text-primary"
                       : "border-white/[0.06] text-text-muted hover:text-white"
                   }`}
                 >
@@ -1215,7 +1220,7 @@ function EditPanel({
                   onClick={() => setLocal({ ...local, greekLifeEnabled: false, greekOrganization: "" })}
                   className={`border px-4 py-2 text-xs font-bold transition-colors ${
                     !local.greekLifeEnabled
-                      ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                      ? "border-accent-teal bg-primary/15 text-primary"
                       : "border-white/[0.06] text-text-muted hover:text-white"
                   }`}
                 >
@@ -1259,12 +1264,12 @@ function EditPanel({
                   {local.skills.map((skill) => (
                     <span
                       key={skill}
-                      className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                      className="flex items-center gap-1.5 border border-accent-teal bg-primary/15 px-3 py-2 text-xs font-bold text-primary"
                     >
                       {skill}
                       <button
                         onClick={() => setLocal((p) => ({ ...p, skills: p.skills.filter((s) => s !== skill) }))}
-                        className="text-accent-teal/60 hover:text-accent-teal"
+                        className="text-primary/60 hover:text-primary"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1290,9 +1295,9 @@ function EditPanel({
         </section>
 
         {/* Location */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <MapPin size={16} className="text-accent-teal" />
+            <MapPin size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Location</h3>
           </div>
           <div className="space-y-4">
@@ -1321,7 +1326,7 @@ function EditPanel({
                       onClick={() => toggleLocation(loc)}
                       className={`border px-3 py-2 text-xs font-bold transition-colors ${
                         active
-                          ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                          ? "border-accent-teal bg-primary/15 text-primary"
                           : "border-white/[0.06] text-text-muted hover:text-white"
                       }`}
                     >
@@ -1332,12 +1337,12 @@ function EditPanel({
                 {local.customLocations.map((loc) => (
                   <span
                     key={loc}
-                    className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                    className="flex items-center gap-1.5 border border-accent-teal bg-primary/15 px-3 py-2 text-xs font-bold text-primary"
                   >
                     {loc}
                     <button
                       onClick={() => setLocal((p) => ({ ...p, customLocations: p.customLocations.filter((l) => l !== loc) }))}
-                      className="text-accent-teal/60 hover:text-accent-teal"
+                      className="text-primary/60 hover:text-primary"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -1367,9 +1372,9 @@ function EditPanel({
 
         {/* Target roles — track-grouped. Selected ROLE names persist into
             targetIndustries (storage shape unchanged). */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Target size={16} className="text-accent-teal" />
+            <Target size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Roles</h3>
           </div>
           <TrackRolePicker selected={local.targetIndustries} onToggle={toggleIndustry} />
@@ -1379,9 +1384,9 @@ function EditPanel({
         </section>
 
         {/* Firms + Experience */}
-        <section className="border border-white/[0.06] bg-bg-card p-6">
+        <section className="border border-white/[0.06] bg-bg-surface-soft p-6">
           <div className="mb-4 flex items-center gap-2">
-            <Building2 size={16} className="text-accent-teal" />
+            <Building2 size={16} className="text-primary" />
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-text-muted">Target Firms</h3>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1393,7 +1398,7 @@ function EditPanel({
                   onClick={() => toggleFirm(firm)}
                   className={`border px-3 py-2 text-xs font-bold transition-colors ${
                     active
-                      ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                      ? "border-accent-teal bg-primary/15 text-primary"
                       : "border-white/[0.06] text-text-muted hover:text-white"
                   }`}
                 >
@@ -1404,12 +1409,12 @@ function EditPanel({
             {local.customFirms.map((firm) => (
               <span
                 key={firm}
-                className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal"
+                className="flex items-center gap-1.5 border border-accent-teal bg-primary/15 px-3 py-2 text-xs font-bold text-primary"
               >
                 {firm}
                 <button
                   onClick={() => setLocal((p) => ({ ...p, customFirms: p.customFirms.filter((f) => f !== firm) }))}
-                  className="text-accent-teal/60 hover:text-accent-teal"
+                  className="text-primary/60 hover:text-primary"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -1450,7 +1455,7 @@ function EditPanel({
 
         {/* Save */}
         <Button
-          className="w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+          className="w-full bg-primary py-5 text-sm font-bold text-white hover:bg-primary/90"
           onClick={handleSave}
           disabled={saving}
         >
@@ -1578,7 +1583,7 @@ function Wizard({
         <div className="flex gap-2">
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <div key={i} className="flex-1">
-              <div className={`h-1 w-full transition-colors duration-300 ${i <= step ? "bg-accent-teal" : "bg-white/[0.06]"}`} />
+              <div className={`h-1 w-full transition-colors duration-300 ${i <= step ? "bg-primary" : "bg-white/[0.06]"}`} />
             </div>
           ))}
         </div>
@@ -1589,7 +1594,7 @@ function Wizard({
               <div
                 key={i}
                 className={`flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors duration-300 ${
-                  i <= step ? "text-accent-teal" : "text-muted-foreground/40"
+                  i <= step ? "text-primary" : "text-muted-foreground/40"
                 }`}
               >
                 <Icon className="h-3 w-3" />
@@ -1601,7 +1606,7 @@ function Wizard({
       </div>
 
       <div className="w-full max-w-lg">
-        <div className="border border-white/[0.06] bg-bg-card p-8">
+        <div className="border border-white/[0.06] bg-bg-surface-soft p-8">
           {step === 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Your School</p>
@@ -1657,11 +1662,11 @@ function Wizard({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPrefs({ ...prefs, greekLifeEnabled: true })}
-                      className={`border px-4 py-2 text-xs font-bold transition-colors ${prefs.greekLifeEnabled ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
+                      className={`border px-4 py-2 text-xs font-bold transition-colors ${prefs.greekLifeEnabled ? "border-accent-teal bg-primary/15 text-primary" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
                     >YES</button>
                     <button
                       onClick={() => setPrefs({ ...prefs, greekLifeEnabled: false, greekOrganization: "" })}
-                      className={`border px-4 py-2 text-xs font-bold transition-colors ${!prefs.greekLifeEnabled ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
+                      className={`border px-4 py-2 text-xs font-bold transition-colors ${!prefs.greekLifeEnabled ? "border-accent-teal bg-primary/15 text-primary" : "border-white/[0.06] text-muted-foreground hover:text-foreground"}`}
                     >NO</button>
                   </div>
                 </div>
@@ -1705,7 +1710,7 @@ function Wizard({
                         <button
                           key={loc}
                           onClick={() => toggleLocation(loc)}
-                          className={`border px-4 py-2.5 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
+                          className={`border px-4 py-2.5 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-primary/15 text-primary" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
                         >{loc}</button>
                       );
                     })}
@@ -1714,9 +1719,9 @@ function Wizard({
                 {prefs.customLocations.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {prefs.customLocations.map((loc) => (
-                      <span key={loc} className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal">
+                      <span key={loc} className="flex items-center gap-1.5 border border-accent-teal bg-primary/15 px-3 py-2 text-xs font-bold text-primary">
                         {loc}
-                        <button onClick={() => removeCustomLocation(loc)} className="text-accent-teal/60 hover:text-accent-teal">
+                        <button onClick={() => removeCustomLocation(loc)} className="text-primary/60 hover:text-primary">
                           <X className="h-3 w-3" />
                         </button>
                       </span>
@@ -1776,7 +1781,7 @@ function Wizard({
                     <button
                       key={firm}
                       onClick={() => toggleFirm(firm)}
-                      className={`border px-3 py-2 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-accent-teal/15 text-accent-teal" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
+                      className={`border px-3 py-2 text-xs font-bold transition-colors ${active ? "border-accent-teal bg-primary/15 text-primary" : "border-white/[0.06] bg-transparent text-muted-foreground hover:text-foreground"}`}
                     >{firm}</button>
                   );
                 })}
@@ -1784,9 +1789,9 @@ function Wizard({
               {prefs.customFirms.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {prefs.customFirms.map((firm) => (
-                    <span key={firm} className="flex items-center gap-1.5 border border-accent-teal bg-accent-teal/15 px-3 py-2 text-xs font-bold text-accent-teal">
+                    <span key={firm} className="flex items-center gap-1.5 border border-accent-teal bg-primary/15 px-3 py-2 text-xs font-bold text-primary">
                       {firm}
-                      <button onClick={() => removeCustomFirm(firm)} className="text-accent-teal/60 hover:text-accent-teal">
+                      <button onClick={() => removeCustomFirm(firm)} className="text-primary/60 hover:text-primary">
                         <X className="h-3 w-3" />
                       </button>
                     </span>
@@ -1810,8 +1815,8 @@ function Wizard({
 
           {step === 4 && (
             <div className="text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border border-accent-teal/30 bg-accent-teal/10">
-                <CheckCircle2 className="h-8 w-8 text-accent-teal" />
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border border-accent-teal/30 bg-primary/10">
+                <CheckCircle2 className="h-8 w-8 text-primary" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">You&apos;re all set!</h2>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -1820,7 +1825,7 @@ function Wizard({
               <div className="mt-6 space-y-2 text-left">
                 {prefs.university && (
                   <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
-                    <GraduationCap className="h-4 w-4 text-accent-teal" />
+                    <GraduationCap className="h-4 w-4 text-primary" />
                     <span className="text-xs text-foreground">
                       {prefs.university}{prefs.greekLifeEnabled && prefs.greekOrganization ? ` / ${prefs.greekOrganization}` : ""}
                     </span>
@@ -1828,7 +1833,7 @@ function Wizard({
                 )}
                 {(prefs.hometown || prefs.targetLocations.length > 0 || prefs.customLocations.length > 0) && (
                   <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
-                    <MapPin className="h-4 w-4 text-accent-teal" />
+                    <MapPin className="h-4 w-4 text-primary" />
                     <span className="text-xs text-foreground">
                       {prefs.hometown ? `From ${prefs.hometown}` : ""}
                       {prefs.hometown && (prefs.targetLocations.length + prefs.customLocations.length) > 0 ? " · " : ""}
@@ -1840,7 +1845,7 @@ function Wizard({
                 )}
                 {prefs.targetIndustries.length > 0 && (
                   <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
-                    <Target className="h-4 w-4 text-accent-teal" />
+                    <Target className="h-4 w-4 text-primary" />
                     <span className="text-xs text-foreground">
                       {prefs.targetIndustries.length} industr{prefs.targetIndustries.length === 1 ? "y" : "ies"} selected
                     </span>
@@ -1848,7 +1853,7 @@ function Wizard({
                 )}
                 {allFirmsCount > 0 && (
                   <div className="flex items-center gap-2 border border-white/[0.06] bg-white/[0.02] px-4 py-2.5">
-                    <Building2 className="h-4 w-4 text-accent-teal" />
+                    <Building2 className="h-4 w-4 text-primary" />
                     <span className="text-xs text-foreground">
                       {allFirmsCount} firm{allFirmsCount === 1 ? "" : "s"} targeted
                     </span>
@@ -1856,7 +1861,7 @@ function Wizard({
                 )}
               </div>
               <Button
-                className="mt-8 w-full bg-accent-teal py-5 text-sm font-bold text-white hover:bg-accent-teal/90"
+                className="mt-8 w-full bg-primary py-5 text-sm font-bold text-white hover:bg-primary/90"
                 onClick={handleFinish}
               >
                 Go to Dashboard
@@ -1874,7 +1879,7 @@ function Wizard({
                 </Button>
               )}
             </div>
-            <Button size="sm" className="gap-1 bg-accent-teal text-xs font-bold text-white hover:bg-accent-teal/90" onClick={goNext}>
+            <Button size="sm" className="gap-1 bg-primary text-xs font-bold text-white hover:bg-primary/90" onClick={goNext}>
               Continue<ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -1894,7 +1899,7 @@ function Wizard({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
+export function ProfileSettingsWorkspace() {
   const [prefs, setPrefs] = useState<Preferences>(getDefaults);
   const [mode, setMode] = useState<"loading" | "wizard" | "panel">("loading");
 
@@ -2004,5 +2009,35 @@ export default function SettingsPage() {
       initialPrefs={prefs}
       onComplete={() => setMode("panel")}
     />
+  );
+}
+
+const settingsCategories = [
+  { href: "/dashboard/settings/profile", title: "Profile & education", description: "Identity, education, experience, skills, and student eligibility.", icon: GraduationCap },
+  { href: "/dashboard/settings/goals", title: "Recruiting goals", description: "Target roles, organizations, locations, deadlines, and weekly relationship goals.", icon: Target },
+  { href: "/dashboard/settings/integrations", title: "Connected accounts", description: "OAuth accounts, search sources, enrichment, and connection health.", icon: Building2 },
+  { href: "/dashboard/settings/integrations#search", title: "Search & enrichment", description: "Official career sources, provider readiness, costs, and recovery actions.", icon: Search },
+  { href: "/dashboard/settings/integrations#browser-companion", title: "Browser companion", description: "Pairing token, reviewed LinkedIn capture, permissions, and revocation.", icon: Upload },
+  { href: "/dashboard/settings/data", title: "Data & imports", description: "Import, export, source history, and data recovery.", icon: FileText },
+  { href: "/dashboard/settings/integrations#ai-readiness", title: "AI readiness", description: "Plain-language status for model, retrieval, and grounding capabilities.", icon: CheckCircle2 },
+  { href: "/dashboard/settings/preferences", title: "Preferences", description: "Draft style, notifications, accessibility, and product behavior.", icon: Mail },
+  { href: "/dashboard/settings/billing", title: "Billing & usage", description: "Plan, credits, usage, and renewal details.", icon: CreditCard },
+  { href: "/dashboard/settings/account", title: "Account & privacy", description: "Sessions, privacy, deletion, and security controls.", icon: Shield },
+];
+
+export default function SettingsHubPage() {
+  return (
+    <div className="mx-auto max-w-[980px] px-5 py-8 sm:px-8">
+      <div className="grid gap-3 md:grid-cols-2">
+        {settingsCategories.map(({ href, title, description, icon: Icon }) => (
+          <a key={`${href}:${title}`} href={href} className="group rounded-2xl border border-border bg-white p-5 hover:border-primary/30 hover:shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-soft text-text-secondary group-hover:bg-primary-soft group-hover:text-primary"><Icon className="h-5 w-5" /></span>
+              <div className="min-w-0"><h2 className="font-heading text-xl font-medium text-text-primary">{title}</h2><p className="mt-1 text-sm leading-6 text-text-secondary">{description}</p><span className="mt-3 inline-flex items-center text-sm font-medium text-primary">Open settings <ChevronRight className="ml-1 h-4 w-4" /></span></div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }

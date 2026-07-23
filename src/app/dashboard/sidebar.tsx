@@ -1,271 +1,242 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+// Modified from DeepTutor's collapsible navigation and recent-work patterns.
+// KithNode replaces tutoring surfaces with user-scoped recruiting workspaces.
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
-  LayoutDashboard,
-  Share2,
-  Settings,
-  MessageSquare,
-  HelpCircle,
+  Brain,
+  BriefcaseBusiness,
+  Building2,
+  ChevronRight,
+  Clock3,
+  FileText,
+  Gauge,
+  Home,
+  LibraryBig,
   LogOut,
   Menu,
-  X,
-  ChevronRight,
-  Gauge,
-  PanelLeft,
-  PanelLeftOpen,
+  MessageSquare,
   PanelLeftClose,
-  Check,
-  Bot,
-  BriefcaseBusiness,
-  Wrench,
+  PanelLeftOpen,
+  Search,
+  Settings,
+  Users,
+  X,
 } from "lucide-react";
-import {
-  type SidebarMode,
-  resolveSidebarCollapsed,
-  migrateSidebarMode,
-  SIDEBAR_MODE_KEY,
-} from "@/lib/sidebar-mode";
+import { LogoIcon } from "@/components/logo";
+import { apiFetch } from "@/lib/api-client";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
-  tour?: string;
+  icon: typeof Home;
   matches?: string[];
 };
 
-const PRIMARY_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, tour: "overview" },
-  { href: "/dashboard/assistant", label: "Career Copilot", icon: Bot },
-  { href: "/dashboard/applications", label: "Applications", icon: BriefcaseBusiness },
-  { href: "/dashboard/network", label: "Network", icon: Share2, matches: ["/dashboard/contacts", "/dashboard/discover", "/dashboard/pipeline", "/dashboard/edge"] },
-  { href: "/dashboard/toolkit", label: "Career Toolkit", icon: Wrench, matches: ["/dashboard/resume", "/dashboard/linkedin", "/dashboard/coffee-prep"] },
-];
-
-const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
-  {
-    label: "WORKSPACE",
-    items: PRIMARY_ITEMS,
-  },
-];
-
-// Founder-only nav group, appended in NavContent when isFounderUser is true.
-const FOUNDER_NAV_GROUP: { label: string; items: NavItem[] } = {
-  label: "FOUNDER",
-  items: [
-    { href: "/dashboard/ops", label: "Ops", icon: Gauge, tour: undefined },
-  ],
+type RecentItem = {
+  id: string;
+  kind: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  updatedAt: string;
 };
 
-// Nav links only — shared by the desktop rail and the mobile drawer. Account
-// identity is NOT here: on desktop it lives in the top-right avatar dropdown; on
-// mobile (no top bar) it lives in <MobileAccount> at the bottom of the drawer.
-function NavContent({
-  pathname,
-  isFounderUser,
-  collapsed,
-  onNavClick,
-}: {
-  pathname: string;
-  isFounderUser: boolean;
-  collapsed: boolean;
-  onNavClick?: () => void;
-}) {
-  const navGroups = [
-    ...NAV_GROUPS,
-    ...(isFounderUser ? [FOUNDER_NAV_GROUP] : []),
-  ];
-
-  return (
-    <nav className="flex-1 overflow-y-auto px-3 py-3">
-      {navGroups.map((group) => (
-        <div key={group.label} className="mb-3">
-          {!collapsed && (
-            <p className="mb-1 px-3 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">
-              {group.label}
-            </p>
-          )}
-          {group.items.map((item) => {
-            const active = pathname === item.href || item.matches?.some((prefix) => pathname.startsWith(prefix));
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavClick}
-                title={collapsed ? item.label : undefined}
-                data-tour={item.tour}
-                className={`mb-0.5 flex items-center border-l-2 transition-all duration-200 ${
-                  collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"
-                } text-[13px] ${
-                  active
-                    ? "bg-accent-teal/10 text-accent-teal font-medium border-accent-teal shadow-[inset_4px_0_12px_-6px_rgba(14,165,233,0.3)]"
-                    : "border-transparent text-text-secondary hover:bg-white/[0.04] hover:text-white"
-                }`}
-              >
-                <Icon
-                  size={18}
-                  strokeWidth={active ? 2.2 : 1.8}
-                  className={active ? "text-accent-teal drop-shadow-[0_0_8px_rgba(14,165,233,0.4)]" : ""}
-                />
-                {!collapsed && <span className="flex-1">{item.label}</span>}
-                {!collapsed && <ChevronRight size={12} className="text-text-muted" />}
-              </Link>
-            );
-          })}
-        </div>
-      ))}
-    </nav>
-  );
-}
-
-const MODE_OPTIONS: { mode: SidebarMode; label: string; icon: typeof PanelLeft }[] = [
-  { mode: "expanded", label: "Expanded", icon: PanelLeftOpen },
-  { mode: "collapsed", label: "Collapsed", icon: PanelLeftClose },
-  { mode: "hover", label: "Expand on hover", icon: PanelLeft },
+const PRIMARY: NavItem[] = [
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/dashboard/people", label: "People", icon: Users, matches: ["/dashboard/contacts", "/contact/"] },
+  { href: "/dashboard/companies", label: "Companies", icon: Building2 },
+  { href: "/dashboard/applications", label: "Applications", icon: BriefcaseBusiness },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText, matches: ["/dashboard/resume", "/dashboard/linkedin", "/dashboard/coffee-prep"] },
+  { href: "/dashboard/research", label: "Research", icon: Search, matches: ["/dashboard/discover"] },
 ];
 
-// Desktop-only footer: the Supabase-style sidebar control. Carries the
-// `sidebar-collapse` tour anchor so the product tour still has a target.
-function SidebarControl({
-  mode,
-  onMode,
-  collapsed,
-}: {
-  mode: SidebarMode;
-  onMode: (m: SidebarMode) => void;
-  collapsed: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+const UTILITIES: NavItem[] = [
+  { href: "/dashboard/memory", label: "Memory", icon: Brain },
+  { href: "/dashboard/knowledge", label: "Knowledge Center", icon: LibraryBig },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: globalThis.MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+function isActive(pathname: string, item: NavItem) {
+  if (item.href === "/dashboard") return pathname === item.href;
+  return pathname.startsWith(item.href) || item.matches?.some((prefix) => pathname.startsWith(prefix));
+}
+
+function SidebarLink({
+  item,
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const Icon = item.icon;
+  const active = isActive(pathname, item);
 
   return (
-    <div ref={ref} className="relative border-t border-white/[0.06] px-2 py-2">
-      <button
-        type="button"
-        data-tour="sidebar-collapse"
-        onClick={() => setOpen((o) => !o)}
-        title="Sidebar control"
-        aria-label="Sidebar control"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={`flex items-center text-text-muted transition-colors duration-150 hover:text-accent-teal ${
-          collapsed ? "w-full justify-center py-1.5" : "gap-2 px-1 py-1.5 text-[11px]"
-        }`}
-      >
-        <PanelLeft size={14} />
-        {!collapsed && <span>Sidebar control</span>}
-      </button>
-
-      {open && (
-        <div className="absolute bottom-[calc(100%+4px)] left-2 z-50 w-[190px] border border-white/[0.06] bg-bg-secondary shadow-2xl">
-          <div className="border-b border-white/[0.06] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.1em] text-text-muted">
-            Sidebar control
-          </div>
-          {MODE_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            const active = opt.mode === mode;
-            return (
-              <button
-                key={opt.mode}
-                type="button"
-                onClick={() => {
-                  onMode(opt.mode);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-[11px] transition-colors ${
-                  active
-                    ? "bg-accent-teal/10 text-accent-teal"
-                    : "text-text-secondary hover:bg-white/[0.04] hover:text-foreground"
-                }`}
-              >
-                <Icon size={13} className="shrink-0" />
-                <span className="flex-1 text-left">{opt.label}</span>
-                {active && <Check size={12} className="shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      title={collapsed ? item.label : undefined}
+      aria-current={active ? "page" : undefined}
+      className={`group relative flex min-h-11 items-center rounded-lg text-sm transition-colors ${
+        collapsed ? "justify-center px-2" : "gap-3 px-3"
+      } ${
+        active
+          ? "bg-surface-selected font-medium text-text-primary"
+          : "text-text-secondary hover:bg-surface-selected/70 hover:text-text-primary"
+      }`}
+    >
+      {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-primary" /> : null}
+      <Icon size={18} strokeWidth={active ? 2.1 : 1.8} />
+      {collapsed ? null : <span className="truncate">{item.label}</span>}
+    </Link>
   );
 }
 
-// Mobile-drawer-only footer. The desktop top-right avatar dropdown owns identity +
-// account on desktop, but the desktop bar is hidden on mobile, so the drawer keeps
-// a compact account section (no top bar to fall back on).
-function MobileAccount({ userName, onNavClick }: { userName: string; onNavClick: () => void }) {
-  const initials =
-    userName
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2) || "U";
+function SidebarBody({
+  pathname,
+  collapsed,
+  isFounderUser,
+  userName,
+  onNavigate,
+}: {
+  pathname: string;
+  collapsed: boolean;
+  isFounderUser: boolean;
+  userName: string;
+  onNavigate?: () => void;
+}) {
+  const [recents, setRecents] = useState<RecentItem[]>([]);
 
-  const links = [{ href: "/dashboard/settings", label: "Settings", icon: Settings }];
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/recents")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json() as { recents?: RecentItem[] };
+        if (!cancelled) setRecents((data.recents || []).slice(0, 6));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
+  const initials = useMemo(
+    () =>
+      userName
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "KN",
+    [userName],
+  );
 
   return (
-    <div className="border-t border-white/[0.06] px-4 py-3">
-      <div className="mb-2 flex items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-accent-teal/15 text-[11px] font-bold text-accent-teal">
-          {initials}
-        </div>
-        <p className="truncate text-[12px] font-medium text-white">{userName}</p>
-      </div>
-      {links.map(({ href, label, icon: Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          onClick={onNavClick}
-          className="flex items-center gap-2 py-1.5 text-[12px] text-text-secondary transition-colors hover:text-accent-teal"
-        >
-          <Icon size={14} className="shrink-0" />
-          {label}
+    <>
+      <div className={`flex h-16 items-center ${collapsed ? "justify-center" : "px-4"}`}>
+        <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 text-text-primary">
+          <LogoIcon className="h-7 w-7" />
+          {collapsed ? null : (
+            <span className="font-heading text-xl font-semibold tracking-[-0.02em]">
+              Kith<span className="text-primary">Node</span>
+            </span>
+          )}
         </Link>
-      ))}
-      <button
-        type="button"
-        onClick={() => {
-          window.dispatchEvent(new CustomEvent("kn:start-tour"));
-          onNavClick();
-        }}
-        className="flex w-full items-center gap-2 py-1.5 text-[12px] text-text-secondary transition-colors hover:text-accent-teal"
-      >
-        <HelpCircle size={14} className="shrink-0" />
-        Take the tour
-      </button>
-      <a
-        href="https://kithnode.canny.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 py-1.5 text-[12px] text-text-secondary transition-colors hover:text-accent-teal"
-      >
-        <MessageSquare size={14} className="shrink-0" />
-        Send Feedback
-      </a>
-      <button
-        type="button"
-        onClick={() => signOut({ callbackUrl: "/" })}
-        className="flex items-center gap-2 py-1.5 text-[12px] text-text-muted transition-colors hover:text-accent-red"
-      >
-        <LogOut size={14} className="shrink-0" />
-        Sign out
-      </button>
-    </div>
+      </div>
+
+      <nav aria-label="Primary" className="space-y-1 px-2">
+        {PRIMARY.map((item) => (
+          <SidebarLink
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </nav>
+
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-2">
+        {collapsed ? (
+          <div className="mx-auto h-px w-8 bg-border-soft" />
+        ) : (
+          <>
+            <div className="flex items-center justify-between px-3">
+              <p className="text-xs font-medium text-text-secondary">Recents</p>
+              <Link href="/dashboard/recents" title="View all recent work" className="rounded-md p-1 text-text-faint hover:bg-surface-selected hover:text-text-primary">
+                <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="mt-1.5 space-y-0.5">
+              {recents.length === 0 ? (
+                <p className="px-3 py-2 text-xs leading-5 text-text-faint">Recent work will appear here.</p>
+              ) : (
+                recents.map((recent) => (
+                  <Link
+                    key={recent.id}
+                    href={recent.href}
+                    onClick={onNavigate}
+                    className="group flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs text-text-secondary hover:bg-surface-selected hover:text-text-primary"
+                  >
+                    {recent.kind === "chat" ? <MessageSquare size={13} className="shrink-0 text-text-faint" /> : <Clock3 size={13} className="shrink-0 text-text-faint" />}
+                    <span className="min-w-0 flex-1 truncate">{recent.title || "Untitled record"}</span>
+                    <ChevronRight size={12} className="opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="space-y-1 border-t border-border-soft px-2 py-2">
+        {UTILITIES.map((item) => (
+          <SidebarLink
+            key={item.href}
+            item={item}
+            pathname={pathname}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ))}
+        {isFounderUser ? (
+          <SidebarLink
+            item={{ href: "/dashboard/ops", label: "Founder Ops", icon: Gauge }}
+            pathname={pathname}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        ) : null}
+        <div className={`mt-2 flex items-center ${collapsed ? "justify-center" : "gap-3 px-2 py-2"}`}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-text-primary text-xs font-semibold text-white">
+            {initials}
+          </div>
+          {collapsed ? null : (
+            <>
+              <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">{userName}</span>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/" })}
+                title="Sign out"
+                className="rounded-lg p-2 text-text-faint hover:bg-surface-selected hover:text-error"
+              >
+                <LogOut size={15} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -277,138 +248,88 @@ export function Sidebar({
   userName: string;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false); // mobile drawer
-  const [hovering, setHovering] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Lazy-init mode from localStorage (migrating the legacy boolean key), SSR-safe.
-  const [mode, setMode] = useState<SidebarMode>(() => {
-    if (typeof window === "undefined") return "expanded";
-    try {
-      return migrateSidebarMode((k) => localStorage.getItem(k));
-    } catch {
-      return "expanded";
-    }
-  });
-
-  // Persist mode.
   useEffect(() => {
     try {
-      localStorage.setItem(SIDEBAR_MODE_KEY, mode);
+      setCollapsed(localStorage.getItem("kithnode:sidebar-collapsed") === "true");
     } catch {
-      // storage unavailable — ignore
+      // Local storage can be unavailable in restricted browser contexts.
     }
-  }, [mode]);
-
-  // Hover only matters in hover mode; reset when leaving it.
-  useEffect(() => {
-    if (mode !== "hover") setHovering(false);
-  }, [mode]);
-
-  // Cmd/Ctrl+B toggles expanded <-> collapsed (desktop), but not while typing.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b")) return;
-      const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
-      e.preventDefault();
-      setMode((m) => (m === "collapsed" ? "expanded" : "collapsed"));
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Debounced collapse-on-leave so a quick mouse-out doesn't strobe the width.
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onEnter = () => {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current);
-    setHovering(true);
-  };
-  const onLeave = () => {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current);
-    leaveTimer.current = setTimeout(() => setHovering(false), 150);
-  };
-
-  const collapsed = resolveSidebarCollapsed(mode, hovering);
-  const reservedNarrow = mode === "collapsed" || mode === "hover"; // in-flow width
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("kithnode:sidebar-collapsed", String(next));
+      } catch {
+        // Preserve navigation even if persistence is unavailable.
+      }
+      return next;
+    });
+  }
 
   return (
     <>
-      {/* Desktop rail: hidden below lg. In hover mode the panel floats (absolute)
-          over content while the rail reserves a fixed 56px, so there's no shift. */}
-      <aside
-        className={`relative hidden shrink-0 transition-[width] duration-200 lg:block ${
-          reservedNarrow ? "w-14" : "w-[220px]"
-        }`}
-        onMouseEnter={mode === "hover" ? onEnter : undefined}
-        onMouseLeave={mode === "hover" ? onLeave : undefined}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+        className="fixed left-4 top-3 z-40 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-white text-text-primary shadow-sm lg:hidden"
       >
-        <div
-          className={`flex flex-col border-r border-white/[0.06] bg-bg-secondary transition-[width] duration-200 ${
-            mode === "hover"
-              ? `absolute inset-y-0 left-0 z-40 ${collapsed ? "w-14" : "w-[220px] shadow-2xl"}`
-              : "h-full w-full"
-          }`}
-        >
-          <NavContent pathname={pathname} isFounderUser={isFounderUser} collapsed={collapsed} />
-          <SidebarControl mode={mode} onMode={setMode} collapsed={collapsed} />
-        </div>
-      </aside>
+        <Menu size={20} />
+      </button>
 
-      {/* Mobile top bar: visible below lg */}
-      <div className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-white/[0.06] bg-bg-secondary px-4 py-3 lg:hidden">
-        <div className="font-heading text-lg font-bold tracking-tight text-white" aria-label="KithNode">
-          Kith<span className="text-accent-teal">Node</span>
-        </div>
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Open navigation"
-          className="flex h-11 w-11 items-center justify-center text-text-secondary transition-colors duration-150 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          <Menu size={22} />
-        </button>
-      </div>
-
-      {/* Mobile drawer backdrop */}
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/60 lg:hidden" onClick={() => setOpen(false)} />
-      )}
-
-      {/* Mobile drawer */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full w-[260px] flex-col border-r border-white/[0.06] bg-bg-secondary transition-transform duration-300 lg:hidden ${
-          open ? "translate-x-0" : "-translate-x-full"
+        className={`relative hidden h-screen shrink-0 flex-col border-r border-border-soft bg-sidebar transition-[width] duration-200 lg:flex ${
+          collapsed ? "w-[60px]" : "w-[240px]"
         }`}
       >
-        <div className="flex justify-end px-4 pt-4">
-          <button
-            onClick={() => setOpen(false)}
-            aria-label="Close navigation"
-            className="flex h-11 w-11 items-center justify-center text-text-secondary transition-colors duration-150 hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <NavContent
+        <SidebarBody
           pathname={pathname}
+          collapsed={collapsed}
           isFounderUser={isFounderUser}
-          collapsed={false}
-          onNavClick={() => setOpen(false)}
+          userName={userName}
         />
-        <MobileAccount userName={userName} onNavClick={() => setOpen(false)} />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-6 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-white text-text-secondary shadow-sm hover:text-text-primary"
+        >
+          {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+        </button>
       </aside>
 
-      <nav aria-label="Primary navigation" className="fixed inset-x-0 bottom-0 z-40 grid h-[66px] grid-cols-5 border-t border-white/[0.08] bg-bg-secondary lg:hidden">
-        {PRIMARY_ITEMS.map((item) => {
-          const active = pathname === item.href || item.matches?.some((prefix) => pathname.startsWith(prefix));
-          const Icon = item.icon;
-          return (
-            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[10px] font-bold ${active ? "text-accent-teal" : "text-text-muted"}`}>
-              <Icon className="h-5 w-5" />
-              <span className="max-w-full truncate">{item.label === "Career Copilot" ? "Copilot" : item.label === "Career Toolkit" ? "Toolkit" : item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+            className="absolute inset-0 bg-black/20"
+          />
+          <aside className="relative flex h-full w-[min(86vw,320px)] flex-col border-r border-border bg-sidebar shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation"
+              className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-xl text-text-secondary hover:bg-surface-selected"
+            >
+              <X size={19} />
+            </button>
+            <SidebarBody
+              pathname={pathname}
+              collapsed={false}
+              isFounderUser={isFounderUser}
+              userName={userName}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          </aside>
+        </div>
+      ) : null}
     </>
   );
 }

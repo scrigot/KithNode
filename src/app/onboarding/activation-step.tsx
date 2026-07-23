@@ -157,7 +157,7 @@ export function ActivationStep() {
               placeholder="ACCESS-CODE"
               aria-label="Access code"
               disabled={redeeming}
-              className="flex-1 border border-white/[0.1] bg-muted px-3 py-2 font-mono text-[13px] uppercase tracking-wider text-foreground placeholder:text-muted-foreground/50 focus:border-accent-teal/60 focus:outline-none disabled:opacity-60"
+              className="flex-1 border border-border bg-muted px-3 py-2 font-mono text-[13px] uppercase tracking-wider text-foreground placeholder:text-muted-foreground/50 focus:border-accent-teal/60 focus:outline-none disabled:opacity-60"
             />
             <button
               type="button"
@@ -195,7 +195,7 @@ export function ActivationStep() {
               className={`flex flex-col border bg-bg-card ${
                 p.highlight
                   ? "border-accent-teal/40 shadow-[0_0_20px_-4px_rgba(14,165,233,0.15)]"
-                  : "border-white/[0.08]"
+                  : "border-border-soft"
               }`}
             >
               <div className="border-b border-white/[0.06] px-4 py-3">
@@ -207,7 +207,7 @@ export function ActivationStep() {
                     className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
                       p.highlight
                         ? "bg-accent-teal/15 text-accent-teal"
-                        : "border border-white/[0.1] text-muted-foreground"
+                        : "border border-border text-muted-foreground"
                     }`}
                   >
                     {p.badge}

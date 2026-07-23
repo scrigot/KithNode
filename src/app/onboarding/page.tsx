@@ -214,8 +214,8 @@ function StepIndicator({ step }: { step: number }) {
                 i === step
                   ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
                   : i < step
-                    ? "border-white/[0.12] text-foreground"
-                    : "border-white/[0.06] text-muted-foreground/40"
+                    ? "border-border text-foreground"
+                    : "border-border-soft text-muted-foreground/40"
               }`}
             >
               {i < step ? <Check className="h-2.5 w-2.5" /> : i + 1}
@@ -253,7 +253,7 @@ function SingleChipGroup({
             className={`border px-4 py-2 text-[12px] font-bold transition-colors ${
               active
                 ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                : "border-border-soft text-muted-foreground hover:text-foreground"
             }`}
           >
             {opt}
@@ -286,7 +286,7 @@ function ChipGroup({
             className={`border px-3 py-1.5 text-[11px] font-bold transition-colors ${
               active
                 ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                : "border-border-soft text-muted-foreground hover:text-foreground"
             }`}
           >
             {opt}
@@ -974,7 +974,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 1: WELCOME ─────────────────────────────────────────── */}
         {step === 0 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-2 flex items-center gap-2">
                 <Network size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -998,7 +998,7 @@ function OnboardingFunnel() {
                 ].map((c) => (
                   <div
                     key={c.k}
-                    className="border border-white/[0.06] bg-muted px-3 py-2"
+                    className="border border-border-soft bg-muted px-3 py-2"
                   >
                     <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-accent-teal">
                       {c.k}
@@ -1025,7 +1025,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 2: GOAL ────────────────────────────────────────────── */}
         {step === 1 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Target size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1067,7 +1067,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 3: PAIN ────────────────────────────────────────────── */}
         {step === 2 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Sparkles size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1112,7 +1112,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 4: TIMELINE ────────────────────────────────────────── */}
         {step === 3 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <CalendarDays size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1153,7 +1153,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 5: YOU (identity) ──────────────────────────────────── */}
         {step === 4 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <GraduationCap size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1279,7 +1279,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 6: RESUME ──────────────────────────────────────────── */}
         {step === 5 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <FileText size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1350,7 +1350,7 @@ function OnboardingFunnel() {
                 ].map((c) => (
                   <div
                     key={c.k}
-                    className="border border-white/[0.06] bg-muted px-3 py-2"
+                    className="border border-border-soft bg-muted px-3 py-2"
                   >
                     <p className="font-mono text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
                       {c.k}
@@ -1387,7 +1387,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 7: TARGETS ─────────────────────────────────────────── */}
         {step === 6 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Target size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1397,7 +1397,7 @@ function OnboardingFunnel() {
               <TrackRolePicker selected={industries} onToggle={toggleIndustry} />
             </section>
 
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Building2 size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1436,7 +1436,7 @@ function OnboardingFunnel() {
               </div>
             </section>
 
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Building2 size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1464,7 +1464,7 @@ function OnboardingFunnel() {
               </div>
             </section>
 
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <CalendarDays size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1532,7 +1532,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 8: EDGES ───────────────────────────────────────────── */}
         {step === 7 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Network size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1584,7 +1584,7 @@ function OnboardingFunnel() {
                       className={`border px-4 py-1.5 text-[11px] font-bold transition-colors ${
                         greekLifeEnabled
                           ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                          : "border-border-soft text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       YES
@@ -1598,7 +1598,7 @@ function OnboardingFunnel() {
                       className={`border px-4 py-1.5 text-[11px] font-bold transition-colors ${
                         !greekLifeEnabled
                           ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
-                          : "border-white/[0.06] text-muted-foreground hover:text-foreground"
+                          : "border-border-soft text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       NO
@@ -1625,12 +1625,12 @@ function OnboardingFunnel() {
             {/* Clubs (+ roles) — gated: clubs are the #1 warm-path signal, so an
                 empty list can't silently advance (see advanceFromEdges). */}
             <section
-              className={`border bg-bg-card p-5 ${
+              className={`border bg-white p-5 ${
                 clubsSkipPrompt
                   ? "border-amber-400/60 ring-1 ring-amber-400/60"
                   : resumeFilled.has("clubMemberships")
                     ? "border-accent-teal/60 ring-1 ring-accent-teal/60"
-                    : "border-white/[0.06]"
+                    : "border-border-soft"
               }`}
             >
               <div className="mb-1 flex items-center gap-2">
@@ -1692,7 +1692,7 @@ function OnboardingFunnel() {
                           void savePrefs(8);
                         }}
                         disabled={savingPrefs}
-                        className="border border-white/[0.12] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                        className="border border-border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
                       >
                         I have no clubs
                       </button>
@@ -1703,7 +1703,7 @@ function OnboardingFunnel() {
 
             {/* Past experiences */}
             <section
-              className={`border bg-bg-card p-5 ${resumeFilled.has("experiences") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-white/[0.06]"}`}
+              className={`border bg-white p-5 ${resumeFilled.has("experiences") ? "border-accent-teal/60 ring-1 ring-accent-teal/60" : "border-border-soft"}`}
             >
               <div className="mb-3 flex items-center gap-2">
                 <Building2 size={14} className="text-accent-teal" />
@@ -1719,7 +1719,7 @@ function OnboardingFunnel() {
             </section>
 
             {/* Skills */}
-            <section className="border border-white/[0.06] bg-bg-card p-5">
+            <section className="border border-border-soft bg-white p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Target size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -1792,8 +1792,8 @@ function OnboardingFunnel() {
         {step === 8 && (
           <div className="mt-4 space-y-3">
             {/* CSV upload */}
-            <section className="border border-white/[0.06] bg-bg-card">
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+            <section className="border border-border-soft bg-white">
+              <div className="flex items-center justify-between border-b border-border-soft px-4 py-2.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
                   <Upload className="h-3 w-3" />
                   Import LinkedIn (CSV)
@@ -1818,7 +1818,7 @@ function OnboardingFunnel() {
                       ? "border-accent-teal bg-accent-teal/10"
                       : csvFileName
                         ? "border-accent-teal/40 bg-accent-teal/5"
-                        : "border-white/[0.1] bg-muted hover:border-white/[0.25]"
+                        : "border-border-soft bg-muted hover:border-text-faint"
                   }`}
                 >
                   <input
@@ -1864,8 +1864,8 @@ function OnboardingFunnel() {
             </section>
 
             {/* Manual add */}
-            <section className="border border-white/[0.06] bg-bg-card">
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+            <section className="border border-border-soft bg-white">
+              <div className="flex items-center justify-between border-b border-border-soft px-4 py-2.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
                   <Users className="h-3 w-3" />
                   Paste connections manually
@@ -1908,7 +1908,7 @@ function OnboardingFunnel() {
                     {manualContacts.map((c, i) => (
                       <span
                         key={`${c.name}-${i}`}
-                        className="flex items-center gap-1.5 border border-white/[0.06] bg-muted px-2 py-1 text-[10px] text-foreground"
+                        className="flex items-center gap-1.5 border border-border-soft bg-muted px-2 py-1 text-[10px] text-foreground"
                       >
                         {c.name}
                         {c.firmName ? (
@@ -1959,7 +1959,7 @@ function OnboardingFunnel() {
             </section>
 
             {/* Sample / skip */}
-            <section className="flex items-center justify-between border border-white/[0.06] bg-bg-card px-4 py-3">
+            <section className="flex items-center justify-between border border-border-soft bg-white px-4 py-3">
               <p className="text-[11px] text-muted-foreground">
                 No CSV handy? Load a few sample contacts to try it out.
               </p>
@@ -2030,7 +2030,7 @@ function OnboardingFunnel() {
         {/* ─── STEP 10: REVEAL ─────────────────────────────────────────── */}
         {step === 9 && (
           <div className="mt-4 space-y-3">
-            <section className="border border-accent-teal/30 bg-bg-card p-5">
+            <section className="border border-accent-teal/30 bg-white p-5">
               <div className="mb-1 flex items-center gap-2">
                 <Network size={14} className="text-accent-teal" />
                 <h2 className="text-[11px] font-bold uppercase tracking-wider text-accent-teal">
@@ -2060,8 +2060,8 @@ function OnboardingFunnel() {
             </section>
 
             {/* Blurred top-3 preview — names stay redacted until unlock. */}
-            <section className="border border-white/[0.06] bg-bg-card">
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+            <section className="border border-border-soft bg-white">
+              <div className="flex items-center justify-between border-b border-border-soft px-4 py-2.5">
                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent-teal">
                   <Lock className="h-3 w-3" />
                   Top matches
@@ -2091,9 +2091,9 @@ function OnboardingFunnel() {
                     ).map((c) => (
                       <div
                         key={c.id}
-                        className="flex items-center gap-3 border border-white/[0.06] px-3 py-2"
+                        className="flex items-center gap-3 border border-border-soft px-3 py-2"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-white/[0.1] bg-muted">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-border-soft bg-muted">
                           <Lock className="h-3 w-3 text-muted-foreground/60" />
                         </span>
                         <div className="min-w-0 flex-1">

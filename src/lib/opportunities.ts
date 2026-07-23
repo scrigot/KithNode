@@ -24,6 +24,12 @@ export const OPPORTUNITY_TYPES = [
   "summer_analyst",
   "insight_program",
   "leadership_program",
+  "club",
+  "mba",
+  "undergraduate",
+  "scholarship",
+  "fellowship",
+  "custom",
 ] as const;
 
 export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number];
@@ -64,6 +70,8 @@ const opportunityFields = {
   postedAt: optionalDate,
   sourceFreshAt: optionalDate,
   resumeId: z.union([z.string().trim().max(200), z.literal(""), z.null()]).optional().transform((value) => value || null),
+  organizationId: z.union([z.string().trim().max(200), z.literal(""), z.null()]).optional().transform((value) => value || null),
+  details: z.record(z.string(), z.unknown()),
 };
 
 export const opportunityCreateSchema = z.object({
@@ -91,6 +99,8 @@ export const opportunityCreateSchema = z.object({
   postedAt: optionalDate,
   sourceFreshAt: optionalDate,
   resumeId: opportunityFields.resumeId,
+  organizationId: opportunityFields.organizationId,
+  details: opportunityFields.details.default({}),
 });
 
 // Keep patch fields default-free. Applying create defaults during PATCH would
@@ -134,6 +144,12 @@ export function opportunityTypeLabel(type: OpportunityType | string) {
     summer_analyst: "Summer analyst",
     insight_program: "Insight program",
     leadership_program: "Leadership program",
+    club: "Club",
+    mba: "MBA program",
+    undergraduate: "Undergraduate program",
+    scholarship: "Scholarship",
+    fellowship: "Fellowship",
+    custom: "Custom",
   };
   return labels[type] || statusLabel(type);
 }

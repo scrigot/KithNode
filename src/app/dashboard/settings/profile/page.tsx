@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { ProfileSettingsWorkspace } from "../page";
 
 export default function ProfileSettingsPage() {
-  redirect("/dashboard/settings?section=profile");
+  return <ProfileSettingsWorkspace />;
 }

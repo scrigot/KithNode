@@ -8,51 +8,51 @@ datasource db {
 }
 
 model User {
-  id                 String       @id @default(cuid())
-  email              String       @unique
-  name               String
-  image              String       @default("")
-  university         String       @default("")
-  highSchool         String       @default("")
-  targetIndustry     String       @default("")
-  hometown           String       @default("")
-  greekOrg           String       @default("")
-  targetIndustries   String       @default("")
-  targetFirms        String       @default("")
-  targetLocations    String       @default("")
-  clubs              String       @default("")
-  skills             String       @default("")
-  major              String       @default("")
-  minor              String       @default("")
-  concentration      String       @default("")
-  degrees            String       @default("")
-  pastFirms          String       @default("")
-  educations         String       @default("")
-  experiences        String       @default("")
-  clubMemberships    String       @default("")
-  recruitingDate     DateTime?
-  graduationYear     Int?
-  weeklyGoalTarget   Int          @default(3)
-  stripeCustomerId   String?      @default("")
-  subscriptionStatus String?      @default("trial")
-  subscriptionPlan   String?      @default("")
-  trialEndsAt        DateTime?    @default(dbgenerated("(now() + '7 days'::interval)"))
-  subscriptionEndsAt DateTime?
-  credits                 Int       @default(0)
-  creditsMonthlyAllotment Int       @default(0)
-  creditsRenewAt          DateTime? @db.Timestamptz(6)
-  onboardingGoal          String    @default("")
-  onboardingPain          String    @default("")
-  onboardingTimeline      String    @default("")
-  tutorialDoneAt          DateTime? @db.Timestamptz(6)
-  draftTone               String    @default("warm")
-  draftLength             String    @default("medium")
-  draftSignature          String    @default("")
-  draftSubjectStyle       String    @default("casual")
-  digestEmailEnabled      Boolean   @default(true)
-  followupEmailEnabled    Boolean   @default(true)
-  createdAt          DateTime     @default(now())
-  connections        Connection[]
+  id                      String       @id @default(cuid())
+  email                   String       @unique
+  name                    String
+  image                   String       @default("")
+  university              String       @default("")
+  highSchool              String       @default("")
+  targetIndustry          String       @default("")
+  hometown                String       @default("")
+  greekOrg                String       @default("")
+  targetIndustries        String       @default("")
+  targetFirms             String       @default("")
+  targetLocations         String       @default("")
+  clubs                   String       @default("")
+  skills                  String       @default("")
+  major                   String       @default("")
+  minor                   String       @default("")
+  concentration           String       @default("")
+  degrees                 String       @default("")
+  pastFirms               String       @default("")
+  educations              String       @default("")
+  experiences             String       @default("")
+  clubMemberships         String       @default("")
+  recruitingDate          DateTime?
+  graduationYear          Int?
+  weeklyGoalTarget        Int          @default(3)
+  stripeCustomerId        String?      @default("")
+  subscriptionStatus      String?      @default("trial")
+  subscriptionPlan        String?      @default("")
+  trialEndsAt             DateTime?    @default(dbgenerated("(now() + '7 days'::interval)"))
+  subscriptionEndsAt      DateTime?
+  credits                 Int          @default(0)
+  creditsMonthlyAllotment Int          @default(0)
+  creditsRenewAt          DateTime?    @db.Timestamptz(6)
+  onboardingGoal          String       @default("")
+  onboardingPain          String       @default("")
+  onboardingTimeline      String       @default("")
+  tutorialDoneAt          DateTime?    @db.Timestamptz(6)
+  draftTone               String       @default("warm")
+  draftLength             String       @default("medium")
+  draftSignature          String       @default("")
+  draftSubjectStyle       String       @default("casual")
+  digestEmailEnabled      Boolean      @default(true)
+  followupEmailEnabled    Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  connections             Connection[]
 }
 
 model AlumniContact {
@@ -182,8 +182,8 @@ model ContactOverride {
 }
 
 model WaitlistSignup {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
   email             String
   full_name         String
   university        String
@@ -194,7 +194,7 @@ model WaitlistSignup {
   current_prep      String?
   referred_by       String?
   ref_code          String?
-  email_status      String   @default("pending") // pending | sent | failed | skipped | unknown
+  email_status      String    @default("pending") // pending | sent | failed | skipped | unknown
   email_sent_at     DateTime? @db.Timestamptz(6)
 
   @@map("waitlist_signups")
@@ -285,14 +285,14 @@ model EmailEvent {
 // A named timeline phase (e.g. "Beta with 5 users"). Exactly one row should be
 // status="active"; it drives the timeline highlight + the next-10 task list.
 model Phase {
-  id        String      @id @default(cuid())
-  name      String
-  gate      String // "G0".."G4"
-  order     Int         @default(0)
-  status    String      @default("planned") // planned | active | done
-  startedAt DateTime?   @db.Timestamptz(6)
-  doneAt    DateTime?   @db.Timestamptz(6)
-  createdAt DateTime    @default(now()) @db.Timestamptz(6)
+  id         String      @id @default(cuid())
+  name       String
+  gate       String // "G0".."G4"
+  order      Int         @default(0)
+  status     String      @default("planned") // planned | active | done
+  startedAt  DateTime?   @db.Timestamptz(6)
+  doneAt     DateTime?   @db.Timestamptz(6)
+  createdAt  DateTime    @default(now()) @db.Timestamptz(6)
   milestones Milestone[]
 
   @@map("phases")
@@ -301,18 +301,18 @@ model Phase {
 // A roadmap task under a phase + lane. Next-10 = next incomplete by order under
 // the active phase. Per-lane roadmap = filter by lane.
 model Milestone {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   lane      String // one of the 8 lane keys (see lane-config.ts)
   phaseId   String?
   gate      String // "G0".."G4"
-  status    String   @default("planned") // planned | in_progress | done | at_risk
-  order     Int      @default(0)
+  status    String    @default("planned") // planned | in_progress | done | at_risk
+  order     Int       @default(0)
   note      String?
   evidence  String? // commit / build-log ref
   doneAt    DateTime? @db.Timestamptz(6)
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  phase     Phase?   @relation(fields: [phaseId], references: [id])
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  phase     Phase?    @relation(fields: [phaseId], references: [id])
 
   @@map("milestones")
 }
@@ -363,32 +363,32 @@ model EmailLog {
 // table. `alumniContactId` optionally links a row imported from a prod
 // AlumniContact so we can trace provenance.
 model MeContact {
-  id             String   @id @default(cuid())
-  userId         String
-  name           String
-  firmName       String?
-  title          String?
-  linkedInUrl    String?
-  email          String?
-  location       String?
-  education      String?
-  industry       String?
-  seniorityLevel String?
-  pastFirms      String?
-  notes          String   @default("")
-  source         String   @default("manual") // manual | linkedin_csv | prod_import | apollo
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  firmName        String?
+  title           String?
+  linkedInUrl     String?
+  email           String?
+  location        String?
+  education       String?
+  industry        String?
+  seniorityLevel  String?
+  pastFirms       String?
+  notes           String    @default("")
+  source          String    @default("manual") // manual | linkedin_csv | prod_import | apollo
   alumniContactId String? // provenance link when imported from a prod AlumniContact row
-  connectedOn    DateTime? // LinkedIn "Connected On" date when known
-  lastSpokenAt   DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  connectedOn     DateTime? // LinkedIn "Connected On" date when known
+  lastSpokenAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 
-  pipelineEntries MePipelineEntry[]
-  memory          MeContactMemory?
-  prepBriefs      MePrepBrief[]
-  enrichmentNotes MeContactNote[]
-  discoveryLeads  MeDiscoveryLead[]
-  activities      MeContactActivity[]
+  pipelineEntries  MePipelineEntry[]
+  memory           MeContactMemory?
+  prepBriefs       MePrepBrief[]
+  enrichmentNotes  MeContactNote[]
+  discoveryLeads   MeDiscoveryLead[]
+  activities       MeContactActivity[]
   applicationLinks MeApplicationContact[]
 
   @@unique([userId, linkedInUrl]) // scoped dedup — normalized URL, per-user
@@ -523,28 +523,28 @@ model MeContactActivity {
 // contacts (shared school/club/employer/hometown/location). Seeded by the
 // prod-import script from prod User prefs; editable via a small settings form.
 model MeProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  schools         String   @default("")
-  clubs           String   @default("")
-  pastFirms       String   @default("")
-  hometown        String   @default("")
-  location        String   @default("")
-  currentWork     String   @default("")
-  goals           String   @default("")
-  targetRoles     String   @default("")
-  targetExpertise String   @default("")
-  targetCompanies String   @default("")
-  targetLocations String   @default("")
-  searchKeywords  String   @default("")
-  profileNotes    String   @default("")
-  outreachStyle   String   @default("")
-  outreachLength  String   @default("")
-  outreachSignoff String   @default("")
-  outreachPositioning String @default("")
-  outreachGoals   String   @default("")
-  preferredEmailClient String @default("")
-  updatedAt       DateTime @default(now()) @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  schools              String   @default("")
+  clubs                String   @default("")
+  pastFirms            String   @default("")
+  hometown             String   @default("")
+  location             String   @default("")
+  currentWork          String   @default("")
+  goals                String   @default("")
+  targetRoles          String   @default("")
+  targetExpertise      String   @default("")
+  targetCompanies      String   @default("")
+  targetLocations      String   @default("")
+  searchKeywords       String   @default("")
+  profileNotes         String   @default("")
+  outreachStyle        String   @default("")
+  outreachLength       String   @default("")
+  outreachSignoff      String   @default("")
+  outreachPositioning  String   @default("")
+  outreachGoals        String   @default("")
+  preferredEmailClient String   @default("")
+  updatedAt            DateTime @default(now()) @updatedAt
 }
 
 // People found during /me discovery before they become real contacts. This is a
@@ -587,17 +587,17 @@ model MeDiscoveryLead {
 // prod exposure today. Before this table ever runs against a shared/prod DB, add
 // a Supabase RLS policy filtering on userId (per repo convention).
 model MeResume {
-  id         String   @id @default(cuid())
-  userId     String
-  title      String   @default("Untitled resume")
-  track      String   @default("ai-consulting") // ai-consulting | ai-engineering | ai-generalist
-  templateId String   @default("dense")
-  content    Json     @default("{}") // structured editable sections (ResumeContent)
+  id          String   @id @default(cuid())
+  userId      String
+  title       String   @default("Untitled resume")
+  track       String   @default("ai-consulting") // ai-consulting | ai-engineering | ai-generalist
+  templateId  String   @default("dense")
+  content     Json     @default("{}") // structured editable sections (ResumeContent)
   score       Int      @default(0)
   dimensions  Json     @default("[]") // last GradedResume.dimensions
   notes       Json     @default("[]") // LLM qualitative notes / bullet rewrites
-  docVersion  Int      @default(1)    // schema version of `content` (1=fixed fields, 2=sections[])
-  userContext String   @default("")   // free-text "what I've done / who I am" for tailored rewrites
+  docVersion  Int      @default(1) // schema version of `content` (1=fixed fields, 2=sections[])
+  userContext String   @default("") // free-text "what I've done / who I am" for tailored rewrites
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
@@ -609,28 +609,28 @@ model MeResume {
 // Internship/job application tracker for the /me workspace. Manual-first,
 // spreadsheet-like CRM rows with links to saved resumes and networking contacts.
 model MeInternshipApplication {
-  id              String    @id @default(cuid())
-  userId          String
-  company         String
-  role            String
-  location        String    @default("")
-  season          String    @default("")
-  jobUrl          String    @default("")
-  source          String    @default("")
-  deadline        DateTime?
-  status          String    @default("interested")
-  priority        String    @default("medium")
-  resumeId        String?
-  jobDescription  String    @default("")
-  notes           String    @default("")
-  nextAction      String    @default("")
-  nextActionDue   DateTime?
-  appliedAt       DateTime?
-  archived        Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  company        String
+  role           String
+  location       String    @default("")
+  season         String    @default("")
+  jobUrl         String    @default("")
+  source         String    @default("")
+  deadline       DateTime?
+  status         String    @default("interested")
+  priority       String    @default("medium")
+  resumeId       String?
+  jobDescription String    @default("")
+  notes          String    @default("")
+  nextAction     String    @default("")
+  nextActionDue  DateTime?
+  appliedAt      DateTime?
+  archived       Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
 
-  resume  MeResume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  resume   MeResume?              @relation(fields: [resumeId], references: [id], onDelete: SetNull)
   contacts MeApplicationContact[]
   events   MeApplicationEvent[]
 
@@ -755,9 +755,9 @@ model AssistantToolCall {
   status           String    @default("proposed") // proposed | approved | denied | running | completed | failed
   riskLevel        String    @default("read") // read | write | external | destructive
   requiresApproval Boolean   @default(true)
-  error             String    @default("")
-  createdAt         DateTime  @default(now()) @db.Timestamptz(6)
-  completedAt       DateTime? @db.Timestamptz(6)
+  error            String    @default("")
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  completedAt      DateTime? @db.Timestamptz(6)
 
   @@index([userId, status, createdAt])
   @@index([runId, createdAt])
@@ -785,6 +785,8 @@ model AssistantMemory {
   active          Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  corrections MemoryCorrection[]
 
   @@index([userId, kind, active, updatedAt])
 }
@@ -831,12 +833,12 @@ model IntegrationConnection {
   accessTokenEncrypted  String
   refreshTokenEncrypted String    @default("")
   expiresAt             DateTime? @db.Timestamptz(6)
-  scopes                 String    @default("")
-  status                 String    @default("connected") // connected | expired | revoked | error
-  lastCheckedAt          DateTime? @db.Timestamptz(6)
-  lastError              String    @default("")
-  createdAt              DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt              DateTime  @updatedAt @db.Timestamptz(6)
+  scopes                String    @default("")
+  status                String    @default("connected") // connected | expired | revoked | error
+  lastCheckedAt         DateTime? @db.Timestamptz(6)
+  lastError             String    @default("")
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
 
   @@unique([userId, provider])
   @@index([userId, status, updatedAt])
@@ -889,40 +891,43 @@ model LinkedInProfileRevision {
 // Canonical, user-owned job opportunities. Discovery writes only reviewed
 // public listing data; application submission is deliberately out of scope.
 model Opportunity {
-  id             String    @id @default(cuid())
-  userId         String
-  company        String
-  companyKey     String
-  role           String
-  location       String    @default("")
-  workMode       String    @default("") // remote | hybrid | onsite | unknown
-  jobUrl         String
-  applyUrl       String    @default("")
-  source         String    @default("manual") // manual | greenhouse | lever | ashby | jsonld
-  externalId     String    @default("")
-  description    String    @default("")
-  status         String    @default("discovered") // discovered | saved | preparing | applied | assessment | interview | offer | accepted | rejected | withdrawn | archived
-  priority       String    @default("medium") // low | medium | high
-  opportunityType String  @default("job") // job | internship | co_op | externship | off_cycle | summer_analyst | insight_program | leadership_program
-  season         String    @default("")
-  notes          String    @default("")
-  nextAction     String    @default("")
-  nextActionDue  DateTime? @db.Timestamptz(6)
-  appliedAt      DateTime? @db.Timestamptz(6)
-  archivedAt     DateTime? @db.Timestamptz(6)
-  lastActivityAt DateTime  @default(now()) @db.Timestamptz(6)
-  fitScore       Int       @default(0)
-  networkScore   Int       @default(0)
-  matchReasons   Json      @default("[]")
-  sourceFreshAt  DateTime? @db.Timestamptz(6)
-  postedAt       DateTime? @db.Timestamptz(6)
-  deadline       DateTime? @db.Timestamptz(6)
-  resumeId       String?
-  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+  id              String    @id @default(cuid())
+  userId          String
+  company         String
+  companyKey      String
+  role            String
+  location        String    @default("")
+  workMode        String    @default("") // remote | hybrid | onsite | unknown
+  jobUrl          String
+  applyUrl        String    @default("")
+  source          String    @default("manual") // manual | greenhouse | lever | ashby | jsonld
+  externalId      String    @default("")
+  description     String    @default("")
+  status          String    @default("discovered") // discovered | saved | preparing | applied | assessment | interview | offer | accepted | rejected | withdrawn | archived
+  priority        String    @default("medium") // low | medium | high
+  opportunityType String    @default("job") // job | internship | co_op | externship | off_cycle | summer_analyst | insight_program | leadership_program
+  season          String    @default("")
+  notes           String    @default("")
+  nextAction      String    @default("")
+  nextActionDue   DateTime? @db.Timestamptz(6)
+  appliedAt       DateTime? @db.Timestamptz(6)
+  archivedAt      DateTime? @db.Timestamptz(6)
+  lastActivityAt  DateTime  @default(now()) @db.Timestamptz(6)
+  fitScore        Int       @default(0)
+  networkScore    Int       @default(0)
+  matchReasons    Json      @default("[]")
+  sourceFreshAt   DateTime? @db.Timestamptz(6)
+  postedAt        DateTime? @db.Timestamptz(6)
+  deadline        DateTime? @db.Timestamptz(6)
+  resumeId        String?
+  organizationId  String?
+  details         Json      @default("{}")
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
 
-  contacts OpportunityContact[]
-  events   OpportunityEvent[]
+  contacts     OpportunityContact[]
+  events       OpportunityEvent[]
+  organization Organization?        @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@unique([userId, jobUrl])
   @@index([userId, status, fitScore])
@@ -932,16 +937,198 @@ model Opportunity {
   @@index([userId, priority, deadline])
   @@index([userId, nextActionDue])
   @@index([userId, lastActivityAt])
+  @@index([userId, organizationId])
+}
+
+// Canonical user-owned organizations. "Companies" is the employer-focused
+// workspace view; schools, clubs, funds, nonprofits, and programs use the same
+// identity layer so records across research, contacts, and applications resolve
+// to one organization.
+model Organization {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  nameKey     String
+  type        String   @default("company") // company | school | club | fund | nonprofit | program | other
+  domain      String   @default("")
+  website     String   @default("")
+  logoUrl     String   @default("")
+  location    String   @default("")
+  industry    String   @default("")
+  description String   @default("")
+  status      String   @default("active") // active | archived
+  source      String   @default("manual")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  people       PersonOrganization[]
+  applications Opportunity[]
+
+  @@unique([userId, nameKey])
+  @@index([userId, type, updatedAt])
+  @@index([userId, status, name])
+}
+
+model PersonOrganization {
+  id               String    @id @default(cuid())
+  userId           String
+  contactId        String
+  organizationId   String
+  relationshipType String    @default("employment") // employment | education | membership | recruiting | referral | other
+  title            String    @default("")
+  isCurrent        Boolean   @default(false)
+  startedAt        DateTime? @db.Timestamptz(6)
+  endedAt          DateTime? @db.Timestamptz(6)
+  source           String    @default("manual")
+  confidence       Float     @default(1)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactId, organizationId, relationshipType, title])
+  @@index([userId, contactId])
+  @@index([userId, organizationId, isCurrent])
+}
+
+// Unified catalog record over resumes, LinkedIn copies, essays, cover letters,
+// outreach, and meeting-prep briefs. Existing source records stay authoritative;
+// legacyType + legacyId allow a catalog record to point at them without copying
+// or deleting source data.
+model CareerDocument {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   @default("custom") // resume | linkedin | essay | cover_letter | outreach | meeting_brief | custom
+  title       String
+  status      String   @default("draft") // draft | current | archived
+  variantType String   @default("") // job | internship | club | school | general
+  legacyType  String   @default("")
+  legacyId    String   @default("")
+  content     Json     @default("{}")
+  evidence    Json     @default("[]")
+  metadata    Json     @default("{}")
+  source      String   @default("manual")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  revisions CareerDocumentRevision[]
+  links     CareerDocumentLink[]
+
+  @@unique([userId, legacyType, legacyId])
+  @@index([userId, type, updatedAt])
+  @@index([userId, status, updatedAt])
+}
+
+model CareerDocumentRevision {
+  id            String   @id @default(cuid())
+  documentId    String
+  userId        String
+  version       Int
+  content       Json
+  evidence      Json     @default("[]")
+  changeSummary String   @default("")
+  source        String   @default("save")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  document CareerDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@index([userId, createdAt])
+}
+
+model CareerDocumentLink {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  entityType String // application | person | organization
+  entityId   String
+  relation   String   @default("reference")
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  document CareerDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId, entityType, entityId, relation])
+  @@index([userId, entityType, entityId])
+}
+
+model SavedCrmView {
+  id        String   @id @default(cuid())
+  userId    String
+  workspace String // people | companies | applications | documents | research
+  name      String
+  isDefault Boolean  @default(false)
+  filters   Json     @default("{}")
+  sort      Json     @default("[]")
+  columns   Json     @default("[]")
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, workspace, name])
+  @@index([userId, workspace, updatedAt])
+}
+
+model MemoryCorrection {
+  id          String   @id @default(cuid())
+  memoryId    String
+  userId      String
+  action      String // correct | forget | restore
+  beforeValue Json
+  afterValue  Json?
+  reason      String   @default("")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  memory AssistantMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId, memoryId, createdAt])
+  @@index([userId, action, createdAt])
+}
+
+model KnowledgeSource {
+  id             String    @id @default(cuid())
+  userId         String
+  entityType     String // resume | linkedin | goal | contact | application | document | import | job_source | integration
+  entityId       String
+  title          String
+  status         String    @default("ready") // ready | indexing | stale | degraded | unavailable | disabled
+  provenance     String    @default("")
+  freshnessAt    DateTime? @db.Timestamptz(6)
+  indexedAt      DateTime? @db.Timestamptz(6)
+  lastCheckedAt  DateTime? @db.Timestamptz(6)
+  safeErrorCode  String    @default("")
+  recoveryAction String    @default("")
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, status, updatedAt])
+  @@index([userId, entityType, updatedAt])
+}
+
+model AutomatedAssociationAudit {
+  id         String   @id @default(cuid())
+  userId     String
+  sourceType String
+  sourceId   String
+  targetType String
+  targetId   String
+  action     String
+  evidence   Json     @default("{}")
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([userId, sourceType, sourceId])
+  @@index([userId, targetType, targetId])
 }
 
 model OpportunityContact {
-  id            String      @id @default(cuid())
+  id            String   @id @default(cuid())
   userId        String
   opportunityId String
   contactId     String
-  score         Int         @default(0)
-  reason        String      @default("")
-  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  score         Int      @default(0)
+  reason        String   @default("")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
 
   opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 

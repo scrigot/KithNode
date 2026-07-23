@@ -36,7 +36,8 @@ describe("opportunity contracts", () => {
   it("rejects unknown stages and unsafe scores", () => {
     expect(opportunityCreateSchema.safeParse({ company: "Firm", role: "Role", status: "hired" }).success).toBe(false);
     expect(opportunityPatchSchema.safeParse({ fitScore: 101 }).success).toBe(false);
-    expect(opportunityPatchSchema.safeParse({ opportunityType: "fellowship" }).success).toBe(false);
+    expect(opportunityPatchSchema.safeParse({ opportunityType: "grant" }).success).toBe(false);
+    expect(opportunityPatchSchema.safeParse({ opportunityType: "fellowship" }).success).toBe(true);
   });
 
   it("accepts null dates and bounded timeline notes", () => {
