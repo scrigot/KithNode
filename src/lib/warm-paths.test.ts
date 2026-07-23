@@ -1,191 +1,77 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { findWarmPaths } from "./warm-paths";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock supabase
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: vi.fn(),
-  },
+const relationshipsAtCompanies = vi.fn();
+vi.mock("@/lib/relationships/repository", () => ({
+  relationshipsAtCompanies: (...args: unknown[]) => relationshipsAtCompanies(...args),
 }));
 
-import { supabase } from "@/lib/supabase";
+import { findWarmPaths } from "./warm-paths";
 
-function mockSupabaseQuery(data: Record<string, unknown>[] | null, error: unknown = null) {
-  const chain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue({ data, error }),
-  };
-  (supabase.from as ReturnType<typeof vi.fn>).mockReturnValue(chain);
-  return chain;
-}
-
-beforeEach(() => {
-  vi.clearAllMocks();
+const relationship = (overrides: Record<string, unknown> = {}) => ({
+  contactId: "contact-1",
+  name: "Maya Chen",
+  title: "Forward Deployed Engineer",
+  firmName: "Scale AI",
+  linkedInUrl: "https://www.linkedin.com/in/maya",
+  state: "verified",
+  relationshipType: "former teammate",
+  confidence: 1,
+  evidence: ["User confirmed they worked together."],
+  source: "user_confirmed",
+  effectiveAt: null,
+  ...overrides,
 });
 
 describe("findWarmPaths", () => {
-  it("returns warm paths when user has contacts at the same firm", async () => {
-    mockSupabaseQuery([
-      {
-        name: "Jake Bennett",
-        title: "Analyst",
-        firmName: "Moelis & Company",
-        affiliations: "Chi Phi,UNC",
-        importedByUserId: "user-1",
-      },
-      {
-        name: "Sarah Lee",
-        title: "Associate",
-        firmName: "Moelis",
-        affiliations: "Duke",
-        importedByUserId: "user-1",
-      },
-      {
-        name: "Bob Jones",
-        title: "VP",
-        firmName: "Goldman Sachs",
-        affiliations: "",
-        importedByUserId: "user-1",
-      },
-    ]);
-
-    const paths = await findWarmPaths("user-1", "Moelis and Company");
-
-    expect(paths).toHaveLength(2);
-    expect(paths[0]).toEqual({
-      intermediaryName: "Jake Bennett",
-      intermediaryRelation: "Chi Phi,UNC",
-      intermediaryLinkedInUrl: "",
-      firmName: "Moelis & Company",
-      title: "Analyst",
-    });
-    expect(paths[1]).toEqual({
-      intermediaryName: "Sarah Lee",
-      intermediaryRelation: "Duke",
-      intermediaryLinkedInUrl: "",
-      firmName: "Moelis",
-      title: "Associate",
-    });
+  beforeEach(() => {
+    relationshipsAtCompanies.mockReset();
   });
 
-  it("returns empty array when no contacts match the firm", async () => {
-    mockSupabaseQuery([
-      {
-        name: "Bob Jones",
-        title: "VP",
-        firmName: "Goldman Sachs",
-        affiliations: "",
-        importedByUserId: "user-1",
-      },
-    ]);
+  it("returns only relationships classified as verified", async () => {
+    relationshipsAtCompanies.mockResolvedValue(new Map([
+      ["scaleai", [
+        relationship(),
+        relationship({
+          contactId: "contact-2",
+          name: "Potential Alum",
+          state: "potential",
+          relationshipType: "shared school",
+          evidence: ["Same school; no interaction confirmed."],
+        }),
+      ]],
+    ]));
 
-    const paths = await findWarmPaths("user-1", "Moelis");
-    expect(paths).toHaveLength(0);
+    await expect(findWarmPaths("user-1", "Scale AI")).resolves.toEqual([{
+      intermediaryName: "Maya Chen",
+      intermediaryRelation: "former teammate",
+      intermediaryLinkedInUrl: "https://www.linkedin.com/in/maya",
+      firmName: "Scale AI",
+      title: "Forward Deployed Engineer",
+      evidence: ["User confirmed they worked together."],
+    }]);
   });
 
-  it("returns empty array when supabase returns no data", async () => {
-    mockSupabaseQuery(null);
+  it("does not promote an imported or shared-school contact to a warm path", async () => {
+    relationshipsAtCompanies.mockResolvedValue(new Map([
+      ["databricks", [
+        relationship({
+          state: "potential",
+          relationshipType: "shared school",
+          evidence: ["Both profiles list UNC; no interaction has been confirmed."],
+        }),
+      ]],
+    ]));
 
-    const paths = await findWarmPaths("user-1", "Moelis");
-    expect(paths).toHaveLength(0);
+    await expect(findWarmPaths("user-1", "Databricks")).resolves.toEqual([]);
   });
 
-  it("returns empty array when supabase errors", async () => {
-    mockSupabaseQuery(null, { message: "DB error" });
-
-    const paths = await findWarmPaths("user-1", "Moelis");
-    expect(paths).toHaveLength(0);
+  it("returns an empty result when the company has no relationship evidence", async () => {
+    relationshipsAtCompanies.mockResolvedValue(new Map());
+    await expect(findWarmPaths("user-1", "Unknown Company")).resolves.toEqual([]);
   });
 
-  it("returns empty array for empty firm name", async () => {
-    const paths = await findWarmPaths("user-1", "");
-    expect(paths).toHaveLength(0);
-    expect(supabase.from).not.toHaveBeenCalled();
-  });
-
-  it("normalizes firm names -- GS matches Goldman Sachs", async () => {
-    mockSupabaseQuery([
-      {
-        name: "Alice Chen",
-        title: "Analyst",
-        firmName: "Goldman Sachs Group",
-        affiliations: "Wharton",
-        importedByUserId: "user-1",
-      },
-    ]);
-
-    const paths = await findWarmPaths("user-1", "GS");
-
-    expect(paths).toHaveLength(1);
-    expect(paths[0].intermediaryName).toBe("Alice Chen");
-  });
-
-  it("normalizes firm names -- Goldman Sachs Group matches gs alias", async () => {
-    mockSupabaseQuery([
-      {
-        name: "Tom Park",
-        title: "MD",
-        firmName: "GS",
-        affiliations: "",
-        importedByUserId: "user-1",
-      },
-    ]);
-
-    const paths = await findWarmPaths("user-1", "Goldman Sachs Group, Inc.");
-
-    expect(paths).toHaveLength(1);
-    expect(paths[0].intermediaryName).toBe("Tom Park");
-  });
-
-  it("returns multiple paths from different contacts at same firm", async () => {
-    mockSupabaseQuery([
-      {
-        name: "Person A",
-        title: "Analyst",
-        firmName: "Evercore",
-        affiliations: "UNC",
-        importedByUserId: "user-1",
-      },
-      {
-        name: "Person B",
-        title: "Associate",
-        firmName: "Evercore ISI",
-        affiliations: "Duke",
-        importedByUserId: "user-1",
-      },
-      {
-        name: "Person C",
-        title: "VP",
-        firmName: "Evercore",
-        affiliations: "",
-        importedByUserId: "user-1",
-      },
-    ]);
-
-    const paths = await findWarmPaths("user-1", "Evercore");
-
-    expect(paths).toHaveLength(3);
-    expect(paths.map((p) => p.intermediaryName)).toEqual([
-      "Person A",
-      "Person B",
-      "Person C",
-    ]);
-  });
-
-  it("uses 'Connection' as default relation when affiliations is empty", async () => {
-    mockSupabaseQuery([
-      {
-        name: "No Affil",
-        title: "Analyst",
-        firmName: "Lazard",
-        affiliations: "",
-        importedByUserId: "user-1",
-      },
-    ]);
-
-    const paths = await findWarmPaths("user-1", "Lazard");
-
-    expect(paths[0].intermediaryRelation).toBe("Connection");
+  it("does not query for a blank company", async () => {
+    await expect(findWarmPaths("user-1", "")).resolves.toEqual([]);
+    expect(relationshipsAtCompanies).not.toHaveBeenCalled();
   });
 });

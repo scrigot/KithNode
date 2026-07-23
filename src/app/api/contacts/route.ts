@@ -13,10 +13,13 @@ import { applyOverlay } from "@/lib/contact-overrides";
 import { contactNeedsInfo } from "@/lib/needs-info";
 import {
   engagementScore,
-  relationshipClass,
   isDormantKith,
   displayTier,
 } from "@/lib/relationship-score";
+import {
+  classifyRelationship,
+  type RelationshipEvidenceInput,
+} from "@/lib/relationships/classifier";
 
 export async function GET() {
   const session = await auth();
@@ -99,6 +102,35 @@ export async function GET() {
         seen.add(c.id);
         return true;
       });
+    const contactIds = all.map((contact) => contact.id);
+    const [connectionResult, evidenceResult] = contactIds.length
+      ? await Promise.all([
+          supabase
+            .from("Connection")
+            .select("alumniId,status")
+            .eq("userId", userId)
+            .in("alumniId", contactIds),
+          supabase
+            .from("RelationshipEvidence")
+            .select("contactId,state,relationshipType,source,summary,confidence,verifiedByUser,effectiveAt,expiresAt")
+            .eq("userId", userId)
+            .in("contactId", contactIds),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
+    const connectionByContact = new Map<string, string>(
+      (connectionResult.data || []).map((row) => [
+        String(row.alumniId),
+        String(row.status || ""),
+      ]),
+    );
+    const evidenceByContact = new Map<string, RelationshipEvidenceInput[]>();
+    for (const row of evidenceResult.data || []) {
+      const contactId = String(row.contactId);
+      evidenceByContact.set(contactId, [
+        ...(evidenceByContact.get(contactId) || []),
+        row as RelationshipEvidenceInput,
+      ]);
+    }
 
     // Transform Supabase data to match RankedContact interface.
     // Redact PII only when not unlocked. A contact is unlocked when the viewer
@@ -121,12 +153,21 @@ export async function GET() {
         const viewIsFriend = c.isFriend;
         const viewLastSpokenAt = c.lastSpokenAt;
         const viewSpeakFrequency = c.speakFrequency;
-        const klass = relationshipClass({
+        const relationship = classifyRelationship({
+          id: c.id,
+          name: c.name || "",
+          title: c.title,
+          firmName: c.firmName,
+          linkedInUrl: c.linkedInUrl,
+          affiliations: c.affiliations,
+          source: c.source,
           isFriend: viewIsFriend,
-          pipelineStage: stageByContact.get(c.id),
           lastSpokenAt: viewLastSpokenAt,
-          now,
-        });
+          connectionStatus:
+            connectionByContact.get(c.id) || stageByContact.get(c.id),
+          evidence: evidenceByContact.get(c.id) || [],
+        }, new Date(now));
+        const klass = relationship.state === "verified" ? "kith" : "";
         const engagement = engagementScore({
           lastSpokenAt: viewLastSpokenAt,
           speakFrequency: viewSpeakFrequency,
@@ -166,6 +207,10 @@ export async function GET() {
             tier: displayedTier,
           },
           relationship_class: klass,
+          relationship_state: relationship.state,
+          relationship_type: relationship.relationshipType,
+          relationship_evidence: relationship.evidence,
+          relationship_confidence: relationship.confidence,
           dormant,
           needs_info: contactNeedsInfo(c, displayedTier),
           is_friend: !!viewIsFriend,

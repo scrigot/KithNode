@@ -21,6 +21,10 @@ type Person = {
   title: string;
   linkedin_location: string;
   relationship_class?: string;
+  relationship_state?: "verified" | "potential" | "none" | "unavailable";
+  relationship_type?: string;
+  relationship_evidence?: string[];
+  relationship_confidence?: number;
   dormant?: boolean;
   needs_info?: boolean;
   company?: { name?: string };
@@ -182,13 +186,24 @@ export function PeopleWorkspace() {
                       <p className="mt-0.5 text-sm text-text-secondary">{person.title || "Role not captured"}</p>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-text-secondary"><Building2 className="mr-2 inline h-4 w-4 text-text-muted" />{person.company?.name || "Unknown"}</td>
-                    <td className="px-4 py-3.5"><StatusBadge tone={person.relationship_class === "kith" ? "success" : "neutral"}>{person.relationship_class || person.score?.tier || "new"}</StatusBadge></td>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge tone={person.relationship_state === "verified" ? "success" : "neutral"}>
+                        {person.relationship_state === "verified" ? "Verified" : person.relationship_state === "potential" ? "Potential" : "No path"}
+                      </StatusBadge>
+                      {person.relationship_type ? <p className="mt-1 text-xs text-text-muted">{person.relationship_type}</p> : null}
+                    </td>
                     <td className="px-4 py-3.5 text-sm tabular-nums text-text-secondary">{Math.round(person.score?.fit_score || 0)}%</td>
                     <td className="px-4 py-3.5 text-sm text-text-secondary">{person.linkedin_location || "—"}</td>
                     <td className="px-4 py-3.5 text-sm">
-                      <Link href={`/dashboard/coffee-prep/${person.id}`} className="font-medium text-primary hover:underline">
-                        {person.needs_info ? "Add missing context" : person.dormant ? "Reconnect thoughtfully" : "Prepare next conversation"}
-                      </Link>
+                      {person.relationship_state === "verified" ? (
+                        <Link href={`/dashboard/coffee-prep/${person.id}`} className="font-medium text-primary hover:underline">
+                          {person.dormant ? "Reconnect thoughtfully" : "Prepare next conversation"}
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={() => void openPerson(person)} className="font-medium text-primary hover:underline">
+                          {person.needs_info ? "Add missing context" : "Verify relationship"}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3.5"><button type="button" onClick={() => void openPerson(person)} aria-label={`Edit ${person.name}`} className="flex min-h-10 min-w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-selected hover:text-text-primary"><Pencil className="h-4 w-4" /></button></td>
                   </tr>

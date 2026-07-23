@@ -126,6 +126,8 @@ declare
   v_created boolean := false;
   v_now timestamptz := now();
   v_output jsonb;
+  v_relationship jsonb;
+  v_attached_contact_ids jsonb := '[]'::jsonb;
 begin
   select * into v_action
   from public."AssistantAction"
@@ -280,6 +282,40 @@ begin
     );
   end if;
 
+  -- Carry only server-classified verified relationships into the saved
+  -- application. Potential/imported paths remain visible in the search result
+  -- but never become attached contacts until the user verifies them.
+  for v_relationship in
+    select relationship
+    from jsonb_array_elements(
+      coalesce(v_candidate->'data'->'relationships', '[]'::jsonb)
+    ) relationship
+    where relationship->>'state' = 'verified'
+  loop
+    if exists (
+      select 1
+      from public."AlumniContact" contact
+      where contact.id = v_relationship->>'contactId'
+        and contact."importedByUserId" = p_user_id
+    ) then
+      insert into public."OpportunityContact" (
+        id, "userId", "opportunityId", "contactId", score, reason, "createdAt"
+      ) values (
+        gen_random_uuid()::text,
+        p_user_id,
+        v_saved.id,
+        v_relationship->>'contactId',
+        least(100, greatest(0, round(coalesce((v_relationship->>'confidence')::numeric, 0.8) * 100)::integer)),
+        coalesce(nullif(v_relationship->'evidence'->>0, ''), 'Verified relationship from the saved assistant result.'),
+        v_now
+      )
+      on conflict ("userId", "opportunityId", "contactId") do update
+        set score = excluded.score,
+            reason = excluded.reason;
+      v_attached_contact_ids := v_attached_contact_ids || jsonb_build_array(v_relationship->>'contactId');
+    end if;
+  end loop;
+
   v_output := jsonb_build_object(
     'receiptId', v_action.id,
     'actionId', v_action.id,
@@ -288,6 +324,7 @@ begin
     'opportunityId', v_saved.id,
     'created', v_created,
     'previousStatus', case when v_created then null else v_existing.status end,
+    'attachedContactIds', v_attached_contact_ids,
     'message', 'Saved to Applications. No application or message was sent.',
     'undoAvailable', true
   );

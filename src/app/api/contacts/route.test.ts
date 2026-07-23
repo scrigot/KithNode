@@ -48,7 +48,12 @@ describe("GET /api/contacts", () => {
 
   // Wires the route's three list queries: AlumniContact (select→eq→order),
   // UserDiscover (select→eq→eq), PipelineEntry (select→eq).
-  function mockListQueries(contacts: Record<string, unknown>[], pipeline: Record<string, unknown>[] = []) {
+  function mockListQueries(
+    contacts: Record<string, unknown>[],
+    pipeline: Record<string, unknown>[] = [],
+    connections: Record<string, unknown>[] = [],
+    evidence: Record<string, unknown>[] = [],
+  ) {
     let callCount = 0;
     mockFrom.mockImplementation(() => {
       callCount++;
@@ -74,6 +79,18 @@ describe("GET /api/contacts", () => {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => Promise.resolve({ data: pipeline, error: null })),
+          })),
+        };
+      }
+      if (callCount === 4 || callCount === 5) {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              in: vi.fn(() => Promise.resolve({
+                data: callCount === 4 ? connections : evidence,
+                error: null,
+              })),
+            })),
           })),
         };
       }
@@ -108,6 +125,7 @@ describe("GET /api/contacts", () => {
     expect(body[0].score.fit_score).toBe(65);
     expect(body[0].score.total_score).toBe(65);
     expect(body[0].relationship_class).toBe("");
+    expect(body[0].relationship_state).toBe("potential");
     expect(body[0].score.tier).toBe("warm");
     // created_at is surfaced for the Warm Signals "Newest" sort.
     expect(body[0].created_at).toBe("2026-06-11T12:00:00.000Z");
@@ -159,6 +177,31 @@ describe("GET /api/contacts", () => {
     const body = await response.json();
     expect(body[0].relationship_class).toBe("kith");
     expect(body[0].score.tier).toBe("kith");
+  });
+
+  it("uses user-confirmed evidence as the canonical warm-path decision", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "test@unc.edu", email: "test@unc.edu" } });
+    mockListQueries(
+      [{ ...baseContact, id: "confirmed", name: "Confirmed Contact", warmthScore: 20, tier: "cold" }],
+      [],
+      [],
+      [{
+        contactId: "confirmed",
+        state: "verified",
+        relationshipType: "former teammate",
+        source: "user_confirmed",
+        summary: "User confirmed they worked together.",
+        confidence: 1,
+        verifiedByUser: true,
+      }],
+    );
+
+    const response = await GET();
+    const body = await response.json();
+    expect(body[0].relationship_class).toBe("kith");
+    expect(body[0].relationship_state).toBe("verified");
+    expect(body[0].relationship_type).toBe("former teammate");
+    expect(body[0].relationship_evidence).toEqual(["User confirmed they worked together."]);
   });
 
   it("blanks the owner's private relationship fields for a non-owner viewing a pooled high_value contact", async () => {

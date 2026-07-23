@@ -183,7 +183,7 @@ async function discoverOpportunities(mode: DiscoveryMode, userId: string, userEm
     supabase.from("LinkedInProfile").select("*").eq("userId", userId).order("isPrimary", { ascending: false }).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("MeResume").select("*").eq("userId", userEmail).order("updatedAt", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("Opportunity").select("company,role,status,location").eq("userId", userId).neq("status", "archived").order("updatedAt", { ascending: false }).limit(50),
-    supabase.from("AlumniContact").select("id,firmName,title,skills").eq("importedByUserId", userId).order("updatedAt", { ascending: false }).limit(300),
+    supabase.from("AlumniContact").select("id,firmName,title,skills").eq("importedByUserId", userId).order("createdAt", { ascending: false }).limit(300),
     listJobSources(userId, true),
   ]);
   const user = dataOrThrow<Record<string, any> | null>("load user profile", userResult);

@@ -111,6 +111,21 @@ SQL
 psql -d "$VERIFY_DB" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
 begin;
 
+insert into public."AlumniContact" (
+  id, name, "firmName", title, "linkedInUrl", university, "graduationYear",
+  "importedByUserId", source
+) values (
+  'verify-contact',
+  'Verified Contact',
+  'Scale AI',
+  'Applied AI Engineer',
+  'https://www.linkedin.com/in/kithnode-verify-contact',
+  'UNC Chapel Hill',
+  2024,
+  'verify-user',
+  'manual'
+);
+
 insert into public."AssistantResult" (
   id, "runId", "userId", "skillId", status, payload, "sourceFreshAt", "expiresAt"
 ) values (
@@ -141,6 +156,14 @@ insert into public."AssistantResult" (
             'postedAt', now(),
             'opportunityType', 'internship',
             'season', 'Summer 2027'
+          ),
+          'relationships', jsonb_build_array(
+            jsonb_build_object(
+              'contactId', 'verify-contact',
+              'state', 'verified',
+              'confidence', 1,
+              'evidence', jsonb_build_array('User confirmed this relationship.')
+            )
           )
         )
       )
@@ -207,6 +230,13 @@ begin
   where "userId" = 'verify-user';
   if opportunity_count <> 1 then
     raise exception 'save action created % opportunities, expected 1', opportunity_count;
+  end if;
+  if (
+    select count(*)
+    from public."OpportunityContact"
+    where "userId" = 'verify-user' and "contactId" = 'verify-contact'
+  ) <> 1 then
+    raise exception 'verified relationship was not attached to the saved opportunity';
   end if;
 
   undo_receipt := public.undo_assistant_action('verify-user', 'verify-action');
