@@ -5,7 +5,7 @@
 
 ## Now (active)
 - [ ] [Product/Eng][G0] Beta launch prep (one real user today; beta this week)
-- [ ] [Product/Eng][G0] Commit/review the recruiting-workstation changes, run the clean-tree live design audit, then deploy the additive Opportunity migration and app together.
+- [ ] [Product/Eng][G0] Deploy the DeepTutor-inspired product cutover, then run authenticated production smoke tests for Home, Companies, Applications, Documents, OAuth, AI, and browser-companion recovery.
 
 ## Next
 - [ ] [Growth][G0] Marketing Phase 0 wiring: source-tag the /waitlist (`?source=` capture) + add lead-magnet download to /waitlist/thanks. See `marketing/strategy.md`.
@@ -22,6 +22,7 @@
 - [ ] [Product/Eng][G1] Evaluate LinkedIn OIDC beyond basic identity only after product access is approved.
 
 ## Done (recent; see build-log.md for detail)
+- [x] [Product/Eng][G0] DeepTutor-to-KithNode product transplant: light application shell, full Home Copilot, linked People/Companies/Applications/Documents/Research workspaces, functional Memory and Knowledge Center, category-card Settings, public demo/auth/error states, compatibility redirects, additive canonical-record migration, live organization backfill, and desktop/mobile QA (2026-07-23; 1,252 tests, typecheck, lint, migration verification, production build, and authenticated browser QA passed)
 - [x] [Product/Eng][G0] Guided Network Research release zero: intent-first Discover desk, private draft queue, transactional field-level commits with provenance, owner-safe shared overlays, removal of automated LinkedIn reads, and an owner-only no-DOM Chrome companion (2026-07-21; 1,191 tests, migration verification, lint, production build, and authenticated desktop/mobile visual QA passed)
 - [x] [Product/Eng][G0] Recruiting workstation: canonical Applications + timeline APIs, five-hub navigation, nested Settings, action-first Overview, Career Toolkit, responsive mobile pipeline, DESIGN.md, and fixture-only `/demo` (2026-07-20; 1,191 tests, migration verification, lint, and production build passed locally)
 - [x] KN-FU1: GET privacy-blanking regression tests (0907d5b)

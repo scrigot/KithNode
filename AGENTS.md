@@ -50,6 +50,10 @@ npm run db:seed      # Seed test data
 - SessionProvider in `src/app/providers.tsx` wraps app layout
 
 ## Gotchas
+- The authenticated product now uses a light, six-workspace shell: Home, People, Companies, Applications, Documents, and Research. Keep legacy dashboard routes as compatibility redirects instead of restoring duplicate navigation.
+- `/api/applications` is the canonical generalized application interface. `/api/opportunities` remains a one-release compatibility adapter and must preserve the same authenticated UUID ownership.
+- Product-layer tables (`Organization`, `PersonOrganization`, `CareerDocument*`, `SavedCrmView`, `MemoryCorrection`, `KnowledgeSource`, and `AutomatedAssociationAudit`) are server-only: RLS enabled, browser roles revoked, and service-role access through authenticated routes.
+- Avoid large PostgREST `.in(...)` filters for organization hydration. Fetch tenant-scoped association rows with `fetchAllRows()` and filter locally; 500 UUIDs can exceed request URL limits and silently zero relationship counts if errors are ignored.
 - Next.js 16 removed `next lint` — use `eslint src` instead
 - Tailwind v4 uses `@import "tailwindcss"` not `@tailwind base/components/utilities`
 - `create-next-app` refuses to run in directories with existing files

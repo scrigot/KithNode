@@ -9,6 +9,7 @@ import {
   organizationNameKey,
 } from "@/lib/product-records";
 import { supabase } from "@/lib/supabase";
+import { fetchAllRows } from "@/lib/supabase-paginate";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -34,16 +35,41 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const ids = (organizations || []).map((organization) => organization.id);
-  const [{ data: people = [] }, { data: applications = [] }] = ids.length
-    ? await Promise.all([
-        supabase.from("PersonOrganization").select("organizationId,contactId,isCurrent").eq("userId", userId).in("organizationId", ids),
-        supabase.from("Opportunity").select("organizationId,status").eq("userId", userId).in("organizationId", ids),
-      ])
-    : [{ data: [] }, { data: [] }];
-
-  const peopleRows = people || [];
-  const applicationRows = applications || [];
+  const organizationIds = new Set((organizations || []).map((organization) => organization.id));
+  let peopleRows: Array<{ organizationId: string; contactId: string; isCurrent: boolean }> = [];
+  let applicationRows: Array<{ organizationId: string | null; status: string }> = [];
+  if (organizationIds.size) {
+    try {
+      [peopleRows, applicationRows] = await Promise.all([
+        fetchAllRows<{ organizationId: string; contactId: string; isCurrent: boolean }>(() =>
+          supabase
+            .from("PersonOrganization")
+            .select("organizationId,contactId,isCurrent")
+            .eq("userId", userId)
+            .order("id"),
+        ),
+        fetchAllRows<{ organizationId: string | null; status: string }>(() =>
+          supabase
+            .from("Opportunity")
+            .select("organizationId,status")
+            .eq("userId", userId)
+            .order("id"),
+        ),
+      ]);
+      peopleRows = peopleRows.filter((item) => organizationIds.has(item.organizationId));
+      applicationRows = applicationRows.filter(
+        (item): item is { organizationId: string; status: string } =>
+          Boolean(item.organizationId && organizationIds.has(item.organizationId)),
+      );
+    } catch {
+      return routeError(
+        "Company relationships are temporarily unavailable.",
+        503,
+        "organization_relationships_unavailable",
+        "Retry in a moment. No people or applications were changed.",
+      );
+    }
+  }
   const hydrated = (organizations || []).map((organization) => ({
     ...organization,
     peopleCount: peopleRows.filter((item) => item.organizationId === organization.id).length,
