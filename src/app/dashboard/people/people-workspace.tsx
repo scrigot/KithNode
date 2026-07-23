@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Building2, Pencil, Plus, UserRound, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import {
+  countPeopleViews,
+  PEOPLE_VIEW_COPY,
+  personMatchesView,
+  type PeopleView,
+  sortPeopleForView,
+} from "@/lib/people-views";
 import { EmptyWorkspace, QuietButton, RecordTable, SearchField, WorkspaceContent } from "@/components/product-workspace";
 import { StatusBadge, WorkspaceError, WorkspaceHeader, WorkspaceLoading } from "@/components/workspace-ui";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -24,7 +31,7 @@ type Person = {
 export function PeopleWorkspace() {
   const [people, setPeople] = useState<Person[]>([]);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"all" | "warm" | "needs_info">("all");
+  const [view, setView] = useState<PeopleView>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -52,13 +59,14 @@ export function PeopleWorkspace() {
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return people.filter((person) => {
-      if (view === "warm" && !["kith", "warm", "hot"].includes((person.relationship_class || person.score?.tier || "").toLowerCase())) return false;
-      if (view === "needs_info" && !person.needs_info) return false;
+    const matches = people.filter((person) => {
+      if (!personMatchesView(person, view)) return false;
       if (!needle) return true;
       return [person.name, person.title, person.company?.name, person.linkedin_location].some((value) => value?.toLowerCase().includes(needle));
     });
+    return sortPeopleForView(matches, view);
   }, [people, query, view]);
+  const viewCounts = useMemo(() => countPeopleViews(people), [people]);
 
   async function openPerson(person: Person) {
     setEditing(person);
@@ -108,17 +116,30 @@ export function PeopleWorkspace() {
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-3 sm:flex-row sm:items-center">
           <SearchField value={query} onChange={setQuery} placeholder="Search name, organization, role, or location" label="Search people" />
           <div className="flex gap-1 rounded-lg bg-surface-soft p-1">
-            {(["all", "warm", "needs_info"] as const).map((option) => (
+            {(Object.keys(PEOPLE_VIEW_COPY) as PeopleView[]).map((option) => (
               <button
                 key={option}
                 type="button"
                 onClick={() => setView(option)}
+                aria-pressed={view === option}
+                aria-label={`${PEOPLE_VIEW_COPY[option].label}, ${viewCounts[option]} people`}
                 className={`min-h-9 rounded-md px-3 text-sm font-medium ${view === option ? "bg-white text-text-primary shadow-sm" : "text-text-secondary"}`}
               >
-                {option === "all" ? "All people" : option === "warm" ? "Warm paths" : "Needs context"}
+                {PEOPLE_VIEW_COPY[option].label}
+                <span className="ml-1.5 text-xs tabular-nums text-text-muted">
+                  {viewCounts[option]}
+                </span>
               </button>
             ))}
           </div>
+        </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
+          <p className="text-sm text-text-secondary">
+            {PEOPLE_VIEW_COPY[view].description}
+          </p>
+          <p className="text-xs tabular-nums text-text-muted">
+            Showing {visible.length} of {viewCounts[view]}
+          </p>
         </div>
         {selectedIds.length ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary-soft px-4 py-3">
