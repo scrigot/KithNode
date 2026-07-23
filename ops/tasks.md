@@ -6,9 +6,15 @@
 ## Now (active)
 - [ ] [Product/Eng][G0] Beta launch prep (one real user today; beta this week)
 - [ ] [Product/Eng][G0] Deploy the DeepTutor-inspired product cutover, then run authenticated production smoke tests for Home, Companies, Applications, Documents, OAuth, AI, and browser-companion recovery.
-- [ ] [Product/Strategy][G0] Confirm the personal-AI-recruiting-agent premises, then complete the `/autoplan` CEO, design, engineering, and DX reviews.
+- [ ] [Product/Eng][G0] WA-00: Make local KithNode fixture-first and secret-free, with a guarded live mode and ≤15-minute golden-path setup.
+- [ ] [Product/Eng][G0] WA-01: Add user-owned relationship evidence, backfill private facts, and enforce two-user tenant isolation.
 
 ## Next
+- [ ] [Product/Eng][G0] WA-02: Replace warm-tier, warmth-score, affiliation-only, and same-firm heuristics with one canonical relationship classifier.
+- [ ] [Product/Eng][G0] WA-03: Add durable assistant runs and server-stored internship candidates.
+- [ ] [Product/Eng][G0] WA-04: Add idempotent preview, approval, atomic save, completion receipt, and ten-minute undo.
+- [ ] [Product/Eng][G0] WA-05: Integrate the safe Phase 0 workflow into Home and pass authenticated desktop/mobile/accessibility E2E.
+- [ ] [Product/Eng][G0] WA-06: Roll out to internal users, then one 10–20-student UNC cohort behind a feature flag.
 - [ ] [Growth][G0] Marketing Phase 0 wiring: source-tag the /waitlist (`?source=` capture) + add lead-magnet download to /waitlist/thanks. See `marketing/strategy.md`.
 - [ ] [People/Hiring][G0] Stand up the intern-ready ops kit (see `ops/scaling/`): run the week-1 setup checklist in `ops/scaling/README.md`.
 - [ ] [Sales][G0] Build the procurement answer-library Claude Project (FERPA / security questionnaire / SSO / DPA) per `ops/scaling/automation-map.md`.
@@ -23,6 +29,7 @@
 - [ ] [Product/Eng][G1] Evaluate LinkedIn OIDC beyond basic identity only after product access is approved.
 
 ## Done (recent; see build-log.md for detail)
+- [x] [Product/Strategy][G0] Complete `/autoplan` CEO, product-design, engineering, and connector/DX reviews for the personal AI recruiting agent; lock the warm-path internship Phase 0 plan and implementation gates (2026-07-23)
 - [x] [Product/Eng][G0] Make People saved views truthful and visibly distinct: alphabetical All people, relationship-only Warm paths, missing-data Needs context, with counts and explanations (2026-07-23; focused tests, typecheck, and lint passed)
 - [x] [Product/Eng][G0] DeepTutor-to-KithNode product transplant: light application shell, full Home Copilot, linked People/Companies/Applications/Documents/Research workspaces, functional Memory and Knowledge Center, category-card Settings, public demo/auth/error states, compatibility redirects, additive canonical-record migration, live organization backfill, and desktop/mobile QA (2026-07-23; 1,252 tests, typecheck, lint, migration verification, production build, and authenticated browser QA passed)
 - [x] [Product/Eng][G0] Guided Network Research release zero: intent-first Discover desk, private draft queue, transactional field-level commits with provenance, owner-safe shared overlays, removal of automated LinkedIn reads, and an owner-only no-DOM Chrome companion (2026-07-21; 1,191 tests, migration verification, lint, production build, and authenticated desktop/mobile visual QA passed)
