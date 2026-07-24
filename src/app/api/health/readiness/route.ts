@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-const EXPECTED_MIGRATION = "20260721200000";
+const EXPECTED_MIGRATION = "20260724110000";
 
 function projectRef(value: string | undefined) {
   if (!value) return null;
