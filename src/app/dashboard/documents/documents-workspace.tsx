@@ -39,6 +39,8 @@ const icons: Record<string, typeof FileText> = {
   meeting_brief: FilePenLine,
 };
 
+const DOCUMENT_PAGE_SIZE = 50;
+
 function documentHref(document: DocumentRecord) {
   const id = document.legacyId || document.id.split(":").at(-1) || document.id;
   if (document.type === "resume") return "/dashboard/resume";
@@ -57,6 +59,7 @@ export function DocumentsWorkspace() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<DocumentRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(DOCUMENT_PAGE_SIZE);
 
   async function load() {
     setLoading(true);
@@ -75,10 +78,18 @@ export function DocumentsWorkspace() {
   }
   useEffect(() => { void load(); }, []);
 
-  const visible = useMemo(() => {
+  const matchingDocuments = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return documents.filter((document) => (type === "all" || document.type === type) && (!needle || document.title.toLowerCase().includes(needle)));
   }, [documents, query, type]);
+  const visible = useMemo(
+    () => matchingDocuments.slice(0, visibleLimit),
+    [matchingDocuments, visibleLimit],
+  );
+
+  useEffect(() => {
+    setVisibleLimit(DOCUMENT_PAGE_SIZE);
+  }, [query, type]);
 
   async function createDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,6 +167,11 @@ export function DocumentsWorkspace() {
             {tabs.map(([value, label]) => <button key={value} type="button" onClick={() => setType(value)} className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-medium ${type === value ? "bg-primary-soft text-primary" : "text-text-secondary hover:bg-surface-soft"}`}>{label}</button>)}
           </div>
         </div>
+        {!loading && !error && documents.length ? (
+          <p className="px-1 text-right text-xs tabular-nums text-text-muted">
+            Showing {visible.length} of {matchingDocuments.length}
+          </p>
+        ) : null}
         {warning ? <div className="rounded-xl border border-warning/20 bg-warning-soft px-4 py-3 text-sm text-text-secondary">{warning}</div> : null}
         {loading ? <WorkspaceLoading label="Loading documents" /> : error ? <WorkspaceError message={error} onRetry={load} /> : !documents.length ? (
           <EmptyWorkspace
@@ -182,6 +198,20 @@ export function DocumentsWorkspace() {
               })}</tbody>
             </table>
             {!visible.length ? <div className="px-5 py-12 text-center text-sm text-text-secondary">No documents match this view.</div> : null}
+            {visible.length < matchingDocuments.length ? (
+              <div className="flex items-center justify-between gap-3 border-t border-border-soft px-4 py-3">
+                <p className="text-sm text-text-secondary">
+                  {matchingDocuments.length - visible.length} more documents match this view.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setVisibleLimit((current) => current + DOCUMENT_PAGE_SIZE)}
+                  className="min-h-10 rounded-lg border border-border bg-white px-4 text-sm font-medium text-text-primary hover:bg-surface-soft"
+                >
+                  Show 50 more
+                </button>
+              </div>
+            ) : null}
           </RecordTable>
         )}
       </WorkspaceContent>

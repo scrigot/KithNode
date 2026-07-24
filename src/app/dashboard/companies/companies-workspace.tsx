@@ -25,6 +25,8 @@ type Organization = {
   activeApplicationCount: number;
 };
 
+const ORGANIZATION_PAGE_SIZE = 50;
+
 export function CompaniesWorkspace() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [query, setQuery] = useState("");
@@ -33,6 +35,7 @@ export function CompaniesWorkspace() {
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(ORGANIZATION_PAGE_SIZE);
 
   async function load() {
     setLoading(true);
@@ -53,12 +56,20 @@ export function CompaniesWorkspace() {
     void load();
   }, [type]);
 
-  const visible = useMemo(() => {
+  const matchingOrganizations = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return needle
       ? organizations.filter((organization) => [organization.name, organization.industry, organization.location].some((value) => value?.toLowerCase().includes(needle)))
       : organizations;
   }, [organizations, query]);
+  const visible = useMemo(
+    () => matchingOrganizations.slice(0, visibleLimit),
+    [matchingOrganizations, visibleLimit],
+  );
+
+  useEffect(() => {
+    setVisibleLimit(ORGANIZATION_PAGE_SIZE);
+  }, [query, type]);
 
   async function addOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,6 +116,11 @@ export function CompaniesWorkspace() {
             <option value="other">Other</option>
           </select>
         </div>
+        {!loading && !error && organizations.length ? (
+          <p className="px-1 text-right text-xs tabular-nums text-text-muted">
+            Showing {visible.length} of {matchingOrganizations.length}
+          </p>
+        ) : null}
         {adding ? (
           <form onSubmit={addOrganization} className="grid gap-3 rounded-2xl border border-primary/20 bg-primary-soft p-4 sm:grid-cols-2 lg:grid-cols-4">
             <label><FieldLabel>Name</FieldLabel><input name="name" required className="min-h-10 w-full rounded-lg border border-border bg-white px-3 text-sm" /></label>
@@ -137,10 +153,20 @@ export function CompaniesWorkspace() {
                 </tr>;
               })}</tbody>
             </table>
+            {!visible.length ? <div className="px-5 py-12 text-center text-sm text-text-secondary">No organizations match this search.</div> : null}
+            {visible.length < matchingOrganizations.length ? (
+              <div className="flex items-center justify-between gap-3 border-t border-border-soft px-4 py-3">
+                <p className="text-sm text-text-secondary">
+                  {matchingOrganizations.length - visible.length} more organizations match this view.
+                </p>
+                <QuietButton onClick={() => setVisibleLimit((current) => current + ORGANIZATION_PAGE_SIZE)}>
+                  Show 50 more
+                </QuietButton>
+              </div>
+            ) : null}
           </RecordTable>
         )}
       </WorkspaceContent>
     </div>
   );
 }
-

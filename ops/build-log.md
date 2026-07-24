@@ -105,6 +105,14 @@
     - a5aefdb feat(dashboard): Supabase-style nav shell — full-width topbar, nav-only sidebar, credits on Usage
     - c5636ae feat(outreach): in-app Draft Outreach popup with mutual-signal highlighting
     - 8184ea2 docs(spec): in-app outreach popup design
+
+### 2026-07-24 — Trusted agent production hardening and QA
+- Grounded Home chat in canonical Applications records, so questions about a saved application cite its actual stage, priority, deadline, next action, official source, resume, and linked contacts instead of starting a fresh opportunity search.
+- Kept undergraduate opportunity discovery student-first while separating explicit discovery from questions about already saved or tracked records.
+- Upgraded Auth.js, Next.js, Prisma, and supporting packages; production dependency findings fell from 15 (2 critical) to 5 (0 critical). Remaining findings are upstream build-tool advisories without a compatible runtime patch.
+- Completed signed-in desktop/mobile checks for Home, Applications, People, Companies, Documents, Research, Command/Ctrl+Enter, and the exact Scale AI saved-application question.
+- Bounded large People, Companies, and Documents views to 50 records at a time with truthful matching counts and explicit “show more” controls for faster rendering and saner keyboard/screen-reader navigation.
+- Verified 153 test files passed and 3 skipped (1,259 tests passed, 4 skipped), with typecheck, lint, production build, and diff checks passing.
     - 5457105 fix(onboarding): give grad year its own column, stop clobbering target date
     - 7a62b2c fix(onboarding): restore beta trial + unblock the onboarding flow
     - fe7f10c docs(ops): landing Cluely-rebuild spec

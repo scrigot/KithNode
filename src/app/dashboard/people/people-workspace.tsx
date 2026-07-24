@@ -32,6 +32,8 @@ type Person = {
   notes?: string;
 };
 
+const PEOPLE_PAGE_SIZE = 50;
+
 export function PeopleWorkspace() {
   const [people, setPeople] = useState<Person[]>([]);
   const [query, setQuery] = useState("");
@@ -41,6 +43,7 @@ export function PeopleWorkspace() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editing, setEditing] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(PEOPLE_PAGE_SIZE);
 
   async function load() {
     setLoading(true);
@@ -61,7 +64,7 @@ export function PeopleWorkspace() {
     void load();
   }, []);
 
-  const visible = useMemo(() => {
+  const matchingPeople = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matches = people.filter((person) => {
       if (!personMatchesView(person, view)) return false;
@@ -70,7 +73,12 @@ export function PeopleWorkspace() {
     });
     return sortPeopleForView(matches, view);
   }, [people, query, view]);
+  const visible = useMemo(() => matchingPeople.slice(0, visibleLimit), [matchingPeople, visibleLimit]);
   const viewCounts = useMemo(() => countPeopleViews(people), [people]);
+
+  useEffect(() => {
+    setVisibleLimit(PEOPLE_PAGE_SIZE);
+  }, [query, view]);
 
   async function openPerson(person: Person) {
     setEditing(person);
@@ -142,7 +150,7 @@ export function PeopleWorkspace() {
             {PEOPLE_VIEW_COPY[view].description}
           </p>
           <p className="text-xs tabular-nums text-text-muted">
-            Showing {visible.length} of {viewCounts[view]}
+            Showing {visible.length} of {matchingPeople.length}
           </p>
         </div>
         {selectedIds.length ? (
@@ -211,6 +219,16 @@ export function PeopleWorkspace() {
               </tbody>
             </table>
             {!visible.length ? <div className="px-5 py-12 text-center text-sm text-text-secondary"><UserRound className="mx-auto mb-3 h-5 w-5" />No people match this view.</div> : null}
+            {visible.length < matchingPeople.length ? (
+              <div className="flex items-center justify-between gap-3 border-t border-border-soft px-4 py-3">
+                <p className="text-sm text-text-secondary">
+                  {matchingPeople.length - visible.length} more people match this view.
+                </p>
+                <QuietButton onClick={() => setVisibleLimit((current) => current + PEOPLE_PAGE_SIZE)}>
+                  Show 50 more
+                </QuietButton>
+              </div>
+            ) : null}
           </RecordTable>
         )}
       </WorkspaceContent>
