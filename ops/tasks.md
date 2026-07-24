@@ -5,11 +5,11 @@
 
 ## Now (active)
 - [ ] [Product/Eng][G0] Beta launch prep (one real user today; beta this week)
-- [ ] [Product/Eng][G0] Deploy the DeepTutor-inspired product cutover, then run authenticated production smoke tests for Home, Companies, Applications, Documents, OAuth, AI, and browser-companion recovery.
 - [ ] [Product/Eng][G0] WA-00: Make local KithNode fixture-first and secret-free, with a guarded live mode and ≤15-minute golden-path setup.
 - [ ] [Product/Eng][G0] WA-05: Run signed-in desktop/mobile/accessibility browser QA for the Home internship → verified warm path → approval → Applications → undo workflow after the code cutover deploys.
 
 ## Next
+- [ ] [Security/Eng][G0] Upgrade and regression-test the production dependency tree: `npm audit --omit=dev` currently reports 15 findings (2 critical in Auth.js/next-auth, 5 high including Next.js); do not use force upgrades without auth, middleware, build, and browser regression coverage.
 - [ ] [Product/Eng][G0] WA-06: Roll out to internal users, then one 10–20-student UNC cohort behind a feature flag.
 - [ ] [Growth][G0] Marketing Phase 0 wiring: source-tag the /waitlist (`?source=` capture) + add lead-magnet download to /waitlist/thanks. See `marketing/strategy.md`.
 - [ ] [People/Hiring][G0] Stand up the intern-ready ops kit (see `ops/scaling/`): run the week-1 setup checklist in `ops/scaling/README.md`.
@@ -25,6 +25,7 @@
 - [ ] [Product/Eng][G1] Evaluate LinkedIn OIDC beyond basic identity only after product access is approved.
 
 ## Done (recent; see build-log.md for detail)
+- [x] [Product/Eng][G0] Deploy the DeepTutor-inspired product cutover and trusted internship/warm-path agent to production; configure canonical environment readiness, repair large-network relationship lookups, and make Applications saves canonical across tracking URLs without downgrading user-authored stage, priority, notes, deadline, or next action. Production now discovers five official student opportunities, finds verified contacts, reuses the tracked Scale AI record exactly once, and provides recorded reversible mutations (2026-07-24; 1,258 tests, 4 skipped, migration reconstruction and both transaction verifiers, typecheck, lint, production build, readiness, signed-in Home/Applications smoke, and public landing/demo checks passed)
 - [x] [Product/Eng][G0] WA-01–04 trusted internship agent kernel: user-owned relationship evidence, one conservative verified/potential classifier shared by People and Copilot, durable server-stored candidates, official-source student eligibility, evidence-backed action previews, idempotent atomic save, verified-contact attachment, receipts, denial, and undo. Additive production migrations deployed with RLS and service-role-only grants (2026-07-23; local reconstruction and transaction verifier, live Scale AI/Databricks smoke, 1,256 tests, typecheck, lint, production build, hosted schema/grant/function/advisor verification passed)
 - [x] [Product/Strategy][G0] Complete `/autoplan` CEO, product-design, engineering, and connector/DX reviews for the personal AI recruiting agent; lock the warm-path internship Phase 0 plan and implementation gates (2026-07-23)
 - [x] [Product/Eng][G0] Make People saved views truthful and visibly distinct: alphabetical All people, relationship-only Warm paths, missing-data Needs context, with counts and explanations (2026-07-23; focused tests, typecheck, and lint passed)
