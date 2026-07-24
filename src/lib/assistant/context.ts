@@ -9,10 +9,17 @@ function rows<T>(operation: string, result: { data: T[] | null; error: { message
 }
 
 export async function buildAssistantContext(userId: string) {
-  const [userResult, goalResult, pipelineResult, memoryResult, recommendationResult, connectedCalendars] = await Promise.all([
+  const [userResult, goalResult, pipelineResult, applicationResult, memoryResult, recommendationResult, connectedCalendars] = await Promise.all([
     supabase.from("User").select("name,university,graduationYear,targetIndustries,targetFirms,targetLocations,onboardingGoal,onboardingTimeline").eq("id", userId).maybeSingle(),
     supabase.from("CareerGoal").select("*").eq("userId", userId).eq("status", "active").order("priority", { ascending: false }).order("updatedAt", { ascending: false }).limit(10),
     supabase.from("PipelineEntry").select("id,contactId,pipelineId,stage,notes,lastTouchAt,updatedAt").eq("userId", userId).order("updatedAt", { ascending: false }).limit(30),
+    supabase
+      .from("Opportunity")
+      .select("id,company,role,location,workMode,jobUrl,applyUrl,source,status,priority,opportunityType,season,notes,nextAction,nextActionDue,appliedAt,lastActivityAt,fitScore,networkScore,matchReasons,sourceFreshAt,postedAt,deadline,resumeId,organizationId,details,createdAt,updatedAt")
+      .eq("userId", userId)
+      .neq("status", "archived")
+      .order("lastActivityAt", { ascending: false })
+      .limit(50),
     supabase.from("AssistantMemory").select("*").eq("userId", userId).eq("active", true).order("updatedAt", { ascending: false }).limit(20),
     supabase.from("Recommendation").select("*").eq("userId", userId).eq("status", "open").order("dueAt", { ascending: true }).order("createdAt", { ascending: false }).limit(10),
     connectedCalendarContext(userId).catch(() => []),
@@ -32,6 +39,7 @@ export async function buildAssistantContext(userId: string) {
     user: userResult.data,
     goals: rows("load goals", goalResult),
     pipeline: pipeline.map((entry) => ({ ...entry, contact: contacts.get(String(entry.contactId)) || null, pipeline: pipelines.get(String(entry.pipelineId)) || null })),
+    applications: rows("load applications", applicationResult),
     memories: rows("load memories", memoryResult),
     existingRecommendations: rows("load recommendations", recommendationResult),
     connectedCalendars,
