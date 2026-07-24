@@ -265,6 +265,234 @@ rollback;
 SQL
 echo "assistant action transaction passed"
 
+# Prove a tracked official listing is matched across URL tracking parameters,
+# preserves the user's richer pipeline state, and reverses only links created
+# by this action.
+psql -d "$VERIFY_DB" -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
+begin;
+
+insert into public."AlumniContact" (
+  id, name, "firmName", title, "linkedInUrl", university, "graduationYear",
+  "importedByUserId", source
+) values (
+  'verify-existing-contact',
+  'Existing Flow Contact',
+  'Scale AI',
+  'Applied AI Engineer',
+  'https://www.linkedin.com/in/kithnode-existing-flow-contact',
+  'UNC Chapel Hill',
+  2024,
+  'verify-existing-user',
+  'manual'
+);
+
+insert into public."Opportunity" (
+  id, "userId", company, "companyKey", role, location, "workMode", "jobUrl",
+  source, "externalId", status, priority, "opportunityType", notes, "nextAction",
+  "lastActivityAt", "createdAt", "updatedAt"
+) values (
+  'verify-existing-opportunity',
+  'verify-existing-user',
+  'Scale AI',
+  'scale-ai',
+  'Applied AI Intern',
+  'Hybrid',
+  'hybrid',
+  'https://job-boards.greenhouse.io/scaleai/jobs/verify-existing?gh_src=campus',
+  'manual',
+  '',
+  'preparing',
+  'high',
+  'internship',
+  'Keep this user-authored note.',
+  'Tailor resume, then apply.',
+  now() - interval '1 day',
+  now() - interval '1 day',
+  now() - interval '1 day'
+);
+
+insert into public."AssistantResult" (
+  id, "runId", "userId", "skillId", status, payload, "sourceFreshAt", "expiresAt"
+) values (
+  'verify-existing-result',
+  'verify-existing-run',
+  'verify-existing-user',
+  'find_internships',
+  'ready',
+  jsonb_build_object(
+    'cards',
+    jsonb_build_array(
+      jsonb_build_object(
+        'id', 'greenhouse:scale-ai:verify-existing',
+        'data', jsonb_build_object(
+          'opportunity', jsonb_build_object(
+            'company', 'Scale AI',
+            'role', 'Applied AI Intern',
+            'location', 'San Francisco, CA',
+            'workMode', 'hybrid',
+            'jobUrl', 'https://job-boards.greenhouse.io/scaleai/jobs/verify-existing',
+            'applyUrl', 'https://job-boards.greenhouse.io/scaleai/jobs/verify-existing',
+            'source', 'greenhouse',
+            'externalId', 'verify-existing',
+            'description', 'Canonical listing for an already tracked application.',
+            'fitScore', 91,
+            'networkScore', 14,
+            'matchReasons', jsonb_build_array('Applied AI matches approved evidence'),
+            'postedAt', now(),
+            'opportunityType', 'internship',
+            'season', 'Summer 2027'
+          ),
+          'relationships', jsonb_build_array(
+            jsonb_build_object(
+              'contactId', 'verify-existing-contact',
+              'state', 'verified',
+              'confidence', 1,
+              'evidence', jsonb_build_array('User confirmed this relationship.')
+            )
+          )
+        )
+      )
+    )
+  ),
+  now(),
+  now() + interval '1 day'
+);
+
+insert into public."AssistantToolCall" (
+  id, "runId", "userId", "toolName", input, status, "riskLevel", "requiresApproval"
+) values (
+  'verify-existing-tool',
+  'verify-existing-run',
+  'verify-existing-user',
+  'save_opportunity',
+  jsonb_build_object(
+    'resultId', 'verify-existing-result',
+    'candidateId', 'greenhouse:scale-ai:verify-existing'
+  ),
+  'proposed',
+  'write',
+  true
+);
+
+insert into public."AssistantApproval" (
+  id, "toolCallId", "userId", status
+) values (
+  'verify-existing-approval',
+  'verify-existing-tool',
+  'verify-existing-user',
+  'pending'
+);
+
+insert into public."AssistantAction" (
+  id, "userId", "runId", "resultId", "toolCallId", "actionType",
+  status, "idempotencyKey", preview, input
+) values (
+  'verify-existing-action',
+  'verify-existing-user',
+  'verify-existing-run',
+  'verify-existing-result',
+  'verify-existing-tool',
+  'save_opportunity',
+  'previewed',
+  'verify-existing-run:save-opportunity:verify-existing',
+  jsonb_build_object('consequence', 'Reuses the tracked Applications record.'),
+  jsonb_build_object(
+    'resultId', 'verify-existing-result',
+    'candidateId', 'greenhouse:scale-ai:verify-existing'
+  )
+);
+
+do $existing_action_test$
+declare
+  save_receipt jsonb;
+  undo_receipt jsonb;
+  tracked public."Opportunity"%rowtype;
+begin
+  save_receipt := public.execute_save_opportunity_action(
+    'verify-existing-user',
+    'verify-existing-tool'
+  );
+
+  if coalesce((save_receipt->>'created')::boolean, true) is not false then
+    raise exception 'canonical save reported created=true for an existing listing';
+  end if;
+  if save_receipt->>'opportunityId' <> 'verify-existing-opportunity' then
+    raise exception 'canonical save selected opportunity %, expected existing record',
+      save_receipt->>'opportunityId';
+  end if;
+  if coalesce((save_receipt->>'undoAvailable')::boolean, false) is not true then
+    raise exception 'new verified relationship was not recorded as reversible';
+  end if;
+
+  select * into tracked
+  from public."Opportunity"
+  where id = 'verify-existing-opportunity';
+  if tracked.status <> 'preparing'
+    or tracked.priority <> 'high'
+    or tracked.notes <> 'Keep this user-authored note.'
+    or tracked."nextAction" <> 'Tailor resume, then apply.'
+    or tracked."jobUrl" <> 'https://job-boards.greenhouse.io/scaleai/jobs/verify-existing?gh_src=campus' then
+    raise exception 'canonical save changed user-authored application state';
+  end if;
+  if (
+    select count(*)
+    from public."Opportunity"
+    where "userId" = 'verify-existing-user'
+  ) <> 1 then
+    raise exception 'canonical save created a duplicate application';
+  end if;
+  if (
+    select count(*)
+    from public."OpportunityContact"
+    where "userId" = 'verify-existing-user'
+      and "opportunityId" = 'verify-existing-opportunity'
+      and "contactId" = 'verify-existing-contact'
+  ) <> 1 then
+    raise exception 'canonical save did not attach the new verified relationship';
+  end if;
+
+  undo_receipt := public.undo_assistant_action(
+    'verify-existing-user',
+    'verify-existing-action'
+  );
+  if coalesce((undo_receipt->>'undone')::boolean, false) is not true then
+    raise exception 'existing-record undo receipt is missing undone=true';
+  end if;
+  if not exists (
+    select 1
+    from public."Opportunity"
+    where id = 'verify-existing-opportunity'
+      and status = 'preparing'
+      and priority = 'high'
+      and notes = 'Keep this user-authored note.'
+  ) then
+    raise exception 'undo deleted or changed the pre-existing application';
+  end if;
+  if exists (
+    select 1
+    from public."OpportunityContact"
+    where "userId" = 'verify-existing-user'
+      and "opportunityId" = 'verify-existing-opportunity'
+      and "contactId" = 'verify-existing-contact'
+  ) then
+    raise exception 'undo left the relationship created by the assistant action';
+  end if;
+  if exists (
+    select 1
+    from public."OpportunityEvent"
+    where "userId" = 'verify-existing-user'
+      and "opportunityId" = 'verify-existing-opportunity'
+      and meta->>'assistantActionId' = 'verify-existing-action'
+  ) then
+    raise exception 'undo left the event created by the assistant action';
+  end if;
+end
+$existing_action_test$;
+
+rollback;
+SQL
+echo "canonical assistant save transaction passed"
+
 DRIFT_FILE="${TMPDIR:-/tmp}/kithnode-prisma-drift-${$}.sql"
 DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${VERIFY_DB}" \
   npx prisma migrate diff --from-config-datasource --to-schema "$ROOT/prisma/schema.prisma" --script >"$DRIFT_FILE"

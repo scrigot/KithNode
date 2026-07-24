@@ -763,9 +763,11 @@ export function CareerCopilotWorkspace({
                             <a href={`/dashboard/resume?opportunityId=${encodeURIComponent(savedOpportunityId)}`} className="flex min-h-10 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 text-xs font-semibold text-primary">
                               <BriefcaseBusiness size={13} />Tailor resume
                             </a>
-                            <button type="button" disabled={actionBusy} onClick={() => undoAction(saveAction)} className="min-h-10 rounded-lg border border-border bg-white px-3 text-xs font-medium text-text-secondary disabled:opacity-50">
-                              {actionBusy ? "Undoing…" : "Undo save"}
-                            </button>
+                            {saveAction.output?.undoAvailable !== false ? (
+                              <button type="button" disabled={actionBusy} onClick={() => undoAction(saveAction)} className="min-h-10 rounded-lg border border-border bg-white px-3 text-xs font-medium text-text-secondary disabled:opacity-50">
+                                {actionBusy ? "Undoing…" : "Undo save"}
+                              </button>
+                            ) : null}
                           </>
                         ) : null}
                         {saveAction?.status === "denied" ? <span className="self-center text-xs text-text-secondary">Save dismissed</span> : null}
