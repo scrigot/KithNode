@@ -108,7 +108,20 @@ export function inferCareerSkill(message: string, context: { isCurrentUndergradu
   const slash = parseSlashSkill(message);
   if (slash) return slash.id;
   const text = message.toLowerCase();
-  if (/\b(?:internships?|co[- ]?ops?|externships?|off[- ]cycle|summer analyst|insight weeks?|sophomore (?:leadership|program))\b/.test(text)) return "find_internships";
+  const asksAboutTrackedApplication =
+    /\b(?:my|saved|tracked|existing|current)\s+(?:application|opportunity|internship|job)\b/.test(text) ||
+    /\b(?:application|opportunity)\s+(?:status|deadline|next action|notes?|timeline|contacts?|resume|materials?)\b/.test(text) ||
+    /\b(?:next action|status|deadline|notes?|timeline)\b/.test(text) && /\b(?:application|internship|job|opportunity)\b/.test(text);
+  const asksToDiscover =
+    /\b(?:find|search|discover|show|recommend|match|surface|suggest)\b/.test(text) ||
+    /\bwhat\b.*\b(?:should|could|can)\b.*\b(?:pursue|apply|target)\b/.test(text);
+  const mentionsStudentOpportunity =
+    /\b(?:internships?|co[- ]?ops?|externships?|off[- ]cycle|summer analyst|insight weeks?|sophomore (?:leadership|program))\b/.test(text);
+
+  // References to an existing application belong to the grounded conversational
+  // planner, even when the record itself is an internship. Discovery should only
+  // win when the user is actually asking KithNode to find new opportunities.
+  if (!asksAboutTrackedApplication && asksToDiscover && mentionsStudentOpportunity) return "find_internships";
   if (/\b(?:full[- ]?time|fte|experienced hire)\b/.test(text) && /find|match|show|opportunit|roles?|jobs?/.test(text)) return "find_jobs";
   if (context.isCurrentUndergraduate && /find|match|show|recommend/.test(text) && /opportunit(?:y|ies)|roles?|positions?|openings?/.test(text)) return "find_internships";
   if (/find|match|show/.test(text) && /jobs?|roles?|offers?/.test(text)) return "find_jobs";

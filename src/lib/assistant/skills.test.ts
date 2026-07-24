@@ -20,9 +20,12 @@ describe("career skill registry", () => {
   it("maps common natural-language requests to the same read skills", () => {
     expect(inferCareerSkill("Find internships for a college junior")).toBe("find_internships");
     expect(inferCareerSkill("Show me summer analyst roles")).toBe("find_internships");
+    expect(inferCareerSkill("What internships should I pursue?")).toBe("find_internships");
     expect(inferCareerSkill("Find opportunities for me", { isCurrentUndergraduate: true })).toBe("find_internships");
     expect(inferCareerSkill("Find full-time opportunities for me", { isCurrentUndergraduate: true })).toBe("find_jobs");
     expect(inferCareerSkill("Find job offers based on my profile")).toBe("find_jobs");
+    expect(inferCareerSkill("What is my next action for the Scale AI internship? Use my saved application data.")).toBeUndefined();
+    expect(inferCareerSkill("What is the deadline for my internship application?")).toBeUndefined();
     expect(inferCareerSkill("Which contacts need more info?")).toBe("enrichment_gaps");
     expect(inferCareerSkill("What firms do I need to meet more people at?")).toBe("firm_coverage");
   });
